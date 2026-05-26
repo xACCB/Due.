@@ -234,9 +234,9 @@ export default function HomeworkPlanner() {
     const pending=tasks.filter(t=>!t.done);
     if(pending.length===0){setSuggestion("Nothing left — you're all done! 🎉");return;}
     setSuggestionLoading(true);setSuggestion("");
-    const t=setTimeout(()=>{fetchAISuggestion(tasks,freeBlocks).then(s=>{setSuggestion(s);setSuggestionLoading(false);}).catch(()=>{setSuggestion("Start with your most urgent assignment!");setSuggestionLoading(false);});},700);
+    const t=setTimeout(()=>{fetchAISuggestion(tasks).then(s=>{setSuggestion(s);setSuggestionLoading(false);}).catch(()=>{setSuggestion("Start with your most urgent assignment!");setSuggestionLoading(false);});},700);
     return()=>clearTimeout(t);
-  },[tasks,freeBlocks]);
+  },[tasks]);
 
   // focus input when adding starts
   useEffect(()=>{if(adding){setTimeout(()=>inputRef.current?.focus(),50);}},[adding,step]);
@@ -1026,11 +1026,11 @@ export default function HomeworkPlanner() {
 
         {/* Tabs */}
         <div style={{display:"flex",gap:4,marginBottom:16,background:T.surface,borderRadius:11,padding:3}}>
-          {(["tasks","calendar","appearance","options"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"📋 Tasks",calendar:"📅 Cal",appearance:"🎨 Look",options:"⚙️ Settings"};
+          {(["tasks","appearance","options"] as const).map(id=>{
+            const labels:Record<string,string>={tasks:"📋 Tasks",appearance:"🎨 Look",options:"⚙️ Settings"};
             return <button key={id} onClick={()=>setActiveTab(id)} style={{flex:1,background:activeTab===id?T.card:"transparent",color:activeTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"7px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:activeTab===id?"500":"normal",position:"relative"}}>
               {labels[id]}
-              {id==="calendar"&&calSignedIn&&<span style={{position:"absolute",top:3,right:5,width:5,height:5,borderRadius:"50%",background:"#2ED573"}}/>}
+              {id==="calendar"&&false&&<span style={{position:"absolute",top:3,right:5,width:5,height:5,borderRadius:"50%",background:"#2ED573"}}/>}
             </button>;
           })}
         </div>
@@ -1193,19 +1193,6 @@ export default function HomeworkPlanner() {
           </div>
         </>}
 
-        {/* CALENDAR TAB */}
-        {activeTab==="calendar"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {GOOGLE_CLIENT_ID==="YOUR_CLIENT_ID_HERE"&&<div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.accent}44`}}>
-              <div style={{fontFamily:F.heading,fontSize:15,color:T.accent,marginBottom:8}}>⚙️ Setup needed</div>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,lineHeight:1.8}}>1. Go to <span style={{color:T.accent}}>console.cloud.google.com</span><br/>2. Enable "Google Calendar API"<br/>3. Create OAuth 2.0 Web Client credentials<br/>4. Add your Bolt URL to authorized origins<br/>5. Paste Client ID into App.tsx line 3</div>
-            </div>}
-            {!calSignedIn?(
-              <button onClick={signInWithGoogle} disabled={calLoading} style={{background:"#4285F4",color:"#fff",border:"none",borderRadius:11,padding:"13px 18px",fontFamily:F.body,fontSize:12,cursor:calLoading?"wait":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:9,opacity:calLoading?0.7:1}}>
-                <span style={{fontSize:16}}>📅</span>{calLoading?"Connecting...":"Sign in with Google Calendar"}
-              </button>
-            ):(
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:T.card,borderRadius:11,padding:"11px 14px",border:`1px solid #4285F444`}}>
         {/* APPEARANCE TAB */}
         {activeTab==="appearance"&&(
           <div style={{display:"flex",flexDirection:"column",gap:20}}>

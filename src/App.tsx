@@ -47,7 +47,7 @@ const THEMES = {
   shadow:      { name:"Shadow",      emoji:"👤", bg:"#0c0c0f", card:"#13131a", cardAlt:"#1a1a24", border:"#22222e", borderAccent:"#2a2a3a", text:"#c8c8d8", textMuted:"#6a6a88", textFaint:"#2a2a3a", accent:"#7070aa", surface:"#0f0f15" },
 } as const;
 type ThemeName = keyof typeof THEMES;
-type ThemeObj = typeof THEMES[ThemeName] & { accentGlow: string; gradientCard: string };
+type ThemeObj = Omit<typeof THEMES[ThemeName], "accent"> & { accent: string; accentGlow: string; gradientCard: string };
 
 const LAYOUTS = {
   list:      { name:"List",       emoji:"☰",  desc:"Classic cards" },

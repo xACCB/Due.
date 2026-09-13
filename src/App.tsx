@@ -358,8 +358,9 @@ export default function HomeworkPlanner() {
   const css=`
     @import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');
     *{box-sizing:border-box;}
-    body{margin:0;background:${T.accent}22;transition:background 0.4s;font-family:${F.body};}
-    html{background:${T.accent}22;}
+    body{margin:0;background:${T.bg};transition:background 0.4s;font-family:${F.body};}
+    html{background:${T.bg};}
+    .app-shell{min-height:100svh;min-height:100dvh;}
     .tc{transition:all 0.22s cubic-bezier(.34,1.2,.64,1);}
     .tc:hover{transform:translateY(-2px);filter:brightness(1.05);}
     .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
@@ -1073,13 +1074,13 @@ export default function HomeworkPlanner() {
 
   // Sync outer page background to theme
   useEffect(()=>{
-    document.body.style.background=T.accent+"22";
+    document.body.style.background=T.bg;
     document.body.style.transition="background 0.4s";
     return()=>{ document.body.style.background=""; };
   },[T.accent]);
 
   return (
-    <div className={"dl-"+desktopLayout} style={{minHeight:"100vh",background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s",borderLeft:`3px solid ${T.accent}55`,borderRight:`3px solid ${T.accent}55`,borderBottom:`3px solid ${T.accent}55`,borderTop:`3px solid ${T.accent}55`,borderRadius:pixelMode?0:0,boxShadow:pixelMode?`0 0 0 2px ${T.accent}, 0 0 0 4px ${T.bg}, 0 0 0 6px ${T.accent}44`:`0 0 60px ${T.accent}22, inset 0 0 30px ${T.accent}08`}}>
+    <div className={"app-shell dl-"+desktopLayout} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s",borderLeft:`3px solid ${T.accent}55`,borderRight:`3px solid ${T.accent}55`,borderBottom:`3px solid ${T.accent}55`,borderTop:`3px solid ${T.accent}55`,borderRadius:pixelMode?0:0,boxShadow:pixelMode?`0 0 0 2px ${T.accent}, 0 0 0 4px ${T.bg}, 0 0 0 6px ${T.accent}44`:`0 0 60px ${T.accent}22, inset 0 0 30px ${T.accent}08`}}>
       {pixelMode&&<div className="pixel-scanline"/>}
       {pixelMode&&<div style={{position:"fixed",inset:0,backgroundImage:`repeating-linear-gradient(0deg, ${T.accent}04 0px, transparent 1px, transparent 3px)`,pointerEvents:"none",zIndex:9998}}/>}
       <style>{css}</style>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
 
@@ -184,13 +184,6 @@ export default function HomeworkPlanner() {
       setFbUser(user);
       setFbLoading(false);
     });
-    // Catches errors from the redirect-based sign-in flow (the user is sent to
-    // Google's sign-in page and back -- any failure surfaces here, not through
-    // onAuthStateChanged, since there's no "popup" to reject in this flow).
-    getRedirectResult(auth).catch(e=>{
-      console.error(e);
-      setSignInError("Sign-in didn't go through. Please try again -- if it keeps happening, try leaving Private Browsing mode.");
-    });
     return unsub;
   },[]);
 
@@ -219,8 +212,11 @@ export default function HomeworkPlanner() {
 
   async function signInWithFirebase(){
     setSignInError(null);
-    try{ await signInWithRedirect(auth,googleProvider); }
-    catch(e){ console.error(e); setSignInError("Couldn't start sign-in. Please try again."); }
+    try{ await signInWithPopup(auth,googleProvider); }
+    catch(e){
+      console.error(e);
+      setSignInError("Sign-in didn't go through. Please try again, and make sure pop-ups aren't blocked for this site.");
+    }
   }
   async function signOutFirebase(){
     await fbSignOut(auth);

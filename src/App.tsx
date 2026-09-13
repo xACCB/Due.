@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { User } from "firebase/auth";
 import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
 
@@ -184,6 +184,14 @@ export default function HomeworkPlanner() {
       setFbUser(user);
       setFbLoading(false);
     });
+    // Only relevant if signInWithFirebase had to fall back to the redirect
+    // method below (e.g. a browser that blocks/mishandles the popup) -- this
+    // is where any error from THAT flow surfaces, since there's no popup
+    // promise to catch in that case.
+    getRedirectResult(auth).catch(e=>{
+      console.error(e);
+      setSignInError("Sign-in didn't go through. Please try again.");
+    });
     return unsub;
   },[]);
 
@@ -212,10 +220,21 @@ export default function HomeworkPlanner() {
 
   async function signInWithFirebase(){
     setSignInError(null);
-    try{ await signInWithPopup(auth,googleProvider); }
-    catch(e){
-      console.error(e);
-      setSignInError("Sign-in didn't go through. Please try again, and make sure pop-ups aren't blocked for this site.");
+    try{
+      await signInWithPopup(auth,googleProvider);
+    } catch(e){
+      const code=(e as {code?:string})?.code||"";
+      // The browser blocked, killed, or doesn't support the popup -- fall back
+      // to a full-page redirect instead of just failing. Covers browsers like
+      // Arc that are known to be inconsistent about popups on mobile.
+      const popupIssue=["auth/popup-blocked","auth/popup-closed-by-user","auth/cancelled-popup-request","auth/operation-not-supported-in-this-environment"].includes(code);
+      if (popupIssue) {
+        try{ await signInWithRedirect(auth,googleProvider); }
+        catch(e2){ console.error(e2); setSignInError("Sign-in didn't go through. Please try again."); }
+      } else {
+        console.error(e);
+        setSignInError("Sign-in didn't go through. Please try again, and make sure pop-ups aren't blocked for this site.");
+      }
     }
   }
   async function signOutFirebase(){

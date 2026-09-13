@@ -21,7 +21,7 @@ const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 const googleProvider = new GoogleAuthProvider();
 
-// ─── THEMES (13 total) ────────────────────────────────────────────────────────
+// ─── THEMES (22 total) ────────────────────────────────────────────────────────
 const THEMES = {
   midnight:    { name:"Midnight",    emoji:"🌙", bg:"#0F0F1A", card:"#16162A", cardAlt:"#1e1e35", border:"#252540", borderAccent:"#2A2A50", text:"#EEE8D5", textMuted:"#888",   textFaint:"#555",   accent:"#F0A500", surface:"#1A1A2E" },
   nord:        { name:"Nord",        emoji:"❄️", bg:"#2E3440", card:"#3B4252", cardAlt:"#434C5E", border:"#4C566A", borderAccent:"#5E6E82", text:"#ECEFF4", textMuted:"#D8DEE9", textFaint:"#8894a8", accent:"#88C0D0", surface:"#3B4252" },
@@ -86,7 +86,7 @@ const FONTS = {
 } as const;
 type FontName = keyof typeof FONTS;
 
-const GROUP_BY = { none:{name:"None",emoji:"—"}, subject:{name:"Subject",emoji:"📚"}, priority:{name:"Priority",emoji:"🔥"}, dueDate:{name:"Due Date",emoji:"📅"} };
+const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:"📚"}, priority:{name:"Priority",emoji:"🔥"}, dueDate:{name:"Due Date",emoji:"📅"} };
 const SUBJECTS = ["Math","English","Science","History","Art","PE","Other"];
 const SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA",Other:"#F0A500" };
 const PRIORITY_COLORS: Record<string,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
@@ -123,14 +123,23 @@ function daysUntil(s:string):string|null {
 }
 
 async function fetchAISuggestion(tasks:Task[]):Promise<string> {
+  // NOTE: this used to call api.anthropic.com directly from the browser with no
+  // auth header, so it silently failed on every call. Calling a paid AI API from
+  // client-side code isn't secure anyway (the key would be visible to anyone),
+  // so this generates the suggestion locally from the task data instead.
   const pending=tasks.filter(t=>!t.done);
-  if (pending.length===0) return "Nothing left to do — great work! 🎉";
+  if (pending.length===0) return "Nothing left to do -- great work! 🎉";
   if (pending.length===1) return `Just one task left: "${pending[0].title}". You've got this! 💪`;
-  const today=new Date().toISOString().split("T")[0];
-  const taskList=pending.map((t,i)=>{ const days=t.dueDate?Math.ceil((new Date(t.dueDate).getTime()-Date.now())/86400000):null; return `${i+1}. "${t.title}" — ${t.subject}, due ${t.dueDate||"no date"} (${days!==null?days+" days away":"no deadline"}), est ${t.estMins}m${t.notes?`, note: ${t.notes}`:""}`;}).join("\n");
-  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:`You are a friendly homework coach. Today is ${today}. Pending:\n\n${taskList}\n\nShort warm 2-3 sentence suggestion on what to tackle first and why. Encouraging, mention task by name. Under 80 words, no bullets.`}]})});
-  const data=await res.json();
-  return data.content?.find((b:{type:string;text?:string})=>b.type==="text")?.text||"Start with your most urgent assignment!";
+  const sorted=[...pending].sort((a,b)=>{
+    const o:Record<string,number>={high:0,medium:1,low:2};
+    const d=o[getPriority(a.dueDate,a.estMins)]-o[getPriority(b.dueDate,b.estMins)];
+    return d!==0?d:(a.dueDate||"").localeCompare(b.dueDate||"");
+  });
+  const top=sorted[0];
+  const days=daysUntil(top.dueDate);
+  const timeStr=top.estMins>=60?`${Math.floor(top.estMins/60)}h${top.estMins%60?` ${top.estMins%60}m`:""}`:`${top.estMins} min`;
+  const urgencyPhrase=days==="Overdue!"?"it's overdue":days==="Due today!"?"it's due today":days==="Due tomorrow"?"it's due tomorrow":days?`it's due in ${days.replace(" days left"," days")}`:"it has no deadline yet";
+  return `Start with "${top.title}" -- ${urgencyPhrase} and should take about ${timeStr}. Knock that one out first and the rest gets easier!`;
 }
 
 export default function HomeworkPlanner() {
@@ -145,6 +154,12 @@ export default function HomeworkPlanner() {
   const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
   const [fontName,setFontName]=useState<FontName>(()=>(localStorage.getItem("hw-font") as FontName)||"dmSerif");
   useEffect(()=>{localStorage.setItem("hw-font",fontName);},[fontName]);
+  // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
+  // center column), "sidebar" (tabs move into a persistent left nav column). All of
+  // these only kick in above a min-width via CSS media queries, so phones/tablets
+  // always render the same single narrow column regardless of this setting.
+  const [desktopLayout,setDesktopLayout]=useState(()=>localStorage.getItem("hw-desktoplayout")||"narrow");
+  useEffect(()=>{localStorage.setItem("hw-desktoplayout",desktopLayout);},[desktopLayout]);
 
   useEffect(()=>{localStorage.setItem("hw-tasks",JSON.stringify(tasks));},[tasks]);
   useEffect(()=>{localStorage.setItem("hw-theme",themeName);},[themeName]);
@@ -205,9 +220,7 @@ export default function HomeworkPlanner() {
   const [adding,setAdding]=useState(false);
   const [step,setStep]=useState(0);
   const [newTask,setNewTask]=useState<Partial<Task>>({title:"",subject:"",dueDate:"",estMins:30,notes:""});
-  const [inputVal,setInputVal]=useState("");
-  const inputValRef=useRef(""); // mirrors inputVal without causing re-renders
-  const [animIn,setAnimIn]=useState(false); // kept for compatibility
+  const inputValRef=useRef("");
   const [filter,setFilter]=useState("all");
   const [suggestion,setSuggestion]=useState("");
   const [suggestionLoading,setSuggestionLoading]=useState(false);
@@ -215,7 +228,6 @@ export default function HomeworkPlanner() {
   const [activeSubject,setActiveSubject]=useState("all");
   const [pomodoroActive,setPomodoroActive]=useState(false);
   const [pomodoroSecs,setPomodoroSecs]=useState(25*60);
-  const [pomodoroTask,setPomodoroTask]=useState<Task|null>(null);
   const [timeHours,setTimeHours]=useState(0);
   const [timeMins,setTimeMins]=useState(30);
   const [timeSecs,setTimeSecs]=useState(0);
@@ -232,7 +244,7 @@ export default function HomeworkPlanner() {
 
   useEffect(()=>{
     const pending=tasks.filter(t=>!t.done);
-    if(pending.length===0){setSuggestion("Nothing left — you're all done! 🎉");return;}
+    if(pending.length===0){setSuggestion("Nothing left -- you're all done! 🎉");return;}
     setSuggestionLoading(true);setSuggestion("");
     const t=setTimeout(()=>{fetchAISuggestion(tasks).then(s=>{setSuggestion(s);setSuggestionLoading(false);}).catch(()=>{setSuggestion("Start with your most urgent assignment!");setSuggestionLoading(false);});},700);
     return()=>clearTimeout(t);
@@ -343,6 +355,16 @@ export default function HomeworkPlanner() {
     .sticky-note:hover{transform:rotate(0deg) scale(1.03);}
     .pomo-ring{animation:ring 1s linear infinite;}
     @keyframes ring{from{stroke-dashoffset:0}to{stroke-dashoffset:283}}
+    .app-inner{max-width:580px;margin:0 auto;padding:20px 14px;width:100%;box-sizing:border-box;}
+    @media (min-width:900px){
+      .dl-wide .app-inner{max-width:920px;}
+      .dl-sidebar .app-inner{max-width:1080px;padding:24px 28px;}
+      .dl-sidebar .app-body{display:flex;align-items:flex-start;gap:24px;}
+      .dl-sidebar .app-sidebar{width:168px;flex-shrink:0;position:sticky;top:24px;}
+      .dl-sidebar .app-main{flex:1;min-width:0;}
+      .dl-sidebar .app-sidebar .tab-bar{flex-direction:column;background:none!important;padding:0!important;gap:6px!important;}
+      .dl-sidebar .app-sidebar .tab-bar button{flex:none!important;justify-content:flex-start!important;text-align:left;padding:10px 12px!important;}
+    }
   ` + pixelCSS;
 
   // Session timer
@@ -426,7 +448,12 @@ export default function HomeworkPlanner() {
           {/* Avatar + name */}
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:32}}>
             <div style={{position:"relative",marginBottom:14}}>
-              <img src={fbUser.photoURL||""} alt="" style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:`3px solid ${T.accent}`}}/>
+              {fbUser.photoURL
+                ? <img src={fbUser.photoURL} alt="" style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:`3px solid ${T.accent}`}}/>
+                : <div style={{width:80,height:80,borderRadius:"50%",background:T.surface,border:`3px solid ${T.accent}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
+                  </div>
+              }
               <div style={{position:"absolute",bottom:2,right:2,width:16,height:16,borderRadius:"50%",background:"#2ED573",border:`2px solid ${T.bg}`}}/>
             </div>
             <div style={{fontFamily:F.heading,fontSize:24,color:T.text,marginBottom:4}}>{fbUser.displayName}</div>
@@ -972,7 +999,40 @@ export default function HomeworkPlanner() {
       );
     }
 
-    // default: list
+    // default: list -- this is also the only layout "Group Tasks By" applies to,
+    // since the other layouts (kanban, progress, pyramid, calendar...) already
+    // have their own built-in grouping and combining the two would conflict.
+    if (groupBy!=="none") {
+      const groups=new Map<string,Task[]>();
+      const order:string[]=[];
+      const keyFor=(t:Task)=>{
+        if (groupBy==="subject") return t.subject||"Other";
+        if (groupBy==="priority") return getPriority(t.dueDate,t.estMins);
+        return t.dueDate||"No date"; // dueDate
+      };
+      for (const t of tasks) {
+        const k=keyFor(t);
+        if (!groups.has(k)) { groups.set(k,[]); order.push(k); }
+        groups.get(k)!.push(t);
+      }
+      if (groupBy==="priority") order.sort((a,b)=>({high:0,medium:1,low:2} as Record<string,number>)[a]-({high:0,medium:1,low:2} as Record<string,number>)[b]);
+      if (groupBy==="dueDate") order.sort((a,b)=>a==="No date"?1:b==="No date"?-1:a.localeCompare(b));
+      const labelFor=(k:string)=>{
+        if (groupBy==="priority") return k==="high"?"🔴 High priority":k==="medium"?"🟡 Medium priority":"🟢 Low priority";
+        if (groupBy==="dueDate") return k==="No date"?k:formatDate(k);
+        return k; // subject
+      };
+      return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        {order.map(k=>(
+          <div key={k}>
+            <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{labelFor(k)} ({groups.get(k)!.length})</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)}/>)}
+            </div>
+          </div>
+        ))}
+      </div>;
+    }
     return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)}/>)}</div>;
   }
 
@@ -993,11 +1053,11 @@ export default function HomeworkPlanner() {
   },[T.accent]);
 
   return (
-    <div style={{minHeight:"100vh",background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s",borderLeft:`3px solid ${T.accent}55`,borderRight:`3px solid ${T.accent}55`,borderBottom:`3px solid ${T.accent}55`,borderTop:`3px solid ${T.accent}55`,borderRadius:pixelMode?0:0,boxShadow:pixelMode?`0 0 0 2px ${T.accent}, 0 0 0 4px ${T.bg}, 0 0 0 6px ${T.accent}44`:`0 0 60px ${T.accent}22, inset 0 0 30px ${T.accent}08`}}>
+    <div className={"dl-"+desktopLayout} style={{minHeight:"100vh",background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s",borderLeft:`3px solid ${T.accent}55`,borderRight:`3px solid ${T.accent}55`,borderBottom:`3px solid ${T.accent}55`,borderTop:`3px solid ${T.accent}55`,borderRadius:pixelMode?0:0,boxShadow:pixelMode?`0 0 0 2px ${T.accent}, 0 0 0 4px ${T.bg}, 0 0 0 6px ${T.accent}44`:`0 0 60px ${T.accent}22, inset 0 0 30px ${T.accent}08`}}>
       {pixelMode&&<div className="pixel-scanline"/>}
       {pixelMode&&<div style={{position:"fixed",inset:0,backgroundImage:`repeating-linear-gradient(0deg, ${T.accent}04 0px, transparent 1px, transparent 3px)`,pointerEvents:"none",zIndex:9998}}/>}
       <style>{css}</style>
-      <div style={{maxWidth:580,margin:"0 auto",padding:"20px 14px"}}>
+      <div className="app-inner">
 
         {/* Header */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
@@ -1024,16 +1084,19 @@ export default function HomeworkPlanner() {
         </div>
         <div style={{height:1,background:`linear-gradient(90deg,${T.accent},transparent)`,marginBottom:16}}/>
 
+        <div className="app-body">
+        <div className="app-sidebar">
         {/* Tabs */}
-        <div style={{display:"flex",gap:4,marginBottom:16,background:T.surface,borderRadius:11,padding:3}}>
+        <div className="tab-bar" style={{display:"flex",gap:4,marginBottom:16,background:T.surface,borderRadius:11,padding:3}}>
           {(["tasks","appearance","options"] as const).map(id=>{
             const labels:Record<string,string>={tasks:"📋 Tasks",appearance:"🎨 Look",options:"⚙️ Settings"};
             return <button key={id} onClick={()=>setActiveTab(id)} style={{flex:1,background:activeTab===id?T.card:"transparent",color:activeTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"7px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:activeTab===id?"500":"normal",position:"relative"}}>
               {labels[id]}
-              {id==="calendar"&&false&&<span style={{position:"absolute",top:3,right:5,width:5,height:5,borderRadius:"50%",background:"#2ED573"}}/>}
             </button>;
           })}
         </div>
+        </div>
+        <div className="app-main">
 
         {/* TASKS TAB */}
         {activeTab==="tasks"&&<>
@@ -1044,7 +1107,7 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                 <div style={{display:"flex",alignItems:"center",gap:7}}>
                   <span style={{fontSize:13}}>✨</span>
-                  <span style={{display:"inline-flex",alignItems:"center",background:T.accent+"22",border:`1px solid ${T.accent}55`,borderRadius:999,padding:"1px 9px",fontFamily:F.body,fontSize:9,color:T.accent}}>claude suggests</span>
+                  <span style={{display:"inline-flex",alignItems:"center",background:T.accent+"22",border:`1px solid ${T.accent}55`,borderRadius:999,padding:"1px 9px",fontFamily:F.body,fontSize:9,color:T.accent}}>smart suggestion</span>
                 </div>
                 <button onClick={()=>setShowSuggestion(false)} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px"}}>×</button>
               </div>
@@ -1054,7 +1117,7 @@ export default function HomeworkPlanner() {
           ):(
             <button onClick={()=>setShowSuggestion(true)} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:`1px dashed ${T.border}`,borderRadius:10,padding:"8px 14px",marginBottom:16,cursor:"pointer",width:"100%",color:T.textFaint,fontFamily:F.body,fontSize:11,transition:"all 0.15s"}}>
               <span style={{fontSize:12}}>✨</span>
-              <span>Show claude suggestion</span>
+              <span>Show smart suggestion</span>
             </button>
           )}
 
@@ -1146,34 +1209,29 @@ export default function HomeworkPlanner() {
                           <textarea
                             ref={inputRef as any}
                             defaultValue=""
-                            placeholder="Paste your rubric, instructions, or assignment details here... Claude will estimate how long it'll take! (or skip)"
+                            placeholder="Paste your rubric, instructions, or assignment details here... we'll estimate how long it'll take! (or skip)"
                             rows={5}
                             style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"11px 13px",fontFamily:F.body,fontSize:12,width:"100%",outline:"none",resize:"vertical",lineHeight:1.5}}
                           />
                           <div style={{display:"flex",gap:8}}>
-                            <button onClick={async()=>{
+                            <button onClick={()=>{
                               const rubric=(inputRef.current as any)?.value||"";
                               if(!rubric.trim()){finishTask({...newTask,notes:""} as Task);return;}
-                              // Show loading state
-                              const btn=document.getElementById("rubric-btn");
-                              if(btn){btn.textContent="Analysing...";(btn as HTMLButtonElement).disabled=true;}
-                              try {
-                                const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:200,messages:[{role:"user",content:`You are a homework time estimator. Given this assignment rubric/instructions, estimate how many minutes it will realistically take a student to complete. Consider reading, writing, research, and thinking time. Reply with ONLY a JSON object like: {"minutes": 45, "reason": "short explanation"}\n\nAssignment: "${newTask.title}"\nSubject: ${newTask.subject}\nRubric/Instructions:\n${rubric}`}]})});
-                                const data=await res.json();
-                                const text=data.content?.find((b:{type:string;text?:string})=>b.type==="text")?.text||"";
-                                const parsed=JSON.parse(text.replace(/```json|```/g,"").trim());
-                                // Update task with AI estimate and save rubric as notes
-                                finishTask({...newTask,estMins:parsed.minutes,notes:rubric} as Task);
-                              } catch {
-                                finishTask({...newTask,notes:rubric} as Task);
-                              }
+                              // Local word-count heuristic -- this used to call api.anthropic.com
+                              // directly from the browser with no auth header, so it always failed
+                              // and silently fell back anyway. This estimates from the text itself,
+                              // no network call needed, and never fails.
+                              const words=rubric.trim().split(/\s+/).length;
+                              const keywordBonus=/essay|research|report|paper/i.test(rubric)?20:0;
+                              const estMins=Math.max(10,Math.min(180,Math.round(words/12)*5+keywordBonus));
+                              finishTask({...newTask,estMins,notes:rubric} as Task);
                             }} id="rubric-btn"
                               style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"10px 16px",fontFamily:F.body,fontSize:12,cursor:"pointer",fontWeight:500,flex:1}}>
-                              ✨ Analyse &amp; estimate time
+                              ✨ Estimate time from text
                             </button>
                             <button className="chip" style={{background:"none",color:T.textFaint,border:`1px dashed ${T.border}`}} onClick={()=>finishTask({...newTask,notes:(inputRef.current as any)?.value||""} as Task)}>skip</button>
                           </div>
-                          <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,textAlign:"center"}}>Claude will read your rubric and auto-update the time estimate 🤖</div>
+                          <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,textAlign:"center"}}>Estimates time from your rubric's length -- paste it in or skip</div>
                         </div>
                       )}
                     </div>
@@ -1377,6 +1435,21 @@ export default function HomeworkPlanner() {
                 <button onClick={()=>{setPomodoroSecs(25*60);setPomodoroActive(false);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>↺ Reset</button>
               </div>
             </div>
+            {/* Desktop layout */}
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted}}>Desktop Layout</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+                {[{k:"narrow",l:"Narrow",d:"Centered column"},{k:"wide",l:"Wide",d:"Roomier column"},{k:"sidebar",l:"Sidebar",d:"Nav on the left"}].map(({k,l,d})=>(
+                  <button key={k} onClick={()=>setDesktopLayout(k)} style={{background:desktopLayout===k?T.accent+"22":T.surface,border:`1.5px solid ${desktopLayout===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:desktopLayout===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2,textAlign:"center"}}>
+                    <span style={{fontWeight:500}}>{l}</span>
+                    <span style={{fontSize:9,opacity:0.7}}>{d}</span>
+                  </button>
+                ))}
+              </div>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>
+                Only changes anything on wider screens -- phones always get the narrow view
+              </div>
+            </div>
             {/* Group by */}
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
               <div className="sl" style={{color:T.textMuted}}>Group Tasks By</div>
@@ -1395,7 +1468,7 @@ export default function HomeworkPlanner() {
               <Toggle on={pixelMode} onChange={setPixelMode}/>
             </div>
             <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-              <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show Claude suggestion</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>AI study tip at the top of tasks</div></div>
+              <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show smart suggestion</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Study tip at the top of tasks</div></div>
               <Toggle on={showSuggestion} onChange={setShowSuggestion}/>
             </div>
             <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
@@ -1417,6 +1490,8 @@ export default function HomeworkPlanner() {
             <button onClick={()=>{if(window.confirm("Clear all completed tasks?"))setTasks(prev=>prev.filter(t=>!t.done));}} style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:"#FF4757",fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>🗑 Clear completed tasks</button>
           </div>
         )}
+        </div>
+        </div>
       </div>
       {selectedTask&&<TaskModal/>}
       {showProfile&&<ProfileModal/>}

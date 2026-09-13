@@ -1,6 +1,6 @@
+import { useState, useEffect, useRef, useCallback } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
-import { useState, useEffect, useRef, useCallback } from "react";
 import type { User } from "firebase/auth";
 import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
 
@@ -190,7 +190,8 @@ export default function HomeworkPlanner() {
     // promise to catch in that case.
     getRedirectResult(auth).catch(e=>{
       console.error(e);
-      setSignInError("Sign-in didn't go through. Please try again.");
+      const code=(e as {code?:string})?.code||"unknown";
+      setSignInError(`Sign-in didn't go through (${code}). Please try again.`);
     });
     return unsub;
   },[]);
@@ -223,17 +224,16 @@ export default function HomeworkPlanner() {
     try{
       await signInWithPopup(auth,googleProvider);
     } catch(e){
-      const code=(e as {code?:string})?.code||"";
-      // The browser blocked, killed, or doesn't support the popup -- fall back
-      // to a full-page redirect instead of just failing. Covers browsers like
-      // Arc that are known to be inconsistent about popups on mobile.
-      const popupIssue=["auth/popup-blocked","auth/popup-closed-by-user","auth/cancelled-popup-request","auth/operation-not-supported-in-this-environment"].includes(code);
-      if (popupIssue) {
-        try{ await signInWithRedirect(auth,googleProvider); }
-        catch(e2){ console.error(e2); setSignInError("Sign-in didn't go through. Please try again."); }
-      } else {
-        console.error(e);
-        setSignInError("Sign-in didn't go through. Please try again, and make sure pop-ups aren't blocked for this site.");
+      const code=(e as {code?:string})?.code||"unknown";
+      // Whatever the reason the popup failed, fall back to a full-page
+      // redirect rather than just giving up -- covers browsers like Arc
+      // that are inconsistent about popups on mobile in ways that don't
+      // always match Firebase's standard "popup blocked" error codes.
+      try{ await signInWithRedirect(auth,googleProvider); }
+      catch(e2){
+        console.error(e,e2);
+        const code2=(e2 as {code?:string})?.code||"unknown";
+        setSignInError(`Sign-in didn't go through (${code} / ${code2}). Please try again.`);
       }
     }
   }

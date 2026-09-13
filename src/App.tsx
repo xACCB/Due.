@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
 
@@ -175,6 +175,7 @@ export default function HomeworkPlanner() {
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
   const [fbLoading,setFbLoading]=useState(true);
+  const [signInError,setSignInError]=useState<string|null>(null);
   const isSyncing=useRef(false);
 
   // Listen for auth state
@@ -182,6 +183,13 @@ export default function HomeworkPlanner() {
     const unsub=onAuthStateChanged(auth,user=>{
       setFbUser(user);
       setFbLoading(false);
+    });
+    // Catches errors from the redirect-based sign-in flow (the user is sent to
+    // Google's sign-in page and back -- any failure surfaces here, not through
+    // onAuthStateChanged, since there's no "popup" to reject in this flow).
+    getRedirectResult(auth).catch(e=>{
+      console.error(e);
+      setSignInError("Sign-in didn't go through. Please try again -- if it keeps happening, try leaving Private Browsing mode.");
     });
     return unsub;
   },[]);
@@ -210,8 +218,9 @@ export default function HomeworkPlanner() {
   },[tasks,themeName,layout,fbUser]);
 
   async function signInWithFirebase(){
-    try{ await signInWithPopup(auth,googleProvider); }
-    catch(e){ console.error(e); }
+    setSignInError(null);
+    try{ await signInWithRedirect(auth,googleProvider); }
+    catch(e){ console.error(e); setSignInError("Couldn't start sign-in. Please try again."); }
   }
   async function signOutFirebase(){
     await fbSignOut(auth);
@@ -409,12 +418,13 @@ export default function HomeworkPlanner() {
         </div>
         {/* Sign in box */}
         <div style={{width:"100%",maxWidth:340}}>
-          <button onClick={async()=>{await signInWithFirebase();setShowProfile(false);}}
+          <button onClick={signInWithFirebase}
             style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 20px",cursor:"pointer",marginBottom:12,transition:"all 0.15s"}}>
             {/* Google icon */}
             <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
             <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Continue with Google</span>
           </button>
+          {signInError&&<div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:"#FF4757",marginBottom:12,lineHeight:1.5}}>{signInError}</div>}
           <div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textFaint,lineHeight:1.6}}>
             By signing in you agree to have your homework data synced across your devices. No data is shared with third parties.
           </div>

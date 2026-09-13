@@ -144,6 +144,7 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
 
 export default function HomeworkPlanner() {
   const [tasks,setTasks]=useState<Task[]>(()=>{try{const s=localStorage.getItem("hw-tasks");return s?JSON.parse(s):DEFAULT_TASKS;}catch{return DEFAULT_TASKS;}});
+  const [selectedTask,setSelectedTask]=useState<Task|null>(null);
   const [themeName,setThemeName]=useState<ThemeName>(()=>(localStorage.getItem("hw-theme") as ThemeName)||"midnight");
   const [layout,setLayout]=useState<LayoutName>(()=>(localStorage.getItem("hw-layout") as LayoutName)||"list");
   const [groupBy,setGroupBy]=useState(()=>localStorage.getItem("hw-group")||"none");
@@ -240,7 +241,7 @@ export default function HomeworkPlanner() {
   const inputRef=useRef<HTMLInputElement>(null);
 
   const base=THEMES[themeName];
-  const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:accentOverride||base.accent};
+  const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
 
   useEffect(()=>{
     const pending=tasks.filter(t=>!t.done);
@@ -283,7 +284,7 @@ export default function HomeworkPlanner() {
   }
   function handleAnswer(val:string){
     const q=QUESTIONS[step];
-    const value = q.type==="time" ? parseInt(val) : (q.valueMap?(q.valueMap as Record<string,number>)[val]:val);
+    const value = q.type==="time" ? parseInt(val) : val;
     const updated={...newTask,[q.key]:value};setNewTask(updated);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
@@ -1290,7 +1291,7 @@ export default function HomeworkPlanner() {
                   const active=layout===key;
                   const ic=T.accent;
                   const dim=active?ic:T.textFaint;
-                  const icons:Record<string,JSX.Element>={
+                  const icons:Record<string,React.JSX.Element>={
                     list:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="3" rx="1.5" fill={dim}/><rect x="2" y="9.5" width="18" height="3" rx="1.5" fill={dim}/><rect x="2" y="15" width="18" height="3" rx="1.5" fill={dim}/></svg>,
                     compact:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="8" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="12" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="16" width="18" height="2" rx="1" fill={dim}/></svg>,
                     board:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="8" height="8" rx="2" fill={dim}/><rect x="12" y="2" width="8" height="8" rx="2" fill={dim}/><rect x="2" y="12" width="8" height="8" rx="2" fill={dim}/><rect x="12" y="12" width="8" height="8" rx="2" fill={dim}/></svg>,

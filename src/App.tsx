@@ -87,8 +87,8 @@ const FONTS = {
 type FontName = keyof typeof FONTS;
 
 const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:"📚"}, priority:{name:"Priority",emoji:"🔥"}, dueDate:{name:"Due Date",emoji:"📅"} };
-const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE","Other"];
-const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA",Other:"#F0A500" };
+const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE"];
+const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA" };
 const SUBJECT_COLOR_PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#F7DC6F","#BB8FCE","#82E0AA","#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#a78bfa","#fbbf24","#60a5fa"];
 const PRIORITY_COLORS: Record<string,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
 const QUESTIONS = [

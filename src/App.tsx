@@ -1273,7 +1273,7 @@ export default function HomeworkPlanner() {
             {/* Looks */}
             <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:"10px 0 6px"}}>
               <span className="sl" style={{color:T.textMuted,padding:0}}>🎨 Looks</span>
-              <span style={{color:T.textMuted,fontSize:11,transform:looksOpen?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s"}}>▾</span>
+              <span style={{color:T.textMuted,fontSize:13,transform:looksOpen?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
             </button>
             {looksOpen&&<div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:20}}>
               {/* Theme */}

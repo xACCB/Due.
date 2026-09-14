@@ -1109,14 +1109,14 @@ export default function HomeworkPlanner() {
       <div className="app-inner">
 
         {/* Header */}
-        <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
+        <div style={{position:"relative",display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
           <div>
             <div style={{fontFamily:F.heading,fontSize:28,lineHeight:1,color:T.accent}}>due<span style={{color:T.text}}>. </span></div>
             <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2}}>by due. studios</div>
           </div>
-          {/* Profile button - always visible */}
+          {/* Profile button - always visible, absolutely centered in the header regardless of the side content's widths */}
           {!fbLoading&&(
-            <button onClick={()=>setShowProfile(true)} aria-label="Profile" style={{display:"flex",alignItems:"center",justifyContent:"center",background:"none",border:`1px solid ${T.border}`,borderRadius:"50%",width:32,height:32,padding:0,cursor:"pointer",transition:"all 0.15s",flexShrink:0,alignSelf:"center"}}>
+            <button onClick={()=>setShowProfile(true)} aria-label="Profile" style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",display:"flex",alignItems:"center",justifyContent:"center",background:"none",border:`1px solid ${T.border}`,borderRadius:"50%",width:32,height:32,padding:0,cursor:"pointer",transition:"all 0.15s",flexShrink:0}}>
               {fbUser?.photoURL
                 ? <img src={fbUser.photoURL} alt="" style={{width:28,height:28,borderRadius:"50%",objectFit:"cover"}}/>
                 : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>

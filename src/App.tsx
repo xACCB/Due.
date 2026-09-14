@@ -1116,7 +1116,7 @@ export default function HomeworkPlanner() {
           </div>
           {/* Profile button - always visible */}
           {!fbLoading&&(
-            <button onClick={()=>setShowProfile(true)} aria-label="Profile" style={{display:"flex",alignItems:"center",justifyContent:"center",background:"none",border:`1px solid ${T.border}`,borderRadius:"50%",width:32,height:32,padding:0,cursor:"pointer",transition:"all 0.15s",flexShrink:0}}>
+            <button onClick={()=>setShowProfile(true)} aria-label="Profile" style={{display:"flex",alignItems:"center",justifyContent:"center",background:"none",border:`1px solid ${T.border}`,borderRadius:"50%",width:32,height:32,padding:0,cursor:"pointer",transition:"all 0.15s",flexShrink:0,alignSelf:"center"}}>
               {fbUser?.photoURL
                 ? <img src={fbUser.photoURL} alt="" style={{width:28,height:28,borderRadius:"50%",objectFit:"cover"}}/>
                 : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>

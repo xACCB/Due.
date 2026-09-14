@@ -1130,10 +1130,10 @@ export default function HomeworkPlanner() {
           {/* AI Suggestion */}
           {showSuggestion?(
             <div style={{background:T.gradientCard,borderRadius:12,padding:"10px 12px",marginBottom:16,border:`1px solid ${T.accent}33`,position:"relative",overflow:"hidden"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
-                  <span style={{fontSize:12}}>✨</span>
-                  {suggestionLoading?(<div className="shim" style={{height:11,width:140}}/>):(<span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{suggestion}</span>)}
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:7,minWidth:0}}>
+                  <span style={{fontSize:12,marginTop:1}}>✨</span>
+                  {suggestionLoading?(<div className="shim" style={{height:11,width:140,marginTop:2}}/>):(<span style={{fontFamily:F.body,fontSize:12,color:T.text,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"} as React.CSSProperties}>{suggestion}</span>)}
                 </div>
                 <button onClick={()=>setShowSuggestion(false)} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
               </div>

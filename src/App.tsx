@@ -273,12 +273,12 @@ export default function HomeworkPlanner() {
   const [showAccountMenu,setShowAccountMenu]=useState(false);
   const [showProfile,setShowProfile]=useState(false);
   const [profileTab,setProfileTab]=useState<"profile"|"personalize">("profile");
-  const [newSubjectName,setNewSubjectName]=useState("");
   const [sessionActive,setSessionActive]=useState(false);
   const [sessionSecs,setSessionSecs]=useState(0);
   const [sessionHistory,setSessionHistory]=useState<{mins:number;date:string}[]>([]);
   const sessionInterval=useRef<any>(null);
   const inputRef=useRef<HTMLInputElement>(null);
+  const newSubjectRef=useRef<HTMLInputElement>(null);
 
   const base=THEMES[themeName];
   const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
@@ -489,8 +489,8 @@ export default function HomeworkPlanner() {
                   </div>
                 );
               })}
-              <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectName);setNewSubjectName("");}} style={{display:"flex",gap:8,marginTop:8}}>
-                <input value={newSubjectName} onChange={e=>setNewSubjectName(e.target.value)} placeholder="Add a subject..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
+              <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectRef.current?.value||"");if(newSubjectRef.current)newSubjectRef.current.value="";}} style={{display:"flex",gap:8,marginTop:8}}>
+                <input ref={newSubjectRef} defaultValue="" placeholder="Add a subject..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
                 <button type="submit" style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontWeight:500}}>Add</button>
               </form>
             </div>

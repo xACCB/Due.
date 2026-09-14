@@ -427,8 +427,8 @@ export default function HomeworkPlanner() {
         <button onClick={()=>setShowProfile(false)} style={{position:"absolute",top:20,right:20,background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
         {/* Logo */}
         <div style={{marginBottom:40,textAlign:"center"}}>
-          <div style={{fontFamily:F.heading,fontSize:42,color:T.accent,lineHeight:1}}>homework<span style={{color:T.text}}>.</span></div>
-          <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginTop:6}}>Potato Co · sync across devices</div>
+          <div style={{fontFamily:F.heading,fontSize:42,color:T.accent,lineHeight:1}}>due<span style={{color:T.text}}>.</span></div>
+          <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginTop:6}}>due. studios · sync across devices</div>
         </div>
         {/* Sign in box */}
         <div style={{width:"100%",maxWidth:340}}>
@@ -445,7 +445,7 @@ export default function HomeworkPlanner() {
         </div>
         {/* Bookmark button */}
         <button onClick={()=>{
-          if(navigator.share){navigator.share({title:"Potatoplanner",url:window.location.href}).catch(()=>{});}
+          if(navigator.share){navigator.share({title:"due.",url:window.location.href}).catch(()=>{});}
           else{navigator.clipboard?.writeText(window.location.href);alert("Link copied! Open Safari and paste, then Share → Add to Home Screen.");}
         }} style={{width:"100%",maxWidth:340,background:"none",border:`1px solid ${T.border}`,borderRadius:12,padding:"12px",fontFamily:F.body,fontSize:12,color:T.textMuted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:12}}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
@@ -454,7 +454,7 @@ export default function HomeworkPlanner() {
         {/* Decorative divider */}
         <div style={{position:"absolute",bottom:40,display:"flex",alignItems:"center",gap:12}}>
           <div style={{height:1,width:60,background:T.border}}/>
-          <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>Potato Co</span>
+          <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>due. studios</span>
           <div style={{height:1,width:60,background:T.border}}/>
         </div>
       </div>
@@ -577,7 +577,7 @@ export default function HomeworkPlanner() {
             </div>
             <button onClick={()=>{
               if(navigator.share){
-                navigator.share({title:"Potatoplanner",url:window.location.href}).catch(()=>{});
+                navigator.share({title:"due.",url:window.location.href}).catch(()=>{});
               } else {
                 navigator.clipboard?.writeText(window.location.href);
                 alert("Link copied! Open Safari on your iPhone and paste the link, then use Share → Add to Home Screen.");
@@ -1087,8 +1087,8 @@ export default function HomeworkPlanner() {
         {/* Header */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
           <div>
-            <div style={{fontFamily:F.heading,fontSize:pixelMode?16:28,lineHeight:1,color:T.accent,letterSpacing:pixelMode?"0.05em":"normal"}}>{pixelMode?"POTATOPLANNER":"homework"}<span style={{color:T.text}}>{pixelMode?"":". "}</span></div>
-            <div style={{fontFamily:F.body,fontSize:pixelMode?7:9,color:T.textFaint,marginTop:pixelMode?6:2}}>{pixelMode?">> POTATOPLANNER · PRESS START":"by Potato Co"}</div>
+            <div style={{fontFamily:F.heading,fontSize:pixelMode?16:28,lineHeight:1,color:T.accent,letterSpacing:pixelMode?"0.05em":"normal"}}>{pixelMode?"DUE":"due"}<span style={{color:T.text}}>{pixelMode?"":". "}</span></div>
+            <div style={{fontFamily:F.body,fontSize:pixelMode?7:9,color:T.textFaint,marginTop:pixelMode?6:2}}>{pixelMode?">> DUE · PRESS START":"by due. studios"}</div>
           </div>
           {/* Profile button - always visible */}
           {!fbLoading&&(

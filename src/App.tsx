@@ -362,6 +362,9 @@ export default function HomeworkPlanner() {
       .dl-sidebar .app-sidebar .tab-bar{flex-direction:column;background:none!important;padding:0!important;gap:6px!important;}
       .dl-sidebar .app-sidebar .tab-bar button{flex:none!important;justify-content:flex-start!important;text-align:left;padding:10px 12px!important;}
     }
+    @media (max-width:600px){
+      input,textarea{font-size:16px!important;}
+    }
   `;
 
   // Session timer

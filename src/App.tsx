@@ -482,10 +482,8 @@ export default function HomeworkPlanner() {
                   <div key={s} style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:12,padding:"11px 14px",border:`1px solid ${T.border}`}}>
                     <div style={{width:12,height:12,borderRadius:"50%",background:subjectColors[s]||T.accent,flexShrink:0}}/>
                     <span style={{flex:1,fontFamily:F.body,fontSize:13,color:T.text}}>{s}</span>
-                    {isDefault
-                      ? <span style={{fontFamily:F.body,fontSize:9,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.05em"}}>default</span>
-                      : <button onClick={()=>removeSubject(s)} style={{background:"none",border:"none",color:T.textFaint,fontSize:16,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>×</button>
-                    }
+                    {isDefault&&<span style={{fontFamily:F.body,fontSize:9,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.05em"}}>default</span>}
+                    <button onClick={()=>{if(window.confirm(`Delete "${s}"? This won't remove it from tasks that already use it.`))removeSubject(s);}} style={{background:"none",border:"none",color:T.textFaint,fontSize:16,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>×</button>
                   </div>
                 );
               })}

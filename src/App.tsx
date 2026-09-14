@@ -150,7 +150,6 @@ export default function HomeworkPlanner() {
   const [groupBy,setGroupBy]=useState(()=>localStorage.getItem("hw-group")||"none");
   const [showDone,setShowDone]=useState(()=>localStorage.getItem("hw-showdone")!=="false");
   const [showSuggestion,setShowSuggestion]=useState(()=>localStorage.getItem("hw-showsuggestion")!=="false");
-  const [appIconStyle,setAppIconStyle]=useState(()=>localStorage.getItem("hw-iconStyle")||"flat");
   const [pixelMode,setPixelMode]=useState(()=>localStorage.getItem("hw-pixel")==="true");
   const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
   const [fontName,setFontName]=useState<FontName>(()=>(localStorage.getItem("hw-font") as FontName)||"dmSerif");
@@ -168,7 +167,6 @@ export default function HomeworkPlanner() {
   useEffect(()=>{localStorage.setItem("hw-group",groupBy);},[groupBy]);
   useEffect(()=>{localStorage.setItem("hw-showdone",String(showDone));},[showDone]);
   useEffect(()=>{localStorage.setItem("hw-showsuggestion",String(showSuggestion));},[showSuggestion]);
-  useEffect(()=>{localStorage.setItem("hw-iconStyle",appIconStyle);},[appIconStyle]);
   useEffect(()=>{localStorage.setItem("hw-pixel",String(pixelMode));},[pixelMode]);
   useEffect(()=>{if(accentOverride)localStorage.setItem("hw-accent",accentOverride);else localStorage.removeItem("hw-accent");},[accentOverride]);
 
@@ -1115,8 +1113,8 @@ export default function HomeworkPlanner() {
         <div className="app-sidebar">
         {/* Tabs */}
         <div className="tab-bar" style={{display:"flex",gap:4,marginBottom:16,background:T.surface,borderRadius:11,padding:3}}>
-          {(["tasks","appearance","options"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"📋 Tasks",appearance:"🎨 Look",options:"⚙️ Settings"};
+          {(["tasks","options"] as const).map(id=>{
+            const labels:Record<string,string>={tasks:"📋 Tasks",options:"⚙️ Settings"};
             return <button key={id} onClick={()=>setActiveTab(id)} style={{flex:1,background:activeTab===id?T.card:"transparent",color:activeTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"7px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:activeTab===id?"500":"normal",position:"relative"}}>
               {labels[id]}
             </button>;
@@ -1275,170 +1273,102 @@ export default function HomeworkPlanner() {
         </>}
 
         {/* APPEARANCE TAB */}
-        {activeTab==="appearance"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:20}}>
-            {/* Themes */}
-            <div>
-              <div className="sl" style={{color:T.textMuted}}>Theme ({Object.keys(THEMES).length})</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-                {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).map(([key,th])=>(
-                  <button key={key} onClick={()=>{setThemeName(key);setAccentOverride(null);}}
-                    style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none"}}>
-                    <span style={{fontSize:16}}>{th.emoji}</span>
-                    <span style={{fontFamily:F.body,fontSize:9,color:th.text}}>{th.name}</span>
-                    <div style={{width:20,height:4,borderRadius:999,background:th.accent}}/>
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* Accent */}
-            <div>
-              <div className="sl" style={{color:T.textMuted}}>Custom Accent</div>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <input type="color" value={accentOverride||T.accent} onChange={e=>setAccentOverride(e.target.value)} style={{width:44,height:36,borderRadius:9,cursor:"pointer",border:`1px solid ${T.border}`}}/>
-                <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{accentOverride||T.accent}</span>
-                {accentOverride&&<button onClick={()=>setAccentOverride(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.textMuted,fontFamily:F.body,fontSize:10,padding:"3px 9px",cursor:"pointer"}}>reset</button>}
-              </div>
-              <div style={{marginTop:8,display:"flex",gap:7,flexWrap:"wrap"}}>
-                {["#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#f87171","#34d399","#a78bfa","#fbbf24","#60a5fa"].map(c=>(
-                  <button key={c} onClick={()=>setAccentOverride(c)} style={{width:26,height:26,borderRadius:"50%",background:c,border:`2px solid ${accentOverride===c?"#fff":"transparent"}`,cursor:"pointer"}}/>
-                ))}
-              </div>
-            </div>
-            {/* Layouts */}
-            <div>
-              <div className="sl" style={{color:T.textMuted}}>Layout ({Object.keys(LAYOUTS).length})</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7}}>
-                {(Object.entries(LAYOUTS) as [LayoutName,{name:string;emoji:string;desc:string}][]).map(([key,l])=>{
-                  const active=layout===key;
-                  const ic=T.accent;
-                  const dim=active?ic:T.textFaint;
-                  const icons:Record<string,React.JSX.Element>={
-                    list:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="3" rx="1.5" fill={dim}/><rect x="2" y="9.5" width="18" height="3" rx="1.5" fill={dim}/><rect x="2" y="15" width="18" height="3" rx="1.5" fill={dim}/></svg>,
-                    compact:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="8" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="12" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="16" width="18" height="2" rx="1" fill={dim}/></svg>,
-                    board:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="8" height="8" rx="2" fill={dim}/><rect x="12" y="2" width="8" height="8" rx="2" fill={dim}/><rect x="2" y="12" width="8" height="8" rx="2" fill={dim}/><rect x="12" y="12" width="8" height="8" rx="2" fill={dim}/></svg>,
-                    minimal:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="4" cy="6" r="1.5" fill={dim}/><rect x="7" y="5" width="13" height="2" rx="1" fill={dim}/><circle cx="4" cy="11" r="1.5" fill={dim}/><rect x="7" y="10" width="13" height="2" rx="1" fill={dim}/><circle cx="4" cy="16" r="1.5" fill={dim}/><rect x="7" y="15" width="13" height="2" rx="1" fill={dim}/></svg>,
-                    checklist:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="5" height="5" rx="1.5" stroke={dim} strokeWidth="1.5"/><path d="M3.5 6.5l1.2 1.2L6.5 5" stroke={active?ic:T.textFaint} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><rect x="9" y="5.5" width="11" height="2" rx="1" fill={dim}/><rect x="2" y="13" width="5" height="5" rx="1.5" stroke={dim} strokeWidth="1.5"/><rect x="9" y="14.5" width="11" height="2" rx="1" fill={dim}/></svg>,
-                    sticky:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="8" height="9" rx="2" fill={dim} opacity="0.9" transform="rotate(-4 2 2)"/><rect x="12" y="3" width="8" height="9" rx="2" fill={dim} opacity="0.7" transform="rotate(3 12 3)"/><rect x="3" y="12" width="8" height="8" rx="2" fill={dim} opacity="0.6" transform="rotate(2 3 12)"/></svg>,
-                    kanban:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="5" height="18" rx="1.5" fill={dim} opacity="0.4"/><rect x="9" y="2" width="5" height="13" rx="1.5" fill={dim} opacity="0.7"/><rect x="16" y="2" width="5" height="9" rx="1.5" fill={dim}/></svg>,
-                    timeline:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><line x1="6" y1="2" x2="6" y2="20" stroke={dim} strokeWidth="2" strokeLinecap="round"/><circle cx="6" cy="6" r="2.5" fill={dim}/><rect x="10" y="4.5" width="10" height="3" rx="1.5" fill={dim} opacity="0.7"/><circle cx="6" cy="12" r="2.5" fill={dim}/><rect x="10" y="10.5" width="7" height="3" rx="1.5" fill={dim} opacity="0.7"/><circle cx="6" cy="18" r="2.5" fill={dim}/><rect x="10" y="16.5" width="9" height="3" rx="1.5" fill={dim} opacity="0.7"/></svg>,
-                    subject:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="4" height="4" rx="1" fill={dim}/><rect x="8" y="2" width="4" height="4" rx="1" fill={dim} opacity="0.6"/><rect x="14" y="2" width="4" height="4" rx="1" fill={dim} opacity="0.4"/><rect x="2" y="9" width="18" height="11" rx="2" fill={dim} opacity="0.25"/><rect x="2" y="9" width="18" height="3" rx="1.5" fill={dim} opacity="0.5"/></svg>,
-                    progress:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="4" width="14" height="3.5" rx="1.75" fill={dim}/><rect x="2" y="10" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="10" width="9" height="3.5" rx="1.75" fill={dim}/><rect x="2" y="16" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="16" width="16" height="3.5" rx="1.75" fill={dim}/></svg>,
-                    pyramid:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="7" y="3" width="8" height="4" rx="1.5" fill={dim}/><rect x="4" y="9" width="14" height="4" rx="1.5" fill={dim} opacity="0.7"/><rect x="1" y="15" width="20" height="4" rx="1.5" fill={dim} opacity="0.4"/></svg>,
-                    calendar:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="16" rx="2" stroke={dim} strokeWidth="1.5"/><line x1="2" y1="9" x2="20" y2="9" stroke={dim} strokeWidth="1.5"/><line x1="7" y1="2" x2="7" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><line x1="15" y1="2" x2="15" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><rect x="5" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="10" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="15" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.4"/></svg>,
-                  };
-                  return(
-                    <button key={key} onClick={()=>setLayout(key)}
-                      style={{background:active?T.accent+"22":"none",border:`1.5px solid ${active?T.accent:T.border}`,borderRadius:11,padding:"10px 7px",cursor:"pointer",color:active?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all 0.14s"}}>
-                      {icons[key]}
-                      <span style={{fontWeight:500,fontSize:10}}>{l.name}</span>
-                      <span style={{fontSize:9,opacity:0.6}}>{l.desc}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {/* Fonts */}
-            <div>
-              <div className="sl" style={{color:T.textMuted}}>Font ({Object.keys(FONTS).length})</div>
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {(Object.entries(FONTS) as [FontName, typeof FONTS[FontName]][]).map(([key,f])=>(
-                  <button key={key} onClick={()=>setFontName(key)}
-                    style={{background:fontName===key?T.accent+"22":"none",border:`1.5px solid ${fontName===key?T.accent:T.border}`,borderRadius:11,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"all 0.14s"}}>
-                    <span style={{fontFamily:f.heading,fontSize:18,color:fontName===key?T.accent:T.text}}>{f.preview}</span>
-                    <span style={{fontFamily:F.body,fontSize:10,color:fontName===key?T.accent:T.textFaint}}>{f.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* Preview */}
-            <div>
-              <div className="sl" style={{color:T.textMuted}}>Preview</div>
-              <div style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.accent}44`,position:"relative",overflow:"hidden"}}>
-                <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:T.accent,borderRadius:"12px 0 0 12px"}}/>
-                <div style={{paddingLeft:7,display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                  <span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>
-                  <span style={{fontFamily:F.heading,fontSize:15,color:T.text}}>Sample Assignment</span>
-                  <span style={{background:"#FF6B6B22",color:"#FF6B6B",borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>Math</span>
-                </div>
-                <div style={{display:"flex",gap:12,marginTop:5,paddingLeft:7}}>
-                  <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>📅 Due tomorrow</span>
-                  <span style={{fontFamily:F.body,fontSize:10,color:"#FFA502"}}>Due tomorrow</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* OPTIONS TAB */}
         {activeTab==="options"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
 
-            {/* App Icon Picker */}
-            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted}}>App Icon</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
-                {(Object.entries(THEMES) as [ThemeName, typeof THEMES[ThemeName]][]).map(([key,th])=>{
-                  const ac=th.accent; const bg=th.bg; const ca=th.card;
-                  const isSelected=themeName===key&&appIconStyle!=="pixel";
-                  const icon = appIconStyle==="pixel" ? (
-                    // Pixel notepad
-                    <svg width="36" height="36" viewBox="0 0 16 16" style={{imageRendering:"pixelated"}} fill="none">
-                      <rect x="2" y="1" width="12" height="14" fill={ca}/>
-                      <rect x="2" y="1" width="12" height="2" fill={ac}/>
-                      <rect x="5" y="0" width="2" height="3" fill={ac}/>
-                      <rect x="9" y="0" width="2" height="3" fill={ac}/>
-                      <rect x="3" y="5" width="10" height="1" fill={ac} opacity="0.6"/>
-                      <rect x="3" y="7" width="10" height="1" fill={ac} opacity="0.6"/>
-                      <rect x="3" y="9" width="7" height="1" fill={ac} opacity="0.6"/>
-                      <rect x="3" y="11" width="8" height="1" fill={ac} opacity="0.4"/>
-                    </svg>
-                  ) : appIconStyle==="bubbly" ? (
-                    // Bubbly notepad
-                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-                      <rect width="36" height="36" rx="10" fill={ca}/>
-                      <rect x="8" y="6" width="20" height="24" rx="4" fill={bg} stroke={ac} strokeWidth="1.5"/>
-                      <rect x="8" y="6" width="20" height="7" rx="4" fill={ac}/>
-                      <rect x="13" y="3" width="3" height="6" rx="1.5" fill={ac}/>
-                      <rect x="20" y="3" width="3" height="6" rx="1.5" fill={ac}/>
-                      <rect x="12" y="17" width="12" height="1.5" rx="0.75" fill={ac} opacity="0.5"/>
-                      <rect x="12" y="20" width="9" height="1.5" rx="0.75" fill={ac} opacity="0.5"/>
-                      <rect x="12" y="23" width="10" height="1.5" rx="0.75" fill={ac} opacity="0.35"/>
-                    </svg>
-                  ) : (
-                    // Flat notepad
-                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-                      <rect width="36" height="36" rx="8" fill={bg}/>
-                      <rect x="8" y="7" width="20" height="23" rx="2" fill={ca} stroke={ac} strokeWidth="1.2"/>
-                      <rect x="8" y="7" width="20" height="6" rx="2" fill={ac}/>
-                      <rect x="13" y="4" width="2.5" height="6" rx="1.25" fill={ac}/>
-                      <rect x="20.5" y="4" width="2.5" height="6" rx="1.25" fill={ac}/>
-                      <rect x="12" y="16" width="12" height="1.5" rx="0.75" fill={ac} opacity="0.55"/>
-                      <rect x="12" y="19" width="8" height="1.5" rx="0.75" fill={ac} opacity="0.55"/>
-                      <rect x="12" y="22" width="10" height="1.5" rx="0.75" fill={ac} opacity="0.4"/>
-                    </svg>
-                  );
-                  return(
-                    <button key={key} onClick={()=>setThemeName(key)}
-                      style={{background:isSelected?T.accent+"22":"none",border:`2px solid ${isSelected?T.accent:T.border}`,borderRadius:14,padding:"10px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all 0.15s",transform:isSelected?"scale(1.05)":"none"}}>
-                      {icon}
-                      <span style={{fontFamily:F.body,fontSize:8,color:isSelected?T.accent:T.textFaint}}>{th.name}</span>
+            {/* Preferences */}
+            <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Preferences</div>
+            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:20}}>
+              {/* Theme */}
+              <div>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Theme ({Object.keys(THEMES).length})</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
+                  {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).map(([key,th])=>(
+                    <button key={key} onClick={()=>{setThemeName(key);setAccentOverride(null);}}
+                      style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none"}}>
+                      <span style={{fontSize:16}}>{th.emoji}</span>
+                      <span style={{fontFamily:F.body,fontSize:9,color:th.text}}>{th.name}</span>
+                      <div style={{width:20,height:4,borderRadius:999,background:th.accent}}/>
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-              {/* Style picker */}
-              <div className="sl" style={{color:T.textMuted}}>Icon style</div>
-              <div style={{display:"flex",gap:7}}>
-                {[{k:"flat",l:"Flat"},{k:"bubbly",l:"Bubbly"},{k:"pixel",l:"Pixel"}].map(({k,l})=>(
-                  <button key={k} onClick={()=>setAppIconStyle(k)}
-                    style={{flex:1,background:appIconStyle===k?T.accent+"22":"none",border:`1.5px solid ${appIconStyle===k?T.accent:T.border}`,borderRadius:9,padding:"7px",fontFamily:F.body,fontSize:11,color:appIconStyle===k?T.accent:T.textMuted,cursor:"pointer",transition:"all 0.14s"}}>
-                    {l}
-                  </button>
-                ))}
+              {/* Accent */}
+              <div>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Custom Accent</div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <input type="color" value={accentOverride||T.accent} onChange={e=>setAccentOverride(e.target.value)} style={{width:44,height:36,borderRadius:9,cursor:"pointer",border:`1px solid ${T.border}`}}/>
+                  <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{accentOverride||T.accent}</span>
+                  {accentOverride&&<button onClick={()=>setAccentOverride(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.textMuted,fontFamily:F.body,fontSize:10,padding:"3px 9px",cursor:"pointer"}}>reset</button>}
+                </div>
+                <div style={{marginTop:8,display:"flex",gap:7,flexWrap:"wrap"}}>
+                  {["#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#f87171","#34d399","#a78bfa","#fbbf24","#60a5fa"].map(c=>(
+                    <button key={c} onClick={()=>setAccentOverride(c)} style={{width:26,height:26,borderRadius:"50%",background:c,border:`2px solid ${accentOverride===c?"#fff":"transparent"}`,cursor:"pointer"}}/>
+                  ))}
+                </div>
               </div>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>
-                Tap an icon to switch to that theme
+              {/* Layouts */}
+              <div>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Layout ({Object.keys(LAYOUTS).length})</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7}}>
+                  {(Object.entries(LAYOUTS) as [LayoutName,{name:string;emoji:string;desc:string}][]).map(([key,l])=>{
+                    const active=layout===key;
+                    const ic=T.accent;
+                    const dim=active?ic:T.textFaint;
+                    const icons:Record<string,React.JSX.Element>={
+                      list:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="3" rx="1.5" fill={dim}/><rect x="2" y="9.5" width="18" height="3" rx="1.5" fill={dim}/><rect x="2" y="15" width="18" height="3" rx="1.5" fill={dim}/></svg>,
+                      compact:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="8" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="12" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="16" width="18" height="2" rx="1" fill={dim}/></svg>,
+                      board:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="8" height="8" rx="2" fill={dim}/><rect x="12" y="2" width="8" height="8" rx="2" fill={dim}/><rect x="2" y="12" width="8" height="8" rx="2" fill={dim}/><rect x="12" y="12" width="8" height="8" rx="2" fill={dim}/></svg>,
+                      minimal:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="4" cy="6" r="1.5" fill={dim}/><rect x="7" y="5" width="13" height="2" rx="1" fill={dim}/><circle cx="4" cy="11" r="1.5" fill={dim}/><rect x="7" y="10" width="13" height="2" rx="1" fill={dim}/><circle cx="4" cy="16" r="1.5" fill={dim}/><rect x="7" y="15" width="13" height="2" rx="1" fill={dim}/></svg>,
+                      checklist:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="5" height="5" rx="1.5" stroke={dim} strokeWidth="1.5"/><path d="M3.5 6.5l1.2 1.2L6.5 5" stroke={active?ic:T.textFaint} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><rect x="9" y="5.5" width="11" height="2" rx="1" fill={dim}/><rect x="2" y="13" width="5" height="5" rx="1.5" stroke={dim} strokeWidth="1.5"/><rect x="9" y="14.5" width="11" height="2" rx="1" fill={dim}/></svg>,
+                      sticky:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="8" height="9" rx="2" fill={dim} opacity="0.9" transform="rotate(-4 2 2)"/><rect x="12" y="3" width="8" height="9" rx="2" fill={dim} opacity="0.7" transform="rotate(3 12 3)"/><rect x="3" y="12" width="8" height="8" rx="2" fill={dim} opacity="0.6" transform="rotate(2 3 12)"/></svg>,
+                      kanban:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="5" height="18" rx="1.5" fill={dim} opacity="0.4"/><rect x="9" y="2" width="5" height="13" rx="1.5" fill={dim} opacity="0.7"/><rect x="16" y="2" width="5" height="9" rx="1.5" fill={dim}/></svg>,
+                      timeline:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><line x1="6" y1="2" x2="6" y2="20" stroke={dim} strokeWidth="2" strokeLinecap="round"/><circle cx="6" cy="6" r="2.5" fill={dim}/><rect x="10" y="4.5" width="10" height="3" rx="1.5" fill={dim} opacity="0.7"/><circle cx="6" cy="12" r="2.5" fill={dim}/><rect x="10" y="10.5" width="7" height="3" rx="1.5" fill={dim} opacity="0.7"/><circle cx="6" cy="18" r="2.5" fill={dim}/><rect x="10" y="16.5" width="9" height="3" rx="1.5" fill={dim} opacity="0.7"/></svg>,
+                      subject:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="4" height="4" rx="1" fill={dim}/><rect x="8" y="2" width="4" height="4" rx="1" fill={dim} opacity="0.6"/><rect x="14" y="2" width="4" height="4" rx="1" fill={dim} opacity="0.4"/><rect x="2" y="9" width="18" height="11" rx="2" fill={dim} opacity="0.25"/><rect x="2" y="9" width="18" height="3" rx="1.5" fill={dim} opacity="0.5"/></svg>,
+                      progress:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="4" width="14" height="3.5" rx="1.75" fill={dim}/><rect x="2" y="10" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="10" width="9" height="3.5" rx="1.75" fill={dim}/><rect x="2" y="16" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="16" width="16" height="3.5" rx="1.75" fill={dim}/></svg>,
+                      pyramid:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="7" y="3" width="8" height="4" rx="1.5" fill={dim}/><rect x="4" y="9" width="14" height="4" rx="1.5" fill={dim} opacity="0.7"/><rect x="1" y="15" width="20" height="4" rx="1.5" fill={dim} opacity="0.4"/></svg>,
+                      calendar:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="16" rx="2" stroke={dim} strokeWidth="1.5"/><line x1="2" y1="9" x2="20" y2="9" stroke={dim} strokeWidth="1.5"/><line x1="7" y1="2" x2="7" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><line x1="15" y1="2" x2="15" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><rect x="5" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="10" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="15" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.4"/></svg>,
+                    };
+                    return(
+                      <button key={key} onClick={()=>setLayout(key)}
+                        style={{background:active?T.accent+"22":"none",border:`1.5px solid ${active?T.accent:T.border}`,borderRadius:11,padding:"10px 7px",cursor:"pointer",color:active?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all 0.14s"}}>
+                        {icons[key]}
+                        <span style={{fontWeight:500,fontSize:10}}>{l.name}</span>
+                        <span style={{fontSize:9,opacity:0.6}}>{l.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Fonts */}
+              <div>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Font ({Object.keys(FONTS).length})</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {(Object.entries(FONTS) as [FontName, typeof FONTS[FontName]][]).map(([key,f])=>(
+                    <button key={key} onClick={()=>setFontName(key)}
+                      style={{background:fontName===key?T.accent+"22":"none",border:`1.5px solid ${fontName===key?T.accent:T.border}`,borderRadius:11,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"all 0.14s"}}>
+                      <span style={{fontFamily:f.heading,fontSize:18,color:fontName===key?T.accent:T.text}}>{f.preview}</span>
+                      <span style={{fontFamily:F.body,fontSize:10,color:fontName===key?T.accent:T.textFaint}}>{f.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Preview */}
+              <div>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Preview</div>
+                <div style={{background:T.surface,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.accent}44`,position:"relative",overflow:"hidden"}}>
+                  <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:T.accent,borderRadius:"12px 0 0 12px"}}/>
+                  <div style={{paddingLeft:7,display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+                    <span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>
+                    <span style={{fontFamily:F.heading,fontSize:15,color:T.text}}>Sample Assignment</span>
+                    <span style={{background:"#FF6B6B22",color:"#FF6B6B",borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>Math</span>
+                  </div>
+                  <div style={{display:"flex",gap:12,marginTop:5,paddingLeft:7}}>
+                    <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>📅 Due tomorrow</span>
+                    <span style={{fontFamily:F.body,fontSize:10,color:"#FFA502"}}>Due tomorrow</span>
+                  </div>
+                </div>
               </div>
             </div>
             {/* Pomodoro */}

@@ -362,6 +362,9 @@ export default function HomeworkPlanner() {
       .dl-sidebar .app-sidebar .tab-bar{flex-direction:column;background:none!important;padding:0!important;gap:6px!important;}
       .dl-sidebar .app-sidebar .tab-bar button{flex:none!important;justify-content:flex-start!important;text-align:left;padding:10px 12px!important;}
     }
+    @media (max-width:600px){
+      input,textarea{font-size:16px!important;}
+    }
   `;
 
   // Session timer
@@ -1271,11 +1274,12 @@ export default function HomeworkPlanner() {
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
 
             {/* Looks */}
-            <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:"10px 0 6px"}}>
-              <span className="sl" style={{color:T.textMuted,padding:0}}>🎨 Looks</span>
-              <span style={{color:T.textMuted,fontSize:11,transform:looksOpen?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s"}}>▾</span>
-            </button>
-            {looksOpen&&<div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:20}}>
+            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
+              <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:0}}>
+                <span className="sl" style={{color:T.textMuted,padding:0}}>🎨 Looks</span>
+                <span style={{color:T.textMuted,fontSize:13,transform:looksOpen?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
+              </button>
+              {looksOpen&&<div style={{display:"flex",flexDirection:"column",gap:20,marginTop:16}}>
               {/* Theme */}
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Theme ({Object.keys(THEMES).length})</div>
@@ -1382,6 +1386,7 @@ export default function HomeworkPlanner() {
                 </div>
               </div>
             </div>}
+            </div>
             {/* Group by */}
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
               <div className="sl" style={{color:T.textMuted}}>Group Tasks By</div>

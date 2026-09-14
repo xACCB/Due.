@@ -150,7 +150,6 @@ export default function HomeworkPlanner() {
   const [groupBy,setGroupBy]=useState(()=>localStorage.getItem("hw-group")||"none");
   const [showDone,setShowDone]=useState(()=>localStorage.getItem("hw-showdone")!=="false");
   const [showSuggestion,setShowSuggestion]=useState(()=>localStorage.getItem("hw-showsuggestion")!=="false");
-  const [pixelMode,setPixelMode]=useState(()=>localStorage.getItem("hw-pixel")==="true");
   const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
   const [fontName,setFontName]=useState<FontName>(()=>(localStorage.getItem("hw-font") as FontName)||"dmSerif");
   useEffect(()=>{localStorage.setItem("hw-font",fontName);},[fontName]);
@@ -167,7 +166,6 @@ export default function HomeworkPlanner() {
   useEffect(()=>{localStorage.setItem("hw-group",groupBy);},[groupBy]);
   useEffect(()=>{localStorage.setItem("hw-showdone",String(showDone));},[showDone]);
   useEffect(()=>{localStorage.setItem("hw-showsuggestion",String(showSuggestion));},[showSuggestion]);
-  useEffect(()=>{localStorage.setItem("hw-pixel",String(pixelMode));},[pixelMode]);
   useEffect(()=>{if(accentOverride)localStorage.setItem("hw-accent",accentOverride);else localStorage.removeItem("hw-accent");},[accentOverride]);
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
@@ -248,6 +246,7 @@ export default function HomeworkPlanner() {
   const [suggestion,setSuggestion]=useState("");
   const [suggestionLoading,setSuggestionLoading]=useState(false);
   const [activeTab,setActiveTab]=useState("tasks");
+  const [looksOpen,setLooksOpen]=useState(true);
   const [activeSubject,setActiveSubject]=useState("all");
   const [pomodoroActive,setPomodoroActive]=useState(false);
   const [pomodoroSecs,setPomodoroSecs]=useState(25*60);
@@ -325,33 +324,7 @@ export default function HomeworkPlanner() {
   function deleteTask(id:number){setTasks(prev=>prev.filter(t=>t.id!==id));}
   const currentQ=step>=0?QUESTIONS[step]:null;
 
-  const F = pixelMode ? FONTS["pixel"] : FONTS[fontName];
-  const pixelCSS = pixelMode ? `
-    * { image-rendering: pixelated; letter-spacing: 0.02em; }
-    button, input, textarea { image-rendering: pixelated; }
-    .tc { border-radius: 0 !important; }
-    .tc:hover { transform: translateY(-2px); filter: brightness(1.1); }
-    .chip { border-radius: 0 !important; }
-    .rb { border-radius: 0 !important; }
-    .tog { border-radius: 0 !important; }
-    .tog::after { border-radius: 0 !important; }
-    div[style*="border-radius"] { }
-    @keyframes scanline {
-      0% { transform: translateY(-100%); }
-      100% { transform: translateY(100vh); }
-    }
-    .pixel-scanline {
-      pointer-events: none;
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: ${T.accent}22;
-      animation: scanline 4s linear infinite;
-      z-index: 9999;
-    }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-    .pixel-blink { animation: blink 1s step-end infinite; }
-  ` : "";
+  const F = FONTS[fontName];
 
   const css=`
     @import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');
@@ -389,7 +362,7 @@ export default function HomeworkPlanner() {
       .dl-sidebar .app-sidebar .tab-bar{flex-direction:column;background:none!important;padding:0!important;gap:6px!important;}
       .dl-sidebar .app-sidebar .tab-bar button{flex:none!important;justify-content:flex-start!important;text-align:left;padding:10px 12px!important;}
     }
-  ` + pixelCSS;
+  `;
 
   // Session timer
   useEffect(()=>{
@@ -1078,17 +1051,15 @@ export default function HomeworkPlanner() {
   },[T.accent]);
 
   return (
-    <div className={"app-shell dl-"+desktopLayout} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s",boxShadow:pixelMode?`0 0 0 2px ${T.accent}, 0 0 0 4px ${T.bg}, 0 0 0 6px ${T.accent}44`:"none"}}>
-      {pixelMode&&<div className="pixel-scanline"/>}
-      {pixelMode&&<div style={{position:"fixed",inset:0,backgroundImage:`repeating-linear-gradient(0deg, ${T.accent}04 0px, transparent 1px, transparent 3px)`,pointerEvents:"none",zIndex:9998}}/>}
+    <div className={"app-shell dl-"+desktopLayout} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s"}}>
       <style>{css}</style>
       <div className="app-inner">
 
         {/* Header */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
           <div>
-            <div style={{fontFamily:F.heading,fontSize:pixelMode?16:28,lineHeight:1,color:T.accent,letterSpacing:pixelMode?"0.05em":"normal"}}>{pixelMode?"DUE":"due"}<span style={{color:T.text}}>{pixelMode?"":". "}</span></div>
-            <div style={{fontFamily:F.body,fontSize:pixelMode?7:9,color:T.textFaint,marginTop:pixelMode?6:2}}>{pixelMode?">> DUE · PRESS START":"by due. studios"}</div>
+            <div style={{fontFamily:F.heading,fontSize:28,lineHeight:1,color:T.accent}}>due<span style={{color:T.text}}>. </span></div>
+            <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2}}>by due. studios</div>
           </div>
           {/* Profile button - always visible */}
           {!fbLoading&&(
@@ -1113,8 +1084,8 @@ export default function HomeworkPlanner() {
         <div className="app-sidebar">
         {/* Tabs */}
         <div className="tab-bar" style={{display:"flex",gap:4,marginBottom:16,background:T.surface,borderRadius:11,padding:3}}>
-          {(["tasks","options"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"📋 Tasks",options:"⚙️ Settings"};
+          {(["tasks","tools","options"] as const).map(id=>{
+            const labels:Record<string,string>={tasks:"📋 Tasks",tools:"🛠️ Tools",options:"⚙️ Settings"};
             return <button key={id} onClick={()=>setActiveTab(id)} style={{flex:1,background:activeTab===id?T.card:"transparent",color:activeTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"7px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:activeTab===id?"500":"normal",position:"relative"}}>
               {labels[id]}
             </button>;
@@ -1272,14 +1243,39 @@ export default function HomeworkPlanner() {
           </div>
         </>}
 
-        {/* APPEARANCE TAB */}
+        {/* TOOLS TAB */}
+        {activeTab==="tools"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {/* Pomodoro */}
+            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
+              <div className="sl" style={{color:T.textMuted,textAlign:"left"}}>Pomodoro Timer</div>
+              <div style={{position:"relative",width:100,height:100,margin:"10px auto"}}>
+                <svg width="100" height="100" style={{transform:"rotate(-90deg)"}}>
+                  <circle cx="50" cy="50" r="45" fill="none" stroke={T.border} strokeWidth="6"/>
+                  <circle cx="50" cy="50" r="45" fill="none" stroke={T.accent} strokeWidth="6" strokeDasharray="283" strokeDashoffset={283*(1-pomPct)} strokeLinecap="round" style={{transition:"stroke-dashoffset 1s linear"}}/>
+                </svg>
+                <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
+                  <div style={{fontFamily:F.body,fontSize:18,color:T.text,fontWeight:500}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+                <button onClick={()=>setPomodoroActive(a=>!a)} style={{background:T.accent,color:"#000",border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"⏸ Pause":"▶ Start"}</button>
+                <button onClick={()=>{setPomodoroSecs(25*60);setPomodoroActive(false);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>↺ Reset</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* OPTIONS TAB */}
         {activeTab==="options"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
 
-            {/* Preferences */}
-            <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Preferences</div>
-            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:20}}>
+            {/* Looks */}
+            <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:"10px 0 6px"}}>
+              <span className="sl" style={{color:T.textMuted,padding:0}}>🎨 Looks</span>
+              <span style={{color:T.textMuted,fontSize:11,transform:looksOpen?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s"}}>▾</span>
+            </button>
+            {looksOpen&&<div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:20}}>
               {/* Theme */}
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Theme ({Object.keys(THEMES).length})</div>
@@ -1370,39 +1366,22 @@ export default function HomeworkPlanner() {
                   </div>
                 </div>
               </div>
-            </div>
-            {/* Pomodoro */}
-            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
-              <div className="sl" style={{color:T.textMuted,textAlign:"left"}}>Pomodoro Timer</div>
-              <div style={{position:"relative",width:100,height:100,margin:"10px auto"}}>
-                <svg width="100" height="100" style={{transform:"rotate(-90deg)"}}>
-                  <circle cx="50" cy="50" r="45" fill="none" stroke={T.border} strokeWidth="6"/>
-                  <circle cx="50" cy="50" r="45" fill="none" stroke={T.accent} strokeWidth="6" strokeDasharray="283" strokeDashoffset={283*(1-pomPct)} strokeLinecap="round" style={{transition:"stroke-dashoffset 1s linear"}}/>
-                </svg>
-                <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
-                  <div style={{fontFamily:F.body,fontSize:18,color:T.text,fontWeight:500}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</div>
+              {/* Desktop layout */}
+              <div>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Desktop Layout</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+                  {[{k:"narrow",l:"Narrow",d:"Centered column"},{k:"wide",l:"Wide",d:"Roomier column"},{k:"sidebar",l:"Sidebar",d:"Nav on the left"}].map(({k,l,d})=>(
+                    <button key={k} onClick={()=>setDesktopLayout(k)} style={{background:desktopLayout===k?T.accent+"22":T.surface,border:`1.5px solid ${desktopLayout===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:desktopLayout===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2,textAlign:"center"}}>
+                      <span style={{fontWeight:500}}>{l}</span>
+                      <span style={{fontSize:9,opacity:0.7}}>{d}</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>
+                  Only changes anything on wider screens -- phones always get the narrow view
                 </div>
               </div>
-              <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-                <button onClick={()=>setPomodoroActive(a=>!a)} style={{background:T.accent,color:"#000",border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"⏸ Pause":"▶ Start"}</button>
-                <button onClick={()=>{setPomodoroSecs(25*60);setPomodoroActive(false);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>↺ Reset</button>
-              </div>
-            </div>
-            {/* Desktop layout */}
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted}}>Desktop Layout</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
-                {[{k:"narrow",l:"Narrow",d:"Centered column"},{k:"wide",l:"Wide",d:"Roomier column"},{k:"sidebar",l:"Sidebar",d:"Nav on the left"}].map(({k,l,d})=>(
-                  <button key={k} onClick={()=>setDesktopLayout(k)} style={{background:desktopLayout===k?T.accent+"22":T.surface,border:`1.5px solid ${desktopLayout===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:desktopLayout===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2,textAlign:"center"}}>
-                    <span style={{fontWeight:500}}>{l}</span>
-                    <span style={{fontSize:9,opacity:0.7}}>{d}</span>
-                  </button>
-                ))}
-              </div>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>
-                Only changes anything on wider screens -- phones always get the narrow view
-              </div>
-            </div>
+            </div>}
             {/* Group by */}
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
               <div className="sl" style={{color:T.textMuted}}>Group Tasks By</div>
@@ -1413,13 +1392,6 @@ export default function HomeworkPlanner() {
               </div>
             </div>
             {/* Toggles */}
-            <div style={{background:pixelMode?T.accent+"22":T.card,borderRadius:pixelMode?0:12,padding:"13px 15px",border:`${pixelMode?"2px solid "+T.accent:"1px solid "+T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-              <div>
-                <div style={{fontFamily:F.body,fontSize:pixelMode?9:12,color:T.text}}>Pixel Mode</div>
-                <div style={{fontFamily:F.body,fontSize:pixelMode?8:10,color:T.textFaint,marginTop:1}}>{pixelMode?">> ARCADE MODE ACTIVE":"Retro pixel art style"}</div>
-              </div>
-              <Toggle on={pixelMode} onChange={setPixelMode}/>
-            </div>
             <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show smart suggestion</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Study tip at the top of tasks</div></div>
               <Toggle on={showSuggestion} onChange={setShowSuggestion}/>

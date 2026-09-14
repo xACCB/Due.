@@ -87,11 +87,12 @@ const FONTS = {
 type FontName = keyof typeof FONTS;
 
 const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:"📚"}, priority:{name:"Priority",emoji:"🔥"}, dueDate:{name:"Due Date",emoji:"📅"} };
-const SUBJECTS = ["Math","English","Science","History","Art","PE","Other"];
-const SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA",Other:"#F0A500" };
+const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE","Other"];
+const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA",Other:"#F0A500" };
+const SUBJECT_COLOR_PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#F7DC6F","#BB8FCE","#82E0AA","#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#a78bfa","#fbbf24","#60a5fa"];
 const PRIORITY_COLORS: Record<string,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
 const QUESTIONS = [
-  { key:"subject", label:"What subject? 📚", type:"select", options:SUBJECTS },
+  { key:"subject", label:"What subject? 📚", type:"select" },
   { key:"dueDate", label:"When is it due? 📅", type:"date" },
   { key:"estMins", label:"How long will it take? ⏱️", type:"time" },
   { key:"notes", label:"Paste rubric or instructions 📋 (optional)", type:"text", optional:true },
@@ -159,6 +160,22 @@ export default function HomeworkPlanner() {
   // always render the same single narrow column regardless of this setting.
   const [desktopLayout,setDesktopLayout]=useState(()=>localStorage.getItem("hw-desktoplayout")||"narrow");
   useEffect(()=>{localStorage.setItem("hw-desktoplayout",desktopLayout);},[desktopLayout]);
+  const [subjects,setSubjects]=useState<string[]>(()=>{try{const s=localStorage.getItem("hw-subjects");return s?JSON.parse(s):DEFAULT_SUBJECTS;}catch{return DEFAULT_SUBJECTS;}});
+  const [subjectColors,setSubjectColors]=useState<Record<string,string>>(()=>{try{const s=localStorage.getItem("hw-subjectcolors");return {...DEFAULT_SUBJECT_COLORS,...(s?JSON.parse(s):{})};}catch{return DEFAULT_SUBJECT_COLORS;}});
+  useEffect(()=>{localStorage.setItem("hw-subjects",JSON.stringify(subjects));},[subjects]);
+  useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
+  function addSubject(name:string){
+    const trimmed=name.trim();
+    if(!trimmed||subjects.includes(trimmed))return;
+    const used=new Set(Object.values(subjectColors));
+    const color=SUBJECT_COLOR_PALETTE.find(c=>!used.has(c))||SUBJECT_COLOR_PALETTE[subjects.length%SUBJECT_COLOR_PALETTE.length];
+    setSubjects(prev=>[...prev,trimmed]);
+    setSubjectColors(prev=>({...prev,[trimmed]:color}));
+  }
+  function removeSubject(name:string){
+    setSubjects(prev=>prev.filter(s=>s!==name));
+    setSubjectColors(prev=>{const next={...prev};delete next[name];return next;});
+  }
 
   useEffect(()=>{localStorage.setItem("hw-tasks",JSON.stringify(tasks));},[tasks]);
   useEffect(()=>{localStorage.setItem("hw-theme",themeName);},[themeName]);
@@ -255,6 +272,8 @@ export default function HomeworkPlanner() {
   const [timeSecs,setTimeSecs]=useState(0);
   const [showAccountMenu,setShowAccountMenu]=useState(false);
   const [showProfile,setShowProfile]=useState(false);
+  const [profileTab,setProfileTab]=useState<"profile"|"personalize">("profile");
+  const [newSubjectName,setNewSubjectName]=useState("");
   const [sessionActive,setSessionActive]=useState(false);
   const [sessionSecs,setSessionSecs]=useState(0);
   const [sessionHistory,setSessionHistory]=useState<{mins:number;date:string}[]>([]);
@@ -395,7 +414,7 @@ export default function HomeworkPlanner() {
     const totalTasks=tasks.length;
     const highPri=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="high").length;
     const pct=totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
-    const subjectCounts=SUBJECTS.map(s=>({name:s,count:tasks.filter(t=>t.subject===s).length,color:SUBJECT_COLORS[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
+    const subjectCounts=subjects.map(s=>({name:s,count:tasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
 
     if (!fbUser) return (
       // ── SIGN IN SCREEN (monkeytype-style) ─────────────────────────────────────
@@ -441,11 +460,43 @@ export default function HomeworkPlanner() {
       <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,overflowY:"auto"}}>
         <div style={{maxWidth:560,margin:"0 auto",padding:"20px 16px 40px"}}>
           {/* Header */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:28}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
             <div style={{fontFamily:F.heading,fontSize:22,color:T.accent}}>profile</div>
-            <button onClick={()=>setShowProfile(false)} style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+            <button onClick={()=>{setShowProfile(false);setProfileTab("profile");}} style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
           </div>
 
+          {/* Tabs */}
+          <div style={{display:"flex",gap:4,marginBottom:24,background:T.surface,borderRadius:11,padding:3}}>
+            {(["profile","personalize"] as const).map(id=>{
+              const labels:Record<string,string>={profile:"👤 Profile",personalize:"🎨 Personalization"};
+              return <button key={id} onClick={()=>setProfileTab(id)} style={{flex:1,background:profileTab===id?T.card:"transparent",color:profileTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"8px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:profileTab===id?"500":"normal"}}>{labels[id]}</button>;
+            })}
+          </div>
+
+          {profileTab==="personalize"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Subjects</div>
+              {subjects.map(s=>{
+                const isDefault=(DEFAULT_SUBJECTS as string[]).includes(s);
+                return (
+                  <div key={s} style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:12,padding:"11px 14px",border:`1px solid ${T.border}`}}>
+                    <div style={{width:12,height:12,borderRadius:"50%",background:subjectColors[s]||T.accent,flexShrink:0}}/>
+                    <span style={{flex:1,fontFamily:F.body,fontSize:13,color:T.text}}>{s}</span>
+                    {isDefault
+                      ? <span style={{fontFamily:F.body,fontSize:9,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.05em"}}>default</span>
+                      : <button onClick={()=>removeSubject(s)} style={{background:"none",border:"none",color:T.textFaint,fontSize:16,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>×</button>
+                    }
+                  </div>
+                );
+              })}
+              <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectName);setNewSubjectName("");}} style={{display:"flex",gap:8,marginTop:8}}>
+                <input value={newSubjectName} onChange={e=>setNewSubjectName(e.target.value)} placeholder="Add a subject..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
+                <button type="submit" style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontWeight:500}}>Add</button>
+              </form>
+            </div>
+          )}
+
+          {profileTab==="profile"&&(<>
           {/* Avatar + name */}
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:32}}>
             <div style={{position:"relative",marginBottom:14}}>
@@ -569,6 +620,7 @@ export default function HomeworkPlanner() {
             style={{width:"100%",background:"none",border:`1px solid #FF475744`,borderRadius:12,padding:"13px",color:"#FF4757",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>
             🚪 Sign out
           </button>
+          </>)}
         </div>
       </div>
     );
@@ -579,7 +631,7 @@ export default function HomeworkPlanner() {
     if(!selectedTask)return null;
     const task=tasks.find(t=>t.id===selectedTask.id)||selectedTask;
     const pr=getPriority(task.dueDate,task.estMins);
-    const sc=SUBJECT_COLORS[task.subject]||T.accent;
+    const sc=subjectColors[task.subject]||T.accent;
     const sm=Math.floor(sessionSecs/60); const ss=sessionSecs%60;
     const totalSessionMins=sessionHistory.reduce((a,b)=>a+b.mins,0);
     return(
@@ -693,7 +745,7 @@ export default function HomeworkPlanner() {
   // ─── TASK CARD (base) ────────────────────────────────────────────────────────
   function MiniCard({task,rank}:{task:Task;rank:number}) {
     const pr=getPriority(task.dueDate,task.estMins);
-    const sc=SUBJECT_COLORS[task.subject]||T.accent;
+    const sc=subjectColors[task.subject]||T.accent;
     const dm=daysUntil(task.dueDate);
     const isTop=rank===0&&!task.done; const isNext=rank===1&&!task.done;
     return(
@@ -729,7 +781,7 @@ export default function HomeworkPlanner() {
 
     if (layout==="minimal") return (
       <div style={{display:"flex",flexDirection:"column",gap:2}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=SUBJECT_COLORS[t.subject]||T.accent;return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px",borderBottom:`1px solid ${T.border}22`}}>
             <button onClick={()=>toggleDone(t.id)} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
@@ -762,7 +814,7 @@ export default function HomeworkPlanner() {
 
     if (layout==="compact") return (
       <div style={{display:"flex",flexDirection:"column",gap:5}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=SUBJECT_COLORS[t.subject]||T.accent;const dm=daysUntil(t.dueDate);return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;const dm=daysUntil(t.dueDate);return(
           <div key={t.id} className="tc" style={{background:T.card,borderRadius:9,padding:"8px 11px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,position:"relative",overflow:"hidden"}}>
             <div style={{position:"absolute",left:0,top:0,bottom:0,width:2.5,background:PRIORITY_COLORS[pr]}}/>
             <button onClick={()=>toggleDone(t.id)} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
@@ -779,7 +831,7 @@ export default function HomeworkPlanner() {
 
     if (layout==="board") return (
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))",gap:10}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=SUBJECT_COLORS[t.subject]||T.accent;return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7}}>
             <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:PRIORITY_COLORS[pr],borderRadius:"12px 12px 0 0"}}/>
             <div style={{display:"flex",justifyContent:"space-between"}}>
@@ -801,7 +853,7 @@ export default function HomeworkPlanner() {
     if (layout==="sticky") return (
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:12}}>
         {tasks.map((t,i)=>{
-          const sc=SUBJECT_COLORS[t.subject]||T.accent;
+          const sc=subjectColors[t.subject]||T.accent;
           const rotations=[-2,-1,0,1,2]; const rot=rotations[i%rotations.length];
           const stickyColors=["#fef08a","#bfdbfe","#bbf7d0","#fed7aa","#f5d0fe","#fecdd3"];
           const bg=stickyColors[i%stickyColors.length];
@@ -847,7 +899,7 @@ export default function HomeworkPlanner() {
     if (layout==="timeline") return (
       <div style={{position:"relative",paddingLeft:24}}>
         <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:`linear-gradient(${T.accent},${T.border})`}}/>
-        {tasks.map((t,i)=>{const pr=getPriority(t.dueDate,t.estMins);const sc=SUBJECT_COLORS[t.subject]||T.accent;return(
+        {tasks.map((t,i)=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" style={{position:"relative",marginBottom:14}}>
             <div style={{position:"absolute",left:-19,top:14,width:12,height:12,borderRadius:"50%",background:t.done?"#2ED573":PRIORITY_COLORS[pr],border:`2px solid ${T.bg}`,cursor:"pointer"}} onClick={()=>toggleDone(t.id)}/>
             <div style={{background:T.card,borderRadius:11,padding:"11px 13px",border:`1px solid ${T.border}`,marginLeft:6}}>
@@ -875,7 +927,7 @@ export default function HomeworkPlanner() {
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
             {allSubs.map(s=>(
               <button key={s} className="chip" onClick={()=>setActiveSubject(s)}
-                style={{background:activeSubject===s?(SUBJECT_COLORS[s]||T.accent)+"33":"none",color:activeSubject===s?(SUBJECT_COLORS[s]||T.accent):T.textMuted,border:`1.5px solid ${activeSubject===s?(SUBJECT_COLORS[s]||T.accent):T.border}`}}>
+                style={{background:activeSubject===s?(subjectColors[s]||T.accent)+"33":"none",color:activeSubject===s?(subjectColors[s]||T.accent):T.textMuted,border:`1.5px solid ${activeSubject===s?(subjectColors[s]||T.accent):T.border}`}}>
                 {s==="all"?"All 📚":s}
               </button>
             ))}
@@ -890,7 +942,7 @@ export default function HomeworkPlanner() {
     if (layout==="progress") return (
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {tasks.map(t=>{
-          const pr=getPriority(t.dueDate,t.estMins);const sc=SUBJECT_COLORS[t.subject]||T.accent;
+          const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;
           const maxMins=120; const pct=Math.min(100,Math.round(t.estMins/maxMins*100));
           return(
             <div key={t.id} className="tc" style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`}}>
@@ -965,7 +1017,7 @@ export default function HomeworkPlanner() {
                   {isToday?"📌 Today":formatDate(day)}
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                  {dayTasks.map(t=>{const sc=SUBJECT_COLORS[t.subject]||T.accent;const pr=getPriority(t.dueDate,t.estMins);return(
+                  {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;const pr=getPriority(t.dueDate,t.estMins);return(
                     <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.border}33`}}>
                       <button onClick={()=>toggleDone(t.id)} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {t.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
@@ -1143,7 +1195,7 @@ export default function HomeworkPlanner() {
                   ):currentQ?(
                     <div>
                       <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>{currentQ.label}</div>
-                      {currentQ.type==="select"&&<div style={{display:"flex",flexWrap:"wrap",gap:7}}>{currentQ.options!.map(opt=><button key={opt} className="chip" style={{background:SUBJECT_COLORS[opt]?SUBJECT_COLORS[opt]+"22":T.cardAlt,color:SUBJECT_COLORS[opt]||T.text,border:`1px solid ${SUBJECT_COLORS[opt]||T.border}`}} onClick={()=>handleAnswer(opt)}>{opt}</button>)}{currentQ.optional&&<button className="chip" style={{background:"none",color:T.textFaint,border:`1px dashed ${T.border}`}} onClick={skipOptional}>skip</button>}</div>}
+                      {currentQ.type==="select"&&<div style={{display:"flex",flexWrap:"wrap",gap:7}}>{subjects.map(opt=><button key={opt} className="chip" style={{background:subjectColors[opt]?subjectColors[opt]+"22":T.cardAlt,color:subjectColors[opt]||T.text,border:`1px solid ${subjectColors[opt]||T.border}`}} onClick={()=>handleAnswer(opt)}>{opt}</button>)}{currentQ.optional&&<button className="chip" style={{background:"none",color:T.textFaint,border:`1px dashed ${T.border}`}} onClick={skipOptional}>skip</button>}</div>}
                       {currentQ.type==="date"&&<div style={{display:"flex",gap:7,flexWrap:"wrap"}}>{[{l:"Today",d:0},{l:"Tomorrow",d:1},{l:"3 days",d:3},{l:"Next week",d:7}].map(({l,d})=>{const dt=new Date();dt.setDate(dt.getDate()+d);return<button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>handleAnswer(dt.toISOString().split("T")[0])}>{l}</button>;})} <input ref={inputRef} type="date" defaultValue="" onChange={e=>{inputValRef.current=e.target.value;}} onKeyDown={e=>e.key==="Enter"&&inputRef.current?.value&&handleDateInput(inputRef.current.value)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:12,flex:1,minWidth:120,outline:"none"}}/><button style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"7px 13px",cursor:"pointer"}} onClick={()=>inputRef.current?.value&&handleDateInput(inputRef.current.value)}>→</button></div>}
                       {currentQ.type==="time"&&(
                         <div>
@@ -1232,7 +1284,7 @@ export default function HomeworkPlanner() {
                     <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginBottom:2}}>adding</div>
                     <div style={{fontFamily:F.heading,fontSize:14,color:T.text}}>{newTask.title}</div>
                     <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
-                      {newTask.subject&&<span style={{color:SUBJECT_COLORS[newTask.subject]||T.accent,fontFamily:F.body,fontSize:10}}>{newTask.subject}</span>}
+                      {newTask.subject&&<span style={{color:subjectColors[newTask.subject]||T.accent,fontFamily:F.body,fontSize:10}}>{newTask.subject}</span>}
                       {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>📅 {formatDate(newTask.dueDate)}</span>}
                     </div>
                   </div>}

@@ -1066,14 +1066,11 @@ export default function HomeworkPlanner() {
           </div>
           {/* Profile button - always visible */}
           {!fbLoading&&(
-            <button onClick={()=>setShowProfile(true)} style={{display:"flex",alignItems:"center",gap:6,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px 5px 5px",cursor:"pointer",transition:"all 0.15s"}}>
+            <button onClick={()=>setShowProfile(true)} aria-label="Profile" style={{display:"flex",alignItems:"center",justifyContent:"center",background:"none",border:`1px solid ${T.border}`,borderRadius:"50%",width:32,height:32,padding:0,cursor:"pointer",transition:"all 0.15s",flexShrink:0}}>
               {fbUser?.photoURL
-                ? <img src={fbUser.photoURL} alt="" style={{width:26,height:26,borderRadius:"50%",objectFit:"cover"}}/>
-                : <div style={{width:26,height:26,borderRadius:"50%",background:T.surface,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
-                  </div>
+                ? <img src={fbUser.photoURL} alt="" style={{width:28,height:28,borderRadius:"50%",objectFit:"cover"}}/>
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
               }
-              <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>Profile</span>
             </button>
           )}
           <div style={{textAlign:"right"}}>
@@ -1273,6 +1270,22 @@ export default function HomeworkPlanner() {
         {activeTab==="options"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
 
+            {/* Account */}
+            {!fbLoading&&(
+              <button onClick={()=>setShowProfile(true)} style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer",width:"100%",textAlign:"left"}}>
+                {fbUser?.photoURL
+                  ? <img src={fbUser.photoURL} alt="" style={{width:38,height:38,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>
+                  : <div style={{width:38,height:38,borderRadius:"50%",background:T.surface,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
+                    </div>
+                }
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:F.body,fontSize:13,color:T.text,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?fbUser.displayName:"Not signed in"}</div>
+                  <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?fbUser.email:"Tap to sign in & sync"}</div>
+                </div>
+                <span style={{color:T.textFaint,fontSize:16,flexShrink:0}}>›</span>
+              </button>
+            )}
             {/* Looks */}
             <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
               <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:0,outline:"none",WebkitTapHighlightColor:"transparent"}}>

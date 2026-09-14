@@ -246,7 +246,7 @@ export default function HomeworkPlanner() {
   const [suggestion,setSuggestion]=useState("");
   const [suggestionLoading,setSuggestionLoading]=useState(false);
   const [activeTab,setActiveTab]=useState("tasks");
-  const [looksOpen,setLooksOpen]=useState(true);
+  const [looksOpen,setLooksOpen]=useState(false);
   const [activeSubject,setActiveSubject]=useState("all");
   const [pomodoroActive,setPomodoroActive]=useState(false);
   const [pomodoroSecs,setPomodoroSecs]=useState(25*60);
@@ -1275,7 +1275,7 @@ export default function HomeworkPlanner() {
 
             {/* Looks */}
             <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
-              <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:0}}>
+              <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:0,outline:"none",WebkitTapHighlightColor:"transparent"}}>
                 <span className="sl" style={{color:T.textMuted,padding:0}}>🎨 Looks</span>
                 <span style={{color:T.textMuted,fontSize:13,transform:looksOpen?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
               </button>

@@ -1080,7 +1080,7 @@ export default function HomeworkPlanner() {
   },[T.accent]);
 
   return (
-    <div className={"app-shell dl-"+desktopLayout} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s",borderLeft:`3px solid ${T.accent}55`,borderRight:`3px solid ${T.accent}55`,borderBottom:`3px solid ${T.accent}55`,borderTop:`3px solid ${T.accent}55`,borderRadius:pixelMode?0:0,boxShadow:pixelMode?`0 0 0 2px ${T.accent}, 0 0 0 4px ${T.bg}, 0 0 0 6px ${T.accent}44`:`0 0 60px ${T.accent}22, inset 0 0 30px ${T.accent}08`}}>
+    <div className={"app-shell dl-"+desktopLayout} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s",boxShadow:pixelMode?`0 0 0 2px ${T.accent}, 0 0 0 4px ${T.bg}, 0 0 0 6px ${T.accent}44`:"none"}}>
       {pixelMode&&<div className="pixel-scanline"/>}
       {pixelMode&&<div style={{position:"fixed",inset:0,backgroundImage:`repeating-linear-gradient(0deg, ${T.accent}04 0px, transparent 1px, transparent 3px)`,pointerEvents:"none",zIndex:9998}}/>}
       <style>{css}</style>

@@ -139,7 +139,7 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
   const days=daysUntil(top.dueDate);
   const timeStr=top.estMins>=60?`${Math.floor(top.estMins/60)}h${top.estMins%60?` ${top.estMins%60}m`:""}`:`${top.estMins}m`;
   const urgencyWord=days==="Overdue!"?"overdue":days==="Due today!"?"due today":days==="Due tomorrow"?"due tomorrow":days?days.replace(" days left","d left"):"no deadline";
-  return `Start with "${top.title}" -- ${urgencyWord}, ~${timeStr}`;
+  return `Start with "${top.title}"\n${urgencyWord}, ~${timeStr}`;
 }
 
 export default function HomeworkPlanner() {
@@ -1133,7 +1133,7 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:7,minWidth:0}}>
                   <span style={{fontSize:12,marginTop:1}}>✨</span>
-                  {suggestionLoading?(<div className="shim" style={{height:11,width:140,marginTop:2}}/>):(<span style={{fontFamily:F.body,fontSize:12,color:T.text,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"} as React.CSSProperties}>{suggestion}</span>)}
+                  {suggestionLoading?(<div className="shim" style={{height:11,width:140,marginTop:2}}/>):(<span style={{fontFamily:F.body,fontSize:12,color:T.text,lineHeight:1.4,whiteSpace:"pre-line"}}>{suggestion}</span>)}
                 </div>
                 <button onClick={()=>setShowSuggestion(false)} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
               </div>

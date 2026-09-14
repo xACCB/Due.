@@ -137,9 +137,9 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
   });
   const top=sorted[0];
   const days=daysUntil(top.dueDate);
-  const timeStr=top.estMins>=60?`${Math.floor(top.estMins/60)}h${top.estMins%60?` ${top.estMins%60}m`:""}`:`${top.estMins} min`;
-  const urgencyPhrase=days==="Overdue!"?"it's overdue":days==="Due today!"?"it's due today":days==="Due tomorrow"?"it's due tomorrow":days?`it's due in ${days.replace(" days left"," days")}`:"it has no deadline yet";
-  return `Start with "${top.title}" -- ${urgencyPhrase} and should take about ${timeStr}. Knock that one out first and the rest gets easier!`;
+  const timeStr=top.estMins>=60?`${Math.floor(top.estMins/60)}h${top.estMins%60?` ${top.estMins%60}m`:""}`:`${top.estMins}m`;
+  const urgencyWord=days==="Overdue!"?"overdue":days==="Due today!"?"due today":days==="Due tomorrow"?"due tomorrow":days?days.replace(" days left","d left"):"no deadline";
+  return `Start with "${top.title}" -- ${urgencyWord}, ~${timeStr}`;
 }
 
 export default function HomeworkPlanner() {
@@ -1129,22 +1129,18 @@ export default function HomeworkPlanner() {
         {activeTab==="tasks"&&<>
           {/* AI Suggestion */}
           {showSuggestion?(
-            <div style={{background:T.gradientCard,borderRadius:14,padding:"14px 16px",marginBottom:16,border:`1px solid ${T.accent}33`,position:"relative",overflow:"hidden"}}>
-              <div style={{position:"absolute",top:0,right:0,width:80,height:80,background:`radial-gradient(circle,${T.accent}15 0%,transparent 70%)`,pointerEvents:"none"}}/>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:7}}>
-                  <span style={{fontSize:13}}>✨</span>
-                  <span style={{display:"inline-flex",alignItems:"center",background:T.accent+"22",border:`1px solid ${T.accent}55`,borderRadius:999,padding:"1px 9px",fontFamily:F.body,fontSize:9,color:T.accent}}>smart suggestion</span>
+            <div style={{background:T.gradientCard,borderRadius:12,padding:"10px 12px",marginBottom:16,border:`1px solid ${T.accent}33`,position:"relative",overflow:"hidden"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+                  <span style={{fontSize:12}}>✨</span>
+                  {suggestionLoading?(<div className="shim" style={{height:11,width:140}}/>):(<span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{suggestion}</span>)}
                 </div>
-                <button onClick={()=>setShowSuggestion(false)} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px"}}>×</button>
+                <button onClick={()=>setShowSuggestion(false)} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
               </div>
-              {suggestionLoading?(<div><div className="shim" style={{height:11,width:"88%",marginBottom:6}}/><div className="shim" style={{height:11,width:"60%"}}/></div>):(<div style={{fontFamily:F.heading,fontSize:14,color:T.text,lineHeight:1.6,fontStyle:"italic"}} className="sli">{suggestion}</div>)}
-              {topTask&&!suggestionLoading&&<div style={{marginTop:8,display:"flex",alignItems:"center",gap:7}}><span style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>start here →</span><span style={{background:(SUBJECT_COLORS[topTask.subject]||T.accent)+"22",color:SUBJECT_COLORS[topTask.subject]||T.accent,borderRadius:999,padding:"2px 9px",fontFamily:F.body,fontSize:10}}>{topTask.title}</span></div>}
             </div>
           ):(
-            <button onClick={()=>setShowSuggestion(true)} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:`1px dashed ${T.border}`,borderRadius:10,padding:"8px 14px",marginBottom:16,cursor:"pointer",width:"100%",color:T.textFaint,fontFamily:F.body,fontSize:11,transition:"all 0.15s"}}>
-              <span style={{fontSize:12}}>✨</span>
-              <span>Show smart suggestion</span>
+            <button onClick={()=>setShowSuggestion(true)} style={{position:"fixed",bottom:20,right:16,width:40,height:40,borderRadius:"50%",background:T.card,border:`1px solid ${T.accent}55`,boxShadow:`0 2px 10px ${T.accent}33`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,zIndex:50}} title="Show smart suggestion">
+              ✨
             </button>
           )}
 

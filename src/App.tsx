@@ -112,7 +112,12 @@ const DEFAULT_TASKS: Task[] = [
 ];
 
 function vibrate(pattern:number|number[]) {
-  if (typeof navigator!=="undefined" && "vibrate" in navigator) navigator.vibrate(pattern);
+  // Never let this throw: iOS (Safari, and every other iOS browser -- Apple
+  // requires them all to run on WebKit) has no Vibration API at all, and some
+  // browsers expose a non-functional navigator.vibrate rather than omitting it.
+  try {
+    if (typeof navigator!=="undefined" && typeof navigator.vibrate==="function") navigator.vibrate(pattern);
+  } catch { /* unsupported -- ignore */ }
 }
 function contrastColor(hex:string):string {
   const c=hex.replace("#","");
@@ -432,6 +437,10 @@ export default function HomeworkPlanner() {
   const [step,setStep]=useState(0);
   const [newTask,setNewTask]=useState<Partial<Task>>({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
   const [pendingDueDate,setPendingDueDate]=useState<string|null>(null);
+  // iOS (Safari, and every other iOS browser -- Apple requires them all to use WebKit)
+  // has no Vibration API at all, so a screen-wide flash stands in for haptics there;
+  // real vibration still fires too, wherever the device/browser actually supports it.
+  const [completionPulse,setCompletionPulse]=useState(0);
   const inputValRef=useRef("");
   const [filter,setFilter]=useState("all");
   const [suggestion,setSuggestion]=useState("");
@@ -520,7 +529,10 @@ export default function HomeworkPlanner() {
   function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:Date.now(),done:false}]);setAdding(false);setStep(0);}
   function toggleDone(id:number){
     const task=tasks.find(t=>t.id===id);
-    if(task&&!task.done)vibrate(35);
+    if(task&&!task.done){
+      vibrate([25,40,25]);
+      setCompletionPulse(p=>p+1);
+    }
     setTasks(prev=>prev.map(t=>t.id===id?{...t,done:!t.done}:t));
   }
   function deleteTask(id:number){setTasks(prev=>prev.filter(t=>t.id!==id));}
@@ -538,6 +550,8 @@ export default function HomeworkPlanner() {
     .tc:hover{transform:translateY(-2px);filter:brightness(1.05);}
     .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+    .completion-pulse{position:fixed;inset:0;pointer-events:none;z-index:2000;background:radial-gradient(circle,${T.accent}55,transparent 70%);animation:completionPulse 0.5s ease-out forwards;}
+    @keyframes completionPulse{0%{opacity:1}100%{opacity:0}}
     .sli{animation:sli 0.22s ease forwards;}
     @keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
     .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}
@@ -1566,6 +1580,7 @@ export default function HomeworkPlanner() {
         onDelete={()=>{deleteTask(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
       />}
       {showProfile&&<ProfileModal/>}
+      {completionPulse>0&&<div key={completionPulse} className="completion-pulse"/>}
     </div>
   );
 }

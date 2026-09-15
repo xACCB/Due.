@@ -291,13 +291,31 @@ export default function HomeworkPlanner() {
     return()=>mq.removeEventListener("change",handler);
   },[]);
   const effectiveThemeMode:"light"|"dark"=themeMode==="auto"?(systemPrefersDark?"dark":"light"):themeMode;
+  // Remembers the last theme picked within each category, so switching Light/Dark/Auto
+  // back and forth restores what was there before instead of resetting to the first
+  // theme in the list every time.
+  const [themeByMode,setThemeByMode]=useState<Record<"light"|"dark",ThemeName>>(()=>{
+    const entries=Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][];
+    const firstOf=(isLight:boolean)=>entries.find(([,t])=>t.light===isLight)![0];
+    let saved:Partial<Record<"light"|"dark",string>>={};
+    try{saved=JSON.parse(localStorage.getItem("hw-themebymode")||"{}");}catch{/* ignore */}
+    const validSaved=(k:"light"|"dark")=>{
+      const v=saved[k] as ThemeName|undefined;
+      return v&&THEMES[v]&&THEMES[v].light===(k==="light")?v:null;
+    };
+    const currentCategory:"light"|"dark"=THEMES[themeName].light?"light":"dark";
+    return {
+      light: validSaved("light")||(currentCategory==="light"?themeName:firstOf(true)),
+      dark: validSaved("dark")||(currentCategory==="dark"?themeName:firstOf(false)),
+    };
+  });
+  useEffect(()=>{localStorage.setItem("hw-themebymode",JSON.stringify(themeByMode));},[themeByMode]);
   // Keep the active theme in the selected light/dark category -- if the mode changes
   // (by hand, or the system preference under "auto") and the current theme no longer
-  // matches, jump to the first theme that does.
+  // matches, restore whichever theme was last picked in that category.
   useEffect(()=>{
     if(THEMES[themeName].light===(effectiveThemeMode==="light"))return;
-    const fallback=(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).find(([,t])=>t.light===(effectiveThemeMode==="light"));
-    if(fallback)setThemeName(fallback[0]);
+    setThemeName(themeByMode[effectiveThemeMode]);
   },[effectiveThemeMode]);
   const [layout,setLayout]=useState<LayoutName>(()=>(localStorage.getItem("hw-layout") as LayoutName)||"list");
   const [groupBy,setGroupBy]=useState(()=>localStorage.getItem("hw-group")||"none");
@@ -1393,7 +1411,7 @@ export default function HomeworkPlanner() {
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{effectiveThemeMode==="light"?"Light":"Dark"} themes ({Object.values(THEMES).filter(t=>t.light===(effectiveThemeMode==="light")).length})</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
                   {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).filter(([,th])=>th.light===(effectiveThemeMode==="light")).map(([key,th])=>(
-                    <button key={key} onClick={()=>{setThemeName(key);setAccentOverride(null);}}
+                    <button key={key} onClick={()=>{setThemeName(key);setAccentOverride(null);setThemeByMode(prev=>({...prev,[effectiveThemeMode]:key}));}}
                       style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none"}}>
                       <span style={{fontSize:16}}>{th.emoji}</span>
                       <span style={{fontFamily:F.body,fontSize:9,color:th.text}}>{th.name}</span>

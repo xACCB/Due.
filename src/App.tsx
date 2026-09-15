@@ -23,28 +23,28 @@ const googleProvider = new GoogleAuthProvider();
 
 // ─── THEMES (22 total) ────────────────────────────────────────────────────────
 const THEMES = {
-  midnight:    { name:"Midnight",    emoji:"🌙", bg:"#0F0F1A", card:"#16162A", cardAlt:"#1e1e35", border:"#252540", borderAccent:"#2A2A50", text:"#EEE8D5", textMuted:"#888",   textFaint:"#555",   accent:"#F0A500", surface:"#1A1A2E" },
-  nord:        { name:"Nord",        emoji:"❄️", bg:"#2E3440", card:"#3B4252", cardAlt:"#434C5E", border:"#4C566A", borderAccent:"#5E6E82", text:"#ECEFF4", textMuted:"#D8DEE9", textFaint:"#8894a8", accent:"#88C0D0", surface:"#3B4252" },
-  olivia:      { name:"Olivia",      emoji:"🌹", bg:"#1b1b1b", card:"#2a2a2a", cardAlt:"#333333", border:"#3d3d3d", borderAccent:"#4a4a4a", text:"#e8c4b8", textMuted:"#b08070", textFaint:"#6a4a40", accent:"#e05c5c", surface:"#252525" },
-  stealth:     { name:"Stealth",     emoji:"🕶️", bg:"#0a0a0a", card:"#111111", cardAlt:"#1a1a1a", border:"#222222", borderAccent:"#2a2a2a", text:"#cccccc", textMuted:"#666666", textFaint:"#333333", accent:"#ffffff", surface:"#0f0f0f" },
-  serika:      { name:"Serika",      emoji:"🌾", bg:"#e1dbd2", card:"#cdc6bd", cardAlt:"#d5cec5", border:"#b8b0a5", borderAccent:"#a8a09a", text:"#3b3a36", textMuted:"#7a7060", textFaint:"#aaa090", accent:"#e2b714", surface:"#d4cdc4" },
-  catppuccin:  { name:"Catppuccin",  emoji:"🐱", bg:"#1e1e2e", card:"#313244", cardAlt:"#3a3a54", border:"#45475a", borderAccent:"#585b70", text:"#cdd6f4", textMuted:"#a6adc8", textFaint:"#6c7086", accent:"#cba6f7", surface:"#181825" },
-  tokyonight:  { name:"Tokyo Night", emoji:"🗼", bg:"#1a1b26", card:"#24283b", cardAlt:"#2f344d", border:"#383d5a", borderAccent:"#414868", text:"#c0caf5", textMuted:"#9aa5ce", textFaint:"#565f89", accent:"#7dcfff", surface:"#16161e" },
-  dracula:     { name:"Dracula",     emoji:"🧛", bg:"#282a36", card:"#343746", cardAlt:"#3d4059", border:"#44475a", borderAccent:"#555777", text:"#f8f8f2", textMuted:"#bd93f9", textFaint:"#6272a4", accent:"#ff79c6", surface:"#21222c" },
-  rosepine:    { name:"Rosé Pine",   emoji:"🌸", bg:"#191724", card:"#1f1d2e", cardAlt:"#26233a", border:"#2a2740", borderAccent:"#393552", text:"#e0def4", textMuted:"#908caa", textFaint:"#524f67", accent:"#ebbcba", surface:"#1a1826" },
-  matrix:      { name:"Matrix",      emoji:"💻", bg:"#0a0f0a", card:"#0d160d", cardAlt:"#111e11", border:"#1a2e1a", borderAccent:"#1f381f", text:"#00ff41", textMuted:"#00aa2b", textFaint:"#005515", accent:"#00ff41", surface:"#0b120b" },
-  blush:       { name:"Blush",       emoji:"💗", bg:"#1a0e14", card:"#2a1520", cardAlt:"#351a28", border:"#3d2030", borderAccent:"#4a2838", text:"#f5dde8", textMuted:"#c49aaa", textFaint:"#7a5060", accent:"#f472b6", surface:"#22101a" },
-  paper:       { name:"Paper",       emoji:"📄", bg:"#f5f0e8", card:"#faf7f2", cardAlt:"#ffffff", border:"#e0d8cc", borderAccent:"#cec4b4", text:"#2c2416", textMuted:"#7a6a55", textFaint:"#b0a090", accent:"#c2440f", surface:"#ede8df" },
-  gruvbox:     { name:"Gruvbox",     emoji:"🟫", bg:"#282828", card:"#3c3836", cardAlt:"#504945", border:"#665c54", borderAccent:"#7c6f64", text:"#ebdbb2", textMuted:"#a89984", textFaint:"#7c6f64", accent:"#fabd2f", surface:"#32302f" },
-  milkshake:   { name:"Milkshake",   emoji:"🥤", bg:"#fdf6ff", card:"#f5eaff", cardAlt:"#eedeff", border:"#ddc8f5", borderAccent:"#ccb3ee", text:"#3b1f5e", textMuted:"#8b6aaa", textFaint:"#c4a8e0", accent:"#b44fd1", surface:"#f0e0ff" },
-  suisei:      { name:"Suisei",      emoji:"⭐", bg:"#0d0e1a", card:"#131428", cardAlt:"#1a1b35", border:"#252645", borderAccent:"#2e2f55", text:"#e8eaf6", textMuted:"#9fa8da", textFaint:"#3d4070", accent:"#7c83e8", surface:"#0f1020" },
-  onedark:     { name:"One Dark",    emoji:"🌑", bg:"#282c34", card:"#21252b", cardAlt:"#2c313a", border:"#3e4451", borderAccent:"#4b5263", text:"#abb2bf", textMuted:"#828997", textFaint:"#4b5263", accent:"#61afef", surface:"#1e2127" },
-  cherry:      { name:"Cherry",      emoji:"🌸", bg:"#1a0a0f", card:"#2a1018", cardAlt:"#351520", border:"#4a1f2d", borderAccent:"#5c2638", text:"#fce4ec", textMuted:"#f48fb1", textFaint:"#6a2040", accent:"#f06292", surface:"#200c14" },
-  discord:     { name:"Discord",     emoji:"💬", bg:"#313338", card:"#2b2d31", cardAlt:"#232428", border:"#3f4147", borderAccent:"#4e5058", text:"#dbdee1", textMuted:"#949ba4", textFaint:"#4e5058", accent:"#5865f2", surface:"#1e1f22" },
-  bliss:       { name:"Bliss",       emoji:"🌅", bg:"#1a1625", card:"#221e30", cardAlt:"#2a263c", border:"#373048", borderAccent:"#433a58", text:"#e8e0f5", textMuted:"#a89bc4", textFaint:"#5a5070", accent:"#c9a8f5", surface:"#1d1929" },
-  dev:         { name:"Dev",         emoji:"🖥️", bg:"#1e1e1e", card:"#252526", cardAlt:"#2d2d2d", border:"#3c3c3c", borderAccent:"#4a4a4a", text:"#d4d4d4", textMuted:"#858585", textFaint:"#3c3c3c", accent:"#569cd6", surface:"#1e1e1e" },
-  dark:        { name:"Dark",        emoji:"🌚", bg:"#000000", card:"#0d0d0d", cardAlt:"#141414", border:"#1f1f1f", borderAccent:"#2a2a2a", text:"#e0e0e0", textMuted:"#666666", textFaint:"#2a2a2a", accent:"#ffffff", surface:"#080808" },
-  shadow:      { name:"Shadow",      emoji:"👤", bg:"#0c0c0f", card:"#13131a", cardAlt:"#1a1a24", border:"#22222e", borderAccent:"#2a2a3a", text:"#c8c8d8", textMuted:"#6a6a88", textFaint:"#2a2a3a", accent:"#7070aa", surface:"#0f0f15" },
+  midnight:    { light:false, name:"Midnight",    emoji:"🌙", bg:"#0F0F1A", card:"#16162A", cardAlt:"#1e1e35", border:"#252540", borderAccent:"#2A2A50", text:"#EEE8D5", textMuted:"#888",   textFaint:"#555",   accent:"#F0A500", surface:"#1A1A2E" },
+  nord:        { light:false, name:"Nord",        emoji:"❄️", bg:"#2E3440", card:"#3B4252", cardAlt:"#434C5E", border:"#4C566A", borderAccent:"#5E6E82", text:"#ECEFF4", textMuted:"#D8DEE9", textFaint:"#8894a8", accent:"#88C0D0", surface:"#3B4252" },
+  olivia:      { light:false, name:"Olivia",      emoji:"🌹", bg:"#1b1b1b", card:"#2a2a2a", cardAlt:"#333333", border:"#3d3d3d", borderAccent:"#4a4a4a", text:"#e8c4b8", textMuted:"#b08070", textFaint:"#6a4a40", accent:"#e05c5c", surface:"#252525" },
+  stealth:     { light:false, name:"Stealth",     emoji:"🕶️", bg:"#0a0a0a", card:"#111111", cardAlt:"#1a1a1a", border:"#222222", borderAccent:"#2a2a2a", text:"#cccccc", textMuted:"#666666", textFaint:"#333333", accent:"#ffffff", surface:"#0f0f0f" },
+  serika:      { light:true, name:"Serika",      emoji:"🌾", bg:"#e1dbd2", card:"#cdc6bd", cardAlt:"#d5cec5", border:"#b8b0a5", borderAccent:"#a8a09a", text:"#3b3a36", textMuted:"#7a7060", textFaint:"#aaa090", accent:"#e2b714", surface:"#d4cdc4" },
+  catppuccin:  { light:false, name:"Catppuccin",  emoji:"🐱", bg:"#1e1e2e", card:"#313244", cardAlt:"#3a3a54", border:"#45475a", borderAccent:"#585b70", text:"#cdd6f4", textMuted:"#a6adc8", textFaint:"#6c7086", accent:"#cba6f7", surface:"#181825" },
+  tokyonight:  { light:false, name:"Tokyo Night", emoji:"🗼", bg:"#1a1b26", card:"#24283b", cardAlt:"#2f344d", border:"#383d5a", borderAccent:"#414868", text:"#c0caf5", textMuted:"#9aa5ce", textFaint:"#565f89", accent:"#7dcfff", surface:"#16161e" },
+  dracula:     { light:false, name:"Dracula",     emoji:"🧛", bg:"#282a36", card:"#343746", cardAlt:"#3d4059", border:"#44475a", borderAccent:"#555777", text:"#f8f8f2", textMuted:"#bd93f9", textFaint:"#6272a4", accent:"#ff79c6", surface:"#21222c" },
+  rosepine:    { light:false, name:"Rosé Pine",   emoji:"🌸", bg:"#191724", card:"#1f1d2e", cardAlt:"#26233a", border:"#2a2740", borderAccent:"#393552", text:"#e0def4", textMuted:"#908caa", textFaint:"#524f67", accent:"#ebbcba", surface:"#1a1826" },
+  matrix:      { light:false, name:"Matrix",      emoji:"💻", bg:"#0a0f0a", card:"#0d160d", cardAlt:"#111e11", border:"#1a2e1a", borderAccent:"#1f381f", text:"#00ff41", textMuted:"#00aa2b", textFaint:"#005515", accent:"#00ff41", surface:"#0b120b" },
+  blush:       { light:false, name:"Blush",       emoji:"💗", bg:"#1a0e14", card:"#2a1520", cardAlt:"#351a28", border:"#3d2030", borderAccent:"#4a2838", text:"#f5dde8", textMuted:"#c49aaa", textFaint:"#7a5060", accent:"#f472b6", surface:"#22101a" },
+  paper:       { light:true, name:"Paper",       emoji:"📄", bg:"#f5f0e8", card:"#faf7f2", cardAlt:"#ffffff", border:"#e0d8cc", borderAccent:"#cec4b4", text:"#2c2416", textMuted:"#7a6a55", textFaint:"#b0a090", accent:"#c2440f", surface:"#ede8df" },
+  gruvbox:     { light:false, name:"Gruvbox",     emoji:"🟫", bg:"#282828", card:"#3c3836", cardAlt:"#504945", border:"#665c54", borderAccent:"#7c6f64", text:"#ebdbb2", textMuted:"#a89984", textFaint:"#7c6f64", accent:"#fabd2f", surface:"#32302f" },
+  milkshake:   { light:true, name:"Milkshake",   emoji:"🥤", bg:"#fdf6ff", card:"#f5eaff", cardAlt:"#eedeff", border:"#ddc8f5", borderAccent:"#ccb3ee", text:"#3b1f5e", textMuted:"#8b6aaa", textFaint:"#c4a8e0", accent:"#b44fd1", surface:"#f0e0ff" },
+  suisei:      { light:false, name:"Suisei",      emoji:"⭐", bg:"#0d0e1a", card:"#131428", cardAlt:"#1a1b35", border:"#252645", borderAccent:"#2e2f55", text:"#e8eaf6", textMuted:"#9fa8da", textFaint:"#3d4070", accent:"#7c83e8", surface:"#0f1020" },
+  onedark:     { light:false, name:"One Dark",    emoji:"🌑", bg:"#282c34", card:"#21252b", cardAlt:"#2c313a", border:"#3e4451", borderAccent:"#4b5263", text:"#abb2bf", textMuted:"#828997", textFaint:"#4b5263", accent:"#61afef", surface:"#1e2127" },
+  cherry:      { light:false, name:"Cherry",      emoji:"🌸", bg:"#1a0a0f", card:"#2a1018", cardAlt:"#351520", border:"#4a1f2d", borderAccent:"#5c2638", text:"#fce4ec", textMuted:"#f48fb1", textFaint:"#6a2040", accent:"#f06292", surface:"#200c14" },
+  discord:     { light:false, name:"Discord",     emoji:"💬", bg:"#313338", card:"#2b2d31", cardAlt:"#232428", border:"#3f4147", borderAccent:"#4e5058", text:"#dbdee1", textMuted:"#949ba4", textFaint:"#4e5058", accent:"#5865f2", surface:"#1e1f22" },
+  bliss:       { light:false, name:"Bliss",       emoji:"🌅", bg:"#1a1625", card:"#221e30", cardAlt:"#2a263c", border:"#373048", borderAccent:"#433a58", text:"#e8e0f5", textMuted:"#a89bc4", textFaint:"#5a5070", accent:"#c9a8f5", surface:"#1d1929" },
+  dev:         { light:false, name:"Dev",         emoji:"🖥️", bg:"#1e1e1e", card:"#252526", cardAlt:"#2d2d2d", border:"#3c3c3c", borderAccent:"#4a4a4a", text:"#d4d4d4", textMuted:"#858585", textFaint:"#3c3c3c", accent:"#569cd6", surface:"#1e1e1e" },
+  dark:        { light:false, name:"Dark",        emoji:"🌚", bg:"#000000", card:"#0d0d0d", cardAlt:"#141414", border:"#1f1f1f", borderAccent:"#2a2a2a", text:"#e0e0e0", textMuted:"#666666", textFaint:"#2a2a2a", accent:"#ffffff", surface:"#080808" },
+  shadow:      { light:false, name:"Shadow",      emoji:"👤", bg:"#0c0c0f", card:"#13131a", cardAlt:"#1a1a24", border:"#22222e", borderAccent:"#2a2a3a", text:"#c8c8d8", textMuted:"#6a6a88", textFaint:"#2a2a3a", accent:"#7070aa", surface:"#0f0f15" },
 } as const;
 type ThemeName = keyof typeof THEMES;
 type ThemeObj = Omit<typeof THEMES[ThemeName], "accent"> & { accent: string; accentGlow: string; gradientCard: string };
@@ -147,6 +147,25 @@ export default function HomeworkPlanner() {
   const [tasks,setTasks]=useState<Task[]>(()=>{try{const s=localStorage.getItem("hw-tasks");return s?JSON.parse(s):DEFAULT_TASKS;}catch{return DEFAULT_TASKS;}});
   const [selectedTask,setSelectedTask]=useState<Task|null>(null);
   const [themeName,setThemeName]=useState<ThemeName>(()=>(localStorage.getItem("hw-theme") as ThemeName)||"midnight");
+  const [themeMode,setThemeMode]=useState<"light"|"dark"|"auto">(()=>(localStorage.getItem("hw-thememode") as "light"|"dark"|"auto")||"auto");
+  useEffect(()=>{localStorage.setItem("hw-thememode",themeMode);},[themeMode]);
+  const [systemPrefersDark,setSystemPrefersDark]=useState(()=>typeof window!=="undefined"&&!!window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
+  useEffect(()=>{
+    if(typeof window==="undefined"||!window.matchMedia)return;
+    const mq=window.matchMedia("(prefers-color-scheme: dark)");
+    const handler=(e:MediaQueryListEvent)=>setSystemPrefersDark(e.matches);
+    mq.addEventListener("change",handler);
+    return()=>mq.removeEventListener("change",handler);
+  },[]);
+  const effectiveThemeMode:"light"|"dark"=themeMode==="auto"?(systemPrefersDark?"dark":"light"):themeMode;
+  // Keep the active theme in the selected light/dark category -- if the mode changes
+  // (by hand, or the system preference under "auto") and the current theme no longer
+  // matches, jump to the first theme that does.
+  useEffect(()=>{
+    if(THEMES[themeName].light===(effectiveThemeMode==="light"))return;
+    const fallback=(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).find(([,t])=>t.light===(effectiveThemeMode==="light"));
+    if(fallback)setThemeName(fallback[0]);
+  },[effectiveThemeMode]);
   const [layout,setLayout]=useState<LayoutName>(()=>(localStorage.getItem("hw-layout") as LayoutName)||"list");
   const [groupBy,setGroupBy]=useState(()=>localStorage.getItem("hw-group")||"none");
   const [showDone,setShowDone]=useState(()=>localStorage.getItem("hw-showdone")!=="false");
@@ -1343,11 +1362,24 @@ export default function HomeworkPlanner() {
                 <span style={{color:T.textMuted,fontSize:13,transform:looksOpen?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
               </button>
               {looksOpen&&<div style={{display:"flex",flexDirection:"column",gap:20,marginTop:16}}>
+              {/* Appearance mode */}
+              <div>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Appearance</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+                  {([{k:"light",l:"Light",e:"☀️"},{k:"dark",l:"Dark",e:"🌙"},{k:"auto",l:"Auto",e:"🌗"}] as const).map(({k,l,e})=>(
+                    <button key={k} onClick={()=>setThemeMode(k)} style={{background:themeMode===k?T.accent+"22":T.surface,border:`1.5px solid ${themeMode===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:themeMode===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                      <span style={{fontSize:15}}>{e}</span>
+                      <span style={{fontWeight:500}}>{l}</span>
+                    </button>
+                  ))}
+                </div>
+                {themeMode==="auto"&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>Following your device -- currently {effectiveThemeMode}</div>}
+              </div>
               {/* Theme */}
               <div>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Theme ({Object.keys(THEMES).length})</div>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{effectiveThemeMode==="light"?"Light":"Dark"} themes ({Object.values(THEMES).filter(t=>t.light===(effectiveThemeMode==="light")).length})</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-                  {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).map(([key,th])=>(
+                  {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).filter(([,th])=>th.light===(effectiveThemeMode==="light")).map(([key,th])=>(
                     <button key={key} onClick={()=>{setThemeName(key);setAccentOverride(null);}}
                       style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none"}}>
                       <span style={{fontSize:16}}>{th.emoji}</span>

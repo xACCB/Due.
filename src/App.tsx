@@ -111,6 +111,9 @@ const DEFAULT_TASKS: Task[] = [
   { id:4, title:"History Reading", subject:"History", dueDate:new Date(Date.now()+2*86400000).toISOString().split("T")[0], dueTime:"09:00", estMins:30, done:false },
 ];
 
+function vibrate(pattern:number|number[]) {
+  if (typeof navigator!=="undefined" && "vibrate" in navigator) navigator.vibrate(pattern);
+}
 function contrastColor(hex:string):string {
   const c=hex.replace("#","");
   const r=parseInt(c.substring(0,2),16)/255, g=parseInt(c.substring(2,4),16)/255, b=parseInt(c.substring(4,6),16)/255;
@@ -515,7 +518,11 @@ export default function HomeworkPlanner() {
     setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
   }
   function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:Date.now(),done:false}]);setAdding(false);setStep(0);}
-  function toggleDone(id:number){setTasks(prev=>prev.map(t=>t.id===id?{...t,done:!t.done}:t));}
+  function toggleDone(id:number){
+    const task=tasks.find(t=>t.id===id);
+    if(task&&!task.done)vibrate(35);
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,done:!t.done}:t));
+  }
   function deleteTask(id:number){setTasks(prev=>prev.filter(t=>t.id!==id));}
   const currentQ=step>=0?QUESTIONS[step]:null;
 

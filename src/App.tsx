@@ -102,23 +102,15 @@ const QUESTIONS = [
   { key:"estMins", label:"How long will it take? ⏱️", type:"time" },
 ];
 
-interface Task { id:number; title:string; subject:string; dueDate:string; dueTime:string; estMins:number; done:boolean; }
+interface Task { id:number; title:string; subject:string; dueDate:string; dueTime:string; estMins:number; done:boolean; order:number; }
 
 const DEFAULT_TASKS: Task[] = [
-  { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:new Date(Date.now()+86400000).toISOString().split("T")[0], dueTime:"", estMins:45, done:false },
-  { id:2, title:"Essay Draft", subject:"English", dueDate:new Date(Date.now()+3*86400000).toISOString().split("T")[0], dueTime:"23:59", estMins:90, done:false },
-  { id:3, title:"Lab Report", subject:"Science", dueDate:new Date(Date.now()+5*86400000).toISOString().split("T")[0], dueTime:"", estMins:60, done:false },
-  { id:4, title:"History Reading", subject:"History", dueDate:new Date(Date.now()+2*86400000).toISOString().split("T")[0], dueTime:"09:00", estMins:30, done:false },
+  { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:new Date(Date.now()+86400000).toISOString().split("T")[0], dueTime:"", estMins:45, done:false, order:0 },
+  { id:2, title:"Essay Draft", subject:"English", dueDate:new Date(Date.now()+3*86400000).toISOString().split("T")[0], dueTime:"23:59", estMins:90, done:false, order:1 },
+  { id:3, title:"Lab Report", subject:"Science", dueDate:new Date(Date.now()+5*86400000).toISOString().split("T")[0], dueTime:"", estMins:60, done:false, order:2 },
+  { id:4, title:"History Reading", subject:"History", dueDate:new Date(Date.now()+2*86400000).toISOString().split("T")[0], dueTime:"09:00", estMins:30, done:false, order:3 },
 ];
 
-function vibrate(pattern:number|number[]) {
-  // Never let this throw: iOS (Safari, and every other iOS browser -- Apple
-  // requires them all to run on WebKit) has no Vibration API at all, and some
-  // browsers expose a non-functional navigator.vibrate rather than omitting it.
-  try {
-    if (typeof navigator!=="undefined" && typeof navigator.vibrate==="function") navigator.vibrate(pattern);
-  } catch { /* unsupported -- ignore */ }
-}
 function contrastColor(hex:string):string {
   const c=hex.replace("#","");
   const r=parseInt(c.substring(0,2),16)/255, g=parseInt(c.substring(2,4),16)/255, b=parseInt(c.substring(4,6),16)/255;
@@ -282,7 +274,14 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
 }
 
 export default function HomeworkPlanner() {
-  const [tasks,setTasks]=useState<Task[]>(()=>{try{const s=localStorage.getItem("hw-tasks");return s?JSON.parse(s):DEFAULT_TASKS;}catch{return DEFAULT_TASKS;}});
+  const [tasks,setTasks]=useState<Task[]>(()=>{
+    try{
+      const s=localStorage.getItem("hw-tasks");
+      const loaded:Task[]=s?JSON.parse(s):DEFAULT_TASKS;
+      // Backfill order for tasks saved before drag-to-reorder existed.
+      return loaded.map((t,i)=>t.order===undefined?{...t,order:i}:t);
+    }catch{return DEFAULT_TASKS;}
+  });
   const [selectedTask,setSelectedTask]=useState<Task|null>(null);
   const [themeName,setThemeName]=useState<ThemeName>(()=>{
     const saved=localStorage.getItem("hw-theme") as ThemeName;
@@ -437,10 +436,6 @@ export default function HomeworkPlanner() {
   const [step,setStep]=useState(0);
   const [newTask,setNewTask]=useState<Partial<Task>>({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
   const [pendingDueDate,setPendingDueDate]=useState<string|null>(null);
-  // iOS (Safari, and every other iOS browser -- Apple requires them all to use WebKit)
-  // has no Vibration API at all, so a screen-wide flash stands in for haptics there;
-  // real vibration still fires too, wherever the device/browser actually supports it.
-  const [completionPulse,setCompletionPulse]=useState(0);
   const inputValRef=useRef("");
   const [filter,setFilter]=useState("all");
   const [suggestion,setSuggestion]=useState("");
@@ -462,6 +457,11 @@ export default function HomeworkPlanner() {
   const sessionInterval=useRef<any>(null);
   const inputRef=useRef<HTMLInputElement>(null);
   const newSubjectRef=useRef<HTMLInputElement>(null);
+  // Drag-to-reorder (default list layout, pending tasks only)
+  const [dragTaskId,setDragTaskId]=useState<number|null>(null);
+  const [dragOffsetY,setDragOffsetY]=useState(0);
+  const dragStartY=useRef(0);
+  const dragOrderIds=useRef<number[]>([]);
 
   const base=THEMES[themeName];
   const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
@@ -480,11 +480,10 @@ export default function HomeworkPlanner() {
   // Pomodoro timer
   useEffect(()=>{if(!pomodoroActive)return;const t=setInterval(()=>setPomodoroSecs(s=>{if(s<=1){setPomodoroActive(false);return 25*60;}return s-1;}),1000);return()=>clearInterval(t);},[pomodoroActive]);
 
+  // Pending tasks sort by their manual drag order; done tasks always sink to the bottom.
   const allSorted=[...tasks].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
-    const o:Record<string,number>={high:0,medium:1,low:2};
-    const d=o[getPriority(a.dueDate,a.estMins)]-o[getPriority(b.dueDate,b.estMins)];
-    return d!==0?d:(a.dueDate||"").localeCompare(b.dueDate||"");
+    return a.order-b.order;
   });
   const filteredTasks=allSorted.filter(t=>filter==="done"?t.done:filter==="pending"?!t.done:(showDone?true:!t.done));
   const topTask=allSorted.find(t=>!t.done);
@@ -526,16 +525,42 @@ export default function HomeworkPlanner() {
     if(inputRef.current) inputRef.current.value="";
     setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
   }
-  function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:Date.now(),done:false}]);setAdding(false);setStep(0);}
-  function toggleDone(id:number){
-    const task=tasks.find(t=>t.id===id);
-    if(task&&!task.done){
-      vibrate([25,40,25]);
-      setCompletionPulse(p=>p+1);
-    }
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,done:!t.done}:t));
-  }
+  function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:Date.now(),done:false,order:prev.length}]);setAdding(false);setStep(0);}
+  function toggleDone(id:number){setTasks(prev=>prev.map(t=>t.id===id?{...t,done:!t.done}:t));}
   function deleteTask(id:number){setTasks(prev=>prev.filter(t=>t.id!==id));}
+
+  // Drag-to-reorder: pointer capture keeps move/up events on the handle even as
+  // the finger/cursor leaves it, so no window-level listeners are needed. While
+  // dragging, whichever pending card the pointer is currently over gets swapped
+  // with the dragged one, live, by reassigning their `order` values.
+  function startDrag(id:number,e:React.PointerEvent){
+    dragOrderIds.current=allSorted.filter(t=>!t.done).map(t=>t.id);
+    dragStartY.current=e.clientY;
+    setDragTaskId(id);
+    setDragOffsetY(0);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function onDragMove(e:React.PointerEvent){
+    if(dragTaskId==null)return;
+    setDragOffsetY(e.clientY-dragStartY.current);
+    const el=document.elementFromPoint(e.clientX,e.clientY) as HTMLElement|null;
+    const cardEl=el?.closest("[data-task-id]") as HTMLElement|null;
+    if(!cardEl)return;
+    const overId=Number(cardEl.dataset.taskId);
+    if(!overId||overId===dragTaskId)return;
+    const ids=dragOrderIds.current;
+    const from=ids.indexOf(dragTaskId), to=ids.indexOf(overId);
+    if(from===-1||to===-1||from===to)return;
+    const next=[...ids];
+    next.splice(from,1);
+    next.splice(to,0,dragTaskId);
+    dragOrderIds.current=next;
+    const orderMap=new Map(next.map((tid,idx)=>[tid,idx]));
+    setTasks(prev=>prev.map(t=>orderMap.has(t.id)?{...t,order:orderMap.get(t.id)!}:t));
+    dragStartY.current=e.clientY;
+    setDragOffsetY(0);
+  }
+  function endDrag(){setDragTaskId(null);setDragOffsetY(0);}
   const currentQ=step>=0?QUESTIONS[step]:null;
 
   const F = FONTS[fontName];
@@ -550,8 +575,6 @@ export default function HomeworkPlanner() {
     .tc:hover{transform:translateY(-2px);filter:brightness(1.05);}
     .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
-    .completion-pulse{position:fixed;inset:0;pointer-events:none;z-index:2000;background:radial-gradient(circle,${T.accent}55,transparent 70%);animation:completionPulse 0.5s ease-out forwards;}
-    @keyframes completionPulse{0%{opacity:1}100%{opacity:0}}
     .sli{animation:sli 0.22s ease forwards;}
     @keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
     .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}
@@ -822,15 +845,31 @@ export default function HomeworkPlanner() {
   }
 
   // ─── TASK CARD (base) ────────────────────────────────────────────────────────
-  function MiniCard({task,rank}:{task:Task;rank:number}) {
+  function MiniCard({task,rank,reorderable}:{task:Task;rank:number;reorderable?:boolean}) {
     const pr=getPriority(task.dueDate,task.estMins);
     const sc=subjectColors[task.subject]||T.accent;
     const dm=daysUntil(task.dueDate);
     const isTop=rank===0&&!task.done; const isNext=rank===1&&!task.done;
+    const isDragging=dragTaskId===task.id;
     return(
-      <div className="tc" onClick={()=>{setSelectedTask(task);setSessionHistory([]);}} style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer"}}>
+      <div
+        className="tc"
+        data-task-id={task.id}
+        onClick={()=>{if(dragTaskId==null){setSelectedTask(task);setSessionHistory([]);}}}
+        style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":undefined,pointerEvents:isDragging?"none":undefined}}>
         {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:PRIORITY_COLORS[pr],borderRadius:"13px 0 0 13px"}}/>}
         <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9}}>
+          {reorderable&&!task.done&&(
+            <div
+              onClick={e=>e.stopPropagation()}
+              onPointerDown={e=>{e.stopPropagation();startDrag(task.id,e);}}
+              onPointerMove={onDragMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              style={{color:T.textFaint,cursor:isDragging?"grabbing":"grab",fontSize:14,lineHeight:1,marginTop:2,padding:"0 2px",touchAction:"none",flexShrink:0}}>
+              ⠿
+            </div>
+          )}
           <button onClick={e=>{e.stopPropagation();toggleDone(task.id);}} style={{background:task.done?"#2ED573":"none",border:`2px solid ${task.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
             {task.done&&<span style={{color:"#111",fontSize:10,fontWeight:"bold"}}>✓</span>}
           </button>
@@ -1164,7 +1203,7 @@ export default function HomeworkPlanner() {
         ))}
       </div>;
     }
-    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)}/>)}</div>;
+    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable/>)}</div>;
   }
 
   function Toggle({on,onChange}:{on:boolean;onChange:(v:boolean)=>void}){
@@ -1580,7 +1619,6 @@ export default function HomeworkPlanner() {
         onDelete={()=>{deleteTask(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
       />}
       {showProfile&&<ProfileModal/>}
-      {completionPulse>0&&<div key={completionPulse} className="completion-pulse"/>}
     </div>
   );
 }

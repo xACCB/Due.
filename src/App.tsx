@@ -111,6 +111,13 @@ const DEFAULT_TASKS: Task[] = [
   { id:4, title:"History Reading", subject:"History", dueDate:new Date(Date.now()+2*86400000).toISOString().split("T")[0], dueTime:"09:00", estMins:30, done:false },
 ];
 
+function contrastColor(hex:string):string {
+  const c=hex.replace("#","");
+  const r=parseInt(c.substring(0,2),16)/255, g=parseInt(c.substring(2,4),16)/255, b=parseInt(c.substring(4,6),16)/255;
+  const lin=(v:number)=>v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);
+  const L=0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
+  return L>0.5?"#1a1a1a":"#ffffff";
+}
 function getPriority(dueDate:string, estMins:number):string {
   if (!dueDate) return "low";
   const d=(new Date(dueDate).getTime()-Date.now())/86400000;
@@ -1122,8 +1129,9 @@ export default function HomeworkPlanner() {
   }
 
   function Toggle({on,onChange}:{on:boolean;onChange:(v:boolean)=>void}){
-    return <button className="tog" onClick={()=>onChange(!on)} style={{background:on?T.accent:T.border}}>
-      <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left 0.2s",display:"block"}}/>
+    const trackColor=on?T.accent:T.border;
+    return <button className="tog" onClick={()=>onChange(!on)} style={{background:trackColor}}>
+      <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),boxShadow:"0 1px 3px rgba(0,0,0,0.4)",transition:"left 0.2s",display:"block"}}/>
     </button>;
   }
 

@@ -21,7 +21,7 @@ const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 const googleProvider = new GoogleAuthProvider();
 
-// ─── THEMES (22 total) ────────────────────────────────────────────────────────
+// ─── THEMES (26 total, 13 dark / 13 light) ─────────────────────────────────────
 const THEMES = {
   midnight:    { light:false, name:"Midnight",    emoji:"🌙", bg:"#0F0F1A", card:"#16162A", cardAlt:"#1e1e35", border:"#252540", borderAccent:"#2A2A50", text:"#EEE8D5", textMuted:"#888",   textFaint:"#555",   accent:"#F0A500", surface:"#1A1A2E" },
   nord:        { light:false, name:"Nord",        emoji:"❄️", bg:"#2E3440", card:"#3B4252", cardAlt:"#434C5E", border:"#4C566A", borderAccent:"#5E6E82", text:"#ECEFF4", textMuted:"#D8DEE9", textFaint:"#8894a8", accent:"#88C0D0", surface:"#3B4252" },
@@ -29,7 +29,6 @@ const THEMES = {
   stealth:     { light:false, name:"Stealth",     emoji:"🕶️", bg:"#0a0a0a", card:"#111111", cardAlt:"#1a1a1a", border:"#222222", borderAccent:"#2a2a2a", text:"#cccccc", textMuted:"#666666", textFaint:"#333333", accent:"#ffffff", surface:"#0f0f0f" },
   serika:      { light:true, name:"Serika",      emoji:"🌾", bg:"#e1dbd2", card:"#cdc6bd", cardAlt:"#d5cec5", border:"#b8b0a5", borderAccent:"#a8a09a", text:"#3b3a36", textMuted:"#7a7060", textFaint:"#aaa090", accent:"#e2b714", surface:"#d4cdc4" },
   catppuccin:  { light:false, name:"Catppuccin",  emoji:"🐱", bg:"#1e1e2e", card:"#313244", cardAlt:"#3a3a54", border:"#45475a", borderAccent:"#585b70", text:"#cdd6f4", textMuted:"#a6adc8", textFaint:"#6c7086", accent:"#cba6f7", surface:"#181825" },
-  tokyonight:  { light:false, name:"Tokyo Night", emoji:"🗼", bg:"#1a1b26", card:"#24283b", cardAlt:"#2f344d", border:"#383d5a", borderAccent:"#414868", text:"#c0caf5", textMuted:"#9aa5ce", textFaint:"#565f89", accent:"#7dcfff", surface:"#16161e" },
   dracula:     { light:false, name:"Dracula",     emoji:"🧛", bg:"#282a36", card:"#343746", cardAlt:"#3d4059", border:"#44475a", borderAccent:"#555777", text:"#f8f8f2", textMuted:"#bd93f9", textFaint:"#6272a4", accent:"#ff79c6", surface:"#21222c" },
   rosepine:    { light:false, name:"Rosé Pine",   emoji:"🌸", bg:"#191724", card:"#1f1d2e", cardAlt:"#26233a", border:"#2a2740", borderAccent:"#393552", text:"#e0def4", textMuted:"#908caa", textFaint:"#524f67", accent:"#ebbcba", surface:"#1a1826" },
   matrix:      { light:false, name:"Matrix",      emoji:"💻", bg:"#0a0f0a", card:"#0d160d", cardAlt:"#111e11", border:"#1a2e1a", borderAccent:"#1f381f", text:"#00ff41", textMuted:"#00aa2b", textFaint:"#005515", accent:"#00ff41", surface:"#0b120b" },
@@ -37,14 +36,20 @@ const THEMES = {
   paper:       { light:true, name:"Paper",       emoji:"📄", bg:"#f5f0e8", card:"#faf7f2", cardAlt:"#ffffff", border:"#e0d8cc", borderAccent:"#cec4b4", text:"#2c2416", textMuted:"#7a6a55", textFaint:"#b0a090", accent:"#c2440f", surface:"#ede8df" },
   gruvbox:     { light:false, name:"Gruvbox",     emoji:"🟫", bg:"#282828", card:"#3c3836", cardAlt:"#504945", border:"#665c54", borderAccent:"#7c6f64", text:"#ebdbb2", textMuted:"#a89984", textFaint:"#7c6f64", accent:"#fabd2f", surface:"#32302f" },
   milkshake:   { light:true, name:"Milkshake",   emoji:"🥤", bg:"#fdf6ff", card:"#f5eaff", cardAlt:"#eedeff", border:"#ddc8f5", borderAccent:"#ccb3ee", text:"#3b1f5e", textMuted:"#8b6aaa", textFaint:"#c4a8e0", accent:"#b44fd1", surface:"#f0e0ff" },
-  suisei:      { light:false, name:"Suisei",      emoji:"⭐", bg:"#0d0e1a", card:"#131428", cardAlt:"#1a1b35", border:"#252645", borderAccent:"#2e2f55", text:"#e8eaf6", textMuted:"#9fa8da", textFaint:"#3d4070", accent:"#7c83e8", surface:"#0f1020" },
-  onedark:     { light:false, name:"One Dark",    emoji:"🌑", bg:"#282c34", card:"#21252b", cardAlt:"#2c313a", border:"#3e4451", borderAccent:"#4b5263", text:"#abb2bf", textMuted:"#828997", textFaint:"#4b5263", accent:"#61afef", surface:"#1e2127" },
   cherry:      { light:false, name:"Cherry",      emoji:"🌸", bg:"#1a0a0f", card:"#2a1018", cardAlt:"#351520", border:"#4a1f2d", borderAccent:"#5c2638", text:"#fce4ec", textMuted:"#f48fb1", textFaint:"#6a2040", accent:"#f06292", surface:"#200c14" },
   discord:     { light:false, name:"Discord",     emoji:"💬", bg:"#313338", card:"#2b2d31", cardAlt:"#232428", border:"#3f4147", borderAccent:"#4e5058", text:"#dbdee1", textMuted:"#949ba4", textFaint:"#4e5058", accent:"#5865f2", surface:"#1e1f22" },
-  bliss:       { light:false, name:"Bliss",       emoji:"🌅", bg:"#1a1625", card:"#221e30", cardAlt:"#2a263c", border:"#373048", borderAccent:"#433a58", text:"#e8e0f5", textMuted:"#a89bc4", textFaint:"#5a5070", accent:"#c9a8f5", surface:"#1d1929" },
   dev:         { light:false, name:"Dev",         emoji:"🖥️", bg:"#1e1e1e", card:"#252526", cardAlt:"#2d2d2d", border:"#3c3c3c", borderAccent:"#4a4a4a", text:"#d4d4d4", textMuted:"#858585", textFaint:"#3c3c3c", accent:"#569cd6", surface:"#1e1e1e" },
-  dark:        { light:false, name:"Dark",        emoji:"🌚", bg:"#000000", card:"#0d0d0d", cardAlt:"#141414", border:"#1f1f1f", borderAccent:"#2a2a2a", text:"#e0e0e0", textMuted:"#666666", textFaint:"#2a2a2a", accent:"#ffffff", surface:"#080808" },
-  shadow:      { light:false, name:"Shadow",      emoji:"👤", bg:"#0c0c0f", card:"#13131a", cardAlt:"#1a1a24", border:"#22222e", borderAccent:"#2a2a3a", text:"#c8c8d8", textMuted:"#6a6a88", textFaint:"#2a2a3a", accent:"#7070aa", surface:"#0f0f15" },
+  // ─ light themes from Monkeytype's theme list ─
+  icebergLight:{ light:true, name:"Iceberg Light", emoji:"🧊", bg:"#e8e9ec", card:"#dcdfe4", cardAlt:"#d2d4da", border:"#c6c8d1", borderAccent:"#b4b8c4", text:"#33374c", textMuted:"#6b7089", textFaint:"#a1a6b8", accent:"#2d539e", surface:"#dcdfe4" },
+  rosepineDawn:{ light:true, name:"Rosé Pine Dawn", emoji:"🌤️", bg:"#faf4ed", card:"#fffaf3", cardAlt:"#f2e9e1", border:"#dfdad9", borderAccent:"#cecacd", text:"#575279", textMuted:"#797593", textFaint:"#9893a5", accent:"#d7827e", surface:"#f2e9e1" },
+  gruvboxLight:{ light:true, name:"Gruvbox Light", emoji:"🟨", bg:"#fbf1c7", card:"#f2e5bc", cardAlt:"#ebdbb2", border:"#d5c4a1", borderAccent:"#bdae93", text:"#3c3836", textMuted:"#7c6f64", textFaint:"#a89984", accent:"#af3a03", surface:"#f2e5bc" },
+  eyecare:     { light:true, name:"Eyecare",       emoji:"🌿", bg:"#dde6d5", card:"#cfdac5", cardAlt:"#c3d1b6", border:"#aebd9d", borderAccent:"#9aab86", text:"#33422e", textMuted:"#5a6b52", textFaint:"#7f9074", accent:"#4c6b3f", surface:"#cfdac5" },
+  shoko:       { light:true, name:"Shoko",         emoji:"🌸", bg:"#f7e6e6", card:"#fdf1f1", cardAlt:"#f2dcdc", border:"#e3c6c6", borderAccent:"#d1acac", text:"#5c3a3a", textMuted:"#8a6363", textFaint:"#b58e8e", accent:"#c96a6a", surface:"#f2dcdc" },
+  botanical:   { light:true, name:"Botanical",     emoji:"🪴", bg:"#e7ecdf", card:"#dbe3cf", cardAlt:"#cfd9c0", border:"#b9c6a6", borderAccent:"#a2b28a", text:"#33402a", textMuted:"#5f7050", textFaint:"#849674", accent:"#6b8e4e", surface:"#dbe3cf" },
+  camping:     { light:true, name:"Camping",       emoji:"🏕️", bg:"#efe4d0", card:"#e6d7bd", cardAlt:"#ddc9a8", border:"#c9b088", borderAccent:"#b59a6f", text:"#4a3a24", textMuted:"#7a6440", textFaint:"#a4895f", accent:"#b5651d", surface:"#e6d7bd" },
+  metropolis:  { light:true, name:"Metropolis",    emoji:"🏙️", bg:"#e9eaec", card:"#dddfe3", cardAlt:"#d1d3da", border:"#bcbfc8", borderAccent:"#a5a9b6", text:"#282c34", textMuted:"#565c66", textFaint:"#838994", accent:"#3b6fd6", surface:"#dddfe3" },
+  dolch:       { light:true, name:"Dolch",         emoji:"🍬", bg:"#e4ded4", card:"#f6f1e8", cardAlt:"#ede6d8", border:"#d6cbb5", borderAccent:"#c3b494", text:"#5a5147", textMuted:"#8a8071", textFaint:"#b3a790", accent:"#916b53", surface:"#ede6d8" },
+  terra:       { light:true, name:"Terra",         emoji:"🏺", bg:"#efe2d4", card:"#e7d5c1", cardAlt:"#ddc6ac", border:"#c7ab8c", borderAccent:"#b0906e", text:"#4a3423", textMuted:"#795c40", textFaint:"#a3805e", accent:"#a8562f", surface:"#e7d5c1" },
 } as const;
 type ThemeName = keyof typeof THEMES;
 type ThemeObj = Omit<typeof THEMES[ThemeName], "accent"> & { accent: string; accentGlow: string; gradientCard: string };
@@ -268,7 +273,10 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
 export default function HomeworkPlanner() {
   const [tasks,setTasks]=useState<Task[]>(()=>{try{const s=localStorage.getItem("hw-tasks");return s?JSON.parse(s):DEFAULT_TASKS;}catch{return DEFAULT_TASKS;}});
   const [selectedTask,setSelectedTask]=useState<Task|null>(null);
-  const [themeName,setThemeName]=useState<ThemeName>(()=>(localStorage.getItem("hw-theme") as ThemeName)||"midnight");
+  const [themeName,setThemeName]=useState<ThemeName>(()=>{
+    const saved=localStorage.getItem("hw-theme") as ThemeName;
+    return saved&&saved in THEMES?saved:"midnight";
+  });
   const [themeMode,setThemeMode]=useState<"light"|"dark"|"auto">(()=>(localStorage.getItem("hw-thememode") as "light"|"dark"|"auto")||"auto");
   useEffect(()=>{localStorage.setItem("hw-thememode",themeMode);},[themeMode]);
   const [systemPrefersDark,setSystemPrefersDark]=useState(()=>typeof window!=="undefined"&&!!window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);

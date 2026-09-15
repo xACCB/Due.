@@ -100,16 +100,15 @@ const QUESTIONS = [
   { key:"subject", label:"What subject? 📚", type:"select" },
   { key:"dueDate", label:"When is it due? 📅", type:"date" },
   { key:"estMins", label:"How long will it take? ⏱️", type:"time" },
-  { key:"notes", label:"Paste rubric or instructions 📋 (optional)", type:"text", optional:true },
 ];
 
-interface Task { id:number; title:string; subject:string; dueDate:string; estMins:number; notes:string; done:boolean; }
+interface Task { id:number; title:string; subject:string; dueDate:string; dueTime:string; estMins:number; done:boolean; }
 
 const DEFAULT_TASKS: Task[] = [
-  { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:new Date(Date.now()+86400000).toISOString().split("T")[0], estMins:45, notes:"Focus on quadratics", done:false },
-  { id:2, title:"Essay Draft", subject:"English", dueDate:new Date(Date.now()+3*86400000).toISOString().split("T")[0], estMins:90, notes:"", done:false },
-  { id:3, title:"Lab Report", subject:"Science", dueDate:new Date(Date.now()+5*86400000).toISOString().split("T")[0], estMins:60, notes:"", done:false },
-  { id:4, title:"History Reading", subject:"History", dueDate:new Date(Date.now()+2*86400000).toISOString().split("T")[0], estMins:30, notes:"Pages 120-145", done:false },
+  { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:new Date(Date.now()+86400000).toISOString().split("T")[0], dueTime:"", estMins:45, done:false },
+  { id:2, title:"Essay Draft", subject:"English", dueDate:new Date(Date.now()+3*86400000).toISOString().split("T")[0], dueTime:"23:59", estMins:90, done:false },
+  { id:3, title:"Lab Report", subject:"Science", dueDate:new Date(Date.now()+5*86400000).toISOString().split("T")[0], dueTime:"", estMins:60, done:false },
+  { id:4, title:"History Reading", subject:"History", dueDate:new Date(Date.now()+2*86400000).toISOString().split("T")[0], dueTime:"09:00", estMins:30, done:false },
 ];
 
 function getPriority(dueDate:string, estMins:number):string {
@@ -120,6 +119,11 @@ function getPriority(dueDate:string, estMins:number):string {
 function formatDate(s:string):string {
   if (!s) return "No date";
   return new Date(s+"T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+function formatTime(t:string):string {
+  if (!t) return "";
+  const [h,m]=t.split(":").map(Number);
+  return new Date(2000,0,1,h,m).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
 }
 function daysUntil(s:string):string|null {
   if (!s) return null;
@@ -187,7 +191,7 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
           <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
             <div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontSize:14}}>📅</span>
-              <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(task.dueDate)}</span>
+              <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` at ${formatTime(task.dueTime)}`:""}</span>
             </div>
             <div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontSize:14}}>⏱</span>
@@ -256,14 +260,6 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
               🗑 Delete task
             </button>
           </div>
-
-          {/* Notes */}
-          {task.notes&&(
-            <div style={{marginTop:12,background:T.surface,borderRadius:11,padding:"12px 14px",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Notes / Rubric</div>
-              <div style={{fontFamily:F.body,fontSize:12,color:T.textMuted,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{task.notes}</div>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -406,7 +402,8 @@ export default function HomeworkPlanner() {
 
   const [adding,setAdding]=useState(false);
   const [step,setStep]=useState(0);
-  const [newTask,setNewTask]=useState<Partial<Task>>({title:"",subject:"",dueDate:"",estMins:30,notes:""});
+  const [newTask,setNewTask]=useState<Partial<Task>>({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
+  const [pendingDueDate,setPendingDueDate]=useState<string|null>(null);
   const inputValRef=useRef("");
   const [filter,setFilter]=useState("all");
   const [suggestion,setSuggestion]=useState("");
@@ -458,7 +455,8 @@ export default function HomeworkPlanner() {
 
   function startAdding(){
     setAdding(true);setStep(-1);
-    setNewTask({title:"",subject:"",dueDate:"",estMins:30,notes:""});
+    setNewTask({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
+    setPendingDueDate(null);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
   }
@@ -480,13 +478,17 @@ export default function HomeworkPlanner() {
     setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
   }
   function handleDateInput(val:string){
-    const q=QUESTIONS[step];const value=val;
-    const updated={...newTask,[q.key]:value};setNewTask(updated);
+    setPendingDueDate(val);
+    inputValRef.current="";
+    if(inputRef.current) inputRef.current.value="";
+  }
+  function confirmDueTime(time:string){
+    const updated={...newTask,dueDate:pendingDueDate||"",dueTime:time};setNewTask(updated);
+    setPendingDueDate(null);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
     setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
   }
-  function skipOptional(){setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(newTask as Task);},100);}
   function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:Date.now(),done:false}]);setAdding(false);setStep(0);}
   function toggleDone(id:number){setTasks(prev=>prev.map(t=>t.id===id?{...t,done:!t.done}:t));}
   function deleteTask(id:number){setTasks(prev=>prev.filter(t=>t.id!==id));}
@@ -794,11 +796,10 @@ export default function HomeworkPlanner() {
               <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>
             </div>
             <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
-              <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>📅 {formatDate(task.dueDate)}</span>
+              <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>📅 {formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
               <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>⏱ {task.estMins>=60?`${Math.floor(task.estMins/60)}h${task.estMins%60?` ${task.estMins%60}m`:""}`:` ${task.estMins}m`}</span>
               {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",fontWeight:500}}>{dm}</span>}
             </div>
-            {task.notes&&<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:3,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{task.notes.slice(0,60)}{task.notes.length>60?"...":""}</div>}
           </div>
           <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(task.id);}}>×</button>
         </div>
@@ -1226,8 +1227,28 @@ export default function HomeworkPlanner() {
                   ):currentQ?(
                     <div>
                       <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>{currentQ.label}</div>
-                      {currentQ.type==="select"&&<div style={{display:"flex",flexWrap:"wrap",gap:7}}>{subjects.map(opt=><button key={opt} className="chip" style={{background:subjectColors[opt]?subjectColors[opt]+"22":T.cardAlt,color:subjectColors[opt]||T.text,border:`1px solid ${subjectColors[opt]||T.border}`}} onClick={()=>handleAnswer(opt)}>{opt}</button>)}{currentQ.optional&&<button className="chip" style={{background:"none",color:T.textFaint,border:`1px dashed ${T.border}`}} onClick={skipOptional}>skip</button>}</div>}
-                      {currentQ.type==="date"&&<div style={{display:"flex",gap:7,flexWrap:"wrap"}}>{[{l:"Today",d:0},{l:"Tomorrow",d:1},{l:"3 days",d:3},{l:"Next week",d:7}].map(({l,d})=>{const dt=new Date();dt.setDate(dt.getDate()+d);return<button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>handleAnswer(dt.toISOString().split("T")[0])}>{l}</button>;})} <input ref={inputRef} type="date" defaultValue="" onChange={e=>{inputValRef.current=e.target.value;}} onKeyDown={e=>e.key==="Enter"&&inputRef.current?.value&&handleDateInput(inputRef.current.value)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:12,flex:1,minWidth:120,outline:"none"}}/><button style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"7px 13px",cursor:"pointer"}} onClick={()=>inputRef.current?.value&&handleDateInput(inputRef.current.value)}>→</button></div>}
+                      {currentQ.type==="select"&&<div style={{display:"flex",flexWrap:"wrap",gap:7}}>{subjects.map(opt=><button key={opt} className="chip" style={{background:subjectColors[opt]?subjectColors[opt]+"22":T.cardAlt,color:subjectColors[opt]||T.text,border:`1px solid ${subjectColors[opt]||T.border}`}} onClick={()=>handleAnswer(opt)}>{opt}</button>)}</div>}
+                      {currentQ.type==="date"&&(pendingDueDate===null?(
+                        <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                          {[{l:"Today",d:0},{l:"Tomorrow",d:1},{l:"3 days",d:3},{l:"Next week",d:7}].map(({l,d})=>{const dt=new Date();dt.setDate(dt.getDate()+d);return<button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>handleDateInput(dt.toISOString().split("T")[0])}>{l}</button>;})}
+                          <input ref={inputRef} type="date" defaultValue="" onChange={e=>{inputValRef.current=e.target.value;}} onKeyDown={e=>e.key==="Enter"&&inputRef.current?.value&&handleDateInput(inputRef.current.value)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:12,flex:1,minWidth:120,outline:"none"}}/>
+                          <button style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"7px 13px",cursor:"pointer"}} onClick={()=>inputRef.current?.value&&handleDateInput(inputRef.current.value)}>→</button>
+                        </div>
+                      ):(
+                        <div>
+                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10}}>Due {formatDate(pendingDueDate)} -- what time? ⏰</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:12}}>
+                            {[{l:"Any time",v:""},{l:"9:00 AM",v:"09:00"},{l:"3:00 PM",v:"15:00"},{l:"11:59 PM",v:"23:59"}].map(({l,v})=>(
+                              <button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>confirmDueTime(v)}>{l}</button>
+                            ))}
+                          </div>
+                          <div style={{display:"flex",gap:7}}>
+                            <input ref={inputRef} type="time" defaultValue="" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:12,flex:1,outline:"none"}}/>
+                            <button style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"7px 13px",cursor:"pointer"}} onClick={()=>confirmDueTime(inputRef.current?.value||"")}>→</button>
+                          </div>
+                          <button onClick={()=>setPendingDueDate(null)} style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:11,cursor:"pointer",marginTop:10,padding:0}}>‹ back to date</button>
+                        </div>
+                      ))}
                       {currentQ.type==="time"&&(
                         <div>
                           {/* Quick picks */}
@@ -1279,36 +1300,6 @@ export default function HomeworkPlanner() {
                           </div>
                         </div>
                       )}
-                      {currentQ.type==="text"&&(
-                        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                          <textarea
-                            ref={inputRef as any}
-                            defaultValue=""
-                            placeholder="Paste your rubric, instructions, or assignment details here... we'll estimate how long it'll take! (or skip)"
-                            rows={5}
-                            style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"11px 13px",fontFamily:F.body,fontSize:12,width:"100%",outline:"none",resize:"vertical",lineHeight:1.5}}
-                          />
-                          <div style={{display:"flex",gap:8}}>
-                            <button onClick={()=>{
-                              const rubric=(inputRef.current as any)?.value||"";
-                              if(!rubric.trim()){finishTask({...newTask,notes:""} as Task);return;}
-                              // Local word-count heuristic -- this used to call api.anthropic.com
-                              // directly from the browser with no auth header, so it always failed
-                              // and silently fell back anyway. This estimates from the text itself,
-                              // no network call needed, and never fails.
-                              const words=rubric.trim().split(/\s+/).length;
-                              const keywordBonus=/essay|research|report|paper/i.test(rubric)?20:0;
-                              const estMins=Math.max(10,Math.min(180,Math.round(words/12)*5+keywordBonus));
-                              finishTask({...newTask,estMins,notes:rubric} as Task);
-                            }} id="rubric-btn"
-                              style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"10px 16px",fontFamily:F.body,fontSize:12,cursor:"pointer",fontWeight:500,flex:1}}>
-                              ✨ Estimate time from text
-                            </button>
-                            <button className="chip" style={{background:"none",color:T.textFaint,border:`1px dashed ${T.border}`}} onClick={()=>finishTask({...newTask,notes:(inputRef.current as any)?.value||""} as Task)}>skip</button>
-                          </div>
-                          <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,textAlign:"center"}}>Estimates time from your rubric's length -- paste it in or skip</div>
-                        </div>
-                      )}
                     </div>
                   ):null}
                   {newTask.title&&<div style={{marginTop:12,padding:"9px 13px",background:T.bg,borderRadius:10,border:`1px solid ${T.border}`}}>
@@ -1316,7 +1307,7 @@ export default function HomeworkPlanner() {
                     <div style={{fontFamily:F.heading,fontSize:14,color:T.text}}>{newTask.title}</div>
                     <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
                       {newTask.subject&&<span style={{color:subjectColors[newTask.subject]||T.accent,fontFamily:F.body,fontSize:10}}>{newTask.subject}</span>}
-                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>📅 {formatDate(newTask.dueDate)}</span>}
+                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>📅 {formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime)}`:""}</span>}
                     </div>
                   </div>}
                 </div>

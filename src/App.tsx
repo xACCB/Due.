@@ -550,6 +550,7 @@ export default function HomeworkPlanner() {
   }
 
   const [adding,setAdding]=useState(false);
+  const [focusMode,setFocusMode]=useState(false); // transient by design -- no persistence needed
   const [step,setStep]=useState(0);
   const [newTask,setNewTask]=useState<Partial<Task>>({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
   const [pendingDueDate,setPendingDueDate]=useState<string|null>(null);
@@ -1521,6 +1522,26 @@ export default function HomeworkPlanner() {
 
   const pomMin=Math.floor(pomodoroSecs/60); const pomSec=pomodoroSecs%60;
   const pomPct=pomodoroSecs/(25*60);
+  function renderPomodoroCard(){
+    return (
+      <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
+        <div className="sl" style={{color:T.textMuted,textAlign:"left"}}>Pomodoro Timer</div>
+        <div style={{position:"relative",width:100,height:100,margin:"10px auto"}}>
+          <svg width="100" height="100" style={{transform:"rotate(-90deg)"}}>
+            <circle cx="50" cy="50" r="45" fill="none" stroke={T.border} strokeWidth="6"/>
+            <circle cx="50" cy="50" r="45" fill="none" stroke={T.accent} strokeWidth="6" strokeDasharray="283" strokeDashoffset={283*(1-pomPct)} strokeLinecap="round" style={{transition:"stroke-dashoffset 1s linear"}}/>
+          </svg>
+          <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
+            <div style={{fontFamily:F.body,fontSize:18,color:T.text,fontWeight:500}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+          <button onClick={()=>setPomodoroActive(a=>!a)} style={{background:T.accent,color:"#000",border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"⏸ Pause":"▶ Start"}</button>
+          <button onClick={()=>{setPomodoroSecs(25*60);setPomodoroActive(false);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>↺ Reset</button>
+        </div>
+      </div>
+    );
+  }
 
   // Sync outer page background to theme
   useEffect(()=>{
@@ -1528,6 +1549,40 @@ export default function HomeworkPlanner() {
     document.body.style.transition="background 0.4s";
     return()=>{ document.body.style.background=""; };
   },[T.accent]);
+
+  // Focus Mode: a stripped, full-screen view -- just the single most urgent
+  // pending task and the (reused, not forked) Pomodoro timer. No tab bar, no
+  // other tasks, no settings. Plain useState above, nothing to persist.
+  if(focusMode){
+    return (
+      <div className="app-shell" style={{background:T.bg,fontFamily:F.body,color:T.text,minHeight:"100dvh",display:"flex",flexDirection:"column",padding:20,transition:"background 0.3s,color 0.3s"}}>
+        <style>{css}</style>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>🎯 Focus Mode</div>
+          <button onClick={()=>setFocusMode(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>✕ Exit</button>
+        </div>
+        <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
+          {topTask?(
+            <div className="pop" style={{background:T.gradientCard,borderRadius:16,padding:"20px",border:`1px solid ${T.accent}44`}}>
+              <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <span className="rb" style={{background:T.accent+"33",color:T.accent}}>most urgent</span>
+                <span style={{background:(subjectColors[topTask.subject]||T.accent)+"22",color:subjectColors[topTask.subject]||T.accent,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{topTask.subject}</span>
+              </div>
+              <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{topTask.title}</div>
+              <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>📅 {formatDate(topTask.dueDate)}{topTask.dueTime?` ${formatTime(topTask.dueTime)}`:""}</span>
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>⏱ {topTask.estMins}m</span>
+              </div>
+              <button onClick={()=>toggleDone(topTask.id)} style={{marginTop:14,background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>✓ Mark done</button>
+            </div>
+          ):(
+            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on ✨</div>
+          )}
+          {renderPomodoroCard()}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={"app-shell dl-"+desktopLayout} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s"}}>
@@ -1603,6 +1658,7 @@ export default function HomeworkPlanner() {
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
             {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?"#000":T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
+            {topTask&&<button onClick={()=>setFocusMode(true)} style={{background:"none",border:`1px solid ${T.accent}55`,color:T.accent,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>🎯 Focus</button>}
             <div style={{marginLeft:"auto",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{visibleTasks.filter(t=>!t.done&&!t.archived).length} pending</div>
           </div>
 
@@ -1730,22 +1786,7 @@ export default function HomeworkPlanner() {
         {activeTab==="tools"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {/* Pomodoro */}
-            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
-              <div className="sl" style={{color:T.textMuted,textAlign:"left"}}>Pomodoro Timer</div>
-              <div style={{position:"relative",width:100,height:100,margin:"10px auto"}}>
-                <svg width="100" height="100" style={{transform:"rotate(-90deg)"}}>
-                  <circle cx="50" cy="50" r="45" fill="none" stroke={T.border} strokeWidth="6"/>
-                  <circle cx="50" cy="50" r="45" fill="none" stroke={T.accent} strokeWidth="6" strokeDasharray="283" strokeDashoffset={283*(1-pomPct)} strokeLinecap="round" style={{transition:"stroke-dashoffset 1s linear"}}/>
-                </svg>
-                <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
-                  <div style={{fontFamily:F.body,fontSize:18,color:T.text,fontWeight:500}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</div>
-                </div>
-              </div>
-              <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-                <button onClick={()=>setPomodoroActive(a=>!a)} style={{background:T.accent,color:"#000",border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"⏸ Pause":"▶ Start"}</button>
-                <button onClick={()=>{setPomodoroSecs(25*60);setPomodoroActive(false);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>↺ Reset</button>
-              </div>
-            </div>
+            {renderPomodoroCard()}
 
             {/* Streaks & Stats */}
             <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>

@@ -475,6 +475,18 @@ export default function HomeworkPlanner() {
   const [subjectColors,setSubjectColors]=useState<Record<string,string>>(()=>{try{const s=localStorage.getItem("hw-subjectcolors");return {...DEFAULT_SUBJECT_COLORS,...(s?JSON.parse(s):{})};}catch{return DEFAULT_SUBJECT_COLORS;}});
   useEffect(()=>{localStorage.setItem("hw-subjects",JSON.stringify(subjects));},[subjects]);
   useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
+  // Scratchpad: the textarea itself is fully responsive (plain local state), but
+  // what gets written to localStorage/Firestore is debounced ~500ms behind it so
+  // typing doesn't fire a write (and a Firestore sync) on every keystroke.
+  const [scratchpad,setScratchpad]=useState(()=>localStorage.getItem("hw-scratchpad")||"");
+  const [scratchpadSynced,setScratchpadSynced]=useState(scratchpad);
+  const scratchpadTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  function updateScratchpad(val:string){
+    setScratchpad(val);
+    clearTimeout(scratchpadTimer.current);
+    scratchpadTimer.current=setTimeout(()=>setScratchpadSynced(val),500);
+  }
+  useEffect(()=>{localStorage.setItem("hw-scratchpad",scratchpadSynced);},[scratchpadSynced]);
   function addSubject(name:string){
     const trimmed=name.trim();
     if(!trimmed||subjects.includes(trimmed))return;
@@ -545,6 +557,7 @@ export default function HomeworkPlanner() {
         if(data.layout) setLayout(data.layout as LayoutName);
         if(data.completionLog) setCompletionLog(data.completionLog);
         if(data.unlockedThemesEver) setUnlockedThemesEver(data.unlockedThemesEver);
+        if(data.scratchpad!==undefined){ setScratchpad(data.scratchpad); setScratchpadSynced(data.scratchpad); }
       }
     });
     return unsub;
@@ -555,8 +568,8 @@ export default function HomeworkPlanner() {
     if(!fbUser)return;
     isSyncing.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{tasks,themeName,layout,completionLog,unlockedThemesEver},{merge:true}).finally(()=>{isSyncing.current=false;});
-  },[tasks,themeName,layout,completionLog,unlockedThemesEver,fbUser]);
+    setDoc(ref,{tasks,themeName,layout,completionLog,unlockedThemesEver,scratchpad:scratchpadSynced},{merge:true}).finally(()=>{isSyncing.current=false;});
+  },[tasks,themeName,layout,completionLog,unlockedThemesEver,scratchpadSynced,fbUser]);
 
   async function signInWithFirebase(){
     setSignInError(null);
@@ -1848,6 +1861,17 @@ export default function HomeworkPlanner() {
                   <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Month</div>
                 </div>
               </div>
+            </div>
+
+            {/* Scratchpad */}
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Scratchpad</div>
+              <textarea
+                value={scratchpad}
+                onChange={e=>updateScratchpad(e.target.value)}
+                placeholder="Jot something down..."
+                style={{width:"100%",minHeight:120,maxHeight:280,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto"}}
+              />
             </div>
           </div>
         )}

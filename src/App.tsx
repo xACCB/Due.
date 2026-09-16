@@ -53,6 +53,13 @@ const THEMES = {
 } as const;
 type ThemeName = keyof typeof THEMES;
 type ThemeObj = Omit<typeof THEMES[ThemeName], "accent"> & { accent: string; accentGlow: string; gradientCard: string };
+// Streak-gated themes: unlocked permanently once the streak requirement is hit,
+// even if the streak later breaks (tracked separately in unlockedThemesEver).
+const THEME_UNLOCK_REQUIREMENTS: Partial<Record<ThemeName, number>> = {
+  matrix: 3,
+  dracula: 7,
+  rosepine: 30,
+};
 
 const LAYOUTS = {
   list:      { name:"List",       emoji:"☰",  desc:"Classic cards" },
@@ -462,6 +469,13 @@ export default function HomeworkPlanner() {
     try{const s=localStorage.getItem("hw-completionlog");return s?JSON.parse(s):{};}catch{return {};}
   });
   useEffect(()=>{localStorage.setItem("hw-completionlog",JSON.stringify(completionLog));},[completionLog]);
+  // Themes unlocked via streak milestones, permanently -- once earned, always
+  // available even if the streak later breaks.
+  const [unlockedThemesEver,setUnlockedThemesEver]=useState<Record<string,true>>(()=>{
+    try{const s=localStorage.getItem("hw-unlockedthemes");return s?JSON.parse(s):{};}catch{return {};}
+  });
+  useEffect(()=>{localStorage.setItem("hw-unlockedthemes",JSON.stringify(unlockedThemesEver));},[unlockedThemesEver]);
+  const [shakeTheme,setShakeTheme]=useState<string|null>(null);
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
@@ -498,6 +512,7 @@ export default function HomeworkPlanner() {
         if(data.themeName) setThemeName(data.themeName);
         if(data.layout) setLayout(data.layout as LayoutName);
         if(data.completionLog) setCompletionLog(data.completionLog);
+        if(data.unlockedThemesEver) setUnlockedThemesEver(data.unlockedThemesEver);
       }
     });
     return unsub;
@@ -508,8 +523,8 @@ export default function HomeworkPlanner() {
     if(!fbUser)return;
     isSyncing.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{tasks,themeName,layout,completionLog},{merge:true}).finally(()=>{isSyncing.current=false;});
-  },[tasks,themeName,layout,completionLog,fbUser]);
+    setDoc(ref,{tasks,themeName,layout,completionLog,unlockedThemesEver},{merge:true}).finally(()=>{isSyncing.current=false;});
+  },[tasks,themeName,layout,completionLog,unlockedThemesEver,fbUser]);
 
   async function signInWithFirebase(){
     setSignInError(null);
@@ -635,6 +650,17 @@ export default function HomeworkPlanner() {
     }
     return days;
   })();
+  useEffect(()=>{
+    const newlyUnlocked=(Object.entries(THEME_UNLOCK_REQUIREMENTS) as [ThemeName,number][])
+      .filter(([name,req])=>currentStreak>=req&&!unlockedThemesEver[name]);
+    if(newlyUnlocked.length===0)return;
+    setUnlockedThemesEver(prev=>{
+      const next={...prev};
+      for(const [name] of newlyUnlocked) next[name]=true;
+      return next;
+    });
+  },[currentStreak,unlockedThemesEver]);
+  function isThemeUnlocked(name:ThemeName){ return !THEME_UNLOCK_REQUIREMENTS[name]||!!unlockedThemesEver[name]; }
 
   function startAdding(){
     setAdding(true);setStep(-1);
@@ -838,6 +864,8 @@ export default function HomeworkPlanner() {
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
     .sli{animation:sli 0.22s ease forwards;}
     @keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
+    .shake-locked{animation:shakeLocked 0.35s ease;}
+    @keyframes shakeLocked{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
     .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}
     .chip:hover{transform:scale(1.05);filter:brightness(1.1);}
     .chip:active{transform:scale(.97);}
@@ -1795,14 +1823,30 @@ export default function HomeworkPlanner() {
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{effectiveThemeMode==="light"?"Light":"Dark"} themes ({Object.values(THEMES).filter(t=>t.light===(effectiveThemeMode==="light")).length})</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-                  {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).filter(([,th])=>th.light===(effectiveThemeMode==="light")).map(([key,th])=>(
-                    <button key={key} onClick={()=>{setThemeName(key);setAccentOverride(null);setThemeByMode(prev=>({...prev,[effectiveThemeMode]:key}));}}
-                      style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none"}}>
+                  {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).filter(([,th])=>th.light===(effectiveThemeMode==="light")).map(([key,th])=>{
+                    const req=THEME_UNLOCK_REQUIREMENTS[key];
+                    const locked=req!==undefined&&!isThemeUnlocked(key);
+                    return (
+                    <button key={key}
+                      className={shakeTheme===key?"shake-locked":undefined}
+                      onClick={()=>{
+                        if(locked){
+                          setShakeTheme(key);
+                          setTimeout(()=>setShakeTheme(s=>s===key?null:s),350);
+                          return;
+                        }
+                        setThemeName(key);setAccentOverride(null);setThemeByMode(prev=>({...prev,[effectiveThemeMode]:key}));
+                      }}
+                      style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:locked?"pointer":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none",position:"relative",filter:locked?"grayscale(1)":"none",opacity:locked?0.55:1}}>
+                      {locked&&<span style={{position:"absolute",top:4,right:5,fontSize:10}}>🔒</span>}
                       <span style={{fontSize:16}}>{th.emoji}</span>
                       <span style={{fontFamily:F.body,fontSize:9,color:th.text}}>{th.name}</span>
-                      <div style={{width:20,height:4,borderRadius:999,background:th.accent}}/>
+                      {locked
+                        ? <span style={{fontFamily:F.body,fontSize:8,color:th.textMuted,textAlign:"center",lineHeight:1.2}}>{req}-day streak</span>
+                        : <div style={{width:20,height:4,borderRadius:999,background:th.accent}}/>}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               {/* Accent */}

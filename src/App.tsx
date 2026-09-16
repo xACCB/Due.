@@ -430,6 +430,38 @@ export default function HomeworkPlanner() {
       return changed?next:prev;
     });
   },[tasks,autoArchiveDays]);
+
+  // Due date reminders. NOTE: this is Notification API only, no service worker --
+  // it only fires while the tab is open (or gets reopened/refocused), never as
+  // true background push when the tab/browser is fully closed.
+  const [notificationsEnabled,setNotificationsEnabled]=useState(()=>localStorage.getItem("hw-notifications")==="true");
+  useEffect(()=>{localStorage.setItem("hw-notifications",String(notificationsEnabled));},[notificationsEnabled]);
+  const [notificationNote,setNotificationNote]=useState<string|null>(null);
+  async function toggleNotifications(next:boolean){
+    if(!next){ setNotificationsEnabled(false); setNotificationNote(null); return; }
+    if(!("Notification" in window)){ setNotificationNote("Notifications aren't supported in this browser."); setNotificationsEnabled(false); return; }
+    const perm=await Notification.requestPermission();
+    if(perm==="granted"){ setNotificationsEnabled(true); setNotificationNote(null); }
+    else { setNotificationsEnabled(false); setNotificationNote("Notifications were blocked -- allow them for this site in your browser settings to turn this on."); }
+  }
+  useEffect(()=>{
+    if(!notificationsEnabled)return;
+    if(!("Notification" in window)||Notification.permission!=="granted")return;
+    function checkDue(){
+      if(document.hidden)return;
+      const today=todayISO();
+      if(localStorage.getItem("hw-last-notified")===today)return;
+      const due=tasks.filter(t=>!t.done&&!t.archived&&t.dueDate&&t.dueDate<=today);
+      if(due.length===0)return;
+      localStorage.setItem("hw-last-notified",today);
+      const title=due.length===1?`"${due[0].title}" is due`:`${due.length} tasks due or overdue`;
+      new Notification(title,{body:due.slice(0,3).map(t=>t.title).join(", ")});
+    }
+    checkDue();
+    document.addEventListener("visibilitychange",checkDue);
+    return ()=>document.removeEventListener("visibilitychange",checkDue);
+  },[notificationsEnabled,tasks]);
+
   const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
   const [fontName,setFontName]=useState<FontName>(()=>(localStorage.getItem("hw-font") as FontName)||"dmSerif");
   useEffect(()=>{localStorage.setItem("hw-font",fontName);},[fontName]);
@@ -2000,6 +2032,14 @@ export default function HomeworkPlanner() {
             <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show completed tasks</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Keep done tasks visible</div></div>
               <Toggle on={showDone} onChange={setShowDone}/>
+            </div>
+            <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Due date reminders</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Notify for tasks due today or overdue</div></div>
+                <Toggle on={notificationsEnabled} onChange={toggleNotifications}/>
+              </div>
+              {notificationNote&&<div style={{fontFamily:F.body,fontSize:10,color:"#FF4757",marginTop:8}}>{notificationNote}</div>}
+              {notificationsEnabled&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>Only fires while this tab is open or when you reopen it -- not true background push.</div>}
             </div>
             {/* Auto-archive */}
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>

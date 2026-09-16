@@ -121,13 +121,29 @@ const DEFAULT_TASKS: Task[] = [
 ];
 
 // ─── DATE HELPERS (recurrence, streaks, archive) ───────────────────────────────
-function todayISO():string { return new Date().toISOString().split("T")[0]; }
+// Local calendar date as YYYY-MM-DD -- deliberately NOT toISOString() (which is
+// UTC), since streaks/completion-log keys need to roll over at the user's own
+// local midnight, not UTC midnight.
+function localDateStr(d:Date):string {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function todayISO():string { return localDateStr(new Date()); }
 function advanceDate(dateStr:string, recurrence:Recurrence):string {
   const d = dateStr ? new Date(dateStr+"T00:00:00") : new Date();
   if (recurrence==="daily") d.setDate(d.getDate()+1);
   else if (recurrence==="weekly") d.setDate(d.getDate()+7);
   else if (recurrence==="monthly") d.setMonth(d.getMonth()+1);
   return d.toISOString().split("T")[0];
+}
+function computeStreak(log:Record<string,true>):number {
+  const d=new Date();
+  if(!log[todayISO()]) d.setDate(d.getDate()-1); // today not done yet -- don't break the streak until the day fully ends
+  let streak=0;
+  while(log[localDateStr(d)]){
+    streak++;
+    d.setDate(d.getDate()-1);
+  }
+  return streak;
 }
 
 function contrastColor(hex:string):string {
@@ -601,6 +617,24 @@ export default function HomeworkPlanner() {
   }).filter(matchesSearch);
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
+
+  // Streaks & stats (Tools tab). Archived tasks still count here -- archiving is
+  // just a view filter, it doesn't erase completion history.
+  const currentStreak=computeStreak(completionLog);
+  const startOfWeek=(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());d.setHours(0,0,0,0);return d.getTime();})();
+  const startOfMonth=(()=>{const d=new Date();d.setDate(1);d.setHours(0,0,0,0);return d.getTime();})();
+  const tasksThisWeek=tasks.filter(t=>t.completedAt&&t.completedAt>=startOfWeek).length;
+  const tasksThisMonth=tasks.filter(t=>t.completedAt&&t.completedAt>=startOfMonth).length;
+  const last7Days=(()=>{
+    const days=[];
+    const d=new Date();
+    for(let i=6;i>=0;i--){
+      const day=new Date(d);
+      day.setDate(d.getDate()-i);
+      days.push({label:day.toLocaleDateString(undefined,{weekday:"narrow"}),done:!!completionLog[localDateStr(day)]});
+    }
+    return days;
+  })();
 
   function startAdding(){
     setAdding(true);setStep(-1);
@@ -1682,6 +1716,36 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",gap:8,justifyContent:"center"}}>
                 <button onClick={()=>setPomodoroActive(a=>!a)} style={{background:T.accent,color:"#000",border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"⏸ Pause":"▶ Start"}</button>
                 <button onClick={()=>{setPomodoroSecs(25*60);setPomodoroActive(false);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>↺ Reset</button>
+              </div>
+            </div>
+
+            {/* Streaks & Stats */}
+            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted}}>Streak</div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                <span style={{fontSize:28}}>🔥</span>
+                <span style={{fontFamily:F.heading,fontSize:26,color:T.accent}}>{currentStreak}</span>
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>day{currentStreak===1?"":"s"}</span>
+              </div>
+              <div style={{display:"flex",gap:6,justifyContent:"space-between",marginBottom:14}}>
+                {last7Days.map((d,i)=>(
+                  <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
+                    <div style={{width:"100%",maxWidth:26,height:26,borderRadius:8,background:d.done?T.accent:T.surface,border:`1px solid ${d.done?T.accent:T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {d.done&&<span style={{fontSize:12,color:"#000"}}>✓</span>}
+                    </div>
+                    <span style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>{d.label}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+                <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
+                  <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisWeek}</div>
+                  <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Week</div>
+                </div>
+                <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
+                  <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisMonth}</div>
+                  <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Month</div>
+                </div>
               </div>
             </div>
           </div>

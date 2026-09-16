@@ -100,9 +100,18 @@ const QUESTIONS = [
   { key:"subject", label:"What subject? 📚", type:"select" },
   { key:"dueDate", label:"When is it due? 📅", type:"date" },
   { key:"estMins", label:"How long will it take? ⏱️", type:"time" },
+  { key:"recurrence", label:"Does this repeat? 🔁", type:"recurrence" },
 ];
 
-interface Task { id:number; title:string; subject:string; dueDate:string; dueTime:string; estMins:number; done:boolean; order:number; }
+interface Subtask { id:string; text:string; done:boolean; }
+type Recurrence = "none"|"daily"|"weekly"|"monthly";
+interface Task {
+  id:number; title:string; subject:string; dueDate:string; dueTime:string; estMins:number; done:boolean; order:number;
+  subtasks?: Subtask[];
+  recurrence?: Recurrence;
+  archived?: boolean;
+  completedAt?: number; // ms timestamp, set when marked done, cleared when un-marked -- drives archive timing + weekly/monthly stats
+}
 
 const DEFAULT_TASKS: Task[] = [
   { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:new Date(Date.now()+86400000).toISOString().split("T")[0], dueTime:"", estMins:45, done:false, order:0 },
@@ -110,6 +119,16 @@ const DEFAULT_TASKS: Task[] = [
   { id:3, title:"Lab Report", subject:"Science", dueDate:new Date(Date.now()+5*86400000).toISOString().split("T")[0], dueTime:"", estMins:60, done:false, order:2 },
   { id:4, title:"History Reading", subject:"History", dueDate:new Date(Date.now()+2*86400000).toISOString().split("T")[0], dueTime:"09:00", estMins:30, done:false, order:3 },
 ];
+
+// ─── DATE HELPERS (recurrence, streaks, archive) ───────────────────────────────
+function todayISO():string { return new Date().toISOString().split("T")[0]; }
+function advanceDate(dateStr:string, recurrence:Recurrence):string {
+  const d = dateStr ? new Date(dateStr+"T00:00:00") : new Date();
+  if (recurrence==="daily") d.setDate(d.getDate()+1);
+  else if (recurrence==="weekly") d.setDate(d.getDate()+7);
+  else if (recurrence==="monthly") d.setMonth(d.getMonth()+1);
+  return d.toISOString().split("T")[0];
+}
 
 function contrastColor(hex:string):string {
   const c=hex.replace("#","");
@@ -164,15 +183,24 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHistory,onClose,onStartSession,onEndSession,onToggleDone,onDelete}:{
+function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHistory,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive}:{
   task:Task; T:ThemeObj; F:typeof FONTS[FontName]; subjectColors:Record<string,string>;
   sessionActive:boolean; sessionSecs:number; sessionHistory:{mins:number;date:string}[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
+  onUpdateSubtasks:(subtasks:Subtask[])=>void; onArchive:()=>void;
 }){
   const pr=getPriority(task.dueDate,task.estMins);
   const sc=subjectColors[task.subject]||T.accent;
   const sm=Math.floor(sessionSecs/60); const ss=sessionSecs%60;
   const totalSessionMins=sessionHistory.reduce((a,b)=>a+b.mins,0);
+  const subtasks=task.subtasks||[];
+  const [newSubtaskText,setNewSubtaskText]=useState("");
+  function addSubtask(){
+    const text=newSubtaskText.trim();
+    if(!text)return;
+    onUpdateSubtasks([...subtasks,{id:String(Date.now()),text,done:false}]);
+    setNewSubtaskText("");
+  }
   return(
     <div style={{position:"fixed",inset:0,background:"#00000088",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
       <div className="pop" style={{background:T.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:580,maxHeight:"90vh",overflowY:"auto",border:`1px solid ${T.border}`,borderBottom:"none"}}>
@@ -210,6 +238,29 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
               <span style={{fontSize:14}}>✅</span>
               <span style={{fontFamily:F.body,fontSize:12,color:"#2ED573"}}>{totalSessionMins}m spent today</span>
             </div>}
+          </div>
+
+          {/* Subtasks */}
+          <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:subtasks.length?10:0}}>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"}}>Subtasks</div>
+              {subtasks.length>0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>{subtasks.filter(s=>s.done).length}/{subtasks.length}</div>}
+            </div>
+            {subtasks.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
+              {subtasks.map(s=>(
+                <div key={s.id} style={{display:"flex",alignItems:"center",gap:8}}>
+                  <button onClick={()=>onUpdateSubtasks(subtasks.map(x=>x.id===s.id?{...x,done:!x.done}:x))} style={{background:s.done?"#2ED573":"none",border:`1.5px solid ${s.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:16,height:16,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {s.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
+                  </button>
+                  <span style={{flex:1,fontFamily:F.body,fontSize:12,color:s.done?T.textFaint:T.text,textDecoration:s.done?"line-through":"none"}}>{s.text}</span>
+                  <button onClick={()=>onUpdateSubtasks(subtasks.filter(x=>x.id!==s.id))} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 2px"}}>×</button>
+                </div>
+              ))}
+            </div>}
+            <div style={{display:"flex",gap:6}}>
+              <input value={newSubtaskText} onChange={e=>setNewSubtaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSubtask()} placeholder="Add a subtask..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
+              <button onClick={addSubtask} style={{background:T.accent,color:"#000",border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:12,fontWeight:500}}>+</button>
+            </div>
           </div>
 
           {/* Session timer */}
@@ -257,11 +308,17 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
           )}
 
           {/* Action buttons */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <div style={{display:"grid",gridTemplateColumns:task.done&&!task.archived?"1fr 1fr 1fr":"1fr 1fr",gap:8}}>
             <button onClick={onToggleDone}
               style={{background:task.done?"#FF475722":"#2ED57322",color:task.done?"#FF4757":"#2ED573",border:`1px solid ${task.done?"#FF475744":"#2ED57344"}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
               {task.done?"↩ Mark undone":"✓ Mark done"}
             </button>
+            {task.done&&!task.archived&&(
+              <button onClick={onArchive}
+                style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
+                📦 Archive
+              </button>
+            )}
             <button onClick={onDelete}
               style={{background:"#FF475711",color:"#FF4757",border:"1px solid #FF475733",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
               🗑 Delete task
@@ -328,6 +385,28 @@ export default function HomeworkPlanner() {
   const [groupBy,setGroupBy]=useState(()=>localStorage.getItem("hw-group")||"none");
   const [showDone,setShowDone]=useState(()=>localStorage.getItem("hw-showdone")!=="false");
   const [showSuggestion,setShowSuggestion]=useState(()=>localStorage.getItem("hw-showsuggestion")!=="false");
+  // 0 = never auto-archive. Otherwise the number of days after completion before
+  // a done task is automatically archived (checked once on load).
+  const [autoArchiveDays,setAutoArchiveDays]=useState(()=>{
+    const s=localStorage.getItem("hw-autoarchive");
+    return s!=null?Number(s):7;
+  });
+  useEffect(()=>{localStorage.setItem("hw-autoarchive",String(autoArchiveDays));},[autoArchiveDays]);
+  // Auto-archive: re-checked whenever tasks (local edits, or a Firestore sync
+  // landing) or the setting change. Idempotent -- once a task is archived this
+  // finds nothing new to do and no-ops, so it can't loop or fight manual unarchive.
+  useEffect(()=>{
+    if(autoArchiveDays<=0)return;
+    const cutoff=Date.now()-autoArchiveDays*86400000;
+    setTasks(prev=>{
+      let changed=false;
+      const next=prev.map(t=>{
+        if(t.done&&!t.archived&&t.completedAt&&t.completedAt<cutoff){changed=true;return {...t,archived:true};}
+        return t;
+      });
+      return changed?next:prev;
+    });
+  },[tasks,autoArchiveDays]);
   const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
   const [fontName,setFontName]=useState<FontName>(()=>(localStorage.getItem("hw-font") as FontName)||"dmSerif");
   useEffect(()=>{localStorage.setItem("hw-font",fontName);},[fontName]);
@@ -361,6 +440,12 @@ export default function HomeworkPlanner() {
   useEffect(()=>{localStorage.setItem("hw-showdone",String(showDone));},[showDone]);
   useEffect(()=>{localStorage.setItem("hw-showsuggestion",String(showSuggestion));},[showSuggestion]);
   useEffect(()=>{if(accentOverride)localStorage.setItem("hw-accent",accentOverride);else localStorage.removeItem("hw-accent");},[accentOverride]);
+  // Streaks: one entry per calendar day (local time) with >=1 completion. Feeds
+  // current-streak, weekly/monthly counts (via task.completedAt), and theme unlocks.
+  const [completionLog,setCompletionLog]=useState<Record<string,true>>(()=>{
+    try{const s=localStorage.getItem("hw-completionlog");return s?JSON.parse(s):{};}catch{return {};}
+  });
+  useEffect(()=>{localStorage.setItem("hw-completionlog",JSON.stringify(completionLog));},[completionLog]);
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
@@ -396,6 +481,7 @@ export default function HomeworkPlanner() {
         if(data.tasks) setTasks(data.tasks);
         if(data.themeName) setThemeName(data.themeName);
         if(data.layout) setLayout(data.layout as LayoutName);
+        if(data.completionLog) setCompletionLog(data.completionLog);
       }
     });
     return unsub;
@@ -406,8 +492,8 @@ export default function HomeworkPlanner() {
     if(!fbUser)return;
     isSyncing.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{tasks,themeName,layout},{merge:true}).finally(()=>{isSyncing.current=false;});
-  },[tasks,themeName,layout,fbUser]);
+    setDoc(ref,{tasks,themeName,layout,completionLog},{merge:true}).finally(()=>{isSyncing.current=false;});
+  },[tasks,themeName,layout,completionLog,fbUser]);
 
   async function signInWithFirebase(){
     setSignInError(null);
@@ -438,6 +524,7 @@ export default function HomeworkPlanner() {
   const [pendingDueDate,setPendingDueDate]=useState<string|null>(null);
   const inputValRef=useRef("");
   const [filter,setFilter]=useState("all");
+  const [searchQuery,setSearchQuery]=useState("");
   const [suggestion,setSuggestion]=useState("");
   const [suggestionLoading,setSuggestionLoading]=useState(false);
   const [activeTab,setActiveTab]=useState("tasks");
@@ -462,6 +549,12 @@ export default function HomeworkPlanner() {
   const [dragOffsetY,setDragOffsetY]=useState(0);
   const dragStartY=useRef(0);
   const dragOrderIds=useRef<number[]>([]);
+  // Undo Delete: soft-delete-with-toast. The task stays in `tasks` (so nothing is
+  // lost if the tab closes mid-toast) but is filtered out of every view via
+  // `visibleTasks` below; only one delete can be pending at a time.
+  const [pendingDeleteId,setPendingDeleteId]=useState<number|null>(null);
+  const [pendingDeleteTitle,setPendingDeleteTitle]=useState("");
+  const pendingDeleteTimer=useRef<any>(null);
 
   const base=THEMES[themeName];
   const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
@@ -480,14 +573,25 @@ export default function HomeworkPlanner() {
   // Pomodoro timer
   useEffect(()=>{if(!pomodoroActive)return;const t=setInterval(()=>setPomodoroSecs(s=>{if(s<=1){setPomodoroActive(false);return 25*60;}return s-1;}),1000);return()=>clearInterval(t);},[pomodoroActive]);
 
+  // Soft-deleted (pending undo) tasks are filtered out here, once, so every layout
+  // and view downstream just stops seeing them without needing its own check.
+  const visibleTasks=tasks.filter(t=>t.id!==pendingDeleteId);
   // Pending tasks sort by their manual drag order; done tasks always sink to the bottom.
-  const allSorted=[...tasks].sort((a,b)=>{
+  const allSorted=[...visibleTasks].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
     return a.order-b.order;
   });
-  const filteredTasks=allSorted.filter(t=>filter==="done"?t.done:filter==="pending"?!t.done:(showDone?true:!t.done));
-  const topTask=allSorted.find(t=>!t.done);
-  const totalMins=tasks.filter(t=>!t.done).reduce((s,t)=>s+(t.estMins||0),0);
+  const searchLower=searchQuery.trim().toLowerCase();
+  const matchesSearch=(t:Task)=>!searchLower||t.title.toLowerCase().includes(searchLower)||t.subject.toLowerCase().includes(searchLower);
+  const filteredTasks=allSorted.filter(t=>{
+    if(filter==="archived")return !!t.archived;
+    if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
+    if(filter==="done")return t.done;
+    if(filter==="pending")return !t.done;
+    return showDone?true:!t.done;
+  }).filter(matchesSearch);
+  const topTask=allSorted.find(t=>!t.done&&!t.archived);
+  const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
 
   function startAdding(){
     setAdding(true);setStep(-1);
@@ -526,8 +630,48 @@ export default function HomeworkPlanner() {
     setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
   }
   function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:Date.now(),done:false,order:prev.length}]);setAdding(false);setStep(0);}
-  function toggleDone(id:number){setTasks(prev=>prev.map(t=>t.id===id?{...t,done:!t.done}:t));}
-  function deleteTask(id:number){setTasks(prev=>prev.filter(t=>t.id!==id));}
+  function toggleDone(id:number){
+    const task=tasks.find(t=>t.id===id);
+    if(!task)return;
+    const nowDone=!task.done;
+    if(nowDone){
+      const today=todayISO();
+      setCompletionLog(log=>log[today]?log:{...log,[today]:true});
+    }
+    setTasks(prev=>{
+      let next=prev.map(t=>t.id===id?{...t,done:nowDone,completedAt:nowDone?Date.now():undefined}:t);
+      if(nowDone&&task.recurrence&&task.recurrence!=="none"){
+        const newDue=advanceDate(task.dueDate,task.recurrence);
+        next=[...next,{...task,id:Date.now(),done:false,completedAt:undefined,archived:false,dueDate:newDue,order:prev.length}];
+      }
+      return next;
+    });
+  }
+  function finalizeDelete(id:number){setTasks(prev=>prev.filter(t=>t.id!==id));}
+  function deleteTask(id:number){
+    // Only one delete can be pending at a time -- finalize any earlier one immediately.
+    if(pendingDeleteId!=null){
+      clearTimeout(pendingDeleteTimer.current);
+      finalizeDelete(pendingDeleteId);
+    }
+    const task=tasks.find(t=>t.id===id);
+    setPendingDeleteId(id);
+    setPendingDeleteTitle(task?.title||"Task");
+    pendingDeleteTimer.current=setTimeout(()=>{
+      finalizeDelete(id);
+      setPendingDeleteId(null);
+    },5000);
+  }
+  function undoDelete(){
+    clearTimeout(pendingDeleteTimer.current);
+    setPendingDeleteId(null);
+  }
+  function updateSubtasks(id:number,subtasks:Subtask[]){
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,subtasks}:t));
+  }
+  function archiveTask(id:number){
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,archived:true}:t));
+  }
 
   // Drag-to-reorder: pointer capture keeps move/up events on the handle even as
   // the finger/cursor leaves it, so no window-level listeners are needed. While
@@ -878,6 +1022,7 @@ export default function HomeworkPlanner() {
               {isTop&&<span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>}
               {isNext&&<span className="rb" style={{background:T.text+"11",color:T.textMuted}}>next up</span>}
               <span style={{fontFamily:F.heading,fontSize:15,textDecoration:task.done?"line-through":"none",color:task.done?T.textFaint:T.text}}>{task.title}</span>
+              {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
               <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>
             </div>
             <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
@@ -885,6 +1030,14 @@ export default function HomeworkPlanner() {
               <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>⏱ {task.estMins>=60?`${Math.floor(task.estMins/60)}h${task.estMins%60?` ${task.estMins%60}m`:""}`:` ${task.estMins}m`}</span>
               {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",fontWeight:500}}>{dm}</span>}
             </div>
+            {!!task.subtasks?.length&&(
+              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:5}}>
+                <div style={{flex:1,maxWidth:80,height:4,background:T.border,borderRadius:999}}>
+                  <div style={{width:`${Math.round(task.subtasks.filter(s=>s.done).length/task.subtasks.length*100)}%`,height:"100%",background:T.accent,borderRadius:999,transition:"width 0.3s"}}/>
+                </div>
+                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{task.subtasks.filter(s=>s.done).length}/{task.subtasks.length}</span>
+              </div>
+            )}
           </div>
           <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(task.id);}}>×</button>
         </div>
@@ -1283,10 +1436,21 @@ export default function HomeworkPlanner() {
             </button>
           )}
 
+          {/* Search */}
+          <div style={{position:"relative",marginBottom:10}}>
+            <input
+              value={searchQuery}
+              onChange={e=>setSearchQuery(e.target.value)}
+              placeholder="🔍 Search tasks..."
+              style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"9px 32px 9px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}
+            />
+            {searchQuery&&<button onClick={()=>setSearchQuery("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,lineHeight:1,padding:6}}>×</button>}
+          </div>
+
           {/* Filters + layout picker */}
-          <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center"}}>
-            {["all","pending","done"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?"#000":T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
-            <div style={{marginLeft:"auto",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{tasks.filter(t=>!t.done).length} pending</div>
+          <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
+            {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?"#000":T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
+            <div style={{marginLeft:"auto",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{visibleTasks.filter(t=>!t.done&&!t.archived).length} pending</div>
           </div>
 
           {renderTasks(filteredTasks)}
@@ -1386,6 +1550,11 @@ export default function HomeworkPlanner() {
                           </div>
                         </div>
                       )}
+                      {currentQ.type==="recurrence"&&<div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                        {[{l:"Doesn't repeat",v:"none"},{l:"Daily",v:"daily"},{l:"Weekly",v:"weekly"},{l:"Monthly",v:"monthly"}].map(({l,v})=>(
+                          <button key={v} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>handleAnswer(v)}>{l}</button>
+                        ))}
+                      </div>}
                     </div>
                   ):null}
                   {newTask.title&&<div style={{marginTop:12,padding:"9px 13px",background:T.bg,borderRadius:10,border:`1px solid ${T.border}`}}>
@@ -1394,6 +1563,7 @@ export default function HomeworkPlanner() {
                     <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
                       {newTask.subject&&<span style={{color:subjectColors[newTask.subject]||T.accent,fontFamily:F.body,fontSize:10}}>{newTask.subject}</span>}
                       {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>📅 {formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime)}`:""}</span>}
+                      {newTask.recurrence&&newTask.recurrence!=="none"&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>↻ {newTask.recurrence}</span>}
                     </div>
                   </div>}
                 </div>
@@ -1591,11 +1761,23 @@ export default function HomeworkPlanner() {
               <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show completed tasks</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Keep done tasks visible</div></div>
               <Toggle on={showDone} onChange={setShowDone}/>
             </div>
+            {/* Auto-archive */}
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Auto-Archive Completed Tasks</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:7}}>
+                {[{l:"Never",v:0},{l:"1 day",v:1},{l:"7 days",v:7},{l:"30 days",v:30}].map(({l,v})=>(
+                  <button key={l} onClick={()=>setAutoArchiveDays(v)} style={{background:autoArchiveDays===v?T.accent+"22":T.surface,border:`1.5px solid ${autoArchiveDays===v?T.accent:T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:autoArchiveDays===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                ))}
+              </div>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>
+                Done tasks move to Archived after this long. You can still archive any task manually from its detail view.
+              </div>
+            </div>
             {/* Stats */}
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
               <div className="sl" style={{color:T.textMuted}}>Stats</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:9}}>
-                {[{label:"Total",val:tasks.length},{label:"Done",val:tasks.filter(t=>t.done).length},{label:"Hours",val:`${(totalMins/60).toFixed(1)}h`}].map(({label,val})=>(
+                {[{label:"Total",val:visibleTasks.length},{label:"Done",val:visibleTasks.filter(t=>t.done).length},{label:"Hours",val:`${(totalMins/60).toFixed(1)}h`}].map(({label,val})=>(
                   <div key={label} style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
                     <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{val}</div>
                     <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>{label}</div>
@@ -1617,8 +1799,18 @@ export default function HomeworkPlanner() {
         onStartSession={startSession} onEndSession={endSession}
         onToggleDone={()=>{toggleDone(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
         onDelete={()=>{deleteTask(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
+        onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
+        onArchive={()=>{archiveTask(selectedTask.id);setSelectedTask(null);}}
       />}
       {showProfile&&<ProfileModal/>}
+      {/* Undo Delete toast -- bottom-center so it never collides with the
+          bottom-right smart-suggestion icon or the tab bar above it. */}
+      {pendingDeleteId!=null&&(
+        <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
+          <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:180}}>🗑 "{pendingDeleteTitle}" deleted</span>
+          <button onClick={undoDelete} style={{background:T.accent,color:"#000",border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,11 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
-
-const GOOGLE_CLIENT_ID = ""; // unused
-const GOOGLE_SCOPES = ""; // unused
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -121,16 +118,17 @@ interface Task {
 }
 
 const DEFAULT_TASKS: Task[] = [
-  { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:new Date(Date.now()+86400000).toISOString().split("T")[0], dueTime:"", estMins:45, done:false, order:0 },
-  { id:2, title:"Essay Draft", subject:"English", dueDate:new Date(Date.now()+3*86400000).toISOString().split("T")[0], dueTime:"23:59", estMins:90, done:false, order:1 },
-  { id:3, title:"Lab Report", subject:"Science", dueDate:new Date(Date.now()+5*86400000).toISOString().split("T")[0], dueTime:"", estMins:60, done:false, order:2 },
-  { id:4, title:"History Reading", subject:"History", dueDate:new Date(Date.now()+2*86400000).toISOString().split("T")[0], dueTime:"09:00", estMins:30, done:false, order:3 },
+  { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:localDateStr(new Date(Date.now()+86400000)), dueTime:"", estMins:45, done:false, order:0 },
+  { id:2, title:"Essay Draft", subject:"English", dueDate:localDateStr(new Date(Date.now()+3*86400000)), dueTime:"23:59", estMins:90, done:false, order:1 },
+  { id:3, title:"Lab Report", subject:"Science", dueDate:localDateStr(new Date(Date.now()+5*86400000)), dueTime:"", estMins:60, done:false, order:2 },
+  { id:4, title:"History Reading", subject:"History", dueDate:localDateStr(new Date(Date.now()+2*86400000)), dueTime:"09:00", estMins:30, done:false, order:3 },
 ];
 
 // ─── DATE HELPERS (recurrence, streaks, archive) ───────────────────────────────
 // Local calendar date as YYYY-MM-DD -- deliberately NOT toISOString() (which is
-// UTC), since streaks/completion-log keys need to roll over at the user's own
-// local midnight, not UTC midnight.
+// UTC), since streaks/completion-log keys (and every other place a Date needs to
+// become a due-date string) need to roll over at the user's own local midnight,
+// not UTC midnight.
 function localDateStr(d:Date):string {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
@@ -140,7 +138,7 @@ function advanceDate(dateStr:string, recurrence:Recurrence):string {
   if (recurrence==="daily") d.setDate(d.getDate()+1);
   else if (recurrence==="weekly") d.setDate(d.getDate()+7);
   else if (recurrence==="monthly") d.setMonth(d.getMonth()+1);
-  return d.toISOString().split("T")[0];
+  return localDateStr(d);
 }
 function computeStreak(log:Record<string,true>):number {
   const d=new Date();
@@ -152,6 +150,12 @@ function computeStreak(log:Record<string,true>):number {
   }
   return streak;
 }
+// Monotonic id source for new tasks/subtasks -- plain Date.now() can collide when
+// two are minted in the same millisecond (e.g. a recurring task's next instance
+// spun off in the same tick as an unrelated add), which would corrupt every
+// "by id" operation since two items would then share an id.
+let idSeq=Date.now();
+function nextId():number { return ++idSeq; }
 
 function contrastColor(hex:string):string {
   const c=hex.replace("#","");
@@ -162,7 +166,7 @@ function contrastColor(hex:string):string {
 }
 function getPriority(dueDate:string, estMins:number):string {
   if (!dueDate) return "low";
-  const d=(new Date(dueDate).getTime()-Date.now())/86400000;
+  const d=(new Date(dueDate+"T00:00:00").getTime()-Date.now())/86400000;
   if (d<1||(d<2&&estMins>60)) return "high"; if (d<3) return "medium"; return "low";
 }
 function formatDate(s:string):string {
@@ -221,7 +225,7 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
   function addSubtask(){
     const text=newSubtaskText.trim();
     if(!text)return;
-    onUpdateSubtasks([...subtasks,{id:String(Date.now()),text,done:false}]);
+    onUpdateSubtasks([...subtasks,{id:String(nextId()),text,done:false}]);
     setNewSubtaskText("");
   }
   return(
@@ -612,13 +616,12 @@ export default function HomeworkPlanner() {
   const [timeHours,setTimeHours]=useState(0);
   const [timeMins,setTimeMins]=useState(30);
   const [timeSecs,setTimeSecs]=useState(0);
-  const [showAccountMenu,setShowAccountMenu]=useState(false);
   const [showProfile,setShowProfile]=useState(false);
   const [profileTab,setProfileTab]=useState<"profile"|"personalize">("profile");
   const [sessionActive,setSessionActive]=useState(false);
   const [sessionSecs,setSessionSecs]=useState(0);
   const [sessionHistory,setSessionHistory]=useState<{mins:number;date:string}[]>([]);
-  const sessionInterval=useRef<any>(null);
+  const sessionInterval=useRef<ReturnType<typeof setInterval>|null>(null);
   const inputRef=useRef<HTMLInputElement>(null);
   const newSubjectRef=useRef<HTMLInputElement>(null);
   // Drag-to-reorder (default list layout, pending tasks only)
@@ -640,7 +643,7 @@ export default function HomeworkPlanner() {
   // `visibleTasks` below; only one delete can be pending at a time.
   const [pendingDeleteId,setPendingDeleteId]=useState<number|null>(null);
   const [pendingDeleteTitle,setPendingDeleteTitle]=useState("");
-  const pendingDeleteTimer=useRef<any>(null);
+  const pendingDeleteTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const base=THEMES[themeName];
   const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
@@ -744,7 +747,7 @@ export default function HomeworkPlanner() {
     if(inputRef.current) inputRef.current.value="";
     setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
   }
-  function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:Date.now(),done:false,order:prev.length}]);setAdding(false);setStep(0);}
+  function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:nextId(),done:false,order:prev.length}]);setAdding(false);setStep(0);}
   function toggleDone(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
@@ -757,7 +760,7 @@ export default function HomeworkPlanner() {
       let next=prev.map(t=>t.id===id?{...t,done:nowDone,completedAt:nowDone?Date.now():undefined}:t);
       if(nowDone&&task.recurrence&&task.recurrence!=="none"){
         const newDue=advanceDate(task.dueDate,task.recurrence);
-        next=[...next,{...task,id:Date.now(),done:false,completedAt:undefined,archived:false,dueDate:newDue,order:prev.length}];
+        next=[...next,{...task,id:nextId(),done:false,completedAt:undefined,archived:false,dueDate:newDue,order:prev.length}];
       }
       return next;
     });
@@ -867,6 +870,10 @@ export default function HomeworkPlanner() {
     swipeActiveId.current=null;
     const wasLocked=swipeLocked.current;
     swipeLocked.current=false;
+    // Always clear this, even if not locked -- otherwise a swipe that locked in
+    // and then got interrupted (pointercancel) leaves it stuck true, silently
+    // swallowing the user's very next tap anywhere in the swipeable list.
+    swipeMoved.current=false;
     if(!wasLocked)return;
     setSwipeId(null);
     setSwipeX(0);
@@ -965,11 +972,11 @@ export default function HomeworkPlanner() {
 
   // ─── PROFILE MODAL ────────────────────────────────────────────────────────────
   function ProfileModal() {
-    const doneTasks=tasks.filter(t=>t.done).length;
-    const totalTasks=tasks.length;
-    const highPri=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="high").length;
+    const doneTasks=visibleTasks.filter(t=>t.done).length;
+    const totalTasks=visibleTasks.length;
+    const highPri=visibleTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="high").length;
     const pct=totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
-    const subjectCounts=subjects.map(s=>({name:s,count:tasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
+    const subjectCounts=subjects.map(s=>({name:s,count:visibleTasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
 
     if (!fbUser) return (
       // ── SIGN IN SCREEN (monkeytype-style) ─────────────────────────────────────
@@ -1101,7 +1108,7 @@ export default function HomeworkPlanner() {
               <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:2}}>estimated left</div>
             </div>
             <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:F.heading,fontSize:26,color:"#4ECDC4"}}>{tasks.filter(t=>t.done).reduce((a,b)=>a+(b.estMins||0),0)}m</div>
+              <div style={{fontFamily:F.heading,fontSize:26,color:"#4ECDC4"}}>{visibleTasks.filter(t=>t.done).reduce((a,b)=>a+(b.estMins||0),0)}m</div>
               <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:2}}>completed work</div>
             </div>
           </div>
@@ -1329,7 +1336,7 @@ export default function HomeworkPlanner() {
           return(
             <div key={t.id} className="sticky-note" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:bg,borderRadius:3,padding:"14px 12px",transform:`rotate(${rot}deg)`,boxShadow:"2px 3px 10px #00000033",minHeight:120,display:"flex",flexDirection:"column",gap:6,opacity:t.done?0.5:1,cursor:"pointer"}}>
               <div style={{fontFamily:F.heading,fontSize:14,color:"#1a1a1a",textDecoration:t.done?"line-through":"none",lineHeight:1.3,flex:1}}>{t.title}</div>
-              <div style={{fontFamily:F.body,fontSize:10,color:"#555"}}>{t.subject} · {daysUntil(t.dueDate)||"no date"}</div>
+              <div style={{fontFamily:F.body,fontSize:10,color:"#555"}}><span style={{color:sc,fontWeight:600}}>{t.subject}</span> · {daysUntil(t.dueDate)||"no date"}</div>
               <div style={{display:"flex",justifyContent:"space-between"}}>
                 <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#22c55e":"#ffffff88",border:"1.5px solid #33333333",borderRadius:4,padding:"2px 7px",cursor:"pointer",fontFamily:F.body,fontSize:10,color:"#333"}}>{t.done?"✓ done":"mark done"}</button>
                 <button style={{background:"none",border:"none",color:"#666",cursor:"pointer",fontSize:14}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
@@ -1368,7 +1375,7 @@ export default function HomeworkPlanner() {
     if (layout==="timeline") return (
       <div style={{position:"relative",paddingLeft:24}}>
         <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:`linear-gradient(${T.accent},${T.border})`}}/>
-        {tasks.map((t,i)=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" style={{position:"relative",marginBottom:14}}>
             <div style={{position:"absolute",left:-19,top:14,width:12,height:12,borderRadius:"50%",background:t.done?"#2ED573":PRIORITY_COLORS[pr],border:`2px solid ${T.bg}`,cursor:"pointer"}} onClick={()=>toggleDone(t.id)}/>
             <div onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:T.card,borderRadius:11,padding:"11px 13px",border:`1px solid ${T.border}`,marginLeft:6,cursor:"pointer"}}>
@@ -1472,21 +1479,21 @@ export default function HomeworkPlanner() {
 
     if (layout==="calendar") {
       const week:string[]=[];
-      for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()+i);week.push(d.toISOString().split("T")[0]);}
+      for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()+i);week.push(localDateStr(d));}
       const noDate=tasks.filter(t=>!t.dueDate);
       return(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {week.map(day=>{
             const dayTasks=tasks.filter(t=>t.dueDate===day);
             if(dayTasks.length===0)return null;
-            const isToday=day===new Date().toISOString().split("T")[0];
+            const isToday=day===todayISO();
             return(
               <div key={day} style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${isToday?T.accent+"66":T.border}`}}>
                 <div style={{fontFamily:F.body,fontSize:11,color:isToday?T.accent:T.textMuted,marginBottom:8,fontWeight:isToday?"500":"normal"}}>
                   {isToday?"📌 Today":formatDate(day)}
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                  {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;const pr=getPriority(t.dueDate,t.estMins);return(
+                  {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;return(
                     <div key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.border}33`,cursor:"pointer"}}>
                       <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {t.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
@@ -1593,7 +1600,7 @@ export default function HomeworkPlanner() {
     document.body.style.background=T.bg;
     document.body.style.transition="background 0.4s";
     return()=>{ document.body.style.background=""; };
-  },[T.accent]);
+  },[T.bg]);
 
   // Focus Mode: a stripped, full-screen view -- just the single most urgent
   // pending task and the (reused, not forked) Pomodoro timer. No tab bar, no
@@ -1734,7 +1741,7 @@ export default function HomeworkPlanner() {
                       {currentQ.type==="select"&&<div style={{display:"flex",flexWrap:"wrap",gap:7}}>{subjects.map(opt=><button key={opt} className="chip" style={{background:subjectColors[opt]?subjectColors[opt]+"22":T.cardAlt,color:subjectColors[opt]||T.text,border:`1px solid ${subjectColors[opt]||T.border}`}} onClick={()=>handleAnswer(opt)}>{opt}</button>)}</div>}
                       {currentQ.type==="date"&&(pendingDueDate===null?(
                         <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-                          {[{l:"Today",d:0},{l:"Tomorrow",d:1},{l:"3 days",d:3},{l:"Next week",d:7}].map(({l,d})=>{const dt=new Date();dt.setDate(dt.getDate()+d);return<button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>handleDateInput(dt.toISOString().split("T")[0])}>{l}</button>;})}
+                          {[{l:"Today",d:0},{l:"Tomorrow",d:1},{l:"3 days",d:3},{l:"Next week",d:7}].map(({l,d})=>{const dt=new Date();dt.setDate(dt.getDate()+d);return<button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>handleDateInput(localDateStr(dt))}>{l}</button>;})}
                           <input ref={inputRef} type="date" defaultValue="" onChange={e=>{inputValRef.current=e.target.value;}} onKeyDown={e=>e.key==="Enter"&&inputRef.current?.value&&handleDateInput(inputRef.current.value)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:12,flex:1,minWidth:120,outline:"none"}}/>
                           <button style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"7px 13px",cursor:"pointer"}} onClick={()=>inputRef.current?.value&&handleDateInput(inputRef.current.value)}>→</button>
                         </div>

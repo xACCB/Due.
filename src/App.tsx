@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
+import { initializeFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -15,7 +15,11 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
-const db = getFirestore(fbApp);
+// ignoreUndefinedProperties: a stray `undefined` field anywhere in a synced
+// payload would otherwise make setDoc() throw synchronously (uncaught, since
+// this fires from a plain useEffect with no error boundary), crashing the
+// whole app to a blank screen instead of just dropping that one field.
+const db = initializeFirestore(fbApp, { ignoreUndefinedProperties: true });
 const googleProvider = new GoogleAuthProvider();
 
 // ─── THEMES (26 total, 13 dark / 13 light) ─────────────────────────────────────
@@ -114,7 +118,7 @@ interface Task {
   subtasks?: Subtask[];
   recurrence?: Recurrence;
   archived?: boolean;
-  completedAt?: number; // ms timestamp, set when marked done, cleared when un-marked -- drives archive timing + weekly/monthly stats
+  completedAt?: number | null; // ms timestamp, set when marked done, cleared (null, never undefined -- Firestore's setDoc throws on literal undefined) when un-marked -- drives archive timing + weekly/monthly stats
 }
 
 const DEFAULT_TASKS: Task[] = [
@@ -757,10 +761,10 @@ export default function HomeworkPlanner() {
       setCompletionLog(log=>log[today]?log:{...log,[today]:true});
     }
     setTasks(prev=>{
-      let next=prev.map(t=>t.id===id?{...t,done:nowDone,completedAt:nowDone?Date.now():undefined}:t);
+      let next=prev.map(t=>t.id===id?{...t,done:nowDone,completedAt:nowDone?Date.now():null}:t);
       if(nowDone&&task.recurrence&&task.recurrence!=="none"){
         const newDue=advanceDate(task.dueDate,task.recurrence);
-        next=[...next,{...task,id:nextId(),done:false,completedAt:undefined,archived:false,dueDate:newDue,order:prev.length}];
+        next=[...next,{...task,id:nextId(),done:false,completedAt:null,archived:false,dueDate:newDue,order:prev.length}];
       }
       return next;
     });

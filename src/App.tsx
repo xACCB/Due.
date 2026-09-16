@@ -549,6 +549,15 @@ export default function HomeworkPlanner() {
   const [dragOffsetY,setDragOffsetY]=useState(0);
   const dragStartY=useRef(0);
   const dragOrderIds=useRef<number[]>([]);
+  // Swipe gestures (List/Compact/Checklist layouts): left deletes, right toggles
+  // done. Direction is locked on the first few px of movement so a mostly-vertical
+  // drag (page scroll) is left alone instead of being hijacked as a swipe.
+  const [swipeId,setSwipeId]=useState<number|null>(null);
+  const [swipeX,setSwipeX]=useState(0);
+  const swipeStart=useRef({x:0,y:0});
+  const swipeLocked=useRef(false);
+  const swipeMoved=useRef(false);
+  const SWIPE_THRESHOLD=90;
   // Undo Delete: soft-delete-with-toast. The task stays in `tasks` (so nothing is
   // lost if the tab closes mid-toast) but is filtered out of every view via
   // `visibleTasks` below; only one delete can be pending at a time.
@@ -705,6 +714,80 @@ export default function HomeworkPlanner() {
     setDragOffsetY(0);
   }
   function endDrag(){setDragTaskId(null);setDragOffsetY(0);}
+
+  // Tracks which row a pointer is currently down on, purely via refs, so a plain
+  // tap causes zero state updates -- MiniCard is a nested component (recreated
+  // every parent render), so a setState on pointerdown would remount the pressed
+  // row mid-gesture and silently swallow the browser's native click event. State
+  // (swipeId/swipeX) only gets touched once a gesture actually locks in as a swipe.
+  const swipeActiveId=useRef<number|null>(null);
+  function onSwipeStart(id:number,e:React.PointerEvent){
+    swipeActiveId.current=id;
+    swipeStart.current={x:e.clientX,y:e.clientY};
+    swipeLocked.current=false;
+    swipeMoved.current=false;
+  }
+  function onSwipeMove(id:number,e:React.PointerEvent){
+    if(swipeActiveId.current!==id)return;
+    const dx=e.clientX-swipeStart.current.x;
+    const dy=e.clientY-swipeStart.current.y;
+    if(!swipeLocked.current){
+      if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)*1.5){
+        swipeLocked.current=true;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        setSwipeId(id);
+      } else if(Math.abs(dy)>8){
+        swipeActiveId.current=null; // vertical intent -- let the page scroll instead
+        return;
+      } else return;
+    }
+    swipeMoved.current=true;
+    setSwipeX(Math.max(-140,Math.min(140,dx)));
+  }
+  function onSwipeEnd(id:number){
+    if(swipeActiveId.current!==id)return;
+    swipeActiveId.current=null;
+    const wasLocked=swipeLocked.current;
+    swipeLocked.current=false;
+    if(!wasLocked)return;
+    const dx=swipeX;
+    setSwipeId(null);
+    setSwipeX(0);
+    if(dx<=-SWIPE_THRESHOLD)deleteTask(id);
+    else if(dx>=SWIPE_THRESHOLD)toggleDone(id);
+  }
+  function onSwipeCancel(id:number){
+    if(swipeActiveId.current!==id)return;
+    swipeActiveId.current=null;
+    const wasLocked=swipeLocked.current;
+    swipeLocked.current=false;
+    if(!wasLocked)return;
+    setSwipeId(null);
+    setSwipeX(0);
+  }
+  function swipeHandlers(id:number){
+    return {
+      onPointerDown:(e:React.PointerEvent)=>onSwipeStart(id,e),
+      onPointerMove:(e:React.PointerEvent)=>onSwipeMove(id,e),
+      onPointerUp:()=>onSwipeEnd(id),
+      onPointerCancel:()=>onSwipeCancel(id),
+    };
+  }
+  function swipeContentStyle(id:number):React.CSSProperties{
+    const active=swipeId===id;
+    const dx=active?swipeX:0;
+    return {transform:dx?`translateX(${dx}px)`:undefined,transition:active?"none":"transform 0.25s cubic-bezier(.34,1.4,.64,1)",touchAction:"pan-y"};
+  }
+  function swipeClickGuard(onOpen:()=>void){
+    return ()=>{ if(swipeMoved.current){swipeMoved.current=false;return;} onOpen(); };
+  }
+  function renderSwipeReveal(id:number){
+    if(swipeId!==id||swipeX===0)return null;
+    const isRight=swipeX>0;
+    return <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:isRight?"flex-start":"flex-end",padding:"0 20px",background:isRight?"#2ED57333":"#FF475733",pointerEvents:"none"}}>
+      <span style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:isRight?"#2ED573":"#FF4757"}}>{isRight?"✓ Mark done":"🗑 Delete"}</span>
+    </div>;
+  }
   const currentQ=step>=0?QUESTIONS[step]:null;
 
   const F = FONTS[fontName];
@@ -989,7 +1072,7 @@ export default function HomeworkPlanner() {
   }
 
   // ─── TASK CARD (base) ────────────────────────────────────────────────────────
-  function MiniCard({task,rank,reorderable}:{task:Task;rank:number;reorderable?:boolean}) {
+  function MiniCard({task,rank,reorderable,swipeable}:{task:Task;rank:number;reorderable?:boolean;swipeable?:boolean}) {
     const pr=getPriority(task.dueDate,task.estMins);
     const sc=subjectColors[task.subject]||T.accent;
     const dm=daysUntil(task.dueDate);
@@ -999,10 +1082,12 @@ export default function HomeworkPlanner() {
       <div
         className="tc"
         data-task-id={task.id}
-        onClick={()=>{if(dragTaskId==null){setSelectedTask(task);setSessionHistory([]);}}}
-        style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":undefined,pointerEvents:isDragging?"none":undefined}}>
+        onClick={swipeClickGuard(()=>{if(dragTaskId==null){setSelectedTask(task);setSessionHistory([]);}})}
+        {...(swipeable?swipeHandlers(task.id):{})}
+        style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
+        {swipeable&&renderSwipeReveal(task.id)}
         {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:PRIORITY_COLORS[pr],borderRadius:"13px 0 0 13px"}}/>}
-        <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9}}>
+        <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
           {reorderable&&!task.done&&(
             <div
               onClick={e=>e.stopPropagation()}
@@ -1069,14 +1154,17 @@ export default function HomeworkPlanner() {
     if (layout==="checklist") return (
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
         {tasks.map((t,i)=>{const pr=getPriority(t.dueDate,t.estMins);return(
-          <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.card,borderRadius:10,border:`1px solid ${T.border}`,cursor:"pointer"}}>
-            <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,minWidth:18}}>{String(i+1).padStart(2,"0")}</span>
-            <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${t.done?T.accent:T.textFaint}`,borderRadius:4,background:t.done?T.accent:"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
-              {t.done&&<span style={{color:"#111",fontSize:11,fontWeight:"bold"}}>✓</span>}
-            </button>
-            <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
-            <span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573"}}>{daysUntil(t.dueDate)}</span>
-            <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
+          <div key={t.id} style={{position:"relative",overflow:"hidden",borderRadius:10}}>
+            {renderSwipeReveal(t.id)}
+            <div className="tc" onClick={swipeClickGuard(()=>{setSelectedTask(t);setSessionHistory([]);})} {...swipeHandlers(t.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.card,borderRadius:10,border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
+              <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,minWidth:18}}>{String(i+1).padStart(2,"0")}</span>
+              <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${t.done?T.accent:T.textFaint}`,borderRadius:4,background:t.done?T.accent:"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
+                {t.done&&<span style={{color:"#111",fontSize:11,fontWeight:"bold"}}>✓</span>}
+              </button>
+              <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
+              <span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573"}}>{daysUntil(t.dueDate)}</span>
+              <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
+            </div>
           </div>
         );})}
       </div>
@@ -1085,15 +1173,18 @@ export default function HomeworkPlanner() {
     if (layout==="compact") return (
       <div style={{display:"flex",flexDirection:"column",gap:5}}>
         {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;const dm=daysUntil(t.dueDate);return(
-          <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:T.card,borderRadius:9,padding:"8px 11px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,position:"relative",overflow:"hidden",cursor:"pointer"}}>
-            <div style={{position:"absolute",left:0,top:0,bottom:0,width:2.5,background:PRIORITY_COLORS[pr]}}/>
-            <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
-              {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
-            </button>
-            <span style={{fontFamily:F.body,fontSize:13,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-            <span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>
-            {dm&&!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",flexShrink:0}}>{dm}</span>}
-            <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
+          <div key={t.id} style={{position:"relative",overflow:"hidden",borderRadius:9}}>
+            {renderSwipeReveal(t.id)}
+            <div className="tc" onClick={swipeClickGuard(()=>{setSelectedTask(t);setSessionHistory([]);})} {...swipeHandlers(t.id)} style={{background:T.card,borderRadius:9,padding:"8px 11px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,position:"relative",cursor:"pointer",...swipeContentStyle(t.id)}}>
+              <div style={{position:"absolute",left:0,top:0,bottom:0,width:2.5,background:PRIORITY_COLORS[pr]}}/>
+              <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
+                {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
+              </button>
+              <span style={{fontFamily:F.body,fontSize:13,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+              <span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>
+              {dm&&!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",flexShrink:0}}>{dm}</span>}
+              <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
+            </div>
           </div>
         );})}
       </div>
@@ -1350,13 +1441,13 @@ export default function HomeworkPlanner() {
           <div key={k}>
             <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{labelFor(k)} ({groups.get(k)!.length})</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)}/>)}
+              {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} swipeable/>)}
             </div>
           </div>
         ))}
       </div>;
     }
-    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable/>)}</div>;
+    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable swipeable/>)}</div>;
   }
 
   function Toggle({on,onChange}:{on:boolean;onChange:(v:boolean)=>void}){

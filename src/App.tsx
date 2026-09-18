@@ -161,6 +161,59 @@ function computeStreak(log:Record<string,true>):number {
 let idSeq=Date.now();
 function nextId():number { return ++idSeq; }
 
+// ─── SYLLABUS IMPORT ────────────────────────────────────────────────────────
+// A syllabus is free text with no fixed structure, so this is a heuristic
+// line-scanner rather than a real parser: for each line, look for the first
+// recognizable date (ISO, M/D[/YY], or "Month D[, YYYY]"), and if one's found,
+// treat the rest of that line as the assignment title. No AI/network call --
+// this app intentionally has no backend to send syllabus text to.
+const MONTH_NAMES:Record<string,number> = {
+  jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,may:4,
+  jun:5,june:5,jul:6,july:6,aug:7,august:7,sep:8,sept:8,september:8,
+  oct:9,october:9,nov:10,november:10,dec:11,december:11,
+};
+interface ParsedSyllabusItem { title:string; dueDate:string; }
+function parseSyllabus(text:string):ParsedSyllabusItem[] {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const results:ParsedSyllabusItem[]=[];
+  for(const raw of text.split(/\r?\n/)){
+    const line=raw.trim();
+    if(!line)continue;
+    let d:Date|null=null, matched="";
+    let m=line.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+    if(m){ d=new Date(+m[1],+m[2]-1,+m[3]); matched=m[0]; }
+    if(!d){
+      m=line.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+      if(m){
+        const year=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):today.getFullYear();
+        d=new Date(year,+m[1]-1,+m[2]);
+        matched=m[0];
+      }
+    }
+    if(!d){
+      m=line.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/i);
+      if(m){
+        const year=m[3]?+m[3]:today.getFullYear();
+        d=new Date(year,MONTH_NAMES[m[1].toLowerCase()],+m[2]);
+        matched=m[0];
+      }
+    }
+    if(!d||isNaN(d.getTime()))continue;
+    // No explicit 4-digit year in the match and the date lands well in the
+    // past -- most likely next year's occurrence of that month/day (a Dec
+    // syllabus listing "Jan 15" almost always means the following January).
+    if(!/\d{4}/.test(matched)&&(today.getTime()-d.getTime())/86400000>30){
+      d.setFullYear(d.getFullYear()+1);
+    }
+    let title=(line.slice(0,m!.index)+line.slice(m!.index!+matched.length)).trim();
+    title=title.replace(/^[-–—:•*\s]+|[-–—:•*\s]+$/g,"");
+    if(title.length>100)title=title.slice(0,97)+"...";
+    if(!title)title="Untitled assignment";
+    results.push({title,dueDate:localDateStr(d)});
+  }
+  return results;
+}
+
 function contrastColor(hex:string):string {
   const c=hex.replace("#","");
   const r=parseInt(c.substring(0,2),16)/255, g=parseInt(c.substring(2,4),16)/255, b=parseInt(c.substring(4,6),16)/255;
@@ -615,6 +668,33 @@ export default function HomeworkPlanner() {
   const [activeTab,setActiveTab]=useState("tasks");
   const [looksOpen,setLooksOpen]=useState(false);
   const [activeSubject,setActiveSubject]=useState("all");
+  // Syllabus import: transient by design (a paste-and-review staging area, not
+  // something worth persisting across reloads like tasks/scratchpad are).
+  const [importText,setImportText]=useState("");
+  const [importSubject,setImportSubject]=useState<string|null>(null);
+  const [importPreview,setImportPreview]=useState<{title:string;dueDate:string;checked:boolean}[]|null>(null);
+  const [importedCount,setImportedCount]=useState<number|null>(null);
+  function scanSyllabus(){
+    const found=parseSyllabus(importText);
+    setImportPreview(found.map(f=>({...f,checked:true})));
+    setImportedCount(null);
+  }
+  function toggleImportItem(idx:number){
+    setImportPreview(prev=>prev&&prev.map((it,i)=>i===idx?{...it,checked:!it.checked}:it));
+  }
+  function commitImport(){
+    if(!importPreview)return;
+    const subject=importSubject||subjects[0]||"Other";
+    const toAdd=importPreview.filter(it=>it.checked);
+    if(toAdd.length===0)return;
+    setTasks(prev=>[
+      ...prev,
+      ...toAdd.map((it,i):Task=>({id:nextId(),title:it.title,subject,dueDate:it.dueDate,dueTime:"",estMins:30,done:false,order:prev.length+i})),
+    ]);
+    setImportedCount(toAdd.length);
+    setImportText("");
+    setImportPreview(null);
+  }
   const [pomodoroActive,setPomodoroActive]=useState(false);
   const [pomodoroSecs,setPomodoroSecs]=useState(25*60);
   const [timeHours,setTimeHours]=useState(0);
@@ -1671,9 +1751,9 @@ export default function HomeworkPlanner() {
         <div className="app-sidebar">
         {/* Tabs */}
         <div className="tab-bar" style={{display:"flex",gap:4,marginBottom:16,background:T.surface,borderRadius:11,padding:3}}>
-          {(["tasks","tools","options"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"📋 Tasks",tools:"🛠️ Tools",options:"⚙️ Settings"};
-            return <button key={id} onClick={()=>setActiveTab(id)} style={{flex:1,background:activeTab===id?T.card:"transparent",color:activeTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"7px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:activeTab===id?"500":"normal",position:"relative"}}>
+          {(["tasks","tools","import","options"] as const).map(id=>{
+            const labels:Record<string,string>={tasks:"📋 Tasks",tools:"🛠️ Tools",import:"📥 Import",options:"⚙️ Settings"};
+            return <button key={id} onClick={()=>setActiveTab(id)} style={{flex:1,background:activeTab===id?T.card:"transparent",color:activeTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:10,border:"none",borderRadius:9,padding:"7px 4px",cursor:"pointer",transition:"all 0.15s",fontWeight:activeTab===id?"500":"normal",position:"relative",whiteSpace:"nowrap"}}>
               {labels[id]}
             </button>;
           })}
@@ -1884,6 +1964,65 @@ export default function HomeworkPlanner() {
                 style={{width:"100%",minHeight:120,maxHeight:280,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto"}}
               />
             </div>
+          </div>
+        )}
+
+        {/* IMPORT TAB */}
+        {activeTab==="import"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Import from Syllabus</div>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:10,lineHeight:1.5}}>
+                Paste your syllabus below. Lines with a date (e.g. "Sept 20", "9/20", "2026-09-20") are picked up as assignments -- review and uncheck anything that isn't one before adding.
+              </div>
+              <textarea
+                value={importText}
+                onChange={e=>{setImportText(e.target.value);setImportPreview(null);setImportedCount(null);}}
+                placeholder="Paste your syllabus text here..."
+                style={{width:"100%",minHeight:160,maxHeight:320,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto",marginBottom:10}}
+              />
+              <div style={{marginBottom:10}}>
+                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Add as subject</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                  {subjects.map(s=>{
+                    const active=(importSubject||subjects[0])===s;
+                    return <button key={s} className="chip" onClick={()=>setImportSubject(s)} style={{background:active?(subjectColors[s]||T.accent)+"33":"none",color:active?(subjectColors[s]||T.accent):T.textMuted,border:`1.5px solid ${active?(subjectColors[s]||T.accent):T.border}`}}>{s}</button>;
+                  })}
+                </div>
+              </div>
+              <button onClick={scanSyllabus} disabled={!importText.trim()} style={{width:"100%",background:importText.trim()?T.accent:T.surface,color:importText.trim()?"#000":T.textFaint,border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:importText.trim()?"pointer":"default"}}>
+                🔍 Scan for assignments
+              </button>
+              {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:12,color:"#2ED573",marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
+            </div>
+
+            {importPreview&&(
+              <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>
+                  Found {importPreview.length} assignment{importPreview.length===1?"":"s"}
+                </div>
+                {importPreview.length===0?(
+                  <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"16px 0"}}>No dated lines found -- try a different format.</div>
+                ):(<>
+                  <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,maxHeight:320,overflowY:"auto"}}>
+                    {importPreview.map((it,i)=>(
+                      <div key={i} onClick={()=>toggleImportItem(i)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:T.surface,borderRadius:9,cursor:"pointer",opacity:it.checked?1:0.45}}>
+                        <div style={{width:18,height:18,border:`2px solid ${it.checked?T.accent:T.textFaint}`,borderRadius:5,background:it.checked?T.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {it.checked&&<span style={{color:"#000",fontSize:11,fontWeight:"bold"}}>✓</span>}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.title}</div>
+                          <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{formatDate(it.dueDate)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={commitImport} disabled={!importPreview.some(it=>it.checked)} style={{width:"100%",background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:"pointer"}}>
+                    + Add {importPreview.filter(it=>it.checked).length} task{importPreview.filter(it=>it.checked).length===1?"":"s"}
+                  </button>
+                </>)}
+              </div>
+            )}
           </div>
         )}
 

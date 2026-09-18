@@ -1763,8 +1763,11 @@ export default function HomeworkPlanner() {
 
         {/* TASKS TAB */}
         {activeTab==="tasks"&&<>
-          {/* AI Suggestion */}
-          {showSuggestion?(
+          {/* AI Suggestion -- hidden entirely (box and the floating re-open
+              button both) once there's no pending homework left, since
+              there's nothing to suggest; reappears on its own as soon as a
+              task is added, no separate state to reset. */}
+          {topTask&&(showSuggestion?(
             <div style={{background:T.gradientCard,borderRadius:12,padding:"10px 12px",marginBottom:16,border:`1px solid ${T.accent}33`,position:"relative",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:7,minWidth:0}}>
@@ -1778,7 +1781,7 @@ export default function HomeworkPlanner() {
             <button onClick={()=>setShowSuggestion(true)} style={{position:"fixed",bottom:20,right:16,width:40,height:40,borderRadius:"50%",background:T.card,border:`1px solid ${T.accent}55`,boxShadow:`0 2px 10px ${T.accent}33`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,zIndex:50}} title="Show smart suggestion">
               ✨
             </button>
-          )}
+          ))}
 
           {/* Search */}
           <div style={{position:"relative",marginBottom:10}}>

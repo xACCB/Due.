@@ -65,6 +65,24 @@ if (recaptchaSiteKey) {
     isTokenAutoRefreshEnabled: true,
   });
 }
+// Detects the signature of a browser blocking the storage handoff Firebase
+// needs to complete signInWithRedirect across the round trip through its
+// authDomain (a different origin from this site) -- notably Firefox's
+// Enhanced Tracking Protection / Total Cookie Protection, on by default. This
+// shows up two different ways depending on exactly when the browser blocks
+// it: sometimes getRedirectResult() just resolves with no result and no
+// error (handled separately, see the "no result" branch below), and
+// sometimes it throws this specific error instead ("missing initial state" /
+// web-storage-unsupported) -- both are the same underlying cause and deserve
+// the same actionable message, not a generic "unknown error".
+function isStorageBlockedError(e: unknown): boolean {
+  const code = (e as { code?: string })?.code || "";
+  const message = ((e as { message?: string })?.message || "").toLowerCase();
+  return code === "auth/web-storage-unsupported"
+    || message.includes("missing initial state")
+    || message.includes("sessionstorage");
+}
+const STORAGE_BLOCKED_MESSAGE = "Sign-in was blocked by your browser's tracking protection. In Firefox: click the shield icon in the address bar and turn off Enhanced Tracking Protection for this site, then try again. Chrome and Edge don't hit this issue.";
 
 // ─── THEMES (26 total, 13 dark / 13 light) ─────────────────────────────────────
 const THEMES = {
@@ -1036,18 +1054,20 @@ export default function HomeworkPlanner() {
       const pending=localStorage.getItem("hw-signin-redirect-pending");
       if(!result&&pending&&Date.now()-Number(pending)<5*60*1000){
         // A redirect sign-in was started but Firebase came back with no user
-        // and no thrown error -- this is the signature of the browser's
-        // tracking protection (notably Firefox's Enhanced Tracking
-        // Protection / Total Cookie Protection, on by default) blocking the
-        // storage handoff between this site and the Firebase authDomain
-        // during the redirect round trip, rather than an actual auth error.
-        setSignInError("Sign-in was blocked by your browser's tracking protection. In Firefox: click the shield icon in the address bar and turn off Enhanced Tracking Protection for this site, then try again. Chrome and Edge don't hit this issue.");
+        // and no thrown error -- this is one of two ways storage-blocking
+        // shows up; see isStorageBlockedError above for the other (thrown)
+        // shape, caught below.
+        setSignInError(STORAGE_BLOCKED_MESSAGE);
       }
       localStorage.removeItem("hw-signin-redirect-pending");
     }).catch(e=>{
       console.error(e);
-      const code=(e as {code?:string})?.code||"unknown";
-      setSignInError(`Sign-in didn't go through (${code}). Please try again.`);
+      if(isStorageBlockedError(e)){
+        setSignInError(STORAGE_BLOCKED_MESSAGE);
+      } else {
+        const code=(e as {code?:string})?.code||"unknown";
+        setSignInError(`Sign-in didn't go through (${code}). Please try again.`);
+      }
       localStorage.removeItem("hw-signin-redirect-pending");
     });
     return unsub;
@@ -1225,6 +1245,10 @@ export default function HomeworkPlanner() {
       catch(e2){
         localStorage.removeItem("hw-signin-redirect-pending");
         console.error(e,e2);
+        if(isStorageBlockedError(e)||isStorageBlockedError(e2)){
+          setSignInError(STORAGE_BLOCKED_MESSAGE);
+          return;
+        }
         const code2=(e2 as {code?:string})?.code||"unknown";
         setSignInError(`Sign-in didn't go through (${code} / ${code2}). Please try again.`);
       }

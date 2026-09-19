@@ -587,6 +587,15 @@ export default function HomeworkPlanner() {
   const [fbLoading,setFbLoading]=useState(true);
   const [signInError,setSignInError]=useState<string|null>(null);
   const isSyncing=useRef(false);
+  // Guards the "save TO Firestore" effect below from firing before we've heard
+  // back from Firestore even once after sign-in. Without this, signing in on a
+  // device that still has different local/default tasks races the outbound
+  // save against the inbound onSnapshot read -- if the save's isSyncing.current
+  // window covers the moment the real snapshot arrives, that snapshot gets
+  // dropped (see the !isSyncing.current check below) and the stale local data
+  // gets written over the user's actual cloud data instead of the other way
+  // around.
+  const hasSyncedFromCloud=useRef(false);
 
   // Listen for auth state
   useEffect(()=>{
@@ -622,7 +631,7 @@ export default function HomeworkPlanner() {
 
   // When signed in, sync tasks FROM Firestore
   useEffect(()=>{
-    if(!fbUser)return;
+    if(!fbUser){ hasSyncedFromCloud.current=false; return; }
     const ref=doc(db,"users",fbUser.uid);
     const unsub=onSnapshot(ref,snap=>{
       if(snap.exists()&&!isSyncing.current){
@@ -634,13 +643,16 @@ export default function HomeworkPlanner() {
         if(data.unlockedThemesEver) setUnlockedThemesEver(data.unlockedThemesEver);
         if(data.scratchpad!==undefined){ setScratchpad(data.scratchpad); setScratchpadSynced(data.scratchpad); }
       }
+      hasSyncedFromCloud.current=true;
     });
     return unsub;
   },[fbUser]);
 
-  // Save tasks TO Firestore whenever they change
+  // Save tasks TO Firestore whenever they change. Gated on hasSyncedFromCloud
+  // so the very first write after sign-in can't fire before we know what's
+  // actually in the user's cloud doc -- see the comment on that ref above.
   useEffect(()=>{
-    if(!fbUser)return;
+    if(!fbUser||!hasSyncedFromCloud.current)return;
     isSyncing.current=true;
     const ref=doc(db,"users",fbUser.uid);
     setDoc(ref,{tasks,themeName,layout,completionLog,unlockedThemesEver,scratchpad:scratchpadSynced},{merge:true}).finally(()=>{isSyncing.current=false;});
@@ -725,7 +737,13 @@ export default function HomeworkPlanner() {
   const [sessionHistory,setSessionHistory]=useState<{mins:number;date:string}[]>([]);
   const sessionInterval=useRef<ReturnType<typeof setInterval>|null>(null);
   const inputRef=useRef<HTMLInputElement>(null);
-  const newSubjectRef=useRef<HTMLInputElement>(null);
+  // Controlled (not ref+uncontrolled) specifically because ProfileModal is a
+  // component defined inside this render body, so it gets torn down and
+  // recreated -- along with any of its own uncontrolled DOM inputs -- on every
+  // unrelated re-render of HomeworkPlanner while it's open (a Firestore sync
+  // landing, the streak effect, etc). State that lives up here in the parent
+  // survives that; an uncontrolled input's typed text would silently vanish.
+  const [newSubjectText,setNewSubjectText]=useState("");
   // Drag-to-reorder (default list layout, pending tasks only)
   const [dragTaskId,setDragTaskId]=useState<number|null>(null);
   const [dragOffsetY,setDragOffsetY]=useState(0);
@@ -817,6 +835,7 @@ export default function HomeworkPlanner() {
     setAdding(true);setStep(-1);
     setNewTask({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
     setPendingDueDate(null);
+    setTimeHours(0);setTimeMins(30);setTimeSecs(0);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
   }
@@ -1065,9 +1084,6 @@ export default function HomeworkPlanner() {
     setSessionActive(false);
     if(!selectedTask||sessionSecs<5)return;
     const mins=Math.max(1,Math.round(sessionSecs/60));
-    // Update task's estMins to actual time spent
-    setTasks(prev=>prev.map(t=>t.id===selectedTask.id?{...t,estMins:mins}:t));
-    setSelectedTask(prev=>prev?{...prev,estMins:mins}:prev);
     setSessionHistory(h=>[...h,{mins,date:new Date().toLocaleTimeString()}]);
     setSessionSecs(0);
   }
@@ -1151,8 +1167,8 @@ export default function HomeworkPlanner() {
                   </div>
                 );
               })}
-              <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectRef.current?.value||"");if(newSubjectRef.current)newSubjectRef.current.value="";}} style={{display:"flex",gap:8,marginTop:8}}>
-                <input ref={newSubjectRef} defaultValue="" placeholder="Add a subject..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
+              <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectText);setNewSubjectText("");}} style={{display:"flex",gap:8,marginTop:8}}>
+                <input value={newSubjectText} onChange={e=>setNewSubjectText(e.target.value)} placeholder="Add a subject..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
                 <button type="submit" style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontWeight:500}}>Add</button>
               </form>
             </div>

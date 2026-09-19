@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { initializeFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
+import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot } from "firebase/firestore";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -103,7 +103,8 @@ const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:
 const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE"];
 const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA" };
 const SUBJECT_COLOR_PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#F7DC6F","#BB8FCE","#82E0AA","#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#a78bfa","#fbbf24","#60a5fa"];
-const PRIORITY_COLORS: Record<string,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
+type Priority = "high"|"medium"|"low";
+const PRIORITY_COLORS: Record<Priority,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
 const QUESTIONS = [
   { key:"subject", label:"What subject? 📚", type:"select" },
   { key:"dueDate", label:"When is it due? 📅", type:"date" },
@@ -141,7 +142,17 @@ function advanceDate(dateStr:string, recurrence:Recurrence):string {
   const d = dateStr ? new Date(dateStr+"T00:00:00") : new Date();
   if (recurrence==="daily") d.setDate(d.getDate()+1);
   else if (recurrence==="weekly") d.setDate(d.getDate()+7);
-  else if (recurrence==="monthly") d.setMonth(d.getMonth()+1);
+  else if (recurrence==="monthly") {
+    // setMonth() doesn't clamp to the target month's length -- e.g. Jan 31 + 1
+    // month would silently become Mar 3, not Feb 28. Jump to day 1 of the
+    // target month first (so the day-of-month can't overflow into it), then
+    // clamp the original day-of-month to however many days that month has.
+    const day=d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth()+1);
+    const daysInMonth=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+    d.setDate(Math.min(day,daysInMonth));
+  }
   return localDateStr(d);
 }
 function computeStreak(log:Record<string,true>):number {
@@ -221,7 +232,7 @@ function contrastColor(hex:string):string {
   const L=0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
   return L>0.5?"#1a1a1a":"#ffffff";
 }
-function getPriority(dueDate:string, estMins:number):string {
+function getPriority(dueDate:string, estMins:number):Priority {
   if (!dueDate) return "low";
   const d=(new Date(dueDate+"T00:00:00").getTime()-Date.now())/86400000;
   if (d<1||(d<2&&estMins>60)) return "high"; if (d<3) return "medium"; return "low";
@@ -414,6 +425,336 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
   );
 }
 
+// Defined at module scope for the same reason as TaskModal above: it's
+// rendered from several places (toggles in the Settings tab) and stability
+// matters so it isn't torn down and recreated on every unrelated re-render.
+function Toggle({on,onChange,T}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeObj}){
+  const trackColor=on?T.accent:T.border;
+  return <button className="tog" onClick={()=>onChange(!on)} style={{background:trackColor}}>
+    <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),boxShadow:"0 1px 3px rgba(0,0,0,0.4)",transition:"left 0.2s",display:"block"}}/>
+  </button>;
+}
+
+// ─── TASK CARD (base) ────────────────────────────────────────────────────────
+// Also module scope (see TaskModal above) -- MiniCard is rendered in a loop
+// for every visible task across every layout, so being redefined (and every
+// instance's DOM torn down/recreated) on each unrelated render was the most
+// consequential case of this pattern in the file.
+function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag}:{
+  task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
+  T:ThemeObj; F:typeof FONTS[FontName]; subjectColors:Record<string,string>;
+  dragTaskId:number|null; dragOffsetY:number;
+  onOpen:(task:Task)=>void;
+  onToggleDone:(id:number)=>void;
+  onDelete:(id:number)=>void;
+  swipeClickGuard:(onOpen:()=>void)=>()=>void;
+  swipeHandlers:(id:number)=>{
+    onPointerDown:(e:React.PointerEvent)=>void;
+    onPointerMove:(e:React.PointerEvent)=>void;
+    onPointerUp:()=>void;
+    onPointerCancel:()=>void;
+  };
+  swipeContentStyle:(id:number)=>React.CSSProperties;
+  renderSwipeReveal:(id:number)=>React.ReactNode;
+  startDrag:(id:number,e:React.PointerEvent)=>void;
+  onDragMove:(e:React.PointerEvent)=>void;
+  endDrag:()=>void;
+}) {
+  const pr=getPriority(task.dueDate,task.estMins);
+  const sc=subjectColors[task.subject]||T.accent;
+  const dm=daysUntil(task.dueDate);
+  const isTop=rank===0&&!task.done; const isNext=rank===1&&!task.done;
+  const isDragging=dragTaskId===task.id;
+  return(
+    <div
+      className="tc"
+      data-task-id={task.id}
+      onClick={swipeClickGuard(()=>{if(dragTaskId==null){onOpen(task);}})}
+      {...(swipeable?swipeHandlers(task.id):{})}
+      style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
+      {swipeable&&renderSwipeReveal(task.id)}
+      {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:PRIORITY_COLORS[pr],borderRadius:"13px 0 0 13px"}}/>}
+      <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
+        {reorderable&&!task.done&&(
+          <div
+            onClick={e=>e.stopPropagation()}
+            onPointerDown={e=>{e.stopPropagation();startDrag(task.id,e);}}
+            onPointerMove={onDragMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            style={{color:T.textFaint,cursor:isDragging?"grabbing":"grab",fontSize:14,lineHeight:1,marginTop:2,padding:"0 2px",touchAction:"none",flexShrink:0}}>
+            ⠿
+          </div>
+        )}
+        <button onClick={e=>{e.stopPropagation();onToggleDone(task.id);}} style={{background:task.done?"#2ED573":"none",border:`2px solid ${task.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
+          {task.done&&<span style={{color:"#111",fontSize:10,fontWeight:"bold"}}>✓</span>}
+        </button>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+            {isTop&&<span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>}
+            {isNext&&<span className="rb" style={{background:T.text+"11",color:T.textMuted}}>next up</span>}
+            <span style={{fontFamily:F.heading,fontSize:15,textDecoration:task.done?"line-through":"none",color:task.done?T.textFaint:T.text}}>{task.title}</span>
+            {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
+            <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>
+          </div>
+          <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
+            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>📅 {formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
+            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>⏱ {task.estMins>=60?`${Math.floor(task.estMins/60)}h${task.estMins%60?` ${task.estMins%60}m`:""}`:` ${task.estMins}m`}</span>
+            {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",fontWeight:500}}>{dm}</span>}
+          </div>
+          {!!task.subtasks?.length&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:5}}>
+              <div style={{flex:1,maxWidth:80,height:4,background:T.border,borderRadius:999}}>
+                <div style={{width:`${Math.round(task.subtasks.filter(s=>s.done).length/task.subtasks.length*100)}%`,height:"100%",background:T.accent,borderRadius:999,transition:"width 0.3s"}}/>
+              </div>
+              <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{task.subtasks.filter(s=>s.done).length}/{task.subtasks.length}</span>
+            </div>
+          )}
+        </div>
+        <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();onDelete(task.id);}}>×</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── PROFILE MODAL ────────────────────────────────────────────────────────────
+// Also module scope (see TaskModal/MiniCard above) -- notably, this fixed a
+// real bug on top of the perf/remount concern: the "Add a subject" field used
+// to be an uncontrolled ref-based input, and since this component was being
+// recreated on every unrelated parent re-render, a background update (a
+// Firestore sync landing, etc.) while the user was mid-typing would silently
+// wipe out the text. newSubjectText/setNewSubjectText are lifted to the
+// parent specifically so they survive that; being hoisted now means this
+// component itself is no longer being recreated in the first place either.
+function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,subjects,subjectColors,themeName,fontName,newSubjectText,setNewSubjectText,profileTab,setProfileTab,setShowProfile,signInWithFirebase,signOutFirebase,addSubject,removeSubject}:{
+  T:ThemeObj; F:typeof FONTS[FontName];
+  fbUser:User|null; signInError:string|null; syncError:string|null;
+  visibleTasks:Task[]; totalMins:number;
+  subjects:string[]; subjectColors:Record<string,string>;
+  themeName:ThemeName; fontName:FontName;
+  newSubjectText:string; setNewSubjectText:(v:string)=>void;
+  profileTab:"profile"|"personalize"; setProfileTab:(v:"profile"|"personalize")=>void;
+  setShowProfile:(v:boolean)=>void;
+  signInWithFirebase:()=>Promise<void>;
+  signOutFirebase:()=>Promise<void>;
+  addSubject:(name:string)=>void;
+  removeSubject:(name:string)=>void;
+}) {
+  const doneTasks=visibleTasks.filter(t=>t.done).length;
+  const totalTasks=visibleTasks.length;
+  const highPri=visibleTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="high").length;
+  const pct=totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
+  const subjectCounts=subjects.map(s=>({name:s,count:visibleTasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
+
+  if (!fbUser) return (
+    // ── SIGN IN SCREEN (monkeytype-style) ─────────────────────────────────────
+    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+      <button onClick={()=>setShowProfile(false)} style={{position:"absolute",top:20,right:20,background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+      {/* Logo */}
+      <div style={{marginBottom:40,textAlign:"center"}}>
+        <div style={{fontFamily:F.heading,fontSize:42,color:T.accent,lineHeight:1}}>due<span style={{color:T.text}}>.</span></div>
+        <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginTop:6}}>due. studios · sync across devices</div>
+      </div>
+      {/* Sign in box */}
+      <div style={{width:"100%",maxWidth:340}}>
+        <button onClick={signInWithFirebase}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 20px",cursor:"pointer",marginBottom:12,transition:"all 0.15s"}}>
+          {/* Google icon */}
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+          <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Continue with Google</span>
+        </button>
+        {signInError&&<div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:"#FF4757",marginBottom:12,lineHeight:1.5}}>{signInError}</div>}
+        <div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textFaint,lineHeight:1.6}}>
+          By signing in you agree to have your homework data synced across your devices. No data is shared with third parties.
+        </div>
+      </div>
+      {/* Bookmark button */}
+      <button onClick={()=>{
+        if(navigator.share){navigator.share({title:"due.",url:window.location.href}).catch(()=>{});}
+        else{navigator.clipboard?.writeText(window.location.href);alert("Link copied! Open Safari and paste, then Share → Add to Home Screen.");}
+      }} style={{width:"100%",maxWidth:340,background:"none",border:`1px solid ${T.border}`,borderRadius:12,padding:"12px",fontFamily:F.body,fontSize:12,color:T.textMuted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:12}}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
+        Add to Home Screen
+      </button>
+      {/* Decorative divider */}
+      <div style={{position:"absolute",bottom:40,display:"flex",alignItems:"center",gap:12}}>
+        <div style={{height:1,width:60,background:T.border}}/>
+        <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>due. studios</span>
+        <div style={{height:1,width:60,background:T.border}}/>
+      </div>
+    </div>
+  );
+
+  // ── PROFILE SCREEN (signed in) ─────────────────────────────────────────────
+  return (
+    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,overflowY:"auto"}}>
+      <div style={{maxWidth:560,margin:"0 auto",padding:"20px 16px 40px"}}>
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div style={{fontFamily:F.heading,fontSize:22,color:T.accent}}>profile</div>
+          <button onClick={()=>{setShowProfile(false);setProfileTab("profile");setNewSubjectText("");}} style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:4,marginBottom:24,background:T.surface,borderRadius:11,padding:3}}>
+          {(["profile","personalize"] as const).map(id=>{
+            const labels:Record<string,string>={profile:"👤 Profile",personalize:"🎨 Personalization"};
+            return <button key={id} onClick={()=>setProfileTab(id)} style={{flex:1,background:profileTab===id?T.card:"transparent",color:profileTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"8px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:profileTab===id?"500":"normal"}}>{labels[id]}</button>;
+          })}
+        </div>
+
+        {profileTab==="personalize"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Subjects</div>
+            {subjects.map(s=>{
+              const isDefault=(DEFAULT_SUBJECTS as string[]).includes(s);
+              return (
+                <div key={s} style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:12,padding:"11px 14px",border:`1px solid ${T.border}`}}>
+                  <div style={{width:12,height:12,borderRadius:"50%",background:subjectColors[s]||T.accent,flexShrink:0}}/>
+                  <span style={{flex:1,fontFamily:F.body,fontSize:13,color:T.text}}>{s}</span>
+                  {isDefault&&<span style={{fontFamily:F.body,fontSize:9,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.05em"}}>default</span>}
+                  <button onClick={()=>{if(window.confirm(`Delete "${s}"? This won't remove it from tasks that already use it.`))removeSubject(s);}} style={{background:"none",border:"none",color:T.textFaint,fontSize:16,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>×</button>
+                </div>
+              );
+            })}
+            <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectText);setNewSubjectText("");}} style={{display:"flex",gap:8,marginTop:8}}>
+              <input value={newSubjectText} onChange={e=>setNewSubjectText(e.target.value)} placeholder="Add a subject..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
+              <button type="submit" style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontWeight:500}}>Add</button>
+            </form>
+          </div>
+        )}
+
+        {profileTab==="profile"&&(<>
+        {/* Avatar + name */}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:32}}>
+          <div style={{position:"relative",marginBottom:14}}>
+            {fbUser.photoURL
+              ? <img src={fbUser.photoURL} alt="" style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:`3px solid ${T.accent}`}}/>
+              : <div style={{width:80,height:80,borderRadius:"50%",background:T.surface,border:`3px solid ${T.accent}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
+                </div>
+            }
+            <div style={{position:"absolute",bottom:2,right:2,width:16,height:16,borderRadius:"50%",background:"#2ED573",border:`2px solid ${T.bg}`}}/>
+          </div>
+          <div style={{fontFamily:F.heading,fontSize:24,color:T.text,marginBottom:4}}>{fbUser.displayName}</div>
+          <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:8}}>{fbUser.email}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,background:syncError?"#FF475722":"#2ED57322",borderRadius:999,padding:"4px 12px",border:`1px solid ${syncError?"#FF475744":"#2ED57344"}`}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:syncError?"#FF4757":"#2ED573"}}/>
+            <span style={{fontFamily:F.body,fontSize:11,color:syncError?"#FF4757":"#2ED573"}}>{syncError?"Sync issue":"Synced across devices"}</span>
+          </div>
+          {syncError&&<div style={{fontFamily:F.body,fontSize:11,color:"#FF4757",marginTop:8,textAlign:"center",maxWidth:280,lineHeight:1.5}}>{syncError}</div>}
+        </div>
+
+        {/* Progress ring + stats */}
+        <div style={{background:T.card,borderRadius:16,padding:"20px",border:`1px solid ${T.border}`,marginBottom:14,display:"flex",alignItems:"center",gap:20}}>
+          {/* Ring */}
+          <div style={{position:"relative",width:80,height:80,flexShrink:0}}>
+            <svg width="80" height="80" style={{transform:"rotate(-90deg)"}}>
+              <circle cx="40" cy="40" r="33" fill="none" stroke={T.border} strokeWidth="7"/>
+              <circle cx="40" cy="40" r="33" fill="none" stroke={T.accent} strokeWidth="7" strokeDasharray="207" strokeDashoffset={207*(1-pct/100)} strokeLinecap="round" style={{transition:"stroke-dashoffset 0.8s"}}/>
+            </svg>
+            <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontFamily:F.heading,fontSize:18,color:T.text}}>{pct}%</span>
+            </div>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:F.heading,fontSize:13,color:T.textMuted,marginBottom:10}}>completion</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[{l:"Total",v:totalTasks,c:T.text},{l:"Done",v:doneTasks,c:"#2ED573"},{l:"Pending",v:totalTasks-doneTasks,c:T.accent},{l:"Urgent",v:highPri,c:"#FF4757"}].map(s=>(
+                <div key={s.l}>
+                  <div style={{fontFamily:F.heading,fontSize:20,color:s.c}}>{s.v}</div>
+                  <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Time stats */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+          <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
+            <div style={{fontFamily:F.heading,fontSize:26,color:T.accent}}>{(totalMins/60).toFixed(1)}h</div>
+            <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:2}}>estimated left</div>
+          </div>
+          <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
+            <div style={{fontFamily:F.heading,fontSize:26,color:"#4ECDC4"}}>{visibleTasks.filter(t=>t.done).reduce((a,b)=>a+(b.estMins||0),0)}m</div>
+            <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:2}}>completed work</div>
+          </div>
+        </div>
+
+        {/* Subject breakdown */}
+        {subjectCounts.length>0&&(
+          <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:14}}>
+            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>By subject</div>
+            {subjectCounts.map(s=>(
+              <div key={s.name} style={{marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{s.name}</span>
+                  <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>{s.count} task{s.count!==1?"s":""}</span>
+                </div>
+                <div style={{height:5,background:T.border,borderRadius:999}}>
+                  <div style={{width:`${Math.round(s.count/totalTasks*100)}%`,height:"100%",background:s.color,borderRadius:999,transition:"width 0.5s"}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Theme + font info */}
+        <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:20}}>
+          <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>Current setup</div>
+          <div style={{display:"flex",gap:10}}>
+            <div style={{flex:1,background:T.surface,borderRadius:10,padding:"10px 12px"}}>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:3}}>Theme</div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:T.accent}}/><span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{THEMES[themeName].name}</span></div>
+            </div>
+            <div style={{flex:1,background:T.surface,borderRadius:10,padding:"10px 12px"}}>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:3}}>Font</div>
+              <span style={{fontFamily:F.heading,fontSize:12,color:T.text}}>{FONTS[fontName].name}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Add to home screen */}
+        <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <div style={{width:36,height:36,borderRadius:10,background:T.accent+"22",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.accent} strokeWidth="2" strokeLinecap="round"/></svg>
+            </div>
+            <div>
+              <div style={{fontFamily:F.body,fontSize:13,color:T.text,fontWeight:500}}>Add to Home Screen</div>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Access like a native app on iOS</div>
+            </div>
+          </div>
+          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,lineHeight:1.7,marginBottom:12}}>
+            1. Tap the <span style={{color:T.accent}}>Share button</span> <span style={{fontSize:13}}>⎋</span> at the bottom of Safari<br/>
+            2. Scroll down and tap <span style={{color:T.accent}}>"Add to Home Screen"</span><br/>
+            3. Tap <span style={{color:T.accent}}>"Add"</span> in the top right
+          </div>
+          <button onClick={()=>{
+            if(navigator.share){
+              navigator.share({title:"due.",url:window.location.href}).catch(()=>{});
+            } else {
+              navigator.clipboard?.writeText(window.location.href);
+              alert("Link copied! Open Safari on your iPhone and paste the link, then use Share → Add to Home Screen.");
+            }
+          }} style={{width:"100%",background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer",fontWeight:500,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke="#000" strokeWidth="2.5" strokeLinecap="round"/></svg>
+            Share / Make Bookmark
+          </button>
+        </div>
+
+        {/* Sign out */}
+        <button onClick={async()=>{await signOutFirebase();setShowProfile(false);}}
+          style={{width:"100%",background:"none",border:`1px solid #FF475744`,borderRadius:12,padding:"13px",color:"#FF4757",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>
+          🚪 Sign out
+        </button>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
 export default function HomeworkPlanner() {
   const [tasks,setTasks]=useState<Task[]>(()=>{
     try{
@@ -586,23 +927,54 @@ export default function HomeworkPlanner() {
   const [fbUser,setFbUser]=useState<User|null>(null);
   const [fbLoading,setFbLoading]=useState(true);
   const [signInError,setSignInError]=useState<string|null>(null);
-  const isSyncing=useRef(false);
-  // Guards the "save TO Firestore" effect below from firing before we've heard
-  // back from Firestore, for THIS uid specifically, even once. Without this,
-  // signing in on a device that still has different local/default tasks races
-  // the outbound save against the inbound onSnapshot read -- if the save's
-  // isSyncing.current window covers the moment the real snapshot arrives, that
-  // snapshot gets dropped (see the !isSyncing.current check below) and the
-  // stale local data gets written over the user's actual cloud data instead of
-  // the other way around. Storing the uid we've synced (not just a boolean)
-  // means a direct switch from one signed-in account to another -- or a
-  // sign-out/sign-back-in as the same account -- can't leave a stale "synced"
-  // flag pointing at the wrong (or now-outdated) snapshot: the comparison
-  // below fails until a fresh snapshot for the CURRENT uid actually lands.
-  // Reactive state, not a ref -- a brand-new user (no existing doc yet) only
-  // flips this once, via the exists()===false path, and a ref mutation alone
-  // wouldn't trigger the re-render needed for the save effect to notice.
-  const [syncedForUid,setSyncedForUid]=useState<string|null>(null);
+  // Surfaces a failure from either half of the Firestore sync (read or write)
+  // -- previously both failed completely silently, so a permission error or
+  // dropped connection meant edits just never reached the cloud with no way
+  // for the user to know their data wasn't actually syncing.
+  const [syncError,setSyncError]=useState<string|null>(null);
+  const isSyncingProfile=useRef(false);
+  const isSyncingTasks=useRef(false);
+  // Guards each "save TO Firestore" effect below from firing before we've
+  // heard back from Firestore, for THIS uid specifically, even once. Without
+  // this, signing in on a device that still has different local/default data
+  // races the outbound save against the inbound read -- if the save's
+  // isSyncing window covers the moment the real snapshot arrives, that
+  // snapshot gets dropped and the stale local data gets written over the
+  // user's actual cloud data instead of the other way around. Storing the uid
+  // we've synced (not just a boolean) means a direct switch from one
+  // signed-in account to another -- or a sign-out/sign-back-in as the same
+  // account -- can't leave a stale "synced" flag pointing at the wrong (or
+  // now-outdated) snapshot. Reactive state, not a ref -- an empty result
+  // (nothing to apply) still needs to flip this via a re-render, and a ref
+  // mutation alone wouldn't trigger that.
+  const [profileSyncedForUid,setProfileSyncedForUid]=useState<string|null>(null);
+  const [tasksSyncedForUid,setTasksSyncedForUid]=useState<string|null>(null);
+  // What's currently believed to be in the tasks subcollection (from the last
+  // read OR the last successful write), keyed by task id -- lets the "save
+  // tasks" effect below write only what actually changed instead of
+  // overwriting every task on every edit. This is the entire point of tasks
+  // living in a subcollection instead of one array field: see
+  // migrateLegacyTasks below for the old shape this replaces, and why it
+  // stopped scaling (every edit, however small, rewrote every task ever
+  // created, and the whole document could hit Firestore's 1MB size limit for
+  // a long-time user).
+  const lastSyncedTasksRef=useRef<Map<number,Task>>(new Map());
+  // Gates both live listeners below until any one-time legacy-data migration
+  // for this uid has been checked (and, if needed, completed) -- see
+  // migrateLegacyTasks. Without this, the tasks-subcollection listener could
+  // see "genuinely empty" on a pre-migration existing account (wiping local
+  // tasks the instant it fires) before the migration's own write has a chance
+  // to land.
+  const [readyForUid,setReadyForUid]=useState<string|null>(null);
+  // Whether THIS uid had no profile document at all the moment migration was
+  // checked -- i.e. a genuinely first-ever sign-in, never synced before. An
+  // empty tasks subcollection is ambiguous on its own (brand new account with
+  // nothing to sync down yet, vs. a returning account that legitimately has
+  // zero tasks right now); this disambiguates it so the tasks-FROM listener
+  // knows not to apply an empty result -- and so wipe local state -- for a
+  // brand-new account, while still respecting a real "zero tasks" for anyone
+  // who has synced before.
+  const [isNewAccountForUid,setIsNewAccountForUid]=useState<string|null>(null);
 
   // Listen for auth state
   useEffect(()=>{
@@ -610,7 +982,7 @@ export default function HomeworkPlanner() {
       setFbUser(user);
       setFbLoading(false);
       if(user) localStorage.removeItem("hw-signin-redirect-pending");
-      else setSyncedForUid(null);
+      else { setProfileSyncedForUid(null); setTasksSyncedForUid(null); setReadyForUid(null); setIsNewAccountForUid(null); }
     });
     // Only relevant if signInWithFirebase had to fall back to the redirect
     // method below (e.g. a browser that blocks/mishandles the popup) -- this
@@ -637,35 +1009,147 @@ export default function HomeworkPlanner() {
     return unsub;
   },[]);
 
-  // When signed in, sync tasks FROM Firestore
+  // One-time-per-uid: move any pre-existing "tasks" array field from the old
+  // single-document shape into the users/{uid}/tasks subcollection, then
+  // remove it. Runs to completion (readyForUid gates both live listeners
+  // below) before either one attaches, so there's no window where the
+  // subcollection listener could see "genuinely empty" on an account that
+  // actually still has legacy data waiting to move.
   useEffect(()=>{
+    // Sign-out already resets readyForUid (and the other uid-keyed sync
+    // state) from the auth-listener's callback above, so nothing to do here.
     if(!fbUser)return;
-    const ref=doc(db,"users",fbUser.uid);
-    const unsub=onSnapshot(ref,snap=>{
-      if(snap.exists()&&!isSyncing.current){
-        const data=snap.data();
-        if(data.tasks) setTasks(data.tasks);
-        if(data.themeName) setThemeName(data.themeName);
-        if(data.layout) setLayout(data.layout as LayoutName);
-        if(data.completionLog) setCompletionLog(data.completionLog);
-        if(data.unlockedThemesEver) setUnlockedThemesEver(data.unlockedThemesEver);
-        if(data.scratchpad!==undefined){ setScratchpad(data.scratchpad); setScratchpadSynced(data.scratchpad); }
+    let cancelled=false;
+    (async()=>{
+      try{
+        const profileRef=doc(db,"users",fbUser.uid);
+        const snap=await getDoc(profileRef);
+        const isNew=!snap.exists();
+        const data=snap.exists()?snap.data():null;
+        if(data&&Array.isArray(data.tasks)){
+          const tasksCol=collection(db,"users",fbUser.uid,"tasks");
+          const existing=await getDocs(tasksCol);
+          if(existing.empty&&data.tasks.length>0){
+            const batch=writeBatch(db);
+            for(const t of data.tasks as Task[]) batch.set(doc(tasksCol,String(t.id)),t);
+            // Only commit the new docs, then clear the legacy field, after
+            // confirming the subcollection is actually empty -- if anything
+            // here throws, the legacy field is left in place so the next
+            // load just retries the whole check from scratch.
+            await batch.commit();
+          }
+          await updateDoc(profileRef,{tasks:deleteField()});
+        }
+        if(!cancelled) setIsNewAccountForUid(isNew?fbUser.uid:null);
+      }catch(err){
+        console.error(err);
+        if(!cancelled) setSyncError("Couldn't prepare cloud sync. Please try again.");
+      }finally{
+        if(!cancelled) setReadyForUid(fbUser.uid);
       }
-      setSyncedForUid(fbUser.uid);
-    });
-    return unsub;
+    })();
+    return ()=>{cancelled=true;};
   },[fbUser]);
 
-  // Save tasks TO Firestore whenever they change. Gated on syncedForUid
-  // matching the current user so the very first write after sign-in can't fire
-  // before we know what's actually in the user's cloud doc -- see the comment
-  // on that state above.
+  // Sync the small "profile" fields (not tasks -- those live in their own
+  // subcollection, synced separately below) FROM Firestore.
   useEffect(()=>{
-    if(!fbUser||syncedForUid!==fbUser.uid)return;
-    isSyncing.current=true;
+    if(!fbUser||readyForUid!==fbUser.uid)return;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{tasks,themeName,layout,completionLog,unlockedThemesEver,scratchpad:scratchpadSynced},{merge:true}).finally(()=>{isSyncing.current=false;});
-  },[tasks,themeName,layout,completionLog,unlockedThemesEver,scratchpadSynced,fbUser,syncedForUid]);
+    const unsub=onSnapshot(ref,snap=>{
+      if(snap.exists()&&!isSyncingProfile.current){
+        const data=snap.data();
+        // Firestore data is untyped (DocumentData) -- a malformed or legacy
+        // document (e.g. from an older buggy version, or a manual edit in the
+        // console) could otherwise inject a wrong-shaped value straight into
+        // state and crash a render. Cheap shape checks before applying.
+        if(typeof data.themeName==="string"&&data.themeName in THEMES) setThemeName(data.themeName as ThemeName);
+        if(typeof data.layout==="string"&&data.layout in LAYOUTS) setLayout(data.layout as LayoutName);
+        if(data.completionLog&&typeof data.completionLog==="object") setCompletionLog(data.completionLog);
+        if(data.unlockedThemesEver&&typeof data.unlockedThemesEver==="object") setUnlockedThemesEver(data.unlockedThemesEver);
+        if(typeof data.scratchpad==="string"){ setScratchpad(data.scratchpad); setScratchpadSynced(data.scratchpad); }
+      }
+      setProfileSyncedForUid(fbUser.uid);
+      setSyncError(null);
+    },err=>{
+      console.error(err);
+      setSyncError("Couldn't sync with the cloud -- your changes are saved on this device, but may not reach your other devices until this is resolved.");
+    });
+    return unsub;
+  },[fbUser,readyForUid]);
+
+  // Save the profile fields TO Firestore whenever they change. Gated on
+  // profileSyncedForUid matching the current user so the very first write
+  // can't fire before we know what's actually in the user's cloud doc.
+  useEffect(()=>{
+    if(!fbUser||profileSyncedForUid!==fbUser.uid)return;
+    isSyncingProfile.current=true;
+    const ref=doc(db,"users",fbUser.uid);
+    setDoc(ref,{themeName,layout,completionLog,unlockedThemesEver,scratchpad:scratchpadSynced},{merge:true})
+      .then(()=>setSyncError(null))
+      .catch(err=>{
+        console.error(err);
+        setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
+      })
+      .finally(()=>{isSyncingProfile.current=false;});
+  },[themeName,layout,completionLog,unlockedThemesEver,scratchpadSynced,fbUser,profileSyncedForUid]);
+
+  // Sync tasks FROM the tasks subcollection.
+  useEffect(()=>{
+    if(!fbUser||readyForUid!==fbUser.uid)return;
+    const tasksCol=collection(db,"users",fbUser.uid,"tasks");
+    const unsub=onSnapshot(tasksCol,snap=>{
+      if(!isSyncingTasks.current){
+        // An empty subcollection is ambiguous on its own: a brand-new account
+        // with nothing synced yet vs. a returning account that legitimately
+        // has zero tasks right now. isNewAccountForUid (set by the migration
+        // effect above, from whether a profile doc existed at all) tells
+        // them apart -- for a genuinely new account, leave local state (e.g.
+        // DEFAULT_TASKS) alone so the save effect below pushes it up as the
+        // first write, instead of wiping it with this empty read.
+        if(!(snap.empty&&isNewAccountForUid===fbUser.uid)){
+          const loaded=snap.docs
+            .map(d=>d.data())
+            .filter((t):t is Task=>typeof t.id==="number"&&typeof t.title==="string"); // shape guard, see profile sync above
+          setTasks(loaded);
+          lastSyncedTasksRef.current=new Map(loaded.map(t=>[t.id,t]));
+        }
+      }
+      setTasksSyncedForUid(fbUser.uid);
+      setSyncError(null);
+    },err=>{
+      console.error(err);
+      setSyncError("Couldn't sync with the cloud -- your changes are saved on this device, but may not reach your other devices until this is resolved.");
+    });
+    return unsub;
+  },[fbUser,readyForUid,isNewAccountForUid]);
+
+  // Save tasks TO the tasks subcollection whenever they change -- but only
+  // the individual tasks that actually changed (added, edited, or removed),
+  // diffed against lastSyncedTasksRef, rather than overwriting the whole
+  // collection. This is the entire point of tasks living in a subcollection
+  // instead of one array field: toggling a single task no longer rewrites
+  // every other task along with it.
+  useEffect(()=>{
+    if(!fbUser||tasksSyncedForUid!==fbUser.uid)return;
+    const prevMap=lastSyncedTasksRef.current;
+    const currentMap=new Map(tasks.map(t=>[t.id,t]));
+    const toWrite=tasks.filter(t=>JSON.stringify(prevMap.get(t.id))!==JSON.stringify(t));
+    const toDelete=[...prevMap.keys()].filter(id=>!currentMap.has(id));
+    if(toWrite.length===0&&toDelete.length===0)return;
+    isSyncingTasks.current=true;
+    const tasksCol=collection(db,"users",fbUser.uid,"tasks");
+    const batch=writeBatch(db);
+    for(const t of toWrite) batch.set(doc(tasksCol,String(t.id)),t);
+    for(const id of toDelete) batch.delete(doc(tasksCol,String(id)));
+    batch.commit()
+      .then(()=>{ lastSyncedTasksRef.current=currentMap; setSyncError(null); })
+      .catch(err=>{
+        console.error(err);
+        setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
+      })
+      .finally(()=>{isSyncingTasks.current=false;});
+  },[tasks,fbUser,tasksSyncedForUid]);
 
   async function signInWithFirebase(){
     setSignInError(null);
@@ -744,7 +1228,7 @@ export default function HomeworkPlanner() {
   const [sessionActive,setSessionActive]=useState(false);
   const [sessionSecs,setSessionSecs]=useState(0);
   const [sessionHistory,setSessionHistory]=useState<{mins:number;date:string}[]>([]);
-  const sessionInterval=useRef<ReturnType<typeof setInterval>|null>(null);
+  const sessionInterval=useRef<ReturnType<typeof setInterval>|undefined>(undefined);
   const inputRef=useRef<HTMLInputElement>(null);
   // Controlled (not ref+uncontrolled) specifically because ProfileModal is a
   // component defined inside this render body, so it gets torn down and
@@ -772,7 +1256,7 @@ export default function HomeworkPlanner() {
   // `visibleTasks` below; only one delete can be pending at a time.
   const [pendingDeleteId,setPendingDeleteId]=useState<number|null>(null);
   const [pendingDeleteTitle,setPendingDeleteTitle]=useState("");
-  const pendingDeleteTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const pendingDeleteTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
 
   const base=THEMES[themeName];
   const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
@@ -1035,7 +1519,12 @@ export default function HomeworkPlanner() {
 
   const F = FONTS[fontName];
 
-  const css=`
+  // Memoized on the actual primitives used below (not on T/F themselves --
+  // those are fresh object literals every render) so this multi-hundred-line
+  // stylesheet string, injected via <style>{css}</style>, only gets rebuilt
+  // (and reparsed by the browser) when the theme or font actually changes,
+  // not on every task edit, scratchpad keystroke, or other unrelated render.
+  const css=useMemo(()=>`
     @import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');
     *{box-sizing:border-box;}
     body{margin:0;background:${T.bg};transition:background 0.4s;font-family:${F.body};}
@@ -1076,7 +1565,7 @@ export default function HomeworkPlanner() {
     @media (max-width:600px){
       input,textarea{font-size:16px!important;}
     }
-  `;
+  `,[T.bg,T.card,T.cardAlt,T.border,F.google,F.body]);
 
   // Session timer
   useEffect(()=>{
@@ -1097,284 +1586,16 @@ export default function HomeworkPlanner() {
     setSessionSecs(0);
   }
 
-  // ─── PROFILE MODAL ────────────────────────────────────────────────────────────
-  function ProfileModal() {
-    const doneTasks=visibleTasks.filter(t=>t.done).length;
-    const totalTasks=visibleTasks.length;
-    const highPri=visibleTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="high").length;
-    const pct=totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
-    const subjectCounts=subjects.map(s=>({name:s,count:visibleTasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
-
-    if (!fbUser) return (
-      // ── SIGN IN SCREEN (monkeytype-style) ─────────────────────────────────────
-      <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px"}}>
-        <button onClick={()=>setShowProfile(false)} style={{position:"absolute",top:20,right:20,background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
-        {/* Logo */}
-        <div style={{marginBottom:40,textAlign:"center"}}>
-          <div style={{fontFamily:F.heading,fontSize:42,color:T.accent,lineHeight:1}}>due<span style={{color:T.text}}>.</span></div>
-          <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginTop:6}}>due. studios · sync across devices</div>
-        </div>
-        {/* Sign in box */}
-        <div style={{width:"100%",maxWidth:340}}>
-          <button onClick={signInWithFirebase}
-            style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 20px",cursor:"pointer",marginBottom:12,transition:"all 0.15s"}}>
-            {/* Google icon */}
-            <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
-            <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Continue with Google</span>
-          </button>
-          {signInError&&<div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:"#FF4757",marginBottom:12,lineHeight:1.5}}>{signInError}</div>}
-          <div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textFaint,lineHeight:1.6}}>
-            By signing in you agree to have your homework data synced across your devices. No data is shared with third parties.
-          </div>
-        </div>
-        {/* Bookmark button */}
-        <button onClick={()=>{
-          if(navigator.share){navigator.share({title:"due.",url:window.location.href}).catch(()=>{});}
-          else{navigator.clipboard?.writeText(window.location.href);alert("Link copied! Open Safari and paste, then Share → Add to Home Screen.");}
-        }} style={{width:"100%",maxWidth:340,background:"none",border:`1px solid ${T.border}`,borderRadius:12,padding:"12px",fontFamily:F.body,fontSize:12,color:T.textMuted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:12}}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
-          Add to Home Screen
-        </button>
-        {/* Decorative divider */}
-        <div style={{position:"absolute",bottom:40,display:"flex",alignItems:"center",gap:12}}>
-          <div style={{height:1,width:60,background:T.border}}/>
-          <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>due. studios</span>
-          <div style={{height:1,width:60,background:T.border}}/>
-        </div>
-      </div>
-    );
-
-    // ── PROFILE SCREEN (signed in) ─────────────────────────────────────────────
-    return (
-      <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,overflowY:"auto"}}>
-        <div style={{maxWidth:560,margin:"0 auto",padding:"20px 16px 40px"}}>
-          {/* Header */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-            <div style={{fontFamily:F.heading,fontSize:22,color:T.accent}}>profile</div>
-            <button onClick={()=>{setShowProfile(false);setProfileTab("profile");setNewSubjectText("");}} style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
-          </div>
-
-          {/* Tabs */}
-          <div style={{display:"flex",gap:4,marginBottom:24,background:T.surface,borderRadius:11,padding:3}}>
-            {(["profile","personalize"] as const).map(id=>{
-              const labels:Record<string,string>={profile:"👤 Profile",personalize:"🎨 Personalization"};
-              return <button key={id} onClick={()=>setProfileTab(id)} style={{flex:1,background:profileTab===id?T.card:"transparent",color:profileTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"8px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:profileTab===id?"500":"normal"}}>{labels[id]}</button>;
-            })}
-          </div>
-
-          {profileTab==="personalize"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Subjects</div>
-              {subjects.map(s=>{
-                const isDefault=(DEFAULT_SUBJECTS as string[]).includes(s);
-                return (
-                  <div key={s} style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:12,padding:"11px 14px",border:`1px solid ${T.border}`}}>
-                    <div style={{width:12,height:12,borderRadius:"50%",background:subjectColors[s]||T.accent,flexShrink:0}}/>
-                    <span style={{flex:1,fontFamily:F.body,fontSize:13,color:T.text}}>{s}</span>
-                    {isDefault&&<span style={{fontFamily:F.body,fontSize:9,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.05em"}}>default</span>}
-                    <button onClick={()=>{if(window.confirm(`Delete "${s}"? This won't remove it from tasks that already use it.`))removeSubject(s);}} style={{background:"none",border:"none",color:T.textFaint,fontSize:16,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>×</button>
-                  </div>
-                );
-              })}
-              <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectText);setNewSubjectText("");}} style={{display:"flex",gap:8,marginTop:8}}>
-                <input value={newSubjectText} onChange={e=>setNewSubjectText(e.target.value)} placeholder="Add a subject..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
-                <button type="submit" style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontWeight:500}}>Add</button>
-              </form>
-            </div>
-          )}
-
-          {profileTab==="profile"&&(<>
-          {/* Avatar + name */}
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:32}}>
-            <div style={{position:"relative",marginBottom:14}}>
-              {fbUser.photoURL
-                ? <img src={fbUser.photoURL} alt="" style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:`3px solid ${T.accent}`}}/>
-                : <div style={{width:80,height:80,borderRadius:"50%",background:T.surface,border:`3px solid ${T.accent}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
-                  </div>
-              }
-              <div style={{position:"absolute",bottom:2,right:2,width:16,height:16,borderRadius:"50%",background:"#2ED573",border:`2px solid ${T.bg}`}}/>
-            </div>
-            <div style={{fontFamily:F.heading,fontSize:24,color:T.text,marginBottom:4}}>{fbUser.displayName}</div>
-            <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:8}}>{fbUser.email}</div>
-            <div style={{display:"flex",alignItems:"center",gap:6,background:"#2ED57322",borderRadius:999,padding:"4px 12px",border:"1px solid #2ED57344"}}>
-              <div style={{width:6,height:6,borderRadius:"50%",background:"#2ED573"}}/>
-              <span style={{fontFamily:F.body,fontSize:11,color:"#2ED573"}}>Synced across devices</span>
-            </div>
-          </div>
-
-          {/* Progress ring + stats */}
-          <div style={{background:T.card,borderRadius:16,padding:"20px",border:`1px solid ${T.border}`,marginBottom:14,display:"flex",alignItems:"center",gap:20}}>
-            {/* Ring */}
-            <div style={{position:"relative",width:80,height:80,flexShrink:0}}>
-              <svg width="80" height="80" style={{transform:"rotate(-90deg)"}}>
-                <circle cx="40" cy="40" r="33" fill="none" stroke={T.border} strokeWidth="7"/>
-                <circle cx="40" cy="40" r="33" fill="none" stroke={T.accent} strokeWidth="7" strokeDasharray="207" strokeDashoffset={207*(1-pct/100)} strokeLinecap="round" style={{transition:"stroke-dashoffset 0.8s"}}/>
-              </svg>
-              <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <span style={{fontFamily:F.heading,fontSize:18,color:T.text}}>{pct}%</span>
-              </div>
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontFamily:F.heading,fontSize:13,color:T.textMuted,marginBottom:10}}>completion</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                {[{l:"Total",v:totalTasks,c:T.text},{l:"Done",v:doneTasks,c:"#2ED573"},{l:"Pending",v:totalTasks-doneTasks,c:T.accent},{l:"Urgent",v:highPri,c:"#FF4757"}].map(s=>(
-                  <div key={s.l}>
-                    <div style={{fontFamily:F.heading,fontSize:20,color:s.c}}>{s.v}</div>
-                    <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{s.l}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Time stats */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-            <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:F.heading,fontSize:26,color:T.accent}}>{(totalMins/60).toFixed(1)}h</div>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:2}}>estimated left</div>
-            </div>
-            <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:F.heading,fontSize:26,color:"#4ECDC4"}}>{visibleTasks.filter(t=>t.done).reduce((a,b)=>a+(b.estMins||0),0)}m</div>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:2}}>completed work</div>
-            </div>
-          </div>
-
-          {/* Subject breakdown */}
-          {subjectCounts.length>0&&(
-            <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:14}}>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>By subject</div>
-              {subjectCounts.map(s=>(
-                <div key={s.name} style={{marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                    <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{s.name}</span>
-                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>{s.count} task{s.count!==1?"s":""}</span>
-                  </div>
-                  <div style={{height:5,background:T.border,borderRadius:999}}>
-                    <div style={{width:`${Math.round(s.count/totalTasks*100)}%`,height:"100%",background:s.color,borderRadius:999,transition:"width 0.5s"}}/>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Theme + font info */}
-          <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:20}}>
-            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>Current setup</div>
-            <div style={{display:"flex",gap:10}}>
-              <div style={{flex:1,background:T.surface,borderRadius:10,padding:"10px 12px"}}>
-                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:3}}>Theme</div>
-                <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:T.accent}}/><span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{THEMES[themeName].name}</span></div>
-              </div>
-              <div style={{flex:1,background:T.surface,borderRadius:10,padding:"10px 12px"}}>
-                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:3}}>Font</div>
-                <span style={{fontFamily:F.heading,fontSize:12,color:T.text}}>{FONTS[fontName].name}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Add to home screen */}
-          <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:10}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-              <div style={{width:36,height:36,borderRadius:10,background:T.accent+"22",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.accent} strokeWidth="2" strokeLinecap="round"/></svg>
-              </div>
-              <div>
-                <div style={{fontFamily:F.body,fontSize:13,color:T.text,fontWeight:500}}>Add to Home Screen</div>
-                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Access like a native app on iOS</div>
-              </div>
-            </div>
-            <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,lineHeight:1.7,marginBottom:12}}>
-              1. Tap the <span style={{color:T.accent}}>Share button</span> <span style={{fontSize:13}}>⎋</span> at the bottom of Safari<br/>
-              2. Scroll down and tap <span style={{color:T.accent}}>"Add to Home Screen"</span><br/>
-              3. Tap <span style={{color:T.accent}}>"Add"</span> in the top right
-            </div>
-            <button onClick={()=>{
-              if(navigator.share){
-                navigator.share({title:"due.",url:window.location.href}).catch(()=>{});
-              } else {
-                navigator.clipboard?.writeText(window.location.href);
-                alert("Link copied! Open Safari on your iPhone and paste the link, then use Share → Add to Home Screen.");
-              }
-            }} style={{width:"100%",background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer",fontWeight:500,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke="#000" strokeWidth="2.5" strokeLinecap="round"/></svg>
-              Share / Make Bookmark
-            </button>
-          </div>
-
-          {/* Sign out */}
-          <button onClick={async()=>{await signOutFirebase();setShowProfile(false);}}
-            style={{width:"100%",background:"none",border:`1px solid #FF475744`,borderRadius:12,padding:"13px",color:"#FF4757",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>
-            🚪 Sign out
-          </button>
-          </>)}
-        </div>
-      </div>
-    );
-  }
-
-  // ─── TASK CARD (base) ────────────────────────────────────────────────────────
-  function MiniCard({task,rank,reorderable,swipeable}:{task:Task;rank:number;reorderable?:boolean;swipeable?:boolean}) {
-    const pr=getPriority(task.dueDate,task.estMins);
-    const sc=subjectColors[task.subject]||T.accent;
-    const dm=daysUntil(task.dueDate);
-    const isTop=rank===0&&!task.done; const isNext=rank===1&&!task.done;
-    const isDragging=dragTaskId===task.id;
-    return(
-      <div
-        className="tc"
-        data-task-id={task.id}
-        onClick={swipeClickGuard(()=>{if(dragTaskId==null){setSelectedTask(task);setSessionHistory([]);}})}
-        {...(swipeable?swipeHandlers(task.id):{})}
-        style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
-        {swipeable&&renderSwipeReveal(task.id)}
-        {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:PRIORITY_COLORS[pr],borderRadius:"13px 0 0 13px"}}/>}
-        <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
-          {reorderable&&!task.done&&(
-            <div
-              onClick={e=>e.stopPropagation()}
-              onPointerDown={e=>{e.stopPropagation();startDrag(task.id,e);}}
-              onPointerMove={onDragMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-              style={{color:T.textFaint,cursor:isDragging?"grabbing":"grab",fontSize:14,lineHeight:1,marginTop:2,padding:"0 2px",touchAction:"none",flexShrink:0}}>
-              ⠿
-            </div>
-          )}
-          <button onClick={e=>{e.stopPropagation();toggleDone(task.id);}} style={{background:task.done?"#2ED573":"none",border:`2px solid ${task.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
-            {task.done&&<span style={{color:"#111",fontSize:10,fontWeight:"bold"}}>✓</span>}
-          </button>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-              {isTop&&<span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>}
-              {isNext&&<span className="rb" style={{background:T.text+"11",color:T.textMuted}}>next up</span>}
-              <span style={{fontFamily:F.heading,fontSize:15,textDecoration:task.done?"line-through":"none",color:task.done?T.textFaint:T.text}}>{task.title}</span>
-              {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
-              <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>
-            </div>
-            <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
-              <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>📅 {formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
-              <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>⏱ {task.estMins>=60?`${Math.floor(task.estMins/60)}h${task.estMins%60?` ${task.estMins%60}m`:""}`:` ${task.estMins}m`}</span>
-              {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",fontWeight:500}}>{dm}</span>}
-            </div>
-            {!!task.subtasks?.length&&(
-              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:5}}>
-                <div style={{flex:1,maxWidth:80,height:4,background:T.border,borderRadius:999}}>
-                  <div style={{width:`${Math.round(task.subtasks.filter(s=>s.done).length/task.subtasks.length*100)}%`,height:"100%",background:T.accent,borderRadius:999,transition:"width 0.3s"}}/>
-                </div>
-                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{task.subtasks.filter(s=>s.done).length}/{task.subtasks.length}</span>
-              </div>
-            )}
-          </div>
-          <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(task.id);}}>×</button>
-        </div>
-      </div>
-    );
-  }
-
   // ─── LAYOUT RENDERERS ─────────────────────────────────────────────────────────
   function renderTasks(tasks:Task[]) {
     const pending=allSorted.filter(t=>!t.done);
+    // Shared props for the (module-scope) MiniCard -- spread at each call site
+    // below instead of repeating this whole list three times.
+    const miniCardProps={T,F,subjectColors,dragTaskId,dragOffsetY,
+      onOpen:(t:Task)=>{setSelectedTask(t);setSessionHistory([]);},
+      onToggleDone:toggleDone,onDelete:deleteTask,
+      swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,
+      startDrag,onDragMove,endDrag};
 
     if (layout==="minimal") return (
       <div style={{display:"flex",flexDirection:"column",gap:2}}>
@@ -1536,7 +1757,7 @@ export default function HomeworkPlanner() {
             ))}
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:9}}>
-            {shown.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)}/>)}
+            {shown.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} {...miniCardProps}/>)}
           </div>
         </div>
       );
@@ -1683,21 +1904,15 @@ export default function HomeworkPlanner() {
           <div key={k}>
             <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{labelFor(k)} ({groups.get(k)!.length})</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} swipeable/>)}
+              {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} swipeable {...miniCardProps}/>)}
             </div>
           </div>
         ))}
       </div>;
     }
-    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable swipeable/>)}</div>;
+    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable swipeable {...miniCardProps}/>)}</div>;
   }
 
-  function Toggle({on,onChange}:{on:boolean;onChange:(v:boolean)=>void}){
-    const trackColor=on?T.accent:T.border;
-    return <button className="tog" onClick={()=>onChange(!on)} style={{background:trackColor}}>
-      <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),boxShadow:"0 1px 3px rgba(0,0,0,0.4)",transition:"left 0.2s",display:"block"}}/>
-    </button>;
-  }
 
   const pomMin=Math.floor(pomodoroSecs/60); const pomSec=pomodoroSecs%60;
   const pomPct=pomodoroSecs/(25*60);
@@ -2087,7 +2302,7 @@ export default function HomeworkPlanner() {
                 }
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontFamily:F.body,fontSize:13,color:T.text,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?fbUser.displayName:"Not signed in"}</div>
-                  <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?fbUser.email:"Tap to sign in & sync"}</div>
+                  <div style={{fontFamily:F.body,fontSize:11,color:fbUser&&syncError?"#FF4757":T.textFaint,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?(syncError?"⚠ Sync issue -- tap for details":fbUser.email):"Tap to sign in & sync"}</div>
                 </div>
                 <span style={{color:T.textFaint,fontSize:16,flexShrink:0}}>›</span>
               </button>
@@ -2247,16 +2462,16 @@ export default function HomeworkPlanner() {
             {/* Toggles */}
             <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show smart suggestion</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Study tip at the top of tasks</div></div>
-              <Toggle on={showSuggestion} onChange={setShowSuggestion}/>
+              <Toggle on={showSuggestion} onChange={setShowSuggestion} T={T}/>
             </div>
             <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show completed tasks</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Keep done tasks visible</div></div>
-              <Toggle on={showDone} onChange={setShowDone}/>
+              <Toggle on={showDone} onChange={setShowDone} T={T}/>
             </div>
             <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
                 <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Due date reminders</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Notify for tasks due today or overdue</div></div>
-                <Toggle on={notificationsEnabled} onChange={toggleNotifications}/>
+                <Toggle on={notificationsEnabled} onChange={toggleNotifications} T={T}/>
               </div>
               {notificationNote&&<div style={{fontFamily:F.body,fontSize:10,color:"#FF4757",marginTop:8}}>{notificationNote}</div>}
               {notificationsEnabled&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>Only fires while this tab is open or when you reopen it -- not true background push.</div>}
@@ -2302,7 +2517,20 @@ export default function HomeworkPlanner() {
         onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
         onArchive={()=>{archiveTask(selectedTask.id);setSelectedTask(null);}}
       />}
-      {showProfile&&<ProfileModal/>}
+      {showProfile&&<ProfileModal
+        T={T} F={F}
+        fbUser={fbUser} signInError={signInError} syncError={syncError}
+        visibleTasks={visibleTasks} totalMins={totalMins}
+        subjects={subjects} subjectColors={subjectColors}
+        themeName={themeName} fontName={fontName}
+        newSubjectText={newSubjectText} setNewSubjectText={setNewSubjectText}
+        profileTab={profileTab} setProfileTab={setProfileTab}
+        setShowProfile={setShowProfile}
+        signInWithFirebase={signInWithFirebase}
+        signOutFirebase={signOutFirebase}
+        addSubject={addSubject}
+        removeSubject={removeSubject}
+      />}
       {/* Undo Delete toast -- bottom-center so it never collides with the
           bottom-right smart-suggestion icon or the tab bar above it. */}
       {pendingDeleteId!=null&&(

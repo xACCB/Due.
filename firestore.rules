@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each signed-in user's own document and everything under it (tasks
+    // subcollection, once added) -- readable/writable only by that exact
+    // user, never by anyone else, signed in or not.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /{subcollection=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Deny everything else by default (Firestore already denies unmatched
+    // paths, but explicit beats implicit for a security boundary).
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

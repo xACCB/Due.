@@ -30,7 +30,7 @@ security rules (`firestore.rules` at the repo root, deployed via `npx firebase-t
 --only firestore:rules` — requires `npx firebase-tools login` first), not by hiding the key. There
 is no backend beyond Firebase (Auth + Firestore).
 
-**App Check.** Wired up but inert until `VITE_RECAPTCHA_SITE_KEY` is set (a reCAPTCHA v3 site key
+**App Check.** Wired up but inert until `VITE_RECAPTCHA_SITE_KEY` is set (a reCAPTCHA Enterprise site key
 from Firebase Console → Project Settings → App Check — not a secret, safe as a plain env var).
 Generating tokens client-side does nothing by itself; enforcement (Firestore actually rejecting
 requests without one) is a separate, off-by-default switch in the console that should only be

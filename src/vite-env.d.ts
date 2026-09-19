@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  // reCAPTCHA v3 site key for Firebase App Check. Optional -- App Check is
+  // reCAPTCHA Enterprise site key for Firebase App Check. Optional -- App Check is
   // fully inert (nothing initialized) when this isn't set. Not a secret
   // (verified server-side by Google), so it's fine to set directly in
   // Vercel's project env vars without marking it sensitive.

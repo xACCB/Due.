@@ -1233,25 +1233,40 @@ export default function HomeworkPlanner() {
     try{
       await signInWithPopup(auth,googleProvider);
     } catch(e){
+      console.error(e);
       const code=(e as {code?:string})?.code||"unknown";
-      // Whatever the reason the popup failed, fall back to a full-page
-      // redirect rather than just giving up -- covers browsers like Arc
-      // that are inconsistent about popups on mobile in ways that don't
-      // always match Firebase's standard "popup blocked" error codes.
-      try{
-        localStorage.setItem("hw-signin-redirect-pending",String(Date.now()));
-        await signInWithRedirect(auth,googleProvider);
+      if(code==="auth/popup-closed-by-user"||code==="auth/cancelled-popup-request"){
+        return; // the user closed it (or a second attempt overlapped) -- not a real failure, nothing to show
       }
-      catch(e2){
-        localStorage.removeItem("hw-signin-redirect-pending");
-        console.error(e,e2);
-        if(isStorageBlockedError(e)||isStorageBlockedError(e2)){
-          setSignInError(STORAGE_BLOCKED_MESSAGE);
-          return;
+      if(code==="auth/operation-not-supported-in-this-environment"){
+        // The one case where popup genuinely isn't an option at all (some
+        // embedded/in-app webviews) -- redirect is the only path here,
+        // despite its own known issues (see isStorageBlockedError below).
+        try{
+          localStorage.setItem("hw-signin-redirect-pending",String(Date.now()));
+          await signInWithRedirect(auth,googleProvider);
+        } catch(e2){
+          localStorage.removeItem("hw-signin-redirect-pending");
+          console.error(e2);
+          if(isStorageBlockedError(e2)){ setSignInError(STORAGE_BLOCKED_MESSAGE); }
+          else { const code2=(e2 as {code?:string})?.code||"unknown"; setSignInError(`Sign-in didn't go through (${code2}). Please try again.`); }
         }
-        const code2=(e2 as {code?:string})?.code||"unknown";
-        setSignInError(`Sign-in didn't go through (${code} / ${code2}). Please try again.`);
+        return;
       }
+      // Everything else here (most commonly auth/popup-blocked) means the
+      // browser's popup blocker stepped in. Popup-based sign-in doesn't
+      // depend on sessionStorage surviving a full page navigation the way
+      // signInWithRedirect does (the result comes back via postMessage
+      // between two windows that stay open at the same time), so it's
+      // markedly more reliable in browsers with strict storage partitioning
+      // -- notably Firefox's Enhanced Tracking Protection, which reliably
+      // breaks the redirect method regardless of per-site exceptions, since
+      // the actual storage access happens on Firebase's authDomain (a
+      // different origin from this site) during the round trip, not on this
+      // site's own origin. Asking the user to allow popups and retry with
+      // the *more* reliable method beats silently falling back to the one
+      // that's known to fail here.
+      setSignInError("Your browser blocked the sign-in popup. Please allow popups for this site, then try again -- that's more reliable here than the alternative full-page redirect method.");
     }
   }
   async function signOutFirebase(){

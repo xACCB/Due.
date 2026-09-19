@@ -593,15 +593,29 @@ export default function HomeworkPlanner() {
     const unsub=onAuthStateChanged(auth,user=>{
       setFbUser(user);
       setFbLoading(false);
+      if(user) localStorage.removeItem("hw-signin-redirect-pending");
     });
     // Only relevant if signInWithFirebase had to fall back to the redirect
     // method below (e.g. a browser that blocks/mishandles the popup) -- this
     // is where any error from THAT flow surfaces, since there's no popup
     // promise to catch in that case.
-    getRedirectResult(auth).catch(e=>{
+    getRedirectResult(auth).then(result=>{
+      const pending=localStorage.getItem("hw-signin-redirect-pending");
+      if(!result&&pending&&Date.now()-Number(pending)<5*60*1000){
+        // A redirect sign-in was started but Firebase came back with no user
+        // and no thrown error -- this is the signature of the browser's
+        // tracking protection (notably Firefox's Enhanced Tracking
+        // Protection / Total Cookie Protection, on by default) blocking the
+        // storage handoff between this site and the Firebase authDomain
+        // during the redirect round trip, rather than an actual auth error.
+        setSignInError("Sign-in was blocked by your browser's tracking protection. In Firefox: click the shield icon in the address bar and turn off Enhanced Tracking Protection for this site, then try again. Chrome and Edge don't hit this issue.");
+      }
+      localStorage.removeItem("hw-signin-redirect-pending");
+    }).catch(e=>{
       console.error(e);
       const code=(e as {code?:string})?.code||"unknown";
       setSignInError(`Sign-in didn't go through (${code}). Please try again.`);
+      localStorage.removeItem("hw-signin-redirect-pending");
     });
     return unsub;
   },[]);
@@ -642,8 +656,12 @@ export default function HomeworkPlanner() {
       // redirect rather than just giving up -- covers browsers like Arc
       // that are inconsistent about popups on mobile in ways that don't
       // always match Firebase's standard "popup blocked" error codes.
-      try{ await signInWithRedirect(auth,googleProvider); }
+      try{
+        localStorage.setItem("hw-signin-redirect-pending",String(Date.now()));
+        await signInWithRedirect(auth,googleProvider);
+      }
       catch(e2){
+        localStorage.removeItem("hw-signin-redirect-pending");
         console.error(e,e2);
         const code2=(e2 as {code?:string})?.code||"unknown";
         setSignInError(`Sign-in didn't go through (${code} / ${code2}). Please try again.`);

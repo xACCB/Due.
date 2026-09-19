@@ -50,6 +50,20 @@ require rewriting a user's entire history:
   returning account that legitimately has zero tasks) -- `isNewAccountForUid` (set from whether a
   profile doc existed at all when migration was checked) disambiguates it, so a first sign-in
   doesn't wipe local starter tasks before they've had a chance to sync up.
+- The outbound tasks write is debounced 400ms behind local state (mirroring the scratchpad's own
+  debounce), since drag-to-reorder calls `setTasks()` once per card the dragged item passes over --
+  without this, a single reorder drag would fire one Firestore write per intermediate step instead
+  of one at the end. Local state and `localStorage` stay instant regardless; only the cloud write
+  is delayed.
+- `firestore.rules` validates the shape of profile/task writes (required fields present, correct
+  types, capped string lengths), not just who's making them -- a second layer beyond
+  auth-based ownership, since `firebaseConfig` being public means anyone could otherwise script
+  requests directly against the project, bounded only by whatever the rules allow.
+- Firestore is initialized with `persistentLocalCache`/`persistentMultipleTabManager` for
+  IndexedDB-backed offline support (works offline, repeat loads read from local cache first) with
+  multiple open tabs sharing one cache. Wrapped in try/catch with a plain in-memory fallback, since
+  this runs at module load time before React renders -- an uncaught throw here would blank-page the
+  whole app in an exotic environment instead of just missing offline support.
 
 **Design-system constants** at module scope drive both the inline styles and the runtime
 stylesheet: `THEMES` (26 color themes, half light/half dark, some gated behind streak milestones

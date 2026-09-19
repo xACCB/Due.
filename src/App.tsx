@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot } from "firebase/firestore";
+import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import type { Firestore } from "firebase/firestore";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -19,7 +20,28 @@ const auth = getAuth(fbApp);
 // payload would otherwise make setDoc() throw synchronously (uncaught, since
 // this fires from a plain useEffect with no error boundary), crashing the
 // whole app to a blank screen instead of just dropping that one field.
-const db = initializeFirestore(fbApp, { ignoreUndefinedProperties: true });
+//
+// localCache/persistentLocalCache: enables an IndexedDB-backed local cache
+// instead of the default in-memory-only one, so the app can actually read
+// (and queue writes to sync later) while offline, and repeat loads serve from
+// the local cache instead of a fresh network round trip every time.
+// persistentMultipleTabManager lets multiple open tabs share that cache
+// instead of only the first tab getting persistence and the rest silently
+// falling back to memory-only. Wrapped in try/catch, with a plain in-memory
+// fallback, because this runs at module load time (before React even
+// renders) -- if an exotic environment (locked-down IndexedDB, very old
+// browser) made this throw synchronously and uncaught, the whole app would
+// fail to load at all rather than just missing offline support.
+let db: Firestore;
+try {
+  db = initializeFirestore(fbApp, {
+    ignoreUndefinedProperties: true,
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
+} catch (e) {
+  console.error("Firestore persistent cache unavailable, falling back to in-memory cache:", e);
+  db = initializeFirestore(fbApp, { ignoreUndefinedProperties: true });
+}
 const googleProvider = new GoogleAuthProvider();
 
 // ─── THEMES (26 total, 13 dark / 13 light) ─────────────────────────────────────
@@ -1130,25 +1152,38 @@ export default function HomeworkPlanner() {
   // collection. This is the entire point of tasks living in a subcollection
   // instead of one array field: toggling a single task no longer rewrites
   // every other task along with it.
+  //
+  // Debounced (like the scratchpad above) so a burst of rapid local changes
+  // collapses into one write instead of one per change -- most notably,
+  // drag-to-reorder calls setTasks() on every card the dragged item passes
+  // over, which without this would fire a separate Firestore batch write per
+  // intermediate step of a single drag gesture instead of just one at the
+  // end. Local state (and localStorage) still update instantly either way --
+  // only the outbound cloud write is delayed.
+  const tasksSaveTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   useEffect(()=>{
     if(!fbUser||tasksSyncedForUid!==fbUser.uid)return;
-    const prevMap=lastSyncedTasksRef.current;
-    const currentMap=new Map(tasks.map(t=>[t.id,t]));
-    const toWrite=tasks.filter(t=>JSON.stringify(prevMap.get(t.id))!==JSON.stringify(t));
-    const toDelete=[...prevMap.keys()].filter(id=>!currentMap.has(id));
-    if(toWrite.length===0&&toDelete.length===0)return;
-    isSyncingTasks.current=true;
-    const tasksCol=collection(db,"users",fbUser.uid,"tasks");
-    const batch=writeBatch(db);
-    for(const t of toWrite) batch.set(doc(tasksCol,String(t.id)),t);
-    for(const id of toDelete) batch.delete(doc(tasksCol,String(id)));
-    batch.commit()
-      .then(()=>{ lastSyncedTasksRef.current=currentMap; setSyncError(null); })
-      .catch(err=>{
-        console.error(err);
-        setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
-      })
-      .finally(()=>{isSyncingTasks.current=false;});
+    clearTimeout(tasksSaveTimer.current);
+    tasksSaveTimer.current=setTimeout(()=>{
+      const prevMap=lastSyncedTasksRef.current;
+      const currentMap=new Map(tasks.map(t=>[t.id,t]));
+      const toWrite=tasks.filter(t=>JSON.stringify(prevMap.get(t.id))!==JSON.stringify(t));
+      const toDelete=[...prevMap.keys()].filter(id=>!currentMap.has(id));
+      if(toWrite.length===0&&toDelete.length===0)return;
+      isSyncingTasks.current=true;
+      const tasksCol=collection(db,"users",fbUser.uid,"tasks");
+      const batch=writeBatch(db);
+      for(const t of toWrite) batch.set(doc(tasksCol,String(t.id)),t);
+      for(const id of toDelete) batch.delete(doc(tasksCol,String(id)));
+      batch.commit()
+        .then(()=>{ lastSyncedTasksRef.current=currentMap; setSyncError(null); })
+        .catch(err=>{
+          console.error(err);
+          setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
+        })
+        .finally(()=>{isSyncingTasks.current=false;});
+    },400);
+    return ()=>clearTimeout(tasksSaveTimer.current);
   },[tasks,fbUser,tasksSyncedForUid]);
 
   async function signInWithFirebase(){

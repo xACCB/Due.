@@ -2,14 +2,45 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Each signed-in user's own document and everything under it (tasks
-    // subcollection, once added) -- readable/writable only by that exact
-    // user, never by anyone else, signed in or not.
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
 
-      match /{subcollection=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+    // Beyond "is this the right user", validate the actual shape of a write.
+    // Auth alone only stops other people from touching your data -- this is
+    // a second layer that stops a buggy client update (or someone editing
+    // requests by hand with valid credentials, since firebaseConfig is
+    // public by design) from writing garbage into your own document: wrong
+    // field types, or unbounded strings run up your storage/bandwidth costs.
+    // Optional fields are only type-checked when present, since profile
+    // writes use merge:true and may only touch a subset of fields.
+    function isValidProfile(data) {
+      return (!('themeName' in data) || data.themeName is string)
+        && (!('layout' in data) || data.layout is string)
+        && (!('scratchpad' in data) || (data.scratchpad is string && data.scratchpad.size() <= 50000))
+        && (!('completionLog' in data) || data.completionLog is map)
+        && (!('unlockedThemesEver' in data) || data.unlockedThemesEver is map);
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['id','title','subject','dueDate','dueTime','estMins','done','order'])
+        && data.id is number
+        && data.title is string && data.title.size() <= 500
+        && data.subject is string && data.subject.size() <= 200
+        && data.dueDate is string
+        && data.dueTime is string
+        && data.estMins is number
+        && data.done is bool
+        && data.order is number;
+    }
+
+    match /users/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidProfile(request.resource.data);
+
+      match /tasks/{taskId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidTask(request.resource.data);
       }
     }
 

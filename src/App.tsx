@@ -588,14 +588,21 @@ export default function HomeworkPlanner() {
   const [signInError,setSignInError]=useState<string|null>(null);
   const isSyncing=useRef(false);
   // Guards the "save TO Firestore" effect below from firing before we've heard
-  // back from Firestore even once after sign-in. Without this, signing in on a
-  // device that still has different local/default tasks races the outbound
-  // save against the inbound onSnapshot read -- if the save's isSyncing.current
-  // window covers the moment the real snapshot arrives, that snapshot gets
-  // dropped (see the !isSyncing.current check below) and the stale local data
-  // gets written over the user's actual cloud data instead of the other way
-  // around.
-  const hasSyncedFromCloud=useRef(false);
+  // back from Firestore, for THIS uid specifically, even once. Without this,
+  // signing in on a device that still has different local/default tasks races
+  // the outbound save against the inbound onSnapshot read -- if the save's
+  // isSyncing.current window covers the moment the real snapshot arrives, that
+  // snapshot gets dropped (see the !isSyncing.current check below) and the
+  // stale local data gets written over the user's actual cloud data instead of
+  // the other way around. Storing the uid we've synced (not just a boolean)
+  // means a direct switch from one signed-in account to another -- or a
+  // sign-out/sign-back-in as the same account -- can't leave a stale "synced"
+  // flag pointing at the wrong (or now-outdated) snapshot: the comparison
+  // below fails until a fresh snapshot for the CURRENT uid actually lands.
+  // Reactive state, not a ref -- a brand-new user (no existing doc yet) only
+  // flips this once, via the exists()===false path, and a ref mutation alone
+  // wouldn't trigger the re-render needed for the save effect to notice.
+  const [syncedForUid,setSyncedForUid]=useState<string|null>(null);
 
   // Listen for auth state
   useEffect(()=>{
@@ -603,6 +610,7 @@ export default function HomeworkPlanner() {
       setFbUser(user);
       setFbLoading(false);
       if(user) localStorage.removeItem("hw-signin-redirect-pending");
+      else setSyncedForUid(null);
     });
     // Only relevant if signInWithFirebase had to fall back to the redirect
     // method below (e.g. a browser that blocks/mishandles the popup) -- this
@@ -631,7 +639,7 @@ export default function HomeworkPlanner() {
 
   // When signed in, sync tasks FROM Firestore
   useEffect(()=>{
-    if(!fbUser){ hasSyncedFromCloud.current=false; return; }
+    if(!fbUser)return;
     const ref=doc(db,"users",fbUser.uid);
     const unsub=onSnapshot(ref,snap=>{
       if(snap.exists()&&!isSyncing.current){
@@ -643,20 +651,21 @@ export default function HomeworkPlanner() {
         if(data.unlockedThemesEver) setUnlockedThemesEver(data.unlockedThemesEver);
         if(data.scratchpad!==undefined){ setScratchpad(data.scratchpad); setScratchpadSynced(data.scratchpad); }
       }
-      hasSyncedFromCloud.current=true;
+      setSyncedForUid(fbUser.uid);
     });
     return unsub;
   },[fbUser]);
 
-  // Save tasks TO Firestore whenever they change. Gated on hasSyncedFromCloud
-  // so the very first write after sign-in can't fire before we know what's
-  // actually in the user's cloud doc -- see the comment on that ref above.
+  // Save tasks TO Firestore whenever they change. Gated on syncedForUid
+  // matching the current user so the very first write after sign-in can't fire
+  // before we know what's actually in the user's cloud doc -- see the comment
+  // on that state above.
   useEffect(()=>{
-    if(!fbUser||!hasSyncedFromCloud.current)return;
+    if(!fbUser||syncedForUid!==fbUser.uid)return;
     isSyncing.current=true;
     const ref=doc(db,"users",fbUser.uid);
     setDoc(ref,{tasks,themeName,layout,completionLog,unlockedThemesEver,scratchpad:scratchpadSynced},{merge:true}).finally(()=>{isSyncing.current=false;});
-  },[tasks,themeName,layout,completionLog,unlockedThemesEver,scratchpadSynced,fbUser]);
+  },[tasks,themeName,layout,completionLog,unlockedThemesEver,scratchpadSynced,fbUser,syncedForUid]);
 
   async function signInWithFirebase(){
     setSignInError(null);
@@ -1142,7 +1151,7 @@ export default function HomeworkPlanner() {
           {/* Header */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
             <div style={{fontFamily:F.heading,fontSize:22,color:T.accent}}>profile</div>
-            <button onClick={()=>{setShowProfile(false);setProfileTab("profile");}} style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+            <button onClick={()=>{setShowProfile(false);setProfileTab("profile");setNewSubjectText("");}} style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
           </div>
 
           {/* Tabs */}

@@ -4,6 +4,7 @@ import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, Google
 import type { User } from "firebase/auth";
 import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -43,6 +44,25 @@ try {
   db = initializeFirestore(fbApp, { ignoreUndefinedProperties: true });
 }
 const googleProvider = new GoogleAuthProvider();
+// App Check proves requests are coming from this real app (not a script
+// hitting the project directly with the public firebaseConfig above) via a
+// reCAPTCHA v3 attestation. Fully inert -- and safe to leave committed --
+// until VITE_RECAPTCHA_SITE_KEY is actually set, since without a site key
+// there's nothing to initialize. A site key isn't a secret (same category as
+// firebaseConfig: meant to be public, verified server-side by Google), so
+// this doesn't need to live outside version control. Generating tokens here
+// does nothing on its own -- enforcement (Firestore actually rejecting
+// requests without a valid token) is a separate switch in the Firebase
+// Console, off by default, and should only be flipped on after confirming in
+// the console's App Check metrics that real traffic is producing valid
+// tokens -- otherwise it locks out every real user at once.
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+if (recaptchaSiteKey) {
+  initializeAppCheck(fbApp, {
+    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 // ─── THEMES (26 total, 13 dark / 13 light) ─────────────────────────────────────
 const THEMES = {

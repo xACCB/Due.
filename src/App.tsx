@@ -9,7 +9,14 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-ch
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyD9W3eTvKjthiEZ_0MjeCHBIZ6BevMKgSo",
-  authDomain: "ai-homework-planner-92260.firebaseapp.com",
+  // Deliberately this site's own domain, not Firebase's *.firebaseapp.com --
+  // see vercel.json, which transparently proxies /__/auth/** on this domain
+  // to Firebase's real handler. Sign-in then never crosses origins at all,
+  // which is what actually eliminates (not just mitigates) the class of bug
+  // where browsers with strict storage partitioning -- Firefox's Enhanced
+  // Tracking Protection notably -- break signInWithRedirect when the auth
+  // handler lives on a different origin than the app itself.
+  authDomain: "dueplanner.vercel.app",
   projectId: "ai-homework-planner-92260",
   storageBucket: "ai-homework-planner-92260.firebasestorage.app",
   messagingSenderId: "445404835645",

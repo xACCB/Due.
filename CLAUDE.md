@@ -30,6 +30,18 @@ security rules (`firestore.rules` at the repo root, deployed via `npx firebase-t
 --only firestore:rules` — requires `npx firebase-tools login` first), not by hiding the key. There
 is no backend beyond Firebase (Auth + Firestore).
 
+**`authDomain` is this site's own domain (`dueplanner.vercel.app`), not Firebase's
+`*.firebaseapp.com` one.** `vercel.json` transparently proxies `/__/auth/**` on this domain to
+Firebase's real handler, so the OAuth sign-in flow never crosses origins at all. This is what
+actually eliminates (not just works around) the class of bug where browsers with strict storage
+partitioning — Firefox's Enhanced Tracking Protection notably — break `signInWithRedirect` when
+the auth handler lives on a different origin than the app. `signInWithFirebase` also no longer
+auto-falls-back from a blocked popup to `signInWithRedirect`; popup doesn't depend on
+`sessionStorage` surviving a full page navigation the way redirect does, so it's asked for again
+(with a message to allow popups) rather than silently routing into the less reliable method.
+Redirect is now only attempted automatically for `auth/operation-not-supported-in-this-environment`
+(genuinely no popup support, e.g. some embedded webviews).
+
 **App Check.** Wired up but inert until `VITE_RECAPTCHA_SITE_KEY` is set (a reCAPTCHA Enterprise site key
 from Firebase Console → Project Settings → App Check — not a secret, safe as a plain env var).
 Generating tokens client-side does nothing by itself; enforcement (Firestore actually rejecting
@@ -94,5 +106,6 @@ redefine it as a "new" component and force React to remount the modal every seco
 
 ## Deployment
 
-Deployed on Vercel as a static Vite build, auto-deploying on push to `main`. There's no
-`vercel.json` — build/output is auto-detected via Vercel's Vite preset.
+Deployed on Vercel as a static Vite build, auto-deploying on push to `main`. Build/output is
+auto-detected via Vercel's Vite preset; the one entry in `vercel.json` is the auth proxy rewrite
+described above, not a build config override.

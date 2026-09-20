@@ -119,6 +119,37 @@ Pomodoro-style timer. `TaskModal` (task detail, subtasks, session timer) is defi
 scope, outside `HomeworkPlanner`, specifically so the session timer's once-a-second tick doesn't
 redefine it as a "new" component and force React to remount the modal every second.
 
+**Task fields beyond the original core set:**
+- `tags?: string[]` — free-form, cross-cutting, distinct from `subject` (one per task, tags are
+  many). Edited in `TaskModal`; `allTags` (derived, deduplicated across all tasks) drives the
+  autocomplete suggestion chips there.
+- `priorityOverride?: Priority` — manually pins a task's priority instead of always deriving it
+  from due date/estimate. `getPriority(dueDate, estMins, override?)` checks this first; every call
+  site was updated to pass `task.priorityOverride` as the third argument.
+
+**Bulk edit / multi-select** (`selectionMode`/`selectedIds` state) is deliberately scoped to the
+default list layout only (`MiniCard`) — the other 11 layouts each render their own custom task row
+markup, so extending selection to all of them was judged not worth the scope. `MiniCard` accepts
+`selectionMode`/`isSelected`/`onToggleSelect` and repurposes the done-toggle button into a selection
+checkbox when active, gating swipe/drag handlers off at the same time to avoid gesture conflicts.
+
+**Task templates** (`TaskTemplate`, `templates` state) are local-only — `localStorage`, not synced
+to Firestore. Deliberate scope call: a personal convenience, not core data, not worth a second
+synced subcollection right now. Starting a task from a template (`startFromTemplate`) skips the
+normal step-by-step add-task wizard straight to the due-date question via `usingTemplate`/
+`templateSubtasks` state, since the template already answered the other questions.
+
+**Reminders** (`REMINDER_OFFSETS`, `enabledOffsets` state) support multiple independently-toggleable
+lead times (1 day / 3 hours / 1 hour before, or at due time) for tasks with a specific due *time*;
+tasks with only a due date fall back to the original once-daily due/overdue summary. Sent-reminder
+tracking is keyed by `(taskId, offsetKey, dueDate+dueTime)` in `localStorage`, so editing a task's
+due date/time naturally resets what's still owed. A 1-minute `setInterval` re-checks while the tab
+is open, since offset reminders need to fire close to a specific time, not just on tab-focus.
+
+**Data export** (`exportAllDataJSON`/`exportTasksCSV`) uses a shared `downloadFile()` helper
+(`Blob` + object URL + a synthetic `<a download>` click) — the standard client-side download
+pattern, no server involved.
+
 ## Branding
 
 The company is **Due Studios**; this product is **DuePlanner** (the intended umbrella structure is

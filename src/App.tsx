@@ -5,6 +5,7 @@ import type { User } from "firebase/auth";
 import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
+import { getPerformance } from "firebase/performance";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -71,6 +72,17 @@ if (recaptchaSiteKey) {
     provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
     isTokenAutoRefreshEnabled: true,
   });
+}
+// Automatically tracks real-world page load time and network request
+// latency, visible in Firebase Console -> Performance. No setup/key needed
+// (unlike App Check) and included on the free Spark plan. Wrapped in
+// try/catch since it relies on browser Performance APIs that could be
+// missing in an unsupported environment -- shouldn't be able to break the
+// app over a monitoring feature.
+try {
+  getPerformance(fbApp);
+} catch (e) {
+  console.error("Firebase Performance Monitoring unavailable:", e);
 }
 // Detects the signature of a browser blocking the storage handoff Firebase
 // needs to complete signInWithRedirect across the round trip through its

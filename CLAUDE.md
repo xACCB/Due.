@@ -48,6 +48,12 @@ Generating tokens client-side does nothing by itself; enforcement (Firestore act
 requests without one) is a separate, off-by-default switch in the console that should only be
 flipped on after confirming real traffic is producing valid tokens.
 
+**Performance Monitoring.** `getPerformance(fbApp)` is initialized unconditionally (no key/setup
+needed, included on the free plan) — tracks real-world page load time and network request latency,
+visible in Firebase Console → Performance. Wrapped in try/catch like the Firestore persistence
+setup above, since a monitoring feature shouldn't be able to break the app if its underlying
+browser APIs are unavailable somewhere.
+
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
 - `users/{uid}` — small "profile" fields only: `themeName`, `layout`, `completionLog`,

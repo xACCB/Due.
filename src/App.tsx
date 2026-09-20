@@ -222,6 +222,11 @@ interface Task {
   priorityOverride?: Priority; // manual override for getPriority()'s auto-computed value, cleared to go back to "Auto"
 }
 
+// Reusable task shape -- local-only (localStorage), not synced to Firestore.
+// Deliberate scope call: templates are a personal productivity convenience,
+// not core data, and don't currently justify a second synced collection.
+interface TaskTemplate { id:string; name:string; subject:string; estMins:number; recurrence?:Recurrence; subtasks?:{text:string}[]; }
+
 const DEFAULT_TASKS: Task[] = [
   { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:localDateStr(new Date(Date.now()+86400000)), dueTime:"", estMins:45, done:false, order:0 },
   { id:2, title:"Essay Draft", subject:"English", dueDate:localDateStr(new Date(Date.now()+3*86400000)), dueTime:"23:59", estMins:90, done:false, order:1 },
@@ -379,13 +384,14 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHistory,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onSetPriorityOverride,onSetTags}:{
+function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHistory,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
   task:Task; T:ThemeObj; F:typeof FONTS[FontName]; subjectColors:Record<string,string>;
   sessionActive:boolean; sessionSecs:number; sessionHistory:{mins:number;date:string}[];
   allTags:string[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
   onUpdateSubtasks:(subtasks:Subtask[])=>void; onArchive:()=>void;
   onSetPriorityOverride:(override:Priority|null)=>void; onSetTags:(tags:string[])=>void;
+  onSaveAsTemplate:(name:string)=>void;
 }){
   const pr=getPriority(task.dueDate,task.estMins,task.priorityOverride);
   const sc=subjectColors[task.subject]||T.accent;
@@ -568,6 +574,10 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
               🗑 Delete task
             </button>
           </div>
+          <button onClick={()=>{const name=window.prompt("Name this template:",task.title);if(name&&name.trim())onSaveAsTemplate(name.trim());}}
+            style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
+            📋 Save as template
+          </button>
         </div>
       </div>
     </div>
@@ -1029,6 +1039,14 @@ export default function HomeworkPlanner() {
   const [subjectColors,setSubjectColors]=useState<Record<string,string>>(()=>{try{const s=localStorage.getItem("hw-subjectcolors");return {...DEFAULT_SUBJECT_COLORS,...(s?JSON.parse(s):{})};}catch{return DEFAULT_SUBJECT_COLORS;}});
   useEffect(()=>{localStorage.setItem("hw-subjects",JSON.stringify(subjects));},[subjects]);
   useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
+  const [templates,setTemplates]=useState<TaskTemplate[]>(()=>{try{const s=localStorage.getItem("hw-templates");return s?JSON.parse(s):[];}catch{return [];}});
+  useEffect(()=>{localStorage.setItem("hw-templates",JSON.stringify(templates));},[templates]);
+  function saveAsTemplate(task:Task,name:string){
+    setTemplates(prev=>[...prev,{id:String(nextId()),name,subject:task.subject,estMins:task.estMins,recurrence:task.recurrence,subtasks:(task.subtasks||[]).map(s=>({text:s.text}))}]);
+  }
+  function deleteTemplate(id:string){
+    setTemplates(prev=>prev.filter(t=>t.id!==id));
+  }
   // Scratchpad: the textarea itself is fully responsive (plain local state), but
   // what gets written to localStorage/Firestore is debounced ~500ms behind it so
   // typing doesn't fire a write (and a Firestore sync) on every keystroke.
@@ -1369,6 +1387,8 @@ export default function HomeworkPlanner() {
   const [step,setStep]=useState(0);
   const [newTask,setNewTask]=useState<Partial<Task>>({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
   const [pendingDueDate,setPendingDueDate]=useState<string|null>(null);
+  const [usingTemplate,setUsingTemplate]=useState(false);
+  const [templateSubtasks,setTemplateSubtasks]=useState<{text:string}[]|null>(null);
   const inputValRef=useRef("");
   const [filter,setFilter]=useState("all");
   const [searchQuery,setSearchQuery]=useState("");
@@ -1528,8 +1548,21 @@ export default function HomeworkPlanner() {
     setNewTask({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
     setPendingDueDate(null);
     setTimeHours(0);setTimeMins(30);setTimeSecs(0);
+    setUsingTemplate(false);setTemplateSubtasks(null);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
+  }
+  // Skips straight to the due-date question, since everything else a template
+  // covers (subject/estimate/recurrence/subtasks) is already decided --
+  // confirmDueTime and finishTask below check usingTemplate/templateSubtasks
+  // to finish immediately after the date instead of asking the remaining
+  // normally-sequential questions.
+  function startFromTemplate(tpl:TaskTemplate){
+    setAdding(true);
+    setNewTask({title:tpl.name,subject:tpl.subject,dueDate:"",dueTime:"",estMins:tpl.estMins,recurrence:tpl.recurrence});
+    setPendingDueDate(null);
+    setUsingTemplate(true);setTemplateSubtasks(tpl.subtasks||null);
+    setStep(1);
   }
   function handleTitleSubmit(e:React.FormEvent){
     e.preventDefault();
@@ -1558,9 +1591,18 @@ export default function HomeworkPlanner() {
     setPendingDueDate(null);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
-    setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
+    if(usingTemplate){
+      setTimeout(()=>finishTask(updated as Task),100);
+    } else {
+      setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
+    }
   }
-  function finishTask(task:Task){setTasks(prev=>[...prev,{...task,id:nextId(),done:false,order:prev.length}]);setAdding(false);setStep(0);}
+  function finishTask(task:Task){
+    const subtasks=templateSubtasks?templateSubtasks.map(s=>({id:String(nextId()),text:s.text,done:false})):undefined;
+    setTasks(prev=>[...prev,{...task,id:nextId(),done:false,order:prev.length,...(subtasks?{subtasks}:{})}]);
+    setAdding(false);setStep(0);
+    setUsingTemplate(false);setTemplateSubtasks(null);
+  }
   function toggleDone(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
@@ -2292,8 +2334,13 @@ export default function HomeworkPlanner() {
           {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>nothing here yet ✨</div>}
           <div style={{marginTop:14}}>
             {!adding?(
-              <div style={{display:"flex",justifyContent:"center",paddingTop:10}}>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,paddingTop:10}}>
                 <button onClick={startAdding} style={{background:T.accent,color:"#000",border:"none",borderRadius:14,padding:"13px 28px",fontFamily:F.heading,fontSize:17,cursor:"pointer",boxShadow:`0 4px 20px ${T.accentGlow}`,transition:"all 0.2s"}}>+ add homework</button>
+                {templates.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center",maxWidth:340}}>
+                  {templates.map(tpl=>(
+                    <button key={tpl.id} onClick={()=>startFromTemplate(tpl)} className="chip" style={{background:T.card,color:T.textMuted,border:`1px solid ${T.border}`}}>📋 {tpl.name}</button>
+                  ))}
+                </div>}
               </div>
             ):(
               <div style={{background:T.card,borderRadius:16,padding:"18px",border:`1px solid ${T.borderAccent}`}}>
@@ -2454,6 +2501,25 @@ export default function HomeworkPlanner() {
                 style={{width:"100%",minHeight:120,maxHeight:280,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto"}}
               />
             </div>
+
+            {/* Templates */}
+            {templates.length>0&&(
+              <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Templates</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {templates.map(tpl=>(
+                    <div key={tpl.id} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,borderRadius:9,padding:"9px 12px"}}>
+                      <span style={{flex:1,fontFamily:F.body,fontSize:12,color:T.text}}>{tpl.name}</span>
+                      <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{tpl.subject}</span>
+                      <button onClick={()=>{if(window.confirm(`Delete the "${tpl.name}" template?`))deleteTemplate(tpl.id);}} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 2px"}}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>
+                  Save a task as a template from its detail view -- templates show up as quick-start chips above "add homework".
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2749,6 +2815,7 @@ export default function HomeworkPlanner() {
         onArchive={()=>{archiveTask(selectedTask.id);setSelectedTask(null);}}
         onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
         onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
+        onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}
       />}
       {showProfile&&<ProfileModal
         T={T} F={F}

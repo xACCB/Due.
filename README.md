@@ -1,8 +1,8 @@
-# due.
+# DuePlanner
 
-A homework/task planner built as a fast, highly personalizable alternative to juggling assignments
-across notes apps and spreadsheets — due dates, subjects, recurring tasks, subtasks, a Pomodoro
-timer, streaks, and a full theming system, all in one place.
+A homework/task planner by Due Studios — built as a fast, highly personalizable alternative to
+juggling assignments across notes apps and spreadsheets — due dates, subjects, recurring tasks,
+subtasks, a Pomodoro timer, streaks, and a full theming system, all in one place.
 
 **Live at [dueplanner.vercel.app](https://dueplanner.vercel.app)**
 

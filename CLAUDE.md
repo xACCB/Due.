@@ -119,6 +119,18 @@ Pomodoro-style timer. `TaskModal` (task detail, subtasks, session timer) is defi
 scope, outside `HomeworkPlanner`, specifically so the session timer's once-a-second tick doesn't
 redefine it as a "new" component and force React to remount the modal every second.
 
+## Branding
+
+The company is **Due Studios**; this product is **DuePlanner** (the intended umbrella structure is
+one company, multiple products — e.g. a hypothetical future "DueCalendar" would be a sibling
+product under the same company, not a rename of this one). In UI text and any user-facing copy,
+use "DuePlanner" for anything referring to this product/app specifically; "due. studios" (kept
+lowercase/stylized to match the app's existing minimalist lowercase design language) is correct
+when a line is crediting/attributing the company itself, as in the existing "by due. studios"
+taglines. Don't reintroduce bare "due." as the product's name or wordmark -- there's an established,
+same-category competitor app literally called "Due" (dueapp.com), which is exactly the naming
+collision this convention avoids.
+
 ## Deployment
 
 Deployed on Vercel as a static Vite build, auto-deploying on push to `main`. Build/output is

@@ -353,6 +353,21 @@ function formatDate(s:string):string {
   if (!s) return "No date";
   return new Date(s+"T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 }
+// Quotes a CSV field only when it actually needs it (contains a comma,
+// quote, or newline), escaping embedded quotes by doubling them per the
+// standard CSV convention -- avoids needlessly quoting every plain field.
+function csvField(v:string|number):string {
+  const s=String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+}
+function downloadFile(filename:string,content:string,mimeType:string){
+  const blob=new Blob([content],{type:mimeType});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 function formatTime(t:string):string {
   if (!t) return "";
   const [h,m]=t.split(":").map(Number);
@@ -1715,6 +1730,24 @@ export default function HomeworkPlanner() {
     setTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,subject}:t));
     exitSelectionMode();
   }
+  function exportAllDataJSON(){
+    const data={
+      exportedAt:new Date().toISOString(),
+      tasks,subjects,subjectColors,templates,
+      themeName,layout,fontName,groupBy,
+      completionLog,unlockedThemesEver,scratchpad,
+    };
+    downloadFile(`dueplanner-export-${todayISO()}.json`,JSON.stringify(data,null,2),"application/json");
+  }
+  function exportTasksCSV(){
+    const headers=["title","subject","dueDate","dueTime","estMins","done","priority","tags","recurrence"];
+    const rows=tasks.map(t=>[
+      t.title,t.subject,t.dueDate,t.dueTime,t.estMins,t.done?"yes":"no",
+      getPriority(t.dueDate,t.estMins,t.priorityOverride),
+      (t.tags||[]).join("; "),t.recurrence||"none",
+    ].map(csvField).join(","));
+    downloadFile(`dueplanner-tasks-${todayISO()}.csv`,[headers.join(","),...rows].join("\n"),"text/csv");
+  }
 
   // Drag-to-reorder: pointer capture keeps move/up events on the handle even as
   // the finger/cursor leaves it, so no window-level listeners are needed. While
@@ -2856,6 +2889,14 @@ export default function HomeworkPlanner() {
                     <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>{label}</div>
                   </div>
                 ))}
+              </div>
+            </div>
+            {/* Export */}
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Your Data</div>
+              <div style={{display:"flex",gap:7}}>
+                <button onClick={exportAllDataJSON} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>⬇ Export all (JSON)</button>
+                <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>⬇ Export tasks (CSV)</button>
               </div>
             </div>
             <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>💬 Send feedback / report a bug</a>

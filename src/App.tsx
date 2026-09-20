@@ -203,6 +203,12 @@ const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"
 const SUBJECT_COLOR_PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#F7DC6F","#BB8FCE","#82E0AA","#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#a78bfa","#fbbf24","#60a5fa"];
 type Priority = "high"|"medium"|"low";
 const PRIORITY_COLORS: Record<Priority,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
+const REMINDER_OFFSETS = [
+  { key:"1d", label:"1 day before", mins:1440 },
+  { key:"3h", label:"3 hours before", mins:180 },
+  { key:"1h", label:"1 hour before", mins:60 },
+  { key:"0",  label:"At due time",   mins:0 },
+] as const;
 const QUESTIONS = [
   { key:"subject", label:"What subject? 📚", type:"select" },
   { key:"dueDate", label:"When is it due? 📅", type:"date" },
@@ -1008,23 +1014,62 @@ export default function HomeworkPlanner() {
     if(perm==="granted"){ setNotificationsEnabled(true); setNotificationNote(null); }
     else { setNotificationsEnabled(false); setNotificationNote("Notifications were blocked -- allow them for this site in your browser settings to turn this on."); }
   }
+  // Multiple, independently-toggleable lead times for tasks that have a
+  // specific due TIME (not just a date) -- e.g. both "1 day before" and
+  // "1 hour before" can be on at once. Tasks without a due time fall back to
+  // the plain once-daily due/overdue summary below, since there's no time to
+  // offset from.
+  const [enabledOffsets,setEnabledOffsets]=useState<string[]>(()=>{try{const s=localStorage.getItem("hw-reminder-offsets");return s?JSON.parse(s):["0"];}catch{return ["0"];}});
+  useEffect(()=>{localStorage.setItem("hw-reminder-offsets",JSON.stringify(enabledOffsets));},[enabledOffsets]);
+  function toggleOffset(key:string){
+    setEnabledOffsets(prev=>prev.includes(key)?prev.filter(k=>k!==key):[...prev,key]);
+  }
   useEffect(()=>{
     if(!notificationsEnabled)return;
     if(!("Notification" in window)||Notification.permission!=="granted")return;
     function checkDue(){
       if(document.hidden)return;
       const today=todayISO();
-      if(localStorage.getItem("hw-last-notified")===today)return;
-      const due=tasks.filter(t=>!t.done&&!t.archived&&t.dueDate&&t.dueDate<=today);
-      if(due.length===0)return;
-      localStorage.setItem("hw-last-notified",today);
-      const title=due.length===1?`"${due[0].title}" is due`:`${due.length} tasks due or overdue`;
-      new Notification(title,{body:due.slice(0,3).map(t=>t.title).join(", ")});
+      if(localStorage.getItem("hw-last-notified")!==today){
+        const due=tasks.filter(t=>!t.done&&!t.archived&&t.dueDate&&t.dueDate<=today);
+        if(due.length>0){
+          localStorage.setItem("hw-last-notified",today);
+          const title=due.length===1?`"${due[0].title}" is due`:`${due.length} tasks due or overdue`;
+          new Notification(title,{body:due.slice(0,3).map(t=>t.title).join(", ")});
+        }
+      }
+      // Offset-based reminders, only for tasks with a specific due time --
+      // fires once per (task, offset, due-datetime) combo, tracked so
+      // editing a task's due date/time naturally resets which reminders
+      // are still owed for it.
+      if(enabledOffsets.length===0)return;
+      let sent:Record<string,true>={};
+      try{sent=JSON.parse(localStorage.getItem("hw-sent-reminders")||"{}");}catch{/* ignore */}
+      const now=Date.now();
+      let changed=false;
+      for(const t of tasks){
+        if(t.done||t.archived||!t.dueDate||!t.dueTime)continue;
+        const dueAt=new Date(`${t.dueDate}T${t.dueTime}`).getTime();
+        for(const offset of REMINDER_OFFSETS){
+          if(!enabledOffsets.includes(offset.key))continue;
+          const remindAt=dueAt-offset.mins*60000;
+          const sentKey=`${t.id}-${offset.key}-${t.dueDate}T${t.dueTime}`;
+          if(now>=remindAt&&now<dueAt&&!sent[sentKey]){
+            new Notification(`"${t.title}" is due ${offset.mins===0?"now":`in ${offset.label.replace(" before","")}`}`,{body:`${formatDate(t.dueDate)} at ${formatTime(t.dueTime)}`});
+            sent[sentKey]=true;
+            changed=true;
+          }
+        }
+      }
+      if(changed)localStorage.setItem("hw-sent-reminders",JSON.stringify(sent));
     }
     checkDue();
     document.addEventListener("visibilitychange",checkDue);
-    return ()=>document.removeEventListener("visibilitychange",checkDue);
-  },[notificationsEnabled,tasks]);
+    // Offset reminders need to fire close to a specific time, not just when
+    // the tab regains focus, so also re-check periodically while it's open.
+    const interval=setInterval(checkDue,60000);
+    return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
+  },[notificationsEnabled,tasks,enabledOffsets]);
 
   const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
   const [fontName,setFontName]=useState<FontName>(()=>(localStorage.getItem("hw-font") as FontName)||"dmSerif");
@@ -2770,6 +2815,24 @@ export default function HomeworkPlanner() {
               </div>
               {notificationNote&&<div style={{fontFamily:F.body,fontSize:10,color:"#FF4757",marginTop:8}}>{notificationNote}</div>}
               {notificationsEnabled&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>Only fires while this tab is open or when you reopen it -- not true background push.</div>}
+              {notificationsEnabled&&(
+                <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${T.border}`}}>
+                  <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Remind me</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {REMINDER_OFFSETS.map(o=>(
+                      <button key={o.key} onClick={()=>toggleOffset(o.key)} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left"}}>
+                        <div style={{width:16,height:16,border:`2px solid ${enabledOffsets.includes(o.key)?T.accent:T.textFaint}`,borderRadius:4,background:enabledOffsets.includes(o.key)?T.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {enabledOffsets.includes(o.key)&&<span style={{color:"#111",fontSize:10,fontWeight:"bold"}}>✓</span>}
+                        </div>
+                        <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{o.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>
+                    Only applies to tasks with a specific due time set (not just a date).
+                  </div>
+                </div>
+              )}
             </div>
             {/* Auto-archive */}
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>

@@ -6,6 +6,7 @@ import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteField, colle
 import type { Firestore } from "firebase/firestore";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getPerformance } from "firebase/performance";
+import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -84,6 +85,22 @@ try {
 } catch (e) {
   console.error("Firebase Performance Monitoring unavailable:", e);
 }
+// Basic usage analytics (page views, sessions, engagement time) -- free on
+// the Spark plan, visible in Firebase Console -> Analytics. isSupported() is
+// used (not just try/catch) because the underlying gtag.js script commonly
+// gets blocked outright by ad/privacy blocker extensions (AdGuard, uBlock,
+// etc.) rather than throwing -- isSupported() checks this explicitly instead
+// of silently failing partway through initialization. If the project's never
+// had Google Analytics linked at the Firebase-project level, this will just
+// silently collect nothing rather than error.
+isAnalyticsSupported().then(supported => {
+  if (!supported) return;
+  try {
+    getAnalytics(fbApp);
+  } catch (e) {
+    console.error("Firebase Analytics unavailable:", e);
+  }
+}).catch(()=>{});
 // Detects the signature of a browser blocking the storage handoff Firebase
 // needs to complete signInWithRedirect across the round trip through its
 // authDomain (a different origin from this site) -- notably Firefox's

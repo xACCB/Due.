@@ -54,6 +54,12 @@ visible in Firebase Console → Performance. Wrapped in try/catch like the Fires
 setup above, since a monitoring feature shouldn't be able to break the app if its underlying
 browser APIs are unavailable somewhere.
 
+**Analytics.** `getAnalytics(fbApp)` (basic page views/session/engagement tracking, free on Spark)
+is gated behind `isSupported()` rather than just try/catch, since the underlying `gtag.js` script
+commonly gets silently blocked by ad/privacy-blocker extensions (AdGuard, uBlock, etc.) rather than
+throwing -- `isSupported()` checks that explicitly instead of half-initializing. `public/privacy.html`
+discloses this; keep that page in sync if what's collected here changes.
+
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
 - `users/{uid}` — small "profile" fields only: `themeName`, `layout`, `completionLog`,

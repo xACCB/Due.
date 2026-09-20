@@ -9,6 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run lint` — run ESLint over the whole project.
 - `npm run preview` — serve the built `dist/` output locally.
 - There is no test suite/framework configured in this repo.
+- `.github/workflows/ci.yml` runs `npm run build` + `npm run lint` (plus a non-blocking
+  `npm audit`) on every push/PR to `main` — Vercel's own build would already catch a broken build,
+  but not lint issues, which this exists to catch.
 
 ## Architecture
 
@@ -119,5 +122,9 @@ redefine it as a "new" component and force React to remount the modal every seco
 ## Deployment
 
 Deployed on Vercel as a static Vite build, auto-deploying on push to `main`. Build/output is
-auto-detected via Vercel's Vite preset; the one entry in `vercel.json` is the auth proxy rewrite
-described above, not a build config override.
+auto-detected via Vercel's Vite preset; `vercel.json` holds the auth proxy rewrite described above
+plus basic security response headers (`X-Frame-Options`, `X-Content-Type-Options`,
+`Referrer-Policy`, `Permissions-Policy`) applied to everything except the `/__/auth/**` proxy paths
+-- deliberately excluded so they can't interact with Firebase's own proxied auth handler content.
+No `Content-Security-Policy` is set; one was deliberately not added given the risk of silently
+breaking Google Sign-In/reCAPTCHA/Google Fonts without a live test cycle to verify against.

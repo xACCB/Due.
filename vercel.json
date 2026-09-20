@@ -4,5 +4,16 @@
       "source": "/__/auth/:path*",
       "destination": "https://ai-homework-planner-92260.firebaseapp.com/__/auth/:path*"
     }
+  ],
+  "headers": [
+    {
+      "source": "/((?!__/auth).*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+      ]
+    }
   ]
 }

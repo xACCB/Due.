@@ -218,6 +218,8 @@ interface Task {
   recurrence?: Recurrence;
   archived?: boolean;
   completedAt?: number | null; // ms timestamp, set when marked done, cleared (null, never undefined -- Firestore's setDoc throws on literal undefined) when un-marked -- drives archive timing + weekly/monthly stats
+  tags?: string[]; // free-form, cross-cutting -- distinct from subject (one per task, these are many)
+  priorityOverride?: Priority; // manual override for getPriority()'s auto-computed value, cleared to go back to "Auto"
 }
 
 const DEFAULT_TASKS: Task[] = [
@@ -330,7 +332,8 @@ function contrastColor(hex:string):string {
   const L=0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
   return L>0.5?"#1a1a1a":"#ffffff";
 }
-function getPriority(dueDate:string, estMins:number):Priority {
+function getPriority(dueDate:string, estMins:number, override?:Priority):Priority {
+  if (override) return override;
   if (!dueDate) return "low";
   const d=(new Date(dueDate+"T00:00:00").getTime()-Date.now())/86400000;
   if (d<1||(d<2&&estMins>60)) return "high"; if (d<3) return "medium"; return "low";
@@ -361,7 +364,7 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
   if (pending.length===1) return `Just one task left: "${pending[0].title}". You've got this! 💪`;
   const sorted=[...pending].sort((a,b)=>{
     const o:Record<string,number>={high:0,medium:1,low:2};
-    const d=o[getPriority(a.dueDate,a.estMins)]-o[getPriority(b.dueDate,b.estMins)];
+    const d=o[getPriority(a.dueDate,a.estMins,a.priorityOverride)]-o[getPriority(b.dueDate,b.estMins,b.priorityOverride)];
     return d!==0?d:(a.dueDate||"").localeCompare(b.dueDate||"");
   });
   const top=sorted[0];
@@ -376,13 +379,15 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHistory,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive}:{
+function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHistory,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onSetPriorityOverride,onSetTags}:{
   task:Task; T:ThemeObj; F:typeof FONTS[FontName]; subjectColors:Record<string,string>;
   sessionActive:boolean; sessionSecs:number; sessionHistory:{mins:number;date:string}[];
+  allTags:string[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
   onUpdateSubtasks:(subtasks:Subtask[])=>void; onArchive:()=>void;
+  onSetPriorityOverride:(override:Priority|null)=>void; onSetTags:(tags:string[])=>void;
 }){
-  const pr=getPriority(task.dueDate,task.estMins);
+  const pr=getPriority(task.dueDate,task.estMins,task.priorityOverride);
   const sc=subjectColors[task.subject]||T.accent;
   const sm=Math.floor(sessionSecs/60); const ss=sessionSecs%60;
   const totalSessionMins=sessionHistory.reduce((a,b)=>a+b.mins,0);
@@ -393,6 +398,14 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
     if(!text)return;
     onUpdateSubtasks([...subtasks,{id:String(nextId()),text,done:false}]);
     setNewSubtaskText("");
+  }
+  const tags=task.tags||[];
+  const [newTagText,setNewTagText]=useState("");
+  function addTag(){
+    const t=newTagText.trim();
+    if(!t||tags.includes(t))return;
+    onSetTags([...tags,t]);
+    setNewTagText("");
   }
   return(
     <div style={{position:"fixed",inset:0,background:"#00000088",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
@@ -433,6 +446,22 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
             </div>}
           </div>
 
+          {/* Priority override */}
+          <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
+            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Priority</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+              {([null,"low","medium","high"] as const).map(p=>{
+                const active=p===null?!task.priorityOverride:task.priorityOverride===p;
+                const label=p===null?"Auto":p[0].toUpperCase()+p.slice(1);
+                const color=p===null?T.accent:PRIORITY_COLORS[p];
+                return <button key={p??"auto"} onClick={()=>onSetPriorityOverride(p)}
+                  style={{background:active?color+"22":T.surface,border:`1.5px solid ${active?color:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:active?color:T.textMuted,fontFamily:F.body,fontSize:11}}>
+                  {label}
+                </button>;
+              })}
+            </div>
+          </div>
+
           {/* Subtasks */}
           <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:subtasks.length?10:0}}>
@@ -454,6 +483,28 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
               <input value={newSubtaskText} onChange={e=>setNewSubtaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSubtask()} placeholder="Add a subtask..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
               <button onClick={addSubtask} style={{background:T.accent,color:"#000",border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:12,fontWeight:500}}>+</button>
             </div>
+          </div>
+
+          {/* Tags */}
+          <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
+            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:tags.length?10:0}}>Tags</div>
+            {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+              {tags.map(tag=>(
+                <span key={tag} style={{display:"flex",alignItems:"center",gap:4,background:T.accent+"22",color:T.accent,borderRadius:999,padding:"3px 4px 3px 10px",fontFamily:F.body,fontSize:11}}>
+                  {tag}
+                  <button onClick={()=>onSetTags(tags.filter(x=>x!==tag))} style={{background:"none",border:"none",color:T.accent,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 4px"}}>×</button>
+                </span>
+              ))}
+            </div>}
+            <div style={{display:"flex",gap:6}}>
+              <input value={newTagText} onChange={e=>setNewTagText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTag()} placeholder="Add a tag..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
+              <button onClick={addTag} style={{background:T.accent,color:"#000",border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:12,fontWeight:500}}>+</button>
+            </div>
+            {allTags.filter(t=>!tags.includes(t)).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>
+              {allTags.filter(t=>!tags.includes(t)).slice(0,8).map(t=>(
+                <button key={t} onClick={()=>onSetTags([...tags,t])} style={{background:"none",border:`1px dashed ${T.border}`,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:10,color:T.textFaint,cursor:"pointer"}}>+{t}</button>
+              ))}
+            </div>}
           </div>
 
           {/* Session timer */}
@@ -538,7 +589,7 @@ function Toggle({on,onChange,T}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeOb
 // for every visible task across every layout, so being redefined (and every
 // instance's DOM torn down/recreated) on each unrelated render was the most
 // consequential case of this pattern in the file.
-function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag}:{
+function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
   task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
   T:ThemeObj; F:typeof FONTS[FontName]; subjectColors:Record<string,string>;
   dragTaskId:number|null; dragOffsetY:number;
@@ -557,8 +608,9 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
   startDrag:(id:number,e:React.PointerEvent)=>void;
   onDragMove:(e:React.PointerEvent)=>void;
   endDrag:()=>void;
+  selectionMode?:boolean; isSelected?:boolean; onToggleSelect?:(id:number)=>void;
 }) {
-  const pr=getPriority(task.dueDate,task.estMins);
+  const pr=getPriority(task.dueDate,task.estMins,task.priorityOverride);
   const sc=subjectColors[task.subject]||T.accent;
   const dm=daysUntil(task.dueDate);
   const isTop=rank===0&&!task.done; const isNext=rank===1&&!task.done;
@@ -567,13 +619,13 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
     <div
       className="tc"
       data-task-id={task.id}
-      onClick={swipeClickGuard(()=>{if(dragTaskId==null){onOpen(task);}})}
-      {...(swipeable?swipeHandlers(task.id):{})}
-      style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
-      {swipeable&&renderSwipeReveal(task.id)}
+      onClick={selectionMode?()=>onToggleSelect?.(task.id):swipeClickGuard(()=>{if(dragTaskId==null){onOpen(task);}})}
+      {...(swipeable&&!selectionMode?swipeHandlers(task.id):{})}
+      style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isSelected?T.accent:isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
+      {swipeable&&!selectionMode&&renderSwipeReveal(task.id)}
       {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:PRIORITY_COLORS[pr],borderRadius:"13px 0 0 13px"}}/>}
       <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
-        {reorderable&&!task.done&&(
+        {reorderable&&!task.done&&!selectionMode&&(
           <div
             onClick={e=>e.stopPropagation()}
             onPointerDown={e=>{e.stopPropagation();startDrag(task.id,e);}}
@@ -584,8 +636,8 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
             ⠿
           </div>
         )}
-        <button onClick={e=>{e.stopPropagation();onToggleDone(task.id);}} style={{background:task.done?"#2ED573":"none",border:`2px solid ${task.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
-          {task.done&&<span style={{color:"#111",fontSize:10,fontWeight:"bold"}}>✓</span>}
+        <button onClick={e=>{e.stopPropagation();if(selectionMode){onToggleSelect?.(task.id);}else{onToggleDone(task.id);}}} style={{background:selectionMode?(isSelected?T.accent:"none"):task.done?"#2ED573":"none",border:`2px solid ${selectionMode?(isSelected?T.accent:T.textFaint):task.done?"#2ED573":T.textFaint}`,borderRadius:selectionMode?4:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
+          {(selectionMode?isSelected:task.done)&&<span style={{color:"#111",fontSize:10,fontWeight:"bold"}}>✓</span>}
         </button>
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
@@ -594,6 +646,8 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
             <span style={{fontFamily:F.heading,fontSize:15,textDecoration:task.done?"line-through":"none",color:task.done?T.textFaint:T.text}}>{task.title}</span>
             {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
             <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>
+            {task.priorityOverride&&<span title="Manually set priority" style={{color:T.textFaint,fontSize:10}}>📌</span>}
+            {task.tags?.map(tag=><span key={tag} style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>#{tag}</span>)}
           </div>
           <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
             <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>📅 {formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
@@ -609,7 +663,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
             </div>
           )}
         </div>
-        <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();onDelete(task.id);}}>×</button>
+        {!selectionMode&&<button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();onDelete(task.id);}}>×</button>}
       </div>
     </div>
   );
@@ -640,7 +694,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
 }) {
   const doneTasks=visibleTasks.filter(t=>t.done).length;
   const totalTasks=visibleTasks.length;
-  const highPri=visibleTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="high").length;
+  const highPri=visibleTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high").length;
   const pct=totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
   const subjectCounts=subjects.map(s=>({name:s,count:visibleTasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
 
@@ -1389,6 +1443,16 @@ export default function HomeworkPlanner() {
   const [pendingDeleteId,setPendingDeleteId]=useState<number|null>(null);
   const [pendingDeleteTitle,setPendingDeleteTitle]=useState("");
   const pendingDeleteTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  // Bulk edit / multi-select. Scoped to the default list layout (MiniCard) --
+  // the other 11 layouts each render their own custom task row markup, so
+  // extending selection to all of them is a much bigger job than the value
+  // justifies right now.
+  const [selectionMode,setSelectionMode]=useState(false);
+  const [selectedIds,setSelectedIds]=useState<number[]>([]);
+  function toggleSelected(id:number){
+    setSelectedIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+  }
+  function exitSelectionMode(){ setSelectionMode(false); setSelectedIds([]); }
 
   const base=THEMES[themeName];
   const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
@@ -1410,6 +1474,9 @@ export default function HomeworkPlanner() {
   // Soft-deleted (pending undo) tasks are filtered out here, once, so every layout
   // and view downstream just stops seeing them without needing its own check.
   const visibleTasks=tasks.filter(t=>t.id!==pendingDeleteId);
+  // Every tag used on any task, deduplicated -- powers the "quick add" suggestion
+  // chips in TaskModal's tag editor instead of retyping tags you've already used.
+  const allTags=[...new Set(tasks.flatMap(t=>t.tags||[]))].sort();
   // Pending tasks sort by their manual drag order; done tasks always sink to the bottom.
   const allSorted=[...visibleTasks].sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
@@ -1533,8 +1600,33 @@ export default function HomeworkPlanner() {
   function updateSubtasks(id:number,subtasks:Subtask[]){
     setTasks(prev=>prev.map(t=>t.id===id?{...t,subtasks}:t));
   }
+  function setPriorityOverride(id:number,override:Priority|null){
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,priorityOverride:override??undefined}:t));
+  }
+  function setTaskTags(id:number,tags:string[]){
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,tags}:t));
+  }
   function archiveTask(id:number){
     setTasks(prev=>prev.map(t=>t.id===id?{...t,archived:true}:t));
+  }
+  function bulkMarkDone(ids:number[]){
+    const today=todayISO();
+    setCompletionLog(log=>log[today]?log:{...log,[today]:true});
+    setTasks(prev=>prev.map(t=>ids.includes(t.id)&&!t.done?{...t,done:true,completedAt:Date.now()}:t));
+    exitSelectionMode();
+  }
+  function bulkArchive(ids:number[]){
+    setTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,archived:true}:t));
+    exitSelectionMode();
+  }
+  function bulkDelete(ids:number[]){
+    if(!window.confirm(`Delete ${ids.length} task${ids.length===1?"":"s"}? This can't be undone.`))return;
+    setTasks(prev=>prev.filter(t=>!ids.includes(t.id)));
+    exitSelectionMode();
+  }
+  function bulkSetSubject(ids:number[],subject:string){
+    setTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,subject}:t));
+    exitSelectionMode();
   }
 
   // Drag-to-reorder: pointer capture keeps move/up events on the handle even as
@@ -1727,11 +1819,12 @@ export default function HomeworkPlanner() {
       onOpen:(t:Task)=>{setSelectedTask(t);setSessionHistory([]);},
       onToggleDone:toggleDone,onDelete:deleteTask,
       swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,
-      startDrag,onDragMove,endDrag};
+      startDrag,onDragMove,endDrag,
+      selectionMode,onToggleSelect:toggleSelected};
 
     if (layout==="minimal") return (
       <div style={{display:"flex",flexDirection:"column",gap:2}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px",borderBottom:`1px solid ${T.border}22`,cursor:"pointer"}}>
             <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
@@ -1748,7 +1841,7 @@ export default function HomeworkPlanner() {
 
     if (layout==="checklist") return (
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
-        {tasks.map((t,i)=>{const pr=getPriority(t.dueDate,t.estMins);return(
+        {tasks.map((t,i)=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);return(
           <div key={t.id} style={{position:"relative",overflow:"hidden",borderRadius:10}}>
             {renderSwipeReveal(t.id)}
             <div className="tc" onClick={swipeClickGuard(()=>{setSelectedTask(t);setSessionHistory([]);})} {...swipeHandlers(t.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.card,borderRadius:10,border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
@@ -1767,7 +1860,7 @@ export default function HomeworkPlanner() {
 
     if (layout==="compact") return (
       <div style={{display:"flex",flexDirection:"column",gap:5}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;const dm=daysUntil(t.dueDate);return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;const dm=daysUntil(t.dueDate);return(
           <div key={t.id} style={{position:"relative",overflow:"hidden",borderRadius:9}}>
             {renderSwipeReveal(t.id)}
             <div className="tc" onClick={swipeClickGuard(()=>{setSelectedTask(t);setSessionHistory([]);})} {...swipeHandlers(t.id)} style={{background:T.card,borderRadius:9,padding:"8px 11px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,position:"relative",cursor:"pointer",...swipeContentStyle(t.id)}}>
@@ -1787,7 +1880,7 @@ export default function HomeworkPlanner() {
 
     if (layout==="board") return (
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))",gap:10}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7,cursor:"pointer"}}>
             <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:PRIORITY_COLORS[pr],borderRadius:"12px 12px 0 0"}}/>
             <div style={{display:"flex",justifyContent:"space-between"}}>
@@ -1828,7 +1921,7 @@ export default function HomeworkPlanner() {
     );
 
     if (layout==="kanban") {
-      const cols=[{key:"high",label:"🔴 Urgent",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="high")},{key:"medium",label:"🟡 Soon",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="medium")},{key:"low",label:"🟢 Later",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="low")},{key:"done",label:"✅ Done",tasks:filteredTasks.filter(t=>t.done)}];
+      const cols=[{key:"high",label:"🔴 Urgent",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"🟡 Soon",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"🟢 Later",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✅ Done",tasks:filteredTasks.filter(t=>t.done)}];
       return(
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
           {cols.map(col=>(
@@ -1855,7 +1948,7 @@ export default function HomeworkPlanner() {
     if (layout==="timeline") return (
       <div style={{position:"relative",paddingLeft:24}}>
         <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:`linear-gradient(${T.accent},${T.border})`}}/>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" style={{position:"relative",marginBottom:14}}>
             <div style={{position:"absolute",left:-19,top:14,width:12,height:12,borderRadius:"50%",background:t.done?"#2ED573":PRIORITY_COLORS[pr],border:`2px solid ${T.bg}`,cursor:"pointer"}} onClick={()=>toggleDone(t.id)}/>
             <div onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:T.card,borderRadius:11,padding:"11px 13px",border:`1px solid ${T.border}`,marginLeft:6,cursor:"pointer"}}>
@@ -1898,7 +1991,7 @@ export default function HomeworkPlanner() {
     if (layout==="progress") return (
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {tasks.map(t=>{
-          const pr=getPriority(t.dueDate,t.estMins);const sc=subjectColors[t.subject]||T.accent;
+          const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;
           const maxMins=120; const pct=Math.min(100,Math.round(t.estMins/maxMins*100));
           return(
             <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,cursor:"pointer"}}>
@@ -1928,9 +2021,9 @@ export default function HomeworkPlanner() {
     );
 
     if (layout==="pyramid") {
-      const highT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="high");
-      const medT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="medium");
-      const lowT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins)==="low");
+      const highT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high");
+      const medT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium");
+      const lowT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low");
       const doneT=tasks.filter(t=>t.done);
       return(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -2016,7 +2109,7 @@ export default function HomeworkPlanner() {
       const order:string[]=[];
       const keyFor=(t:Task)=>{
         if (groupBy==="subject") return t.subject||"Other";
-        if (groupBy==="priority") return getPriority(t.dueDate,t.estMins);
+        if (groupBy==="priority") return getPriority(t.dueDate,t.estMins,t.priorityOverride);
         return t.dueDate||"No date"; // dueDate
       };
       for (const t of tasks) {
@@ -2042,7 +2135,7 @@ export default function HomeworkPlanner() {
         ))}
       </div>;
     }
-    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable swipeable {...miniCardProps}/>)}</div>;
+    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable swipeable {...miniCardProps} isSelected={selectedIds.includes(t.id)}/>)}</div>;
   }
 
 
@@ -2188,6 +2281,10 @@ export default function HomeworkPlanner() {
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
             {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?"#000":T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
             {topTask&&<button onClick={()=>setFocusMode(true)} style={{background:"none",border:`1px solid ${T.accent}55`,color:T.accent,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>🎯 Focus</button>}
+            {layout==="list"&&(selectionMode
+              ? <button onClick={exitSelectionMode} style={{background:T.accent,color:"#000",border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>
+              : <button onClick={()=>setSelectionMode(true)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>☑ Select</button>
+            )}
             <div style={{marginLeft:"auto",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{visibleTasks.filter(t=>!t.done&&!t.archived).length} pending</div>
           </div>
 
@@ -2643,12 +2740,15 @@ export default function HomeworkPlanner() {
         task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
         T={T} F={F} subjectColors={subjectColors}
         sessionActive={sessionActive} sessionSecs={sessionSecs} sessionHistory={sessionHistory}
+        allTags={allTags}
         onClose={()=>{setSelectedTask(null);setSessionHistory([]);}}
         onStartSession={startSession} onEndSession={endSession}
         onToggleDone={()=>{toggleDone(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
         onDelete={()=>{deleteTask(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
         onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
         onArchive={()=>{archiveTask(selectedTask.id);setSelectedTask(null);}}
+        onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
+        onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
       />}
       {showProfile&&<ProfileModal
         T={T} F={F}
@@ -2670,6 +2770,19 @@ export default function HomeworkPlanner() {
         <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
           <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:180}}>🗑 "{pendingDeleteTitle}" deleted</span>
           <button onClick={undoDelete} style={{background:T.accent,color:"#000",border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
+        </div>
+      )}
+      {/* Bulk action bar -- only reachable via the "Select" toggle, list layout only */}
+      {selectionMode&&selectedIds.length>0&&(
+        <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:8,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:"10px 14px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)",flexWrap:"wrap",justifyContent:"center"}}>
+          <span style={{fontFamily:F.body,fontSize:12,color:T.text,fontWeight:500}}>{selectedIds.length} selected</span>
+          <button onClick={()=>bulkMarkDone(selectedIds)} style={{background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>✓ Done</button>
+          <button onClick={()=>bulkArchive(selectedIds)} style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>📦 Archive</button>
+          <select onChange={e=>{if(e.target.value)bulkSetSubject(selectedIds,e.target.value);}} defaultValue="" style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 8px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
+            <option value="" disabled>Set subject...</option>
+            {subjects.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+          <button onClick={()=>bulkDelete(selectedIds)} style={{background:"#FF475711",color:"#FF4757",border:"1px solid #FF475733",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>🗑 Delete</button>
         </div>
       )}
     </div>

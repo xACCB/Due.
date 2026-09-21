@@ -152,13 +152,6 @@ const THEMES = {
 } as const;
 type ThemeName = keyof typeof THEMES;
 type ThemeObj = Omit<typeof THEMES[ThemeName], "accent"> & { accent: string; accentGlow: string; gradientCard: string };
-// Streak-gated themes: unlocked permanently once the streak requirement is hit,
-// even if the streak later breaks (tracked separately in unlockedThemesEver).
-const THEME_UNLOCK_REQUIREMENTS: Partial<Record<ThemeName, number>> = {
-  matrix: 3,
-  dracula: 7,
-  rosepine: 30,
-};
 
 const LAYOUTS = {
   list:      { name:"List",       emoji:"☰",  desc:"Classic cards" },
@@ -240,11 +233,10 @@ const DEFAULT_TASKS: Task[] = [
   { id:4, title:"History Reading", subject:"History", dueDate:localDateStr(new Date(Date.now()+2*86400000)), dueTime:"09:00", estMins:30, done:false, order:3 },
 ];
 
-// ─── DATE HELPERS (recurrence, streaks, archive) ───────────────────────────────
+// ─── DATE HELPERS (recurrence, archive) ────────────────────────────────────────
 // Local calendar date as YYYY-MM-DD -- deliberately NOT toISOString() (which is
-// UTC), since streaks/completion-log keys (and every other place a Date needs to
-// become a due-date string) need to roll over at the user's own local midnight,
-// not UTC midnight.
+// UTC), since due-date strings (and every other place a Date needs to become
+// one) need to roll over at the user's own local midnight, not UTC midnight.
 function localDateStr(d:Date):string {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
@@ -265,16 +257,6 @@ function advanceDate(dateStr:string, recurrence:Recurrence):string {
     d.setDate(Math.min(day,daysInMonth));
   }
   return localDateStr(d);
-}
-function computeStreak(log:Record<string,true>):number {
-  const d=new Date();
-  if(!log[todayISO()]) d.setDate(d.getDate()-1); // today not done yet -- don't break the streak until the day fully ends
-  let streak=0;
-  while(log[localDateStr(d)]){
-    streak++;
-    d.setDate(d.getDate()-1);
-  }
-  return streak;
 }
 // Monotonic id source for new tasks/subtasks -- plain Date.now() can collide when
 // two are minted in the same millisecond (e.g. a recurring task's next instance
@@ -1139,19 +1121,6 @@ export default function HomeworkPlanner() {
   useEffect(()=>{localStorage.setItem("hw-showdone",String(showDone));},[showDone]);
   useEffect(()=>{localStorage.setItem("hw-showsuggestion",String(showSuggestion));},[showSuggestion]);
   useEffect(()=>{if(accentOverride)localStorage.setItem("hw-accent",accentOverride);else localStorage.removeItem("hw-accent");},[accentOverride]);
-  // Streaks: one entry per calendar day (local time) with >=1 completion. Feeds
-  // current-streak, weekly/monthly counts (via task.completedAt), and theme unlocks.
-  const [completionLog,setCompletionLog]=useState<Record<string,true>>(()=>{
-    try{const s=localStorage.getItem("hw-completionlog");return s?JSON.parse(s):{};}catch{return {};}
-  });
-  useEffect(()=>{localStorage.setItem("hw-completionlog",JSON.stringify(completionLog));},[completionLog]);
-  // Themes unlocked via streak milestones, permanently -- once earned, always
-  // available even if the streak later breaks.
-  const [unlockedThemesEver,setUnlockedThemesEver]=useState<Record<string,true>>(()=>{
-    try{const s=localStorage.getItem("hw-unlockedthemes");return s?JSON.parse(s):{};}catch{return {};}
-  });
-  useEffect(()=>{localStorage.setItem("hw-unlockedthemes",JSON.stringify(unlockedThemesEver));},[unlockedThemesEver]);
-  const [shakeTheme,setShakeTheme]=useState<string|null>(null);
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
@@ -1297,8 +1266,6 @@ export default function HomeworkPlanner() {
         // state and crash a render. Cheap shape checks before applying.
         if(typeof data.themeName==="string"&&data.themeName in THEMES) setThemeName(data.themeName as ThemeName);
         if(typeof data.layout==="string"&&data.layout in LAYOUTS) setLayout(data.layout as LayoutName);
-        if(data.completionLog&&typeof data.completionLog==="object") setCompletionLog(data.completionLog);
-        if(data.unlockedThemesEver&&typeof data.unlockedThemesEver==="object") setUnlockedThemesEver(data.unlockedThemesEver);
         if(typeof data.scratchpad==="string"){ setScratchpad(data.scratchpad); setScratchpadSynced(data.scratchpad); }
       }
       setProfileSyncedForUid(fbUser.uid);
@@ -1317,14 +1284,14 @@ export default function HomeworkPlanner() {
     if(!fbUser||profileSyncedForUid!==fbUser.uid)return;
     isSyncingProfile.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{themeName,layout,completionLog,unlockedThemesEver,scratchpad:scratchpadSynced},{merge:true})
+    setDoc(ref,{themeName,layout,scratchpad:scratchpadSynced},{merge:true})
       .then(()=>setSyncError(null))
       .catch(err=>{
         console.error(err);
         setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
       })
       .finally(()=>{isSyncingProfile.current=false;});
-  },[themeName,layout,completionLog,unlockedThemesEver,scratchpadSynced,fbUser,profileSyncedForUid]);
+  },[themeName,layout,scratchpadSynced,fbUser,profileSyncedForUid]);
 
   // Sync tasks FROM the tasks subcollection.
   useEffect(()=>{
@@ -1500,7 +1467,7 @@ export default function HomeworkPlanner() {
   // component defined inside this render body, so it gets torn down and
   // recreated -- along with any of its own uncontrolled DOM inputs -- on every
   // unrelated re-render of HomeworkPlanner while it's open (a Firestore sync
-  // landing, the streak effect, etc). State that lives up here in the parent
+  // landing, etc). State that lives up here in the parent
   // survives that; an uncontrolled input's typed text would silently vanish.
   const [newSubjectText,setNewSubjectText]=useState("");
   // Drag-to-reorder (default list layout, pending tasks only)
@@ -1574,34 +1541,12 @@ export default function HomeworkPlanner() {
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
 
-  // Streaks & stats (Tools tab). Archived tasks still count here -- archiving is
-  // just a view filter, it doesn't erase completion history.
-  const currentStreak=computeStreak(completionLog);
+  // Stats (Tools tab). Archived tasks still count here -- archiving is just a
+  // view filter, it doesn't erase completion history.
   const startOfWeek=(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());d.setHours(0,0,0,0);return d.getTime();})();
   const startOfMonth=(()=>{const d=new Date();d.setDate(1);d.setHours(0,0,0,0);return d.getTime();})();
   const tasksThisWeek=tasks.filter(t=>t.completedAt&&t.completedAt>=startOfWeek).length;
   const tasksThisMonth=tasks.filter(t=>t.completedAt&&t.completedAt>=startOfMonth).length;
-  const last7Days=(()=>{
-    const days=[];
-    const d=new Date();
-    for(let i=6;i>=0;i--){
-      const day=new Date(d);
-      day.setDate(d.getDate()-i);
-      days.push({label:day.toLocaleDateString(undefined,{weekday:"narrow"}),done:!!completionLog[localDateStr(day)]});
-    }
-    return days;
-  })();
-  useEffect(()=>{
-    const newlyUnlocked=(Object.entries(THEME_UNLOCK_REQUIREMENTS) as [ThemeName,number][])
-      .filter(([name,req])=>currentStreak>=req&&!unlockedThemesEver[name]);
-    if(newlyUnlocked.length===0)return;
-    setUnlockedThemesEver(prev=>{
-      const next={...prev};
-      for(const [name] of newlyUnlocked) next[name]=true;
-      return next;
-    });
-  },[currentStreak,unlockedThemesEver]);
-  function isThemeUnlocked(name:ThemeName){ return !THEME_UNLOCK_REQUIREMENTS[name]||!!unlockedThemesEver[name]; }
 
   function startAdding(){
     setAdding(true);setStep(-1);
@@ -1667,10 +1612,6 @@ export default function HomeworkPlanner() {
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
     const nowDone=!task.done;
-    if(nowDone){
-      const today=todayISO();
-      setCompletionLog(log=>log[today]?log:{...log,[today]:true});
-    }
     setTasks(prev=>{
       let next=prev.map(t=>t.id===id?{...t,done:nowDone,completedAt:nowDone?Date.now():null}:t);
       if(nowDone&&task.recurrence&&task.recurrence!=="none"){
@@ -1712,8 +1653,6 @@ export default function HomeworkPlanner() {
     setTasks(prev=>prev.map(t=>t.id===id?{...t,archived:true}:t));
   }
   function bulkMarkDone(ids:number[]){
-    const today=todayISO();
-    setCompletionLog(log=>log[today]?log:{...log,[today]:true});
     setTasks(prev=>prev.map(t=>ids.includes(t.id)&&!t.done?{...t,done:true,completedAt:Date.now()}:t));
     exitSelectionMode();
   }
@@ -1735,7 +1674,7 @@ export default function HomeworkPlanner() {
       exportedAt:new Date().toISOString(),
       tasks,subjects,subjectColors,templates,
       themeName,layout,fontName,groupBy,
-      completionLog,unlockedThemesEver,scratchpad,
+      scratchpad,
     };
     downloadFile(`dueplanner-export-${todayISO()}.json`,JSON.stringify(data,null,2),"application/json");
   }
@@ -1880,8 +1819,6 @@ export default function HomeworkPlanner() {
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
     .sli{animation:sli 0.22s ease forwards;}
     @keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
-    .shake-locked{animation:shakeLocked 0.35s ease;}
-    @keyframes shakeLocked{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
     .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}
     .chip:hover{transform:scale(1.05);filter:brightness(1.1);}
     .chip:active{transform:scale(.97);}
@@ -2539,24 +2476,9 @@ export default function HomeworkPlanner() {
             {/* Pomodoro */}
             {renderPomodoroCard()}
 
-            {/* Streaks & Stats */}
+            {/* Stats */}
             <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted}}>Streak</div>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                <span style={{fontSize:28}}>🔥</span>
-                <span style={{fontFamily:F.heading,fontSize:26,color:T.accent}}>{currentStreak}</span>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>day{currentStreak===1?"":"s"}</span>
-              </div>
-              <div style={{display:"flex",gap:6,justifyContent:"space-between",marginBottom:14}}>
-                {last7Days.map((d,i)=>(
-                  <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
-                    <div style={{width:"100%",maxWidth:26,height:26,borderRadius:8,background:d.done?T.accent:T.surface,border:`1px solid ${d.done?T.accent:T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {d.done&&<span style={{fontSize:12,color:"#000"}}>✓</span>}
-                    </div>
-                    <span style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>{d.label}</span>
-                  </div>
-                ))}
-              </div>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Stats</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
                 <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
                   <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisWeek}</div>
@@ -2704,30 +2626,17 @@ export default function HomeworkPlanner() {
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{effectiveThemeMode==="light"?"Light":"Dark"} themes ({Object.values(THEMES).filter(t=>t.light===(effectiveThemeMode==="light")).length})</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-                  {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).filter(([,th])=>th.light===(effectiveThemeMode==="light")).map(([key,th])=>{
-                    const req=THEME_UNLOCK_REQUIREMENTS[key];
-                    const locked=req!==undefined&&!isThemeUnlocked(key);
-                    return (
+                  {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).filter(([,th])=>th.light===(effectiveThemeMode==="light")).map(([key,th])=>(
                     <button key={key}
-                      className={shakeTheme===key?"shake-locked":undefined}
                       onClick={()=>{
-                        if(locked){
-                          setShakeTheme(key);
-                          setTimeout(()=>setShakeTheme(s=>s===key?null:s),350);
-                          return;
-                        }
                         setThemeName(key);setAccentOverride(null);setThemeByMode(prev=>({...prev,[effectiveThemeMode]:key}));
                       }}
-                      style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:locked?"pointer":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none",position:"relative",filter:locked?"grayscale(1)":"none",opacity:locked?0.55:1}}>
-                      {locked&&<span style={{position:"absolute",top:4,right:5,fontSize:10}}>🔒</span>}
+                      style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none",position:"relative"}}>
                       <span style={{fontSize:16}}>{th.emoji}</span>
                       <span style={{fontFamily:F.body,fontSize:9,color:th.text}}>{th.name}</span>
-                      {locked
-                        ? <span style={{fontFamily:F.body,fontSize:8,color:th.textMuted,textAlign:"center",lineHeight:1.2}}>{req}-day streak</span>
-                        : <div style={{width:20,height:4,borderRadius:999,background:th.accent}}/>}
+                      <div style={{width:20,height:4,borderRadius:999,background:th.accent}}/>
                     </button>
-                    );
-                  })}
+                  ))}
                 </div>
               </div>
               {/* Accent */}

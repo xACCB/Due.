@@ -17,9 +17,7 @@ service cloud.firestore {
     function isValidProfile(data) {
       return (!('themeName' in data) || data.themeName is string)
         && (!('layout' in data) || data.layout is string)
-        && (!('scratchpad' in data) || (data.scratchpad is string && data.scratchpad.size() <= 50000))
-        && (!('completionLog' in data) || data.completionLog is map)
-        && (!('unlockedThemesEver' in data) || data.unlockedThemesEver is map);
+        && (!('scratchpad' in data) || (data.scratchpad is string && data.scratchpad.size() <= 50000));
     }
 
     function isValidTask(data) {

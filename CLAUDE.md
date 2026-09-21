@@ -65,10 +65,9 @@ discloses this; keep that page in sync if what's collected here changes.
 
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
-- `users/{uid}` — small "profile" fields only: `themeName`, `layout`, `completionLog`,
-  `unlockedThemesEver`, `scratchpad`. Synced as a whole document (it's small and doesn't grow
-  unboundedly), gated behind `profileSyncedForUid` so the first write after sign-in can't race
-  ahead of the first read.
+- `users/{uid}` — small "profile" fields only: `themeName`, `layout`, `scratchpad`. Synced as a
+  whole document (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so
+  the first write after sign-in can't race ahead of the first read.
 - `users/{uid}/tasks/{taskId}` — one document per task (`taskId` is `String(task.id)`). Synced with
   a diff against `lastSyncedTasksRef` (a `Map<id, Task>` of what's last known to be in the
   subcollection), so only tasks that actually changed get written, via a `writeBatch`, instead of
@@ -99,14 +98,13 @@ require rewriting a user's entire history:
   whole app in an exotic environment instead of just missing offline support.
 
 **Design-system constants** at module scope drive both the inline styles and the runtime
-stylesheet: `THEMES` (26 color themes, half light/half dark, some gated behind streak milestones
-via `THEME_UNLOCK_REQUIREMENTS`), `LAYOUTS` (12 task-list display modes), `FONTS` (16 heading/body
-pairings loaded from Google Fonts).
+stylesheet: `THEMES` (26 color themes, half light/half dark, all freely selectable), `LAYOUTS` (12
+task-list display modes), `FONTS` (16 heading/body pairings loaded from Google Fonts).
 
 **Domain logic as plain module-level functions** (not hooks):
-- `localDateStr` / `todayISO` / `advanceDate` / `computeStreak` — local-timezone date handling for
-  due dates and streaks. Deliberately not `toISOString()`/UTC, since a day should roll over at the
-  user's local midnight, not UTC midnight.
+- `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due dates.
+  Deliberately not `toISOString()`/UTC, since a day should roll over at the user's local midnight,
+  not UTC midnight.
 - `parseSyllabus` — heuristic line-by-line text scanner (no AI/network call) that extracts
   `(title, dueDate)` pairs from pasted syllabus text, used by the Import tab.
 - `getPriority` / `daysUntil` / `formatDate` / `formatTime` — due-date-derived display/priority helpers.

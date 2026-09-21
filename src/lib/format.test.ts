@@ -41,7 +41,7 @@ describe("daysUntil", () => {
     expect(daysUntil("")).toBeNull();
   });
   it("flags an overdue date", () => {
-    expect(daysUntil("2000-01-01")).toBe("Overdue!");
+    expect(daysUntil("2000-01-01")).toBe("Overdue");
   });
   it("flags a far-future date with a day count", () => {
     const future = new Date(); future.setDate(future.getDate()+10);

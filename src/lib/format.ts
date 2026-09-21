@@ -33,5 +33,5 @@ export function daysUntil(s:string):string|null {
   if (!s) return null;
   const now=new Date(); now.setHours(0,0,0,0);
   const d=Math.ceil((new Date(s+"T00:00:00").getTime()-now.getTime())/86400000);
-  if (d<0) return "Overdue!"; if (d===0) return "Due today!"; if (d===1) return "Due tomorrow"; return `${d} days left`;
+  if (d<0) return "Overdue"; if (d===0) return "Due today"; if (d===1) return "Due tomorrow"; return `${d} days left`;
 }

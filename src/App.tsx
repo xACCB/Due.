@@ -130,44 +130,35 @@ function isStorageBlockedError(e: unknown): boolean {
 }
 const STORAGE_BLOCKED_MESSAGE = "Sign-in was blocked by your browser's tracking protection. In Firefox: click the shield icon in the address bar and turn off Enhanced Tracking Protection for this site, then try again. Chrome and Edge don't hit this issue.";
 
+// emoji fields are unused (the layout picker renders its own SVG icons per
+// layout instead) -- kept as "--" rather than removed to avoid touching the
+// object shape everywhere it's typed against.
 const LAYOUTS = {
-  list:      { name:"List",       emoji:"☰",  desc:"Classic cards" },
-  compact:   { name:"Compact",    emoji:"⊟",  desc:"Slim rows" },
-  board:     { name:"Board",      emoji:"⊞",  desc:"Grid cards" },
-  minimal:   { name:"Minimal",    emoji:"·",  desc:"Just text" },
-  checklist: { name:"Checklist",  emoji:"☑",  desc:"Simple ticks" },
-  sticky:    { name:"Sticky",     emoji:"🗒",  desc:"Sticky notes" },
-  kanban:    { name:"Kanban",     emoji:"𝄘",  desc:"By status" },
-  timeline:  { name:"Timeline",   emoji:"↓",  desc:"Time ordered" },
-  subject:   { name:"By Subject", emoji:"📚", desc:"Subject tabs" },
-  progress:  { name:"Progress",   emoji:"▓",  desc:"Progress bars" },
-  pyramid:   { name:"Pyramid",    emoji:"△",  desc:"By priority" },
-  calendar:  { name:"Calendar",   emoji:"📅", desc:"Week view" },
+  list:      { name:"List",       emoji:"--", desc:"Classic cards" },
+  compact:   { name:"Compact",    emoji:"--", desc:"Slim rows" },
+  board:     { name:"Board",      emoji:"--", desc:"Grid cards" },
+  minimal:   { name:"Minimal",    emoji:"--", desc:"Just text" },
+  checklist: { name:"Checklist",  emoji:"--", desc:"Simple ticks" },
+  sticky:    { name:"Sticky",     emoji:"--", desc:"Sticky notes" },
+  kanban:    { name:"Kanban",     emoji:"--", desc:"By status" },
+  timeline:  { name:"Timeline",   emoji:"--", desc:"Time ordered" },
+  subject:   { name:"By Subject", emoji:"--", desc:"Subject tabs" },
+  progress:  { name:"Progress",   emoji:"--", desc:"Progress bars" },
+  pyramid:   { name:"Pyramid",    emoji:"--", desc:"By priority" },
+  calendar:  { name:"Calendar",   emoji:"--", desc:"Week view" },
 } as const;
 type LayoutName = keyof typeof LAYOUTS;
 
 // ─── FONTS ────────────────────────────────────────────────────────────────────
+// One typeface for everything, per the brand guide -- kept as a single-entry
+// FONTS/fontName indirection (rather than removing it) so the many existing
+// `F.heading`/`F.body` call sites throughout the file don't need to change.
 const FONTS = {
-  dmSerif:      { name:"DM Serif",        preview:"Homework.",  heading:"'DM Serif Display', serif",   body:"'DM Mono', monospace",        google:"DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500" },
-  inter:        { name:"Inter",           preview:"Homework.",  heading:"'Inter', sans-serif",          body:"'Inter', sans-serif",          google:"Inter:wght@400;500;600;700" },
-  jakarta:      { name:"Plus Jakarta",    preview:"Homework.",  heading:"'Plus Jakarta Sans', sans-serif", body:"'Plus Jakarta Sans', sans-serif", google:"Plus+Jakarta+Sans:wght@400;500;600;700" },
-  playfair:     { name:"Playfair",        preview:"Homework.",  heading:"'Playfair Display', serif",    body:"'Inter', sans-serif",          google:"Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500" },
-  cormorant:    { name:"Cormorant",       preview:"Homework.",  heading:"'Cormorant Garamond', serif",  body:"'Inter', sans-serif",          google:"Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500" },
-  nunito:       { name:"Nunito",          preview:"Homework.",  heading:"'Nunito', sans-serif",         body:"'Nunito', sans-serif",          google:"Nunito:wght@400;500;600;700;800" },
-  poppins:      { name:"Poppins",         preview:"Homework.",  heading:"'Poppins', sans-serif",        body:"'Poppins', sans-serif",         google:"Poppins:wght@400;500;600;700" },
-  jetbrains:    { name:"JetBrains Mono",  preview:"Homework.",  heading:"'JetBrains Mono', monospace",  body:"'JetBrains Mono', monospace",   google:"JetBrains+Mono:wght@400;500;700" },
-  firacode:     { name:"Fira Code",       preview:"Homework.",  heading:"'Fira Code', monospace",       body:"'Fira Code', monospace",        google:"Fira+Code:wght@400;500;700" },
-  sourceserif:  { name:"Source Serif",    preview:"Homework.",  heading:"'Source Serif 4', serif",      body:"'Source Serif 4', serif",       google:"Source+Serif+4:ital,wght@0,400;0,600;1,400" },
-  lora:         { name:"Lora",            preview:"Homework.",  heading:"'Lora', serif",                body:"'Inter', sans-serif",           google:"Lora:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500" },
-  spacegrotesk: { name:"Space Grotesk",   preview:"Homework.",  heading:"'Space Grotesk', sans-serif",  body:"'Space Grotesk', sans-serif",   google:"Space+Grotesk:wght@400;500;600;700" },
-  ibmplex:      { name:"IBM Plex Serif",  preview:"Homework.",  heading:"'IBM Plex Serif', serif",      body:"'IBM Plex Sans', sans-serif",   google:"IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500" },
-  syne:         { name:"Syne",            preview:"Homework.",  heading:"'Syne', sans-serif",           body:"'Inter', sans-serif",           google:"Syne:wght@400;500;600;700;800" },
-  outfit:       { name:"Outfit",          preview:"Homework.",  heading:"'Outfit', sans-serif",         body:"'Outfit', sans-serif",          google:"Outfit:wght@300;400;500;600;700" },
-  pixel:        { name:"Pixel",           preview:"HW.",        heading:"'Press Start 2P', monospace",  body:"'Press Start 2P', monospace",   google:"Press+Start+2P" },
+  inter: { name:"Inter", preview:"Homework.", heading:"'Inter', sans-serif", body:"'Inter', sans-serif", google:"Inter:wght@400;500;600;700" },
 } as const;
 type FontName = keyof typeof FONTS;
 
-const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:"📚"}, priority:{name:"Priority",emoji:"🔥"}, dueDate:{name:"Due Date",emoji:"📅"} };
+const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:"--"}, priority:{name:"Priority",emoji:"--"}, dueDate:{name:"Due Date",emoji:"--"} };
 const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE"];
 const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA" };
 const SUBJECT_COLOR_PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#F7DC6F","#BB8FCE","#82E0AA","#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#a78bfa","#fbbf24","#60a5fa"];
@@ -179,10 +170,10 @@ const REMINDER_OFFSETS = [
   { key:"0",  label:"At due time",   mins:0 },
 ] as const;
 const QUESTIONS = [
-  { key:"subject", label:"What subject? 📚", type:"select" },
-  { key:"dueDate", label:"When is it due? 📅", type:"date" },
-  { key:"estMins", label:"How long will it take? ⏱️", type:"time" },
-  { key:"recurrence", label:"Does this repeat? 🔁", type:"recurrence" },
+  { key:"subject", label:"What subject?", type:"select" },
+  { key:"dueDate", label:"When is it due?", type:"date" },
+  { key:"estMins", label:"How long will it take?", type:"time" },
+  { key:"recurrence", label:"Does this repeat?", type:"recurrence" },
 ];
 
 interface Subtask { id:string; text:string; done:boolean; }
@@ -214,8 +205,8 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
   // client-side code isn't secure anyway (the key would be visible to anyone),
   // so this generates the suggestion locally from the task data instead.
   const pending=tasks.filter(t=>!t.done);
-  if (pending.length===0) return "Nothing left to do -- great work! 🎉";
-  if (pending.length===1) return `Just one task left: "${pending[0].title}". You've got this! 💪`;
+  if (pending.length===0) return "Nothing left to do.";
+  if (pending.length===1) return `One task left: "${pending[0].title}".`;
   const sorted=[...pending].sort((a,b)=>{
     const o:Record<string,number>={high:0,medium:1,low:2};
     const d=o[getPriority(a.dueDate,a.estMins,a.priorityOverride)]-o[getPriority(b.dueDate,b.estMins,b.priorityOverride)];
@@ -224,7 +215,7 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
   const top=sorted[0];
   const days=daysUntil(top.dueDate);
   const timeStr=top.estMins>=60?`${Math.floor(top.estMins/60)}h${top.estMins%60?` ${top.estMins%60}m`:""}`:`${top.estMins}m`;
-  const urgencyWord=days==="Overdue!"?"overdue":days==="Due today!"?"due today":days==="Due tomorrow"?"due tomorrow":days?days.replace(" days left","d left"):"no deadline";
+  const urgencyWord=days==="Overdue"?"overdue":days==="Due today"?"due today":days==="Due tomorrow"?"due tomorrow":days?days.replace(" days left","d left"):"no deadline";
   return `Start with "${top.title}"\n${urgencyWord}, ~${timeStr}`;
 }
 
@@ -318,17 +309,14 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
           {/* Info row */}
           <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
             <div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:14}}>📅</span>
               <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` at ${formatTime(task.dueTime)}`:""}</span>
             </div>
             <div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:14}}>⏱</span>
               <span style={{fontFamily:F.body,fontSize:12,color:T.accent,fontWeight:500}}>
                 {task.estMins>=60?`${Math.floor(task.estMins/60)}h ${task.estMins%60?`${task.estMins%60}m`:""}`:` ${task.estMins}m`} estimated
               </span>
             </div>
             {totalSessionMins>0&&<div style={{background:"#2ED57322",borderRadius:10,padding:"8px 14px",border:"1px solid #2ED57344",display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:14}}>✅</span>
               <span style={{fontFamily:F.body,fontSize:12,color:"#2ED573"}}>{totalSessionMins}m spent today</span>
             </div>}
           </div>
@@ -402,17 +390,17 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
                 <div style={{fontFamily:F.heading,fontSize:52,color:T.text,lineHeight:1,marginBottom:4}}>
                   {String(sm).padStart(2,"0")}:{String(ss).padStart(2,"0")}
                 </div>
-                <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:18}}>keep going! 💪</div>
-                <button onClick={onEndSession} style={{background:"#FF4757",color:"#fff",border:"none",borderRadius:12,padding:"13px 32px",fontFamily:F.heading,fontSize:17,cursor:"pointer",width:"100%",boxShadow:"0 4px 20px #FF475744"}}>
-                  ⏹ End Session
+                <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:18}}>Session in progress.</div>
+                <button onClick={onEndSession} style={{background:"#FF4757",color:"#fff",border:"none",borderRadius:12,padding:"13px 32px",fontFamily:F.heading,fontSize:17,cursor:"pointer",width:"100%"}}>
+                  End session
                 </button>
               </>
             ):(
               <>
                 <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8,letterSpacing:"0.1em",textTransform:"uppercase"}}>Ready to work?</div>
                 <div style={{fontFamily:F.heading,fontSize:52,color:T.textFaint,lineHeight:1,marginBottom:18}}>00:00</div>
-                <button onClick={onStartSession} style={{background:T.accent,color:"#000",border:"none",borderRadius:12,padding:"13px 32px",fontFamily:F.heading,fontSize:17,cursor:"pointer",width:"100%",boxShadow:`0 4px 20px ${T.accentGlow}`}}>
-                  ▶ Start Session
+                <button onClick={onStartSession} style={{background:T.accent,color:"#000",border:"none",borderRadius:12,padding:"13px 32px",fontFamily:F.heading,fontSize:17,cursor:"pointer",width:"100%"}}>
+                  Start session
                 </button>
               </>
             )}
@@ -442,22 +430,22 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
           <div style={{display:"grid",gridTemplateColumns:task.done&&!task.archived?"1fr 1fr 1fr":"1fr 1fr",gap:8}}>
             <button onClick={onToggleDone}
               style={{background:task.done?"#FF475722":"#2ED57322",color:task.done?"#FF4757":"#2ED573",border:`1px solid ${task.done?"#FF475744":"#2ED57344"}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
-              {task.done?"↩ Mark undone":"✓ Mark done"}
+              {task.done?"Mark undone":"Mark done"}
             </button>
             {task.done&&!task.archived&&(
               <button onClick={onArchive}
                 style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
-                📦 Archive
+                Archive
               </button>
             )}
             <button onClick={onDelete}
               style={{background:"#FF475711",color:"#FF4757",border:"1px solid #FF475733",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
-              🗑 Delete task
+              Delete task
             </button>
           </div>
           <button onClick={()=>{const name=window.prompt("Name this template:",task.title);if(name&&name.trim())onSaveAsTemplate(name.trim());}}
             style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
-            📋 Save as template
+            Save as template
           </button>
         </div>
       </div>
@@ -471,7 +459,7 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
 function Toggle({on,onChange,T}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeObj}){
   const trackColor=on?T.accent:T.border;
   return <button className="tog" onClick={()=>onChange(!on)} style={{background:trackColor}}>
-    <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),boxShadow:"0 1px 3px rgba(0,0,0,0.4)",transition:"left 0.2s",display:"block"}}/>
+    <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),transition:"left 0.2s",display:"block"}}/>
   </button>;
 }
 
@@ -512,7 +500,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
       data-task-id={task.id}
       onClick={selectionMode?()=>onToggleSelect?.(task.id):swipeClickGuard(()=>{if(dragTaskId==null){onOpen(task);}})}
       {...(swipeable&&!selectionMode?swipeHandlers(task.id):{})}
-      style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isSelected?T.accent:isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
+      style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isDragging?T.accent:isSelected?T.accent:isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
       {swipeable&&!selectionMode&&renderSwipeReveal(task.id)}
       {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:PRIORITY_COLORS[pr],borderRadius:"13px 0 0 13px"}}/>}
       <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
@@ -537,12 +525,12 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
             <span style={{fontFamily:F.heading,fontSize:15,textDecoration:task.done?"line-through":"none",color:task.done?T.textFaint:T.text}}>{task.title}</span>
             {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
             <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>
-            {task.priorityOverride&&<span title="Manually set priority" style={{color:T.textFaint,fontSize:10}}>📌</span>}
+            {task.priorityOverride&&<span title="Manually set priority" style={{color:T.textFaint,fontSize:10}}>*</span>}
             {task.tags?.map(tag=><span key={tag} style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>#{tag}</span>)}
           </div>
           <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
-            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>📅 {formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
-            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>⏱ {task.estMins>=60?`${Math.floor(task.estMins/60)}h${task.estMins%60?` ${task.estMins%60}m`:""}`:` ${task.estMins}m`}</span>
+            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
+            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{task.estMins>=60?`${Math.floor(task.estMins/60)}h${task.estMins%60?` ${task.estMins%60}m`:""}`:` ${task.estMins}m`}</span>
             {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",fontWeight:500}}>{dm}</span>}
           </div>
           {!!task.subtasks?.length&&(
@@ -614,7 +602,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
       {/* Bookmark button */}
       <button onClick={()=>{
         if(navigator.share){navigator.share({title:"DuePlanner",url:window.location.href}).catch(()=>{});}
-        else{navigator.clipboard?.writeText(window.location.href);alert("Link copied! Open Safari and paste, then Share → Add to Home Screen.");}
+        else{navigator.clipboard?.writeText(window.location.href);alert("Link copied. Open Safari and paste, then Share → Add to Home Screen.");}
       }} style={{width:"100%",maxWidth:340,background:"none",border:`1px solid ${T.border}`,borderRadius:12,padding:"12px",fontFamily:F.body,fontSize:12,color:T.textMuted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:12}}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
         Add to Home Screen
@@ -641,7 +629,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
         {/* Tabs */}
         <div style={{display:"flex",gap:4,marginBottom:24,background:T.surface,borderRadius:11,padding:3}}>
           {(["profile","personalize"] as const).map(id=>{
-            const labels:Record<string,string>={profile:"👤 Profile",personalize:"🎨 Personalization"};
+            const labels:Record<string,string>={profile:"Profile",personalize:"Personalization"};
             return <button key={id} onClick={()=>setProfileTab(id)} style={{flex:1,background:profileTab===id?T.card:"transparent",color:profileTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:11,border:"none",borderRadius:9,padding:"8px 6px",cursor:"pointer",transition:"all 0.15s",fontWeight:profileTab===id?"500":"normal"}}>{labels[id]}</button>;
           })}
         </div>
@@ -779,7 +767,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
               navigator.share({title:"DuePlanner",url:window.location.href}).catch(()=>{});
             } else {
               navigator.clipboard?.writeText(window.location.href);
-              alert("Link copied! Open Safari on your iPhone and paste the link, then use Share → Add to Home Screen.");
+              alert("Link copied. Open Safari on your iPhone and paste the link, then use Share → Add to Home Screen.");
             }
           }} style={{width:"100%",background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer",fontWeight:500,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke="#000" strokeWidth="2.5" strokeLinecap="round"/></svg>
@@ -790,7 +778,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
         {/* Sign out */}
         <button onClick={async()=>{await signOutFirebase();setShowProfile(false);}}
           style={{width:"100%",background:"none",border:`1px solid #FF475744`,borderRadius:12,padding:"13px",color:"#FF4757",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>
-          🚪 Sign out
+          Sign out
         </button>
         </>)}
       </div>
@@ -808,10 +796,6 @@ export default function HomeworkPlanner() {
     }catch{return DEFAULT_TASKS;}
   });
   const [selectedTask,setSelectedTask]=useState<Task|null>(null);
-  const [themeName,setThemeName]=useState<ThemeName>(()=>{
-    const saved=localStorage.getItem("hw-theme") as ThemeName;
-    return saved&&saved in THEMES?saved:"midnight";
-  });
   const [themeMode,setThemeMode]=usePersistedState<"light"|"dark"|"auto">("hw-thememode","auto");
   const [systemPrefersDark,setSystemPrefersDark]=useState(()=>typeof window!=="undefined"&&!!window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
   useEffect(()=>{
@@ -822,39 +806,11 @@ export default function HomeworkPlanner() {
     return()=>mq.removeEventListener("change",handler);
   },[]);
   const effectiveThemeMode:"light"|"dark"=themeMode==="auto"?(systemPrefersDark?"dark":"light"):themeMode;
-  // Remembers the last theme picked within each category, so switching Light/Dark/Auto
-  // back and forth restores what was there before instead of resetting to the first
-  // theme in the list every time.
-  const [themeByMode,setThemeByMode]=useState<Record<"light"|"dark",ThemeName>>(()=>{
-    const entries=Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][];
-    const firstOf=(isLight:boolean)=>entries.find(([,t])=>t.light===isLight)![0];
-    let saved:Partial<Record<"light"|"dark",string>>={};
-    try{saved=JSON.parse(localStorage.getItem("hw-themebymode")||"{}");}catch{/* ignore */}
-    const validSaved=(k:"light"|"dark")=>{
-      const v=saved[k] as ThemeName|undefined;
-      return v&&THEMES[v]&&THEMES[v].light===(k==="light")?v:null;
-    };
-    const currentCategory:"light"|"dark"=THEMES[themeName].light?"light":"dark";
-    return {
-      light: validSaved("light")||(currentCategory==="light"?themeName:firstOf(true)),
-      dark: validSaved("dark")||(currentCategory==="dark"?themeName:firstOf(false)),
-    };
-  });
-  useEffect(()=>{localStorage.setItem("hw-themebymode",JSON.stringify(themeByMode));},[themeByMode]);
-  // Keep the active theme in the selected light/dark category -- if the mode changes
-  // (by hand, or the system preference under "auto") and the current theme no longer
-  // matches, restore whichever theme was last picked in that category. Adjusted
-  // synchronously during render (React's documented pattern for "adjusting state
-  // when a prop changes") rather than in a useEffect, so the correction lands in
-  // the same render instead of committing one frame with the mismatched theme
-  // first.
-  const [lastEffectiveThemeMode,setLastEffectiveThemeMode]=useState(effectiveThemeMode);
-  if(effectiveThemeMode!==lastEffectiveThemeMode){
-    setLastEffectiveThemeMode(effectiveThemeMode);
-    if(THEMES[themeName].light!==(effectiveThemeMode==="light")){
-      setThemeName(themeByMode[effectiveThemeMode]);
-    }
-  }
+  // There's exactly one theme per light/dark category now (the brand guide's
+  // monochrome palette and its Inverse), so the theme is fully determined by
+  // effectiveThemeMode -- no independent theme choice, no per-category "last
+  // picked" memory, and nothing to correct when the mode changes.
+  const themeName:ThemeName=effectiveThemeMode==="light"?"dueplanner":"dueplannerDark";
   const [layout,setLayout]=usePersistedState<LayoutName>("hw-layout","list");
   const [groupBy,setGroupBy]=usePersistedState("hw-group","none");
   const [showDone,setShowDone]=usePersistedState("hw-showdone",true);
@@ -951,8 +907,7 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
   },[notificationsEnabled,tasks,enabledOffsets]);
 
-  const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
-  const [fontName,setFontName]=usePersistedState<FontName>("hw-font","dmSerif");
+  const [fontName]=usePersistedState<FontName>("hw-font","inter");
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
   // these only kick in above a min-width via CSS media queries, so phones/tablets
@@ -994,8 +949,6 @@ export default function HomeworkPlanner() {
   }
 
   useEffect(()=>{localStorage.setItem("hw-tasks",JSON.stringify(tasks));},[tasks]);
-  useEffect(()=>{localStorage.setItem("hw-theme",themeName);},[themeName]);
-  useEffect(()=>{if(accentOverride)localStorage.setItem("hw-accent",accentOverride);else localStorage.removeItem("hw-accent");},[accentOverride]);
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
@@ -1139,7 +1092,6 @@ export default function HomeworkPlanner() {
         // document (e.g. from an older buggy version, or a manual edit in the
         // console) could otherwise inject a wrong-shaped value straight into
         // state and crash a render. Cheap shape checks before applying.
-        if(typeof data.themeName==="string"&&data.themeName in THEMES) setThemeName(data.themeName as ThemeName);
         if(typeof data.layout==="string"&&data.layout in LAYOUTS) setLayout(data.layout as LayoutName);
         if(typeof data.scratchpad==="string"){ setScratchpad(data.scratchpad); setScratchpadSynced(data.scratchpad); }
       }
@@ -1159,14 +1111,14 @@ export default function HomeworkPlanner() {
     if(!fbUser||profileSyncedForUid!==fbUser.uid)return;
     isSyncingProfile.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{themeName,layout,scratchpad:scratchpadSynced},{merge:true})
+    setDoc(ref,{layout,scratchpad:scratchpadSynced},{merge:true})
       .then(()=>setSyncError(null))
       .catch(err=>{
         console.error(err);
         setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
       })
       .finally(()=>{isSyncingProfile.current=false;});
-  },[themeName,layout,scratchpadSynced,fbUser,profileSyncedForUid]);
+  },[layout,scratchpadSynced,fbUser,profileSyncedForUid]);
 
   // Sync tasks FROM the tasks subcollection.
   useEffect(()=>{
@@ -1412,7 +1364,7 @@ export default function HomeworkPlanner() {
   function exitSelectionMode(){ setSelectionMode(false); setSelectedIds([]); }
 
   const base=THEMES[themeName];
-  const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
+  const T:ThemeObj={...base,accentGlow:base.accent+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:base.accent as typeof base.accent};
   // Mirrors just the resolved background color (not the whole theme) to its own
   // key, read synchronously by a tiny inline script in index.html before React
   // hydrates -- prevents a flash of the browser's default white background for
@@ -1427,9 +1379,9 @@ export default function HomeworkPlanner() {
   useEffect(()=>{
     const pending=tasks.filter(t=>!t.done);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if(pending.length===0){setSuggestion("Nothing left -- you're all done! 🎉");return;}
+    if(pending.length===0){setSuggestion("Nothing left. All done.");return;}
     setSuggestionLoading(true);setSuggestion("");
-    const t=setTimeout(()=>{fetchAISuggestion(tasks).then(s=>{setSuggestion(s);setSuggestionLoading(false);}).catch(()=>{setSuggestion("Start with your most urgent assignment!");setSuggestionLoading(false);});},700);
+    const t=setTimeout(()=>{fetchAISuggestion(tasks).then(s=>{setSuggestion(s);setSuggestionLoading(false);}).catch(()=>{setSuggestion("Start with your most urgent assignment.");setSuggestionLoading(false);});},700);
     return()=>clearTimeout(t);
   },[tasks]);
 
@@ -1716,7 +1668,7 @@ export default function HomeworkPlanner() {
     if(swipeId!==id||swipeX===0)return null;
     const isRight=swipeX>0;
     return <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:isRight?"flex-start":"flex-end",padding:"0 20px",background:isRight?"#2ED57333":"#FF475733",pointerEvents:"none"}}>
-      <span style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:isRight?"#2ED573":"#FF4757"}}>{isRight?"✓ Mark done":"🗑 Delete"}</span>
+      <span style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:isRight?"#2ED573":"#FF4757"}}>{isRight?"Mark done":"Delete"}</span>
     </div>;
   }
   const currentQ=step>=0?QUESTIONS[step]:null;
@@ -1885,11 +1837,11 @@ export default function HomeworkPlanner() {
           const stickyColors=["#fef08a","#bfdbfe","#bbf7d0","#fed7aa","#f5d0fe","#fecdd3"];
           const bg=stickyColors[i%stickyColors.length];
           return(
-            <div key={t.id} className="sticky-note" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:bg,borderRadius:3,padding:"14px 12px",transform:`rotate(${rot}deg)`,boxShadow:"2px 3px 10px #00000033",minHeight:120,display:"flex",flexDirection:"column",gap:6,opacity:t.done?0.5:1,cursor:"pointer"}}>
+            <div key={t.id} className="sticky-note" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:bg,borderRadius:3,padding:"14px 12px",transform:`rotate(${rot}deg)`,border:"1px solid #00000022",minHeight:120,display:"flex",flexDirection:"column",gap:6,opacity:t.done?0.5:1,cursor:"pointer"}}>
               <div style={{fontFamily:F.heading,fontSize:14,color:"#1a1a1a",textDecoration:t.done?"line-through":"none",lineHeight:1.3,flex:1}}>{t.title}</div>
               <div style={{fontFamily:F.body,fontSize:10,color:"#555"}}><span style={{color:sc,fontWeight:600}}>{t.subject}</span> · {daysUntil(t.dueDate)||"no date"}</div>
               <div style={{display:"flex",justifyContent:"space-between"}}>
-                <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#22c55e":"#ffffff88",border:"1.5px solid #33333333",borderRadius:4,padding:"2px 7px",cursor:"pointer",fontFamily:F.body,fontSize:10,color:"#333"}}>{t.done?"✓ done":"mark done"}</button>
+                <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#22c55e":"#ffffff88",border:"1.5px solid #33333333",borderRadius:4,padding:"2px 7px",cursor:"pointer",fontFamily:F.body,fontSize:10,color:"#333"}}>{t.done?"Done":"Mark done"}</button>
                 <button style={{background:"none",border:"none",color:"#666",cursor:"pointer",fontSize:14}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
               </div>
             </div>
@@ -1899,7 +1851,7 @@ export default function HomeworkPlanner() {
     );
 
     if (layout==="kanban") {
-      const cols=[{key:"high",label:"🔴 Urgent",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"🟡 Soon",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"🟢 Later",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✅ Done",tasks:filteredTasks.filter(t=>t.done)}];
+      const cols=[{key:"high",label:"Urgent",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"Soon",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"Later",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"Done",tasks:filteredTasks.filter(t=>t.done)}];
       return(
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
           {cols.map(col=>(
@@ -1936,7 +1888,7 @@ export default function HomeworkPlanner() {
               </div>
               <div style={{display:"flex",gap:10,marginTop:4,flexWrap:"wrap"}}>
                 <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>
-                <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>📅 {formatDate(t.dueDate)}</span>
+                <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}</span>
                 <span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573"}}>{daysUntil(t.dueDate)}</span>
               </div>
             </div>
@@ -1955,7 +1907,7 @@ export default function HomeworkPlanner() {
             {allSubs.map(s=>(
               <button key={s} className="chip" onClick={()=>setActiveSubject(s)}
                 style={{background:activeSubject===s?(subjectColors[s]||T.accent)+"33":"none",color:activeSubject===s?(subjectColors[s]||T.accent):T.textMuted,border:`1.5px solid ${activeSubject===s?(subjectColors[s]||T.accent):T.border}`}}>
-                {s==="all"?"All 📚":s}
+                {s==="all"?"All":s}
               </button>
             ))}
           </div>
@@ -2005,7 +1957,7 @@ export default function HomeworkPlanner() {
       const doneT=tasks.filter(t=>t.done);
       return(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {[{tasks:highT,color:"#FF4757",label:"🔴 High Priority",w:"100%"},{tasks:medT,color:"#FFA502",label:"🟡 Medium Priority",w:"85%"},{tasks:lowT,color:"#2ED573",label:"🟢 Low Priority",w:"65%"},{tasks:doneT,color:T.textFaint,label:"✅ Done",w:"45%"}].map(tier=>(
+          {[{tasks:highT,color:"#FF4757",label:"High Priority",w:"100%"},{tasks:medT,color:"#FFA502",label:"Medium Priority",w:"85%"},{tasks:lowT,color:"#2ED573",label:"Low Priority",w:"65%"},{tasks:doneT,color:T.textFaint,label:"Done",w:"45%"}].map(tier=>(
             tier.tasks.length>0&&(
               <div key={tier.label} style={{margin:"0 auto",width:tier.w}}>
                 <div style={{fontFamily:F.body,fontSize:10,color:tier.color,marginBottom:5,textAlign:"center"}}>{tier.label}</div>
@@ -2041,7 +1993,7 @@ export default function HomeworkPlanner() {
             return(
               <div key={day} style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${isToday?T.accent+"66":T.border}`}}>
                 <div style={{fontFamily:F.body,fontSize:11,color:isToday?T.accent:T.textMuted,marginBottom:8,fontWeight:isToday?"500":"normal"}}>
-                  {isToday?"📌 Today":formatDate(day)}
+                  {isToday?"Today":formatDate(day)}
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;return(
@@ -2061,7 +2013,7 @@ export default function HomeworkPlanner() {
           })}
           {noDate.length>0&&(
             <div style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8}}>📋 No date</div>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8}}>No date</div>
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
                 {noDate.map(t=>(
                   <div key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
@@ -2098,7 +2050,7 @@ export default function HomeworkPlanner() {
       if (groupBy==="priority") order.sort((a,b)=>({high:0,medium:1,low:2} as Record<string,number>)[a]-({high:0,medium:1,low:2} as Record<string,number>)[b]);
       if (groupBy==="dueDate") order.sort((a,b)=>a==="No date"?1:b==="No date"?-1:a.localeCompare(b));
       const labelFor=(k:string)=>{
-        if (groupBy==="priority") return k==="high"?"🔴 High priority":k==="medium"?"🟡 Medium priority":"🟢 Low priority";
+        if (groupBy==="priority") return k==="high"?"High priority":k==="medium"?"Medium priority":"Low priority";
         if (groupBy==="dueDate") return k==="No date"?k:formatDate(k);
         return k; // subject
       };
@@ -2155,8 +2107,8 @@ export default function HomeworkPlanner() {
       <div className="app-shell" style={{background:T.bg,fontFamily:F.body,color:T.text,minHeight:"100dvh",display:"flex",flexDirection:"column",padding:20,transition:"background 0.3s,color 0.3s"}}>
         <style>{css}</style>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>🎯 Focus Mode</div>
-          <button onClick={()=>setFocusMode(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>✕ Exit</button>
+          <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>Focus Mode</div>
+          <button onClick={()=>setFocusMode(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Exit</button>
         </div>
         <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
           {topTask?(
@@ -2167,13 +2119,13 @@ export default function HomeworkPlanner() {
               </div>
               <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{topTask.title}</div>
               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>📅 {formatDate(topTask.dueDate)}{topTask.dueTime?` ${formatTime(topTask.dueTime)}`:""}</span>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>⏱ {topTask.estMins}m</span>
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(topTask.dueDate)}{topTask.dueTime?` ${formatTime(topTask.dueTime)}`:""}</span>
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{topTask.estMins}m</span>
               </div>
-              <button onClick={()=>toggleDone(topTask.id)} style={{marginTop:14,background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>✓ Mark done</button>
+              <button onClick={()=>toggleDone(topTask.id)} style={{marginTop:14,background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>Mark done</button>
             </div>
           ):(
-            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on ✨</div>
+            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on.</div>
           )}
           {renderPomodoroCard()}
         </div>
@@ -2213,7 +2165,7 @@ export default function HomeworkPlanner() {
         {/* Tabs */}
         <div className="tab-bar" style={{display:"flex",gap:4,marginBottom:16,background:T.surface,borderRadius:11,padding:3}}>
           {(["tasks","tools","import","options"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"📋 Tasks",tools:"🛠️ Tools",import:"📥 Import",options:"⚙️ Settings"};
+            const labels:Record<string,string>={tasks:"Tasks",tools:"Tools",import:"Import",options:"Settings"};
             return <button key={id} onClick={()=>setActiveTab(id)} style={{flex:1,background:activeTab===id?T.card:"transparent",color:activeTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:10,border:"none",borderRadius:9,padding:"7px 4px",cursor:"pointer",transition:"all 0.15s",fontWeight:activeTab===id?"500":"normal",position:"relative",whiteSpace:"nowrap"}}>
               {labels[id]}
             </button>;
@@ -2232,15 +2184,14 @@ export default function HomeworkPlanner() {
             <div style={{background:T.gradientCard,borderRadius:12,padding:"10px 12px",marginBottom:16,border:`1px solid ${T.accent}33`,position:"relative",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:7,minWidth:0}}>
-                  <span style={{fontSize:12,marginTop:1}}>✨</span>
                   {suggestionLoading?(<div className="shim" style={{height:11,width:140,marginTop:2}}/>):(<span style={{fontFamily:F.body,fontSize:12,color:T.text,lineHeight:1.4,whiteSpace:"pre-line"}}>{suggestion}</span>)}
                 </div>
                 <button onClick={()=>setShowSuggestion(false)} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
               </div>
             </div>
           ):(
-            <button onClick={()=>setShowSuggestion(true)} style={{position:"fixed",bottom:20,right:16,width:40,height:40,borderRadius:"50%",background:T.card,border:`1px solid ${T.accent}55`,boxShadow:`0 2px 10px ${T.accent}33`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,zIndex:50}} title="Show smart suggestion">
-              ✨
+            <button onClick={()=>setShowSuggestion(true)} style={{position:"fixed",bottom:20,right:16,width:40,height:40,borderRadius:"50%",background:T.card,border:`1px solid ${T.accent}55`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F.heading,fontStyle:"italic",fontSize:15,color:T.accent,zIndex:50}} title="Show smart suggestion">
+              i
             </button>
           ))}
 
@@ -2249,7 +2200,7 @@ export default function HomeworkPlanner() {
             <input
               value={searchQuery}
               onChange={e=>setSearchQuery(e.target.value)}
-              placeholder="🔍 Search tasks..."
+              placeholder="Search tasks..."
               style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"9px 32px 9px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}
             />
             {searchQuery&&<button onClick={()=>setSearchQuery("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,lineHeight:1,padding:6}}>×</button>}
@@ -2258,23 +2209,23 @@ export default function HomeworkPlanner() {
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
             {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?"#000":T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
-            {topTask&&<button onClick={()=>setFocusMode(true)} style={{background:"none",border:`1px solid ${T.accent}55`,color:T.accent,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>🎯 Focus</button>}
+            {topTask&&<button onClick={()=>setFocusMode(true)} style={{background:"none",border:`1px solid ${T.accent}55`,color:T.accent,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>Focus</button>}
             {layout==="list"&&(selectionMode
               ? <button onClick={exitSelectionMode} style={{background:T.accent,color:"#000",border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>
-              : <button onClick={()=>setSelectionMode(true)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>☑ Select</button>
+              : <button onClick={()=>setSelectionMode(true)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Select</button>
             )}
             <div style={{marginLeft:"auto",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{visibleTasks.filter(t=>!t.done&&!t.archived).length} pending</div>
           </div>
 
           {renderTasks(filteredTasks)}
-          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>nothing here yet ✨</div>}
+          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>Nothing here yet.</div>}
           <div style={{marginTop:14}}>
             {!adding?(
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,paddingTop:10}}>
-                <button onClick={startAdding} style={{background:T.accent,color:"#000",border:"none",borderRadius:14,padding:"13px 28px",fontFamily:F.heading,fontSize:17,cursor:"pointer",boxShadow:`0 4px 20px ${T.accentGlow}`,transition:"all 0.2s"}}>+ add homework</button>
+                <button onClick={startAdding} style={{background:T.accent,color:"#000",border:"none",borderRadius:14,padding:"13px 28px",fontFamily:F.heading,fontSize:17,cursor:"pointer",transition:"all 0.2s"}}>+ Add homework</button>
                 {templates.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center",maxWidth:340}}>
                   {templates.map(tpl=>(
-                    <button key={tpl.id} onClick={()=>startFromTemplate(tpl)} className="chip" style={{background:T.card,color:T.textMuted,border:`1px solid ${T.border}`}}>📋 {tpl.name}</button>
+                    <button key={tpl.id} onClick={()=>startFromTemplate(tpl)} className="chip" style={{background:T.card,color:T.textMuted,border:`1px solid ${T.border}`}}>{tpl.name}</button>
                   ))}
                 </div>}
               </div>
@@ -2286,7 +2237,7 @@ export default function HomeworkPlanner() {
                 <div>
                   {step===-1?(
                     <div>
-                      <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>What's the assignment? 🎒</div>
+                      <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>What's the assignment?</div>
                       <form onSubmit={handleTitleSubmit} style={{display:"flex",gap:8}}>
                         <input ref={inputRef} defaultValue="" placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,flex:1,outline:"none"}}/>
                         <button type="submit" style={{background:T.accent,color:"#000",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer"}}>→</button>
@@ -2380,7 +2331,7 @@ export default function HomeworkPlanner() {
                     <div style={{fontFamily:F.heading,fontSize:14,color:T.text}}>{newTask.title}</div>
                     <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
                       {newTask.subject&&<span style={{color:subjectColors[newTask.subject]||T.accent,fontFamily:F.body,fontSize:10}}>{newTask.subject}</span>}
-                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>📅 {formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime)}`:""}</span>}
+                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>{formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime)}`:""}</span>}
                       {newTask.recurrence&&newTask.recurrence!=="none"&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>↻ {newTask.recurrence}</span>}
                     </div>
                   </div>}
@@ -2468,7 +2419,7 @@ export default function HomeworkPlanner() {
                 </div>
               </div>
               <button onClick={scanSyllabus} disabled={!importText.trim()} style={{width:"100%",background:importText.trim()?T.accent:T.surface,color:importText.trim()?"#000":T.textFaint,border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:importText.trim()?"pointer":"default"}}>
-                🔍 Scan for assignments
+                Scan for assignments
               </button>
               {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:12,color:"#2ED573",marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
             </div>
@@ -2518,7 +2469,7 @@ export default function HomeworkPlanner() {
                 }
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontFamily:F.body,fontSize:13,color:T.text,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?fbUser.displayName:"Not signed in"}</div>
-                  <div style={{fontFamily:F.body,fontSize:11,color:fbUser&&syncError?"#FF4757":T.textFaint,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?(syncError?"⚠ Sync issue -- tap for details":fbUser.email):"Tap to sign in & sync"}</div>
+                  <div style={{fontFamily:F.body,fontSize:11,color:fbUser&&syncError?"#FF4757":T.textFaint,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?(syncError?"Sync issue -- tap for details":fbUser.email):"Tap to sign in & sync"}</div>
                 </div>
                 <span style={{color:T.textFaint,fontSize:16,flexShrink:0}}>›</span>
               </button>
@@ -2526,7 +2477,7 @@ export default function HomeworkPlanner() {
             {/* Looks */}
             <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
               <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:0,outline:"none",WebkitTapHighlightColor:"transparent"}}>
-                <span style={{color:T.textMuted,fontFamily:"'DM Mono',monospace",fontSize:10,letterSpacing:".08em",textTransform:"uppercase"}}>🎨 Looks</span>
+                <span style={{color:T.textMuted,fontFamily:"'DM Mono',monospace",fontSize:10,letterSpacing:".08em",textTransform:"uppercase"}}>Looks</span>
                 <span style={{color:T.textMuted,fontSize:13,transform:looksOpen?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
               </button>
               {looksOpen&&<div style={{display:"flex",flexDirection:"column",gap:20,marginTop:16}}>
@@ -2534,45 +2485,13 @@ export default function HomeworkPlanner() {
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Appearance</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
-                  {([{k:"light",l:"Light",e:"☀️"},{k:"dark",l:"Dark",e:"🌙"},{k:"auto",l:"Auto",e:"🌗"}] as const).map(({k,l,e})=>(
-                    <button key={k} onClick={()=>setThemeMode(k)} style={{background:themeMode===k?T.accent+"22":T.surface,border:`1.5px solid ${themeMode===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:themeMode===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                      <span style={{fontSize:15}}>{e}</span>
-                      <span style={{fontWeight:500}}>{l}</span>
+                  {([{k:"light",l:"Light"},{k:"dark",l:"Dark"},{k:"auto",l:"Auto"}] as const).map(({k,l})=>(
+                    <button key={k} onClick={()=>setThemeMode(k)} style={{background:themeMode===k?T.accent+"22":T.surface,border:`1.5px solid ${themeMode===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:themeMode===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,fontWeight:500}}>
+                      {l}
                     </button>
                   ))}
                 </div>
                 {themeMode==="auto"&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>Following your device -- currently {effectiveThemeMode}</div>}
-              </div>
-              {/* Theme */}
-              <div>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{effectiveThemeMode==="light"?"Light":"Dark"} themes ({Object.values(THEMES).filter(t=>t.light===(effectiveThemeMode==="light")).length})</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-                  {(Object.entries(THEMES) as [ThemeName,typeof THEMES[ThemeName]][]).filter(([,th])=>th.light===(effectiveThemeMode==="light")).map(([key,th])=>(
-                    <button key={key}
-                      onClick={()=>{
-                        setThemeName(key);setAccentOverride(null);setThemeByMode(prev=>({...prev,[effectiveThemeMode]:key}));
-                      }}
-                      style={{background:th.card,border:`2px solid ${themeName===key&&!accentOverride?th.accent:th.border}`,borderRadius:12,padding:"11px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s",transform:themeName===key&&!accentOverride?"scale(1.06)":"none",position:"relative"}}>
-                      <span style={{fontSize:16}}>{th.emoji}</span>
-                      <span style={{fontFamily:F.body,fontSize:9,color:th.text}}>{th.name}</span>
-                      <div style={{width:20,height:4,borderRadius:999,background:th.accent}}/>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Accent */}
-              <div>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Custom Accent</div>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <input type="color" value={accentOverride||T.accent} onChange={e=>setAccentOverride(e.target.value)} style={{width:44,height:36,borderRadius:9,cursor:"pointer",border:`1px solid ${T.border}`}}/>
-                  <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{accentOverride||T.accent}</span>
-                  {accentOverride&&<button onClick={()=>setAccentOverride(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.textMuted,fontFamily:F.body,fontSize:10,padding:"3px 9px",cursor:"pointer"}}>reset</button>}
-                </div>
-                <div style={{marginTop:8,display:"flex",gap:7,flexWrap:"wrap"}}>
-                  {["#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#f87171","#34d399","#a78bfa","#fbbf24","#60a5fa"].map(c=>(
-                    <button key={c} onClick={()=>setAccentOverride(c)} style={{width:26,height:26,borderRadius:"50%",background:c,border:`2px solid ${accentOverride===c?"#fff":"transparent"}`,cursor:"pointer"}}/>
-                  ))}
-                </div>
               </div>
               {/* Layouts */}
               <div>
@@ -2607,19 +2526,6 @@ export default function HomeworkPlanner() {
                   })}
                 </div>
               </div>
-              {/* Fonts */}
-              <div>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Font ({Object.keys(FONTS).length})</div>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {(Object.entries(FONTS) as [FontName, typeof FONTS[FontName]][]).map(([key,f])=>(
-                    <button key={key} onClick={()=>setFontName(key)}
-                      style={{background:fontName===key?T.accent+"22":"none",border:`1.5px solid ${fontName===key?T.accent:T.border}`,borderRadius:11,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"all 0.14s"}}>
-                      <span style={{fontFamily:f.heading,fontSize:18,color:fontName===key?T.accent:T.text}}>{f.preview}</span>
-                      <span style={{fontFamily:F.body,fontSize:10,color:fontName===key?T.accent:T.textFaint}}>{f.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
               {/* Preview */}
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Preview</div>
@@ -2631,7 +2537,7 @@ export default function HomeworkPlanner() {
                     <span style={{background:"#FF6B6B22",color:"#FF6B6B",borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>Math</span>
                   </div>
                   <div style={{display:"flex",gap:12,marginTop:5,paddingLeft:7}}>
-                    <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>📅 Due tomorrow</span>
+                    <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>Due tomorrow</span>
                     <span style={{fontFamily:F.body,fontSize:10,color:"#FFA502"}}>Due tomorrow</span>
                   </div>
                 </div>
@@ -2729,8 +2635,8 @@ export default function HomeworkPlanner() {
                 <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>⬇ Export tasks (CSV)</button>
               </div>
             </div>
-            <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>💬 Send feedback / report a bug</a>
-            <button onClick={()=>{if(window.confirm("Clear all completed tasks?"))setTasks(prev=>prev.filter(t=>!t.done));}} style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:"#FF4757",fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>🗑 Clear completed tasks</button>
+            <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>
+            <button onClick={()=>{if(window.confirm("Clear all completed tasks?"))setTasks(prev=>prev.filter(t=>!t.done));}} style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:"#FF4757",fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Clear completed tasks</button>
             {fbUser&&(
               <div style={{background:T.card,borderRadius:12,padding:"14px",border:"1px solid #FF475744"}}>
                 <div className="sl" style={{color:"#FF4757",paddingTop:0}}>Danger Zone</div>
@@ -2798,22 +2704,22 @@ export default function HomeworkPlanner() {
       {/* Undo Delete toast -- bottom-center so it never collides with the
           bottom-right smart-suggestion icon or the tab bar above it. */}
       {pendingDeleteId!=null&&(
-        <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
-          <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:180}}>🗑 "{pendingDeleteTitle}" deleted</span>
+        <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",maxWidth:"calc(100vw - 32px)"}}>
+          <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:180}}>"{pendingDeleteTitle}" deleted</span>
           <button onClick={undoDelete} style={{background:T.accent,color:"#000",border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
         </div>
       )}
       {/* Bulk action bar -- only reachable via the "Select" toggle, list layout only */}
       {selectionMode&&selectedIds.length>0&&(
-        <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:8,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:"10px 14px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)",flexWrap:"wrap",justifyContent:"center"}}>
+        <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:8,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:"10px 14px",maxWidth:"calc(100vw - 32px)",flexWrap:"wrap",justifyContent:"center"}}>
           <span style={{fontFamily:F.body,fontSize:12,color:T.text,fontWeight:500}}>{selectedIds.length} selected</span>
-          <button onClick={()=>bulkMarkDone(selectedIds)} style={{background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>✓ Done</button>
-          <button onClick={()=>bulkArchive(selectedIds)} style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>📦 Archive</button>
+          <button onClick={()=>bulkMarkDone(selectedIds)} style={{background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Done</button>
+          <button onClick={()=>bulkArchive(selectedIds)} style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Archive</button>
           <select onChange={e=>{if(e.target.value)bulkSetSubject(selectedIds,e.target.value);}} defaultValue="" style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 8px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
             <option value="" disabled>Set subject...</option>
             {subjects.map(s=><option key={s} value={s}>{s}</option>)}
           </select>
-          <button onClick={()=>bulkDelete(selectedIds)} style={{background:"#FF475711",color:"#FF4757",border:"1px solid #FF475733",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>🗑 Delete</button>
+          <button onClick={()=>bulkDelete(selectedIds)} style={{background:"#FF475711",color:"#FF4757",border:"1px solid #FF475733",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Delete</button>
         </div>
       )}
     </div>

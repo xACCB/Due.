@@ -52,10 +52,10 @@ pair. It JSON-serializes on write, and on read falls back to the raw string if `
 — several fields predate the hook and stored plain unquoted strings (e.g. `"list"`, not
 `'"list"'`), and this keeps those intact on the first load after adopting the hook rather than
 silently resetting them to the default. Fields with real extra logic on read (`tasks` — order
-backfill; `themeName` — validates against `THEMES`; `themeByMode` — derives from current theme;
-`subjectColors` — merges with defaults; `accentOverride` — `removeItem` instead of writing `null`;
-`scratchpad` — its own separate debounce, see below) are deliberately left as hand-written
-`useState`/`useEffect` pairs rather than forced into the generic hook.
+backfill; `subjectColors` — merges with defaults; `scratchpad` — its own separate debounce, see
+below) are deliberately left as hand-written `useState`/`useEffect` pairs rather than forced into
+the generic hook. `themeName` is no longer independent state at all -- see Design-system
+constants below.
 
 **Firebase.** The `firebaseConfig` (project `ai-homework-planner-92260`) is hardcoded directly in
 `App.tsx` — this is a public client web API key, not a secret; access is enforced by Firestore
@@ -95,9 +95,11 @@ discloses this; keep that page in sync if what's collected here changes.
 
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
-- `users/{uid}` — small "profile" fields only: `themeName`, `layout`, `scratchpad`. Synced as a
-  whole document (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so
-  the first write after sign-in can't race ahead of the first read.
+- `users/{uid}` — small "profile" fields only: `layout`, `scratchpad`. Synced as a whole document
+  (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so the first write
+  after sign-in can't race ahead of the first read. `themeName` isn't a field here (or in
+  `firestore.rules`'s `isValidProfile`) — see Design-system constants: it's a derived value now,
+  not independent state, so there's nothing to sync.
 - `users/{uid}/tasks/{taskId}` — one document per task (`taskId` is `String(task.id)`). Synced with
   a diff against `lastSyncedTasksRef` (a `Map<id, Task>` of what's last known to be in the
   subcollection), so only tasks that actually changed get written, via a `writeBatch`, instead of
@@ -133,10 +135,20 @@ require rewriting a user's entire history:
   given it's irreversible. Not chunked past Firestore's 500-op batch limit, matching the existing
   tasks-sync effect's `writeBatch` usage elsewhere.
 
-**Design-system constants** drive both the inline styles and the runtime stylesheet: `THEMES` (26
-color themes, half light/half dark, all freely selectable — data lives in `src/themes.ts`),
-`LAYOUTS` (12 task-list display modes, still in `App.tsx`), `FONTS` (16 heading/body pairings
-loaded from Google Fonts, still in `App.tsx`).
+**Design-system constants** drive both the inline styles and the runtime stylesheet. Per the
+DuePlanner brand guide (v1.0, Sep 2026): `THEMES` (`src/themes.ts`) holds exactly two entries,
+`dueplanner` (light) and `dueplannerDark` (the guide's own "Inverse" — Ink fill, White text),
+reusing the same nine named grays (Ink/Graphite/Stone/Ash/Smoke/Fog/Mist/Paper/White) in opposite
+roles — no accent colors, no per-user theme choice. `themeName` in `App.tsx` is a plain derived
+`const` (`effectiveThemeMode==="light"?"dueplanner":"dueplannerDark"`), not state — light/dark/auto
+(`themeMode`) is still a real user choice (incl. following system preference), but which of the two
+themes that resolves to is fully determined by it, so there's nothing left to persist, sync, or
+correct. `FONTS` (`App.tsx`) is a single-entry object holding just Inter, kept as a
+`FONTS`/`fontName` indirection (rather than removed) so existing `F.heading`/`F.body` call sites
+throughout the file didn't need to change. `LAYOUTS` (12 task-list display modes, still in
+`App.tsx`) is unrelated to branding and untouched. The brand guide also mandates "no emoji" and "no
+exclamation marks" in UI copy — enforced by convention (checked with a manual grep sweep when this
+was adopted), not by any lint rule.
 
 **Domain logic as plain functions** (not hooks), all in `src/lib/` and unit-tested via `npm test`:
 - `dates.ts`: `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due
@@ -209,6 +221,15 @@ when a line is crediting/attributing the company itself, as in the existing "by 
 taglines. Don't reintroduce bare "due." as the product's name or wordmark -- there's an established,
 same-category competitor app literally called "Due" (dueapp.com), which is exactly the naming
 collision this convention avoids.
+
+**Visual identity** follows the DuePlanner brand guide (v1.0, Sep 2026, not checked into the repo
+— ask the user for it if design-token values need re-checking): strictly monochrome (the nine grays
+in `src/themes.ts`, no accent colors), Inter as the only typeface, flat/bordered surfaces with no
+drop shadows, and calm/factual copy (sentence case, no exclamation marks, no emoji). The logo is a
+lowercase serif "dp" monogram (`public/favicon.svg`, `public/favicon-32/512.png`,
+`public/apple-touch-icon.png`) — `favicon-32.png` and `favicon.svg` deliberately use a flat,
+shadow-free rendering rather than the full soft-echo version the 512px/180px assets use, per the
+guide's own sizing note that the echo blurs below 32px.
 
 ## Deployment
 

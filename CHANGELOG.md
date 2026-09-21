@@ -12,9 +12,12 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   Removed the theme grid, custom accent color picker, and font picker from Options accordingly.
   Flattened all drop shadows. Swept UI copy for the guide's voice rules (no emoji, no exclamation
   marks, sentence case). New "dp" monogram logo/favicon.
-- Color and typeface then departed from the guide's own strict monochrome/Inter choices toward a
-  Notion-inspired look: Notion's actual documented colors (not guessed) for light/dark, and the
-  real native OS font stack Notion itself uses (no single shared web font).
+- Color and typeface then went through a Notion-inspired attempt (Notion's real documented colors
+  and native OS font stack), then settled on truly black-and-white (every color literally `#000000`
+  or `#FFFFFF`, no gray at all) with the app's original pre-rebrand font (DM Serif Display / DM
+  Mono). Fixed ~17 buttons/checkmarks across the file that hardcoded black text on `T.accent`
+  backgrounds (safe when accent was always a bright color; not once it's literally black) to use
+  the existing `contrastColor()` helper instead, so they stay correct in both light and dark.
 
 ### Added
 - Unit tests (Vitest) for the pure date/priority/syllabus-parsing functions.

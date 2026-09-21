@@ -8,24 +8,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` — type-check (`tsc -b`) then production-build (`vite build`) into `dist/`.
 - `npm run lint` — run ESLint over the whole project.
 - `npm run preview` — serve the built `dist/` output locally.
-- There is no test suite/framework configured in this repo.
-- `.github/workflows/ci.yml` runs `npm run build` + `npm run lint` (plus a non-blocking
-  `npm audit`) on every push/PR to `main` — Vercel's own build would already catch a broken build,
-  but not lint issues, which this exists to catch.
+- `npm test` — Vitest, unit tests for the pure functions in `src/lib/` (dates, priority/format
+  helpers, syllabus parsing). Fast, no external services; this is what CI runs.
+- `npm run test:rules` — Firestore emulator + `@firebase/rules-unit-testing`, verifying
+  `firestore.rules` actually rejects malformed writes and cross-user access. Not run in CI (needs
+  the emulator, which needs a JRE); run locally before changing `firestore.rules`.
+- `npm run audit:contrast` — diagnostic script (`scripts/check-theme-contrast.ts`, run via `node
+  --experimental-strip-types`) that checks every theme in `src/themes.ts` against WCAG AA contrast
+  ratios and prints failures. Reports only; doesn't fix anything, since adjusting a theme's hex
+  values is a design call on a live, user-facing palette.
+- A pre-commit hook (husky + lint-staged, `.husky/pre-commit`) runs `eslint --fix` on staged
+  `.ts`/`.tsx` files. Dependabot (`.github/dependabot.yml`) opens weekly npm dependency-update PRs.
+- `.github/workflows/ci.yml` runs `npm run build` + `npm run lint` + `npm test` (plus a
+  non-blocking `npm audit`) on every push/PR to `main` — Vercel's own build would already catch a
+  broken build, but not lint/test failures, which this exists to catch.
 
 ## Architecture
 
-**Single-file app.** Nearly the entire app lives in `src/App.tsx` (~2,270 lines), exported as
-`HomeworkPlanner` and rendered into `#root` by `src/main.tsx`. `src/App.css` is intentionally
-empty (leftover from the Vite template, unused) and `src/index.css` is just a minimal box-sizing
-reset — all real styling comes from inline style objects plus one runtime-generated stylesheet
-string (`css`, built from the active theme/font inside the component) injected via `<style>{css}</style>`
-in both the main view and Focus Mode. There's no CSS modules, styled-components, or Tailwind.
+**Mostly-single-file app.** The bulk of the app (component tree, all state, all Firebase wiring)
+still lives in `src/App.tsx`, exported as `HomeworkPlanner` and rendered into `#root` by
+`src/main.tsx`. Pure, dependency-free pieces have been split out so they're independently testable
+and reusable outside React: `src/types.ts` (`Priority`/`Recurrence`), `src/themes.ts` (the `THEMES`
+palette data, importable by non-React scripts like the contrast auditor), `src/lib/` (`dates.ts`,
+`format.ts`, `syllabus.ts`, `id.ts`, `download.ts` — the module-level functions with unit tests in
+`npm test`), `src/hooks/usePersistedState.ts` (see below), and `src/components/ErrorBoundary.tsx`.
+Everything with real UI logic — tab bodies, pickers, `TaskModal` — is still defined inside
+`App.tsx`; splitting those out further is a deliberately deferred, larger effort (see below).
+`src/App.css` is intentionally empty (leftover from the Vite template, unused) and `src/index.css`
+is just a minimal box-sizing reset — all real styling comes from inline style objects plus one
+runtime-generated stylesheet string (`css`, built from the active theme/font inside the component)
+injected via `<style>{css}</style>` in both the main view and Focus Mode. There's no CSS modules,
+styled-components, or Tailwind. A tiny inline script in `index.html` reads a `hw-bg` localStorage
+key (kept in sync with the active theme's background by `App.tsx`) and paints it on `<html>`
+before React mounts, to avoid a flash of the default background for returning dark-theme users.
 
 **State & persistence.** All app state (tasks, theme, layout, subjects, scratchpad, notification
-prefs, etc.) is `useState` in `HomeworkPlanner`, each persisted to `localStorage` under `hw-*` keys
-via a paired `useEffect`. `localStorage` is the source of truth for signed-out/offline use;
-Firestore (when signed in with Google via Firebase Auth) is a sync layer on top of it.
+prefs, etc.) lives in `HomeworkPlanner`, persisted to `localStorage` under `hw-*` keys.
+`localStorage` is the source of truth for signed-out/offline use; Firestore (when signed in with
+Google via Firebase Auth) is a sync layer on top of it. Most simple fields (no extra
+validation/merge logic on read) use `usePersistedState(key, initial)` — a small hook
+(`src/hooks/usePersistedState.ts`) replacing the repeated `useState` + localStorage `useEffect`
+pair. It JSON-serializes on write, and on read falls back to the raw string if `JSON.parse` throws
+— several fields predate the hook and stored plain unquoted strings (e.g. `"list"`, not
+`'"list"'`), and this keeps those intact on the first load after adopting the hook rather than
+silently resetting them to the default. Fields with real extra logic on read (`tasks` — order
+backfill; `themeName` — validates against `THEMES`; `themeByMode` — derives from current theme;
+`subjectColors` — merges with defaults; `accentOverride` — `removeItem` instead of writing `null`;
+`scratchpad` — its own separate debounce, see below) are deliberately left as hand-written
+`useState`/`useEffect` pairs rather than forced into the generic hook.
 
 **Firebase.** The `firebaseConfig` (project `ai-homework-planner-92260`) is hardcoded directly in
 `App.tsx` — this is a public client web API key, not a secret; access is enforced by Firestore
@@ -96,26 +126,46 @@ require rewriting a user's entire history:
   multiple open tabs sharing one cache. Wrapped in try/catch with a plain in-memory fallback, since
   this runs at module load time before React renders -- an uncaught throw here would blank-page the
   whole app in an exotic environment instead of just missing offline support.
+- Account deletion (Options tab, "Danger Zone", gated on being signed in) batch-deletes every doc
+  in the tasks subcollection plus the profile doc, then calls Firebase Auth's `deleteUser`, then
+  clears every `hw-*` localStorage key and reloads -- "delete my data" means all of it, not just
+  the cloud copy. Gated behind a type-`DELETE`-to-confirm panel rather than a plain `window.confirm`,
+  given it's irreversible. Not chunked past Firestore's 500-op batch limit, matching the existing
+  tasks-sync effect's `writeBatch` usage elsewhere.
 
-**Design-system constants** at module scope drive both the inline styles and the runtime
-stylesheet: `THEMES` (26 color themes, half light/half dark, all freely selectable), `LAYOUTS` (12
-task-list display modes), `FONTS` (16 heading/body pairings loaded from Google Fonts).
+**Design-system constants** drive both the inline styles and the runtime stylesheet: `THEMES` (26
+color themes, half light/half dark, all freely selectable — data lives in `src/themes.ts`),
+`LAYOUTS` (12 task-list display modes, still in `App.tsx`), `FONTS` (16 heading/body pairings
+loaded from Google Fonts, still in `App.tsx`).
 
-**Domain logic as plain module-level functions** (not hooks):
-- `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due dates.
-  Deliberately not `toISOString()`/UTC, since a day should roll over at the user's local midnight,
-  not UTC midnight.
-- `parseSyllabus` — heuristic line-by-line text scanner (no AI/network call) that extracts
-  `(title, dueDate)` pairs from pasted syllabus text, used by the Import tab.
-- `getPriority` / `daysUntil` / `formatDate` / `formatTime` — due-date-derived display/priority helpers.
-- `nextId()` — monotonic counter for task/subtask ids; avoids `Date.now()` collisions when two ids
-  are minted in the same millisecond.
+**Domain logic as plain functions** (not hooks), all in `src/lib/` and unit-tested via `npm test`:
+- `dates.ts`: `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due
+  dates. Deliberately not `toISOString()`/UTC, since a day should roll over at the user's local
+  midnight, not UTC midnight.
+- `syllabus.ts`: `parseSyllabus` — heuristic line-by-line text scanner (no AI/network call) that
+  extracts `(title, dueDate)` pairs from pasted syllabus text, used by the Import tab.
+- `format.ts`: `getPriority` / `daysUntil` / `formatDate` / `formatTime` / `contrastColor` /
+  `csvField` — due-date-derived display/priority helpers, plus the WCAG-luminance-based
+  light/dark-text picker (`contrastColor`) and CSV field quoting used by data export.
+- `id.ts`: `nextId()` — monotonic counter for task/subtask ids; avoids `Date.now()` collisions when
+  two ids are minted in the same millisecond.
+- `download.ts`: `downloadFile` — the `Blob` + object URL + synthetic `<a download>` click pattern
+  used by data export.
 
 **UI shape.** `HomeworkPlanner` renders a tab bar (`tasks` / `tools` / `import` / `options`, via
 `activeTab` state) plus a separate full-screen Focus Mode (`focusMode` state) with its own
 Pomodoro-style timer. `TaskModal` (task detail, subtasks, session timer) is defined at module
 scope, outside `HomeworkPlanner`, specifically so the session timer's once-a-second tick doesn't
-redefine it as a "new" component and force React to remount the modal every second.
+redefine it as a "new" component and force React to remount the modal every second. It hand-rolls a
+focus trap (Tab/Shift+Tab cycle within the panel, focus-return to whatever opened it on close,
+Escape-to-close unless a session is active) since it's a custom `<div>` overlay rather than a
+native `<dialog>`; the trap effect intentionally runs once (mount/unmount only) and reads
+`sessionActive`/`onClose` through refs rather than including them as effect deps, so it doesn't
+re-steal focus into the first element on every unrelated re-render. `TaskModal`'s render site in
+`HomeworkPlanner` is wrapped in `<ErrorBoundary>` (`src/components/ErrorBoundary.tsx`, also reused
+by `main.tsx` for the app-wide boundary) with a small inline fallback, so a malformed task object
+only closes the modal instead of blanking the whole app -- narrower than the app-wide boundary,
+which still exists as the outer safety net for anything else.
 
 **Task fields beyond the original core set:**
 - `tags?: string[]` — free-form, cross-cutting, distinct from `subject` (one per task, tags are

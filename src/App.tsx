@@ -1,12 +1,22 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged, deleteUser } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getPerformance } from "firebase/performance";
 import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
+import type { Priority, Recurrence } from "./types";
+import { THEMES } from "./themes";
+import type { ThemeName, ThemeObj } from "./themes";
+import { localDateStr, todayISO, advanceDate } from "./lib/dates";
+import { nextId } from "./lib/id";
+import { parseSyllabus } from "./lib/syllabus";
+import { contrastColor, getPriority, formatDate, csvField, formatTime, daysUntil } from "./lib/format";
+import { downloadFile } from "./lib/download";
+import { usePersistedState } from "./hooks/usePersistedState";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -120,39 +130,6 @@ function isStorageBlockedError(e: unknown): boolean {
 }
 const STORAGE_BLOCKED_MESSAGE = "Sign-in was blocked by your browser's tracking protection. In Firefox: click the shield icon in the address bar and turn off Enhanced Tracking Protection for this site, then try again. Chrome and Edge don't hit this issue.";
 
-// ─── THEMES (26 total, 13 dark / 13 light) ─────────────────────────────────────
-const THEMES = {
-  midnight:    { light:false, name:"Midnight",    emoji:"🌙", bg:"#0F0F1A", card:"#16162A", cardAlt:"#1e1e35", border:"#252540", borderAccent:"#2A2A50", text:"#EEE8D5", textMuted:"#888",   textFaint:"#555",   accent:"#F0A500", surface:"#1A1A2E" },
-  nord:        { light:false, name:"Nord",        emoji:"❄️", bg:"#2E3440", card:"#3B4252", cardAlt:"#434C5E", border:"#4C566A", borderAccent:"#5E6E82", text:"#ECEFF4", textMuted:"#D8DEE9", textFaint:"#8894a8", accent:"#88C0D0", surface:"#3B4252" },
-  olivia:      { light:false, name:"Olivia",      emoji:"🌹", bg:"#1b1b1b", card:"#2a2a2a", cardAlt:"#333333", border:"#3d3d3d", borderAccent:"#4a4a4a", text:"#e8c4b8", textMuted:"#b08070", textFaint:"#6a4a40", accent:"#e05c5c", surface:"#252525" },
-  stealth:     { light:false, name:"Stealth",     emoji:"🕶️", bg:"#0a0a0a", card:"#111111", cardAlt:"#1a1a1a", border:"#222222", borderAccent:"#2a2a2a", text:"#cccccc", textMuted:"#666666", textFaint:"#333333", accent:"#ffffff", surface:"#0f0f0f" },
-  serika:      { light:true, name:"Serika",      emoji:"🌾", bg:"#e1dbd2", card:"#cdc6bd", cardAlt:"#d5cec5", border:"#b8b0a5", borderAccent:"#a8a09a", text:"#3b3a36", textMuted:"#7a7060", textFaint:"#aaa090", accent:"#e2b714", surface:"#d4cdc4" },
-  catppuccin:  { light:false, name:"Catppuccin",  emoji:"🐱", bg:"#1e1e2e", card:"#313244", cardAlt:"#3a3a54", border:"#45475a", borderAccent:"#585b70", text:"#cdd6f4", textMuted:"#a6adc8", textFaint:"#6c7086", accent:"#cba6f7", surface:"#181825" },
-  dracula:     { light:false, name:"Dracula",     emoji:"🧛", bg:"#282a36", card:"#343746", cardAlt:"#3d4059", border:"#44475a", borderAccent:"#555777", text:"#f8f8f2", textMuted:"#bd93f9", textFaint:"#6272a4", accent:"#ff79c6", surface:"#21222c" },
-  rosepine:    { light:false, name:"Rosé Pine",   emoji:"🌸", bg:"#191724", card:"#1f1d2e", cardAlt:"#26233a", border:"#2a2740", borderAccent:"#393552", text:"#e0def4", textMuted:"#908caa", textFaint:"#524f67", accent:"#ebbcba", surface:"#1a1826" },
-  matrix:      { light:false, name:"Matrix",      emoji:"💻", bg:"#0a0f0a", card:"#0d160d", cardAlt:"#111e11", border:"#1a2e1a", borderAccent:"#1f381f", text:"#00ff41", textMuted:"#00aa2b", textFaint:"#005515", accent:"#00ff41", surface:"#0b120b" },
-  blush:       { light:false, name:"Blush",       emoji:"💗", bg:"#1a0e14", card:"#2a1520", cardAlt:"#351a28", border:"#3d2030", borderAccent:"#4a2838", text:"#f5dde8", textMuted:"#c49aaa", textFaint:"#7a5060", accent:"#f472b6", surface:"#22101a" },
-  paper:       { light:true, name:"Paper",       emoji:"📄", bg:"#f5f0e8", card:"#faf7f2", cardAlt:"#ffffff", border:"#e0d8cc", borderAccent:"#cec4b4", text:"#2c2416", textMuted:"#7a6a55", textFaint:"#b0a090", accent:"#c2440f", surface:"#ede8df" },
-  gruvbox:     { light:false, name:"Gruvbox",     emoji:"🟫", bg:"#282828", card:"#3c3836", cardAlt:"#504945", border:"#665c54", borderAccent:"#7c6f64", text:"#ebdbb2", textMuted:"#a89984", textFaint:"#7c6f64", accent:"#fabd2f", surface:"#32302f" },
-  milkshake:   { light:true, name:"Milkshake",   emoji:"🥤", bg:"#fdf6ff", card:"#f5eaff", cardAlt:"#eedeff", border:"#ddc8f5", borderAccent:"#ccb3ee", text:"#3b1f5e", textMuted:"#8b6aaa", textFaint:"#c4a8e0", accent:"#b44fd1", surface:"#f0e0ff" },
-  cherry:      { light:false, name:"Cherry",      emoji:"🌸", bg:"#1a0a0f", card:"#2a1018", cardAlt:"#351520", border:"#4a1f2d", borderAccent:"#5c2638", text:"#fce4ec", textMuted:"#f48fb1", textFaint:"#6a2040", accent:"#f06292", surface:"#200c14" },
-  discord:     { light:false, name:"Discord",     emoji:"💬", bg:"#313338", card:"#2b2d31", cardAlt:"#232428", border:"#3f4147", borderAccent:"#4e5058", text:"#dbdee1", textMuted:"#949ba4", textFaint:"#4e5058", accent:"#5865f2", surface:"#1e1f22" },
-  dev:         { light:false, name:"Dev",         emoji:"🖥️", bg:"#1e1e1e", card:"#252526", cardAlt:"#2d2d2d", border:"#3c3c3c", borderAccent:"#4a4a4a", text:"#d4d4d4", textMuted:"#858585", textFaint:"#3c3c3c", accent:"#569cd6", surface:"#1e1e1e" },
-  // ─ light themes from Monkeytype's theme list ─
-  icebergLight:{ light:true, name:"Iceberg Light", emoji:"🧊", bg:"#e8e9ec", card:"#dcdfe4", cardAlt:"#d2d4da", border:"#c6c8d1", borderAccent:"#b4b8c4", text:"#33374c", textMuted:"#6b7089", textFaint:"#a1a6b8", accent:"#2d539e", surface:"#dcdfe4" },
-  rosepineDawn:{ light:true, name:"Rosé Pine Dawn", emoji:"🌤️", bg:"#faf4ed", card:"#fffaf3", cardAlt:"#f2e9e1", border:"#dfdad9", borderAccent:"#cecacd", text:"#575279", textMuted:"#797593", textFaint:"#9893a5", accent:"#d7827e", surface:"#f2e9e1" },
-  gruvboxLight:{ light:true, name:"Gruvbox Light", emoji:"🟨", bg:"#fbf1c7", card:"#f2e5bc", cardAlt:"#ebdbb2", border:"#d5c4a1", borderAccent:"#bdae93", text:"#3c3836", textMuted:"#7c6f64", textFaint:"#a89984", accent:"#af3a03", surface:"#f2e5bc" },
-  eyecare:     { light:true, name:"Eyecare",       emoji:"🌿", bg:"#dde6d5", card:"#cfdac5", cardAlt:"#c3d1b6", border:"#aebd9d", borderAccent:"#9aab86", text:"#33422e", textMuted:"#5a6b52", textFaint:"#7f9074", accent:"#4c6b3f", surface:"#cfdac5" },
-  shoko:       { light:true, name:"Shoko",         emoji:"🌸", bg:"#f7e6e6", card:"#fdf1f1", cardAlt:"#f2dcdc", border:"#e3c6c6", borderAccent:"#d1acac", text:"#5c3a3a", textMuted:"#8a6363", textFaint:"#b58e8e", accent:"#c96a6a", surface:"#f2dcdc" },
-  botanical:   { light:true, name:"Botanical",     emoji:"🪴", bg:"#e7ecdf", card:"#dbe3cf", cardAlt:"#cfd9c0", border:"#b9c6a6", borderAccent:"#a2b28a", text:"#33402a", textMuted:"#5f7050", textFaint:"#849674", accent:"#6b8e4e", surface:"#dbe3cf" },
-  camping:     { light:true, name:"Camping",       emoji:"🏕️", bg:"#efe4d0", card:"#e6d7bd", cardAlt:"#ddc9a8", border:"#c9b088", borderAccent:"#b59a6f", text:"#4a3a24", textMuted:"#7a6440", textFaint:"#a4895f", accent:"#b5651d", surface:"#e6d7bd" },
-  metropolis:  { light:true, name:"Metropolis",    emoji:"🏙️", bg:"#e9eaec", card:"#dddfe3", cardAlt:"#d1d3da", border:"#bcbfc8", borderAccent:"#a5a9b6", text:"#282c34", textMuted:"#565c66", textFaint:"#838994", accent:"#3b6fd6", surface:"#dddfe3" },
-  dolch:       { light:true, name:"Dolch",         emoji:"🍬", bg:"#e4ded4", card:"#f6f1e8", cardAlt:"#ede6d8", border:"#d6cbb5", borderAccent:"#c3b494", text:"#5a5147", textMuted:"#8a8071", textFaint:"#b3a790", accent:"#916b53", surface:"#ede6d8" },
-  terra:       { light:true, name:"Terra",         emoji:"🏺", bg:"#efe2d4", card:"#e7d5c1", cardAlt:"#ddc6ac", border:"#c7ab8c", borderAccent:"#b0906e", text:"#4a3423", textMuted:"#795c40", textFaint:"#a3805e", accent:"#a8562f", surface:"#e7d5c1" },
-} as const;
-type ThemeName = keyof typeof THEMES;
-type ThemeObj = Omit<typeof THEMES[ThemeName], "accent"> & { accent: string; accentGlow: string; gradientCard: string };
-
 const LAYOUTS = {
   list:      { name:"List",       emoji:"☰",  desc:"Classic cards" },
   compact:   { name:"Compact",    emoji:"⊟",  desc:"Slim rows" },
@@ -194,7 +171,6 @@ const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:
 const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE"];
 const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA" };
 const SUBJECT_COLOR_PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#F7DC6F","#BB8FCE","#82E0AA","#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#a78bfa","#fbbf24","#60a5fa"];
-type Priority = "high"|"medium"|"low";
 const PRIORITY_COLORS: Record<Priority,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
 const REMINDER_OFFSETS = [
   { key:"1d", label:"1 day before", mins:1440 },
@@ -210,7 +186,6 @@ const QUESTIONS = [
 ];
 
 interface Subtask { id:string; text:string; done:boolean; }
-type Recurrence = "none"|"daily"|"weekly"|"monthly";
 interface Task {
   id:number; title:string; subject:string; dueDate:string; dueTime:string; estMins:number; done:boolean; order:number;
   subtasks?: Subtask[];
@@ -232,135 +207,6 @@ const DEFAULT_TASKS: Task[] = [
   { id:3, title:"Lab Report", subject:"Science", dueDate:localDateStr(new Date(Date.now()+5*86400000)), dueTime:"", estMins:60, done:false, order:2 },
   { id:4, title:"History Reading", subject:"History", dueDate:localDateStr(new Date(Date.now()+2*86400000)), dueTime:"09:00", estMins:30, done:false, order:3 },
 ];
-
-// ─── DATE HELPERS (recurrence, archive) ────────────────────────────────────────
-// Local calendar date as YYYY-MM-DD -- deliberately NOT toISOString() (which is
-// UTC), since due-date strings (and every other place a Date needs to become
-// one) need to roll over at the user's own local midnight, not UTC midnight.
-function localDateStr(d:Date):string {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-function todayISO():string { return localDateStr(new Date()); }
-function advanceDate(dateStr:string, recurrence:Recurrence):string {
-  const d = dateStr ? new Date(dateStr+"T00:00:00") : new Date();
-  if (recurrence==="daily") d.setDate(d.getDate()+1);
-  else if (recurrence==="weekly") d.setDate(d.getDate()+7);
-  else if (recurrence==="monthly") {
-    // setMonth() doesn't clamp to the target month's length -- e.g. Jan 31 + 1
-    // month would silently become Mar 3, not Feb 28. Jump to day 1 of the
-    // target month first (so the day-of-month can't overflow into it), then
-    // clamp the original day-of-month to however many days that month has.
-    const day=d.getDate();
-    d.setDate(1);
-    d.setMonth(d.getMonth()+1);
-    const daysInMonth=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
-    d.setDate(Math.min(day,daysInMonth));
-  }
-  return localDateStr(d);
-}
-// Monotonic id source for new tasks/subtasks -- plain Date.now() can collide when
-// two are minted in the same millisecond (e.g. a recurring task's next instance
-// spun off in the same tick as an unrelated add), which would corrupt every
-// "by id" operation since two items would then share an id.
-let idSeq=Date.now();
-function nextId():number { return ++idSeq; }
-
-// ─── SYLLABUS IMPORT ────────────────────────────────────────────────────────
-// A syllabus is free text with no fixed structure, so this is a heuristic
-// line-scanner rather than a real parser: for each line, look for the first
-// recognizable date (ISO, M/D[/YY], or "Month D[, YYYY]"), and if one's found,
-// treat the rest of that line as the assignment title. No AI/network call --
-// this app intentionally has no backend to send syllabus text to.
-const MONTH_NAMES:Record<string,number> = {
-  jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,may:4,
-  jun:5,june:5,jul:6,july:6,aug:7,august:7,sep:8,sept:8,september:8,
-  oct:9,october:9,nov:10,november:10,dec:11,december:11,
-};
-interface ParsedSyllabusItem { title:string; dueDate:string; }
-function parseSyllabus(text:string):ParsedSyllabusItem[] {
-  const today=new Date(); today.setHours(0,0,0,0);
-  const results:ParsedSyllabusItem[]=[];
-  for(const raw of text.split(/\r?\n/)){
-    const line=raw.trim();
-    if(!line)continue;
-    let d:Date|null=null, matched="";
-    let m=line.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
-    if(m){ d=new Date(+m[1],+m[2]-1,+m[3]); matched=m[0]; }
-    if(!d){
-      m=line.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
-      if(m){
-        const year=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):today.getFullYear();
-        d=new Date(year,+m[1]-1,+m[2]);
-        matched=m[0];
-      }
-    }
-    if(!d){
-      m=line.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/i);
-      if(m){
-        const year=m[3]?+m[3]:today.getFullYear();
-        d=new Date(year,MONTH_NAMES[m[1].toLowerCase()],+m[2]);
-        matched=m[0];
-      }
-    }
-    if(!d||isNaN(d.getTime()))continue;
-    // No explicit 4-digit year in the match and the date lands well in the
-    // past -- most likely next year's occurrence of that month/day (a Dec
-    // syllabus listing "Jan 15" almost always means the following January).
-    if(!/\d{4}/.test(matched)&&(today.getTime()-d.getTime())/86400000>30){
-      d.setFullYear(d.getFullYear()+1);
-    }
-    let title=(line.slice(0,m!.index)+line.slice(m!.index!+matched.length)).trim();
-    title=title.replace(/^[-–—:•*\s]+|[-–—:•*\s]+$/g,"");
-    if(title.length>100)title=title.slice(0,97)+"...";
-    if(!title)title="Untitled assignment";
-    results.push({title,dueDate:localDateStr(d)});
-  }
-  return results;
-}
-
-function contrastColor(hex:string):string {
-  const c=hex.replace("#","");
-  const r=parseInt(c.substring(0,2),16)/255, g=parseInt(c.substring(2,4),16)/255, b=parseInt(c.substring(4,6),16)/255;
-  const lin=(v:number)=>v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);
-  const L=0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
-  return L>0.5?"#1a1a1a":"#ffffff";
-}
-function getPriority(dueDate:string, estMins:number, override?:Priority):Priority {
-  if (override) return override;
-  if (!dueDate) return "low";
-  const d=(new Date(dueDate+"T00:00:00").getTime()-Date.now())/86400000;
-  if (d<1||(d<2&&estMins>60)) return "high"; if (d<3) return "medium"; return "low";
-}
-function formatDate(s:string):string {
-  if (!s) return "No date";
-  return new Date(s+"T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
-}
-// Quotes a CSV field only when it actually needs it (contains a comma,
-// quote, or newline), escaping embedded quotes by doubling them per the
-// standard CSV convention -- avoids needlessly quoting every plain field.
-function csvField(v:string|number):string {
-  const s=String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
-}
-function downloadFile(filename:string,content:string,mimeType:string){
-  const blob=new Blob([content],{type:mimeType});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url; a.download=filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-function formatTime(t:string):string {
-  if (!t) return "";
-  const [h,m]=t.split(":").map(Number);
-  return new Date(2000,0,1,h,m).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
-}
-function daysUntil(s:string):string|null {
-  if (!s) return null;
-  const now=new Date(); now.setHours(0,0,0,0);
-  const d=Math.ceil((new Date(s+"T00:00:00").getTime()-now.getTime())/86400000);
-  if (d<0) return "Overdue!"; if (d===0) return "Due today!"; if (d===1) return "Due tomorrow"; return `${d} days left`;
-}
 
 async function fetchAISuggestion(tasks:Task[]):Promise<string> {
   // NOTE: this used to call api.anthropic.com directly from the browser with no
@@ -416,9 +262,41 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
     onSetTags([...tags,t]);
     setNewTagText("");
   }
+  // Focus trap + focus-return: a custom div-based modal gets neither for free
+  // the way a native <dialog> would. On open, move focus in and cycle
+  // Tab/Shift+Tab between the panel's first/last focusable elements so
+  // keyboard users can't tab out to the page underneath; on close, restore
+  // focus to whatever opened the modal instead of losing it to <body>.
+  //
+  // The mount/unmount effect below intentionally runs once ([] deps) so it
+  // doesn't re-steal focus into the first element on every unrelated
+  // re-render (e.g. the session timer ticking) -- sessionActive/onClose are
+  // read through refs instead, kept current by this separate effect, so
+  // Escape always sees the latest sessionActive rather than whatever it was
+  // when the modal first opened.
+  const sessionActiveRef=useRef(sessionActive);
+  const onCloseRef=useRef(onClose);
+  useEffect(()=>{sessionActiveRef.current=sessionActive;onCloseRef.current=onClose;});
+  const panelRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const previouslyFocused=document.activeElement as HTMLElement|null;
+    const focusableSelector='button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    panelRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus();
+    function handleKeyDown(e:KeyboardEvent){
+      if(e.key==="Escape"&&!sessionActiveRef.current){onCloseRef.current();return;}
+      if(e.key!=="Tab"||!panelRef.current)return;
+      const els=Array.from(panelRef.current.querySelectorAll<HTMLElement>(focusableSelector)).filter(el=>!el.hasAttribute("disabled"));
+      if(els.length===0)return;
+      const first=els[0], last=els[els.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+    document.addEventListener("keydown",handleKeyDown);
+    return ()=>{document.removeEventListener("keydown",handleKeyDown);previouslyFocused?.focus();};
+  },[]);
   return(
     <div style={{position:"fixed",inset:0,background:"#00000088",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
-      <div className="pop" style={{background:T.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:580,maxHeight:"90vh",overflowY:"auto",border:`1px solid ${T.border}`,borderBottom:"none"}}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={task.title} className="pop" style={{background:T.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:580,maxHeight:"90vh",overflowY:"auto",border:`1px solid ${T.border}`,borderBottom:"none"}}>
         {/* Handle */}
         <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}>
           <div style={{width:36,height:4,borderRadius:999,background:T.border}}/>
@@ -934,8 +812,7 @@ export default function HomeworkPlanner() {
     const saved=localStorage.getItem("hw-theme") as ThemeName;
     return saved&&saved in THEMES?saved:"midnight";
   });
-  const [themeMode,setThemeMode]=useState<"light"|"dark"|"auto">(()=>(localStorage.getItem("hw-thememode") as "light"|"dark"|"auto")||"auto");
-  useEffect(()=>{localStorage.setItem("hw-thememode",themeMode);},[themeMode]);
+  const [themeMode,setThemeMode]=usePersistedState<"light"|"dark"|"auto">("hw-thememode","auto");
   const [systemPrefersDark,setSystemPrefersDark]=useState(()=>typeof window!=="undefined"&&!!window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
   useEffect(()=>{
     if(typeof window==="undefined"||!window.matchMedia)return;
@@ -966,28 +843,36 @@ export default function HomeworkPlanner() {
   useEffect(()=>{localStorage.setItem("hw-themebymode",JSON.stringify(themeByMode));},[themeByMode]);
   // Keep the active theme in the selected light/dark category -- if the mode changes
   // (by hand, or the system preference under "auto") and the current theme no longer
-  // matches, restore whichever theme was last picked in that category.
-  useEffect(()=>{
-    if(THEMES[themeName].light===(effectiveThemeMode==="light"))return;
-    setThemeName(themeByMode[effectiveThemeMode]);
-  },[effectiveThemeMode]);
-  const [layout,setLayout]=useState<LayoutName>(()=>(localStorage.getItem("hw-layout") as LayoutName)||"list");
-  const [groupBy,setGroupBy]=useState(()=>localStorage.getItem("hw-group")||"none");
-  const [showDone,setShowDone]=useState(()=>localStorage.getItem("hw-showdone")!=="false");
-  const [showSuggestion,setShowSuggestion]=useState(()=>localStorage.getItem("hw-showsuggestion")!=="false");
+  // matches, restore whichever theme was last picked in that category. Adjusted
+  // synchronously during render (React's documented pattern for "adjusting state
+  // when a prop changes") rather than in a useEffect, so the correction lands in
+  // the same render instead of committing one frame with the mismatched theme
+  // first.
+  const [lastEffectiveThemeMode,setLastEffectiveThemeMode]=useState(effectiveThemeMode);
+  if(effectiveThemeMode!==lastEffectiveThemeMode){
+    setLastEffectiveThemeMode(effectiveThemeMode);
+    if(THEMES[themeName].light!==(effectiveThemeMode==="light")){
+      setThemeName(themeByMode[effectiveThemeMode]);
+    }
+  }
+  const [layout,setLayout]=usePersistedState<LayoutName>("hw-layout","list");
+  const [groupBy,setGroupBy]=usePersistedState("hw-group","none");
+  const [showDone,setShowDone]=usePersistedState("hw-showdone",true);
+  const [showSuggestion,setShowSuggestion]=usePersistedState("hw-showsuggestion",true);
   // 0 = never auto-archive. Otherwise the number of days after completion before
   // a done task is automatically archived (checked once on load).
-  const [autoArchiveDays,setAutoArchiveDays]=useState(()=>{
-    const s=localStorage.getItem("hw-autoarchive");
-    return s!=null?Number(s):7;
-  });
-  useEffect(()=>{localStorage.setItem("hw-autoarchive",String(autoArchiveDays));},[autoArchiveDays]);
+  const [autoArchiveDays,setAutoArchiveDays]=usePersistedState("hw-autoarchive",7);
   // Auto-archive: re-checked whenever tasks (local edits, or a Firestore sync
   // landing) or the setting change. Idempotent -- once a task is archived this
   // finds nothing new to do and no-ops, so it can't loop or fight manual unarchive.
+  // This is a genuine side effect (archiving based on wall-clock time having
+  // passed, not on a prop mirroring another prop), so it belongs in a useEffect
+  // per React's own guidance -- react-hooks/set-state-in-effect's heuristic
+  // doesn't distinguish that from the "adjusting state" anti-pattern it targets.
   useEffect(()=>{
     if(autoArchiveDays<=0)return;
     const cutoff=Date.now()-autoArchiveDays*86400000;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTasks(prev=>{
       let changed=false;
       const next=prev.map(t=>{
@@ -1001,8 +886,7 @@ export default function HomeworkPlanner() {
   // Due date reminders. NOTE: this is Notification API only, no service worker --
   // it only fires while the tab is open (or gets reopened/refocused), never as
   // true background push when the tab/browser is fully closed.
-  const [notificationsEnabled,setNotificationsEnabled]=useState(()=>localStorage.getItem("hw-notifications")==="true");
-  useEffect(()=>{localStorage.setItem("hw-notifications",String(notificationsEnabled));},[notificationsEnabled]);
+  const [notificationsEnabled,setNotificationsEnabled]=usePersistedState("hw-notifications",false);
   const [notificationNote,setNotificationNote]=useState<string|null>(null);
   async function toggleNotifications(next:boolean){
     if(!next){ setNotificationsEnabled(false); setNotificationNote(null); return; }
@@ -1016,8 +900,7 @@ export default function HomeworkPlanner() {
   // "1 hour before" can be on at once. Tasks without a due time fall back to
   // the plain once-daily due/overdue summary below, since there's no time to
   // offset from.
-  const [enabledOffsets,setEnabledOffsets]=useState<string[]>(()=>{try{const s=localStorage.getItem("hw-reminder-offsets");return s?JSON.parse(s):["0"];}catch{return ["0"];}});
-  useEffect(()=>{localStorage.setItem("hw-reminder-offsets",JSON.stringify(enabledOffsets));},[enabledOffsets]);
+  const [enabledOffsets,setEnabledOffsets]=usePersistedState<string[]>("hw-reminder-offsets",["0"]);
   function toggleOffset(key:string){
     setEnabledOffsets(prev=>prev.includes(key)?prev.filter(k=>k!==key):[...prev,key]);
   }
@@ -1069,20 +952,16 @@ export default function HomeworkPlanner() {
   },[notificationsEnabled,tasks,enabledOffsets]);
 
   const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
-  const [fontName,setFontName]=useState<FontName>(()=>(localStorage.getItem("hw-font") as FontName)||"dmSerif");
-  useEffect(()=>{localStorage.setItem("hw-font",fontName);},[fontName]);
+  const [fontName,setFontName]=usePersistedState<FontName>("hw-font","dmSerif");
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
   // these only kick in above a min-width via CSS media queries, so phones/tablets
   // always render the same single narrow column regardless of this setting.
-  const [desktopLayout,setDesktopLayout]=useState(()=>localStorage.getItem("hw-desktoplayout")||"narrow");
-  useEffect(()=>{localStorage.setItem("hw-desktoplayout",desktopLayout);},[desktopLayout]);
-  const [subjects,setSubjects]=useState<string[]>(()=>{try{const s=localStorage.getItem("hw-subjects");return s?JSON.parse(s):DEFAULT_SUBJECTS;}catch{return DEFAULT_SUBJECTS;}});
+  const [desktopLayout,setDesktopLayout]=usePersistedState("hw-desktoplayout","narrow");
+  const [subjects,setSubjects]=usePersistedState<string[]>("hw-subjects",DEFAULT_SUBJECTS);
   const [subjectColors,setSubjectColors]=useState<Record<string,string>>(()=>{try{const s=localStorage.getItem("hw-subjectcolors");return {...DEFAULT_SUBJECT_COLORS,...(s?JSON.parse(s):{})};}catch{return DEFAULT_SUBJECT_COLORS;}});
-  useEffect(()=>{localStorage.setItem("hw-subjects",JSON.stringify(subjects));},[subjects]);
   useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
-  const [templates,setTemplates]=useState<TaskTemplate[]>(()=>{try{const s=localStorage.getItem("hw-templates");return s?JSON.parse(s):[];}catch{return [];}});
-  useEffect(()=>{localStorage.setItem("hw-templates",JSON.stringify(templates));},[templates]);
+  const [templates,setTemplates]=usePersistedState<TaskTemplate[]>("hw-templates",[]);
   function saveAsTemplate(task:Task,name:string){
     setTemplates(prev=>[...prev,{id:String(nextId()),name,subject:task.subject,estMins:task.estMins,recurrence:task.recurrence,subtasks:(task.subtasks||[]).map(s=>({text:s.text}))}]);
   }
@@ -1116,10 +995,6 @@ export default function HomeworkPlanner() {
 
   useEffect(()=>{localStorage.setItem("hw-tasks",JSON.stringify(tasks));},[tasks]);
   useEffect(()=>{localStorage.setItem("hw-theme",themeName);},[themeName]);
-  useEffect(()=>{localStorage.setItem("hw-layout",layout);},[layout]);
-  useEffect(()=>{localStorage.setItem("hw-group",groupBy);},[groupBy]);
-  useEffect(()=>{localStorage.setItem("hw-showdone",String(showDone));},[showDone]);
-  useEffect(()=>{localStorage.setItem("hw-showsuggestion",String(showSuggestion));},[showSuggestion]);
   useEffect(()=>{if(accentOverride)localStorage.setItem("hw-accent",accentOverride);else localStorage.removeItem("hw-accent");},[accentOverride]);
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
@@ -1275,7 +1150,7 @@ export default function HomeworkPlanner() {
       setSyncError("Couldn't sync with the cloud -- your changes are saved on this device, but may not reach your other devices until this is resolved.");
     });
     return unsub;
-  },[fbUser,readyForUid]);
+  },[fbUser,readyForUid,setLayout]);
 
   // Save the profile fields TO Firestore whenever they change. Gated on
   // profileSyncedForUid matching the current user so the very first write
@@ -1408,6 +1283,41 @@ export default function HomeworkPlanner() {
     await fbSignOut(auth);
     setFbUser(null);
   }
+  const [showDeleteAccountConfirm,setShowDeleteAccountConfirm]=useState(false);
+  const [deleteConfirmText,setDeleteConfirmText]=useState("");
+  const [deleteAccountBusy,setDeleteAccountBusy]=useState(false);
+  const [deleteAccountError,setDeleteAccountError]=useState<string|null>(null);
+  // Deletes the Firestore profile doc + every doc in the tasks subcollection,
+  // then the Auth account itself, then wipes local data too -- "delete my
+  // data" should mean all of it, not just the cloud copy. Not chunked into
+  // multiple batches past Firestore's 500-op limit, matching the existing
+  // tasks-sync effect's writeBatch usage elsewhere in this file.
+  async function deleteAccountForever(){
+    if(!fbUser)return;
+    setDeleteAccountBusy(true);
+    setDeleteAccountError(null);
+    try{
+      const tasksCol=collection(db,"users",fbUser.uid,"tasks");
+      const snap=await getDocs(tasksCol);
+      const batch=writeBatch(db);
+      snap.docs.forEach(d=>batch.delete(d.ref));
+      batch.delete(doc(db,"users",fbUser.uid));
+      await batch.commit();
+      await deleteUser(fbUser);
+      Object.keys(localStorage).filter(k=>k.startsWith("hw-")).forEach(k=>localStorage.removeItem(k));
+      window.location.reload();
+    } catch(e){
+      console.error(e);
+      const code=(e as {code?:string})?.code||"unknown";
+      setDeleteAccountError(
+        code==="auth/requires-recent-login"
+          ? "For your security, please sign out, sign back in, and try again."
+          : `Couldn't delete your account (${code}). Please try again.`
+      );
+    } finally {
+      setDeleteAccountBusy(false);
+    }
+  }
 
   const [adding,setAdding]=useState(false);
   const [focusMode,setFocusMode]=useState(false); // transient by design -- no persistence needed
@@ -1503,9 +1413,20 @@ export default function HomeworkPlanner() {
 
   const base=THEMES[themeName];
   const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
+  // Mirrors just the resolved background color (not the whole theme) to its own
+  // key, read synchronously by a tiny inline script in index.html before React
+  // hydrates -- prevents a flash of the browser's default white background for
+  // returning dark-theme users, without duplicating the THEMES palette there.
+  useEffect(()=>{try{localStorage.setItem("hw-bg",T.bg);}catch{/* storage unavailable */}},[T.bg]);
 
+  // Canonical "fetch data when a dependency changes" effect (React's own docs
+  // list this as a case an Effect genuinely is for) -- the immediate setState
+  // calls here start/reset the loading state around the fetch, not "adjust
+  // state to mirror a prop", so react-hooks/set-state-in-effect's heuristic is
+  // a false positive on this specific shape.
   useEffect(()=>{
     const pending=tasks.filter(t=>!t.done);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if(pending.length===0){setSuggestion("Nothing left -- you're all done! 🎉");return;}
     setSuggestionLoading(true);setSuggestion("");
     const t=setTimeout(()=>{fetchAISuggestion(tasks).then(s=>{setSuggestion(s);setSuggestionLoading(false);}).catch(()=>{setSuggestion("Start with your most urgent assignment!");setSuggestionLoading(false);});},700);
@@ -2810,26 +2731,56 @@ export default function HomeworkPlanner() {
             </div>
             <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>💬 Send feedback / report a bug</a>
             <button onClick={()=>{if(window.confirm("Clear all completed tasks?"))setTasks(prev=>prev.filter(t=>!t.done));}} style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:"#FF4757",fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>🗑 Clear completed tasks</button>
+            {fbUser&&(
+              <div style={{background:T.card,borderRadius:12,padding:"14px",border:"1px solid #FF475744"}}>
+                <div className="sl" style={{color:"#FF4757",paddingTop:0}}>Danger Zone</div>
+                {!showDeleteAccountConfirm ? (
+                  <button onClick={()=>{setShowDeleteAccountConfirm(true);setDeleteConfirmText("");setDeleteAccountError(null);}} style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:"#FF4757",fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Delete my account & all data</button>
+                ) : (
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,lineHeight:1.5}}>
+                      This permanently deletes your account, every task, and all settings -- on this device and in the cloud. This can't be undone. Type <b>DELETE</b> to confirm.
+                    </div>
+                    <input value={deleteConfirmText} onChange={e=>setDeleteConfirmText(e.target.value)} placeholder="DELETE" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
+                    {deleteAccountError&&<div style={{fontFamily:F.body,fontSize:11,color:"#FF4757"}}>{deleteAccountError}</div>}
+                    <div style={{display:"flex",gap:7}}>
+                      <button onClick={()=>setShowDeleteAccountConfirm(false)} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Cancel</button>
+                      <button disabled={deleteConfirmText!=="DELETE"||deleteAccountBusy} onClick={deleteAccountForever} style={{flex:1,background:deleteConfirmText==="DELETE"?"#FF4757":T.surface,border:"none",borderRadius:9,padding:"9px 4px",cursor:deleteConfirmText==="DELETE"?"pointer":"not-allowed",color:deleteConfirmText==="DELETE"?"#fff":T.textFaint,fontFamily:F.body,fontSize:11,opacity:deleteAccountBusy?0.6:1}}>{deleteAccountBusy?"Deleting…":"Delete forever"}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <div style={{textAlign:"center",fontFamily:F.body,fontSize:9,color:T.textFaint,paddingTop:4}}>DuePlanner v{__APP_VERSION__}</div>
           </div>
         )}
         </div>
         </div>
       </div>
-      {selectedTask&&<TaskModal
-        task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
-        T={T} F={F} subjectColors={subjectColors}
-        sessionActive={sessionActive} sessionSecs={sessionSecs} sessionHistory={sessionHistory}
-        allTags={allTags}
-        onClose={()=>{setSelectedTask(null);setSessionHistory([]);}}
-        onStartSession={startSession} onEndSession={endSession}
-        onToggleDone={()=>{toggleDone(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
-        onDelete={()=>{deleteTask(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
-        onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
-        onArchive={()=>{archiveTask(selectedTask.id);setSelectedTask(null);}}
-        onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
-        onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
-        onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}
-      />}
+      {selectedTask&&<ErrorBoundary fallback={()=>(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
+          <div style={{background:T.card,borderRadius:12,padding:24,maxWidth:320,textAlign:"center",display:"flex",flexDirection:"column",gap:12,border:`1px solid ${T.border}`}}>
+            <div style={{color:T.text,fontFamily:F.body,fontSize:14}}>This task couldn't be displayed.</div>
+            <button onClick={()=>{setSelectedTask(null);setSessionHistory([]);}} style={{background:T.accent,color:"#000",border:"none",borderRadius:9,padding:"9px 16px",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>Close</button>
+          </div>
+        </div>
+      )}>
+        <TaskModal
+          task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
+          T={T} F={F} subjectColors={subjectColors}
+          sessionActive={sessionActive} sessionSecs={sessionSecs} sessionHistory={sessionHistory}
+          allTags={allTags}
+          onClose={()=>{setSelectedTask(null);setSessionHistory([]);}}
+          onStartSession={startSession} onEndSession={endSession}
+          onToggleDone={()=>{toggleDone(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
+          onDelete={()=>{deleteTask(selectedTask.id);setSelectedTask(null);setSessionHistory([]);}}
+          onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
+          onArchive={()=>{archiveTask(selectedTask.id);setSelectedTask(null);}}
+          onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
+          onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
+          onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}
+        />
+      </ErrorBoundary>}
       {showProfile&&<ProfileModal
         T={T} F={F}
         fbUser={fbUser} signInError={signInError} syncError={syncError}

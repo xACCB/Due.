@@ -1,13 +1,17 @@
 {
   "name": "due",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:rules": "npx firebase-tools emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\"",
+    "audit:contrast": "node --experimental-strip-types scripts/check-theme-contrast.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "firebase": "^12.13.0",
@@ -16,6 +20,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -24,8 +29,14 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^5.0.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": "eslint --fix"
   }
 }

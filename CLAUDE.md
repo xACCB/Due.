@@ -135,19 +135,28 @@ require rewriting a user's entire history:
   given it's irreversible. Not chunked past Firestore's 500-op batch limit, matching the existing
   tasks-sync effect's `writeBatch` usage elsewhere.
 
-**Design-system constants** drive both the inline styles and the runtime stylesheet. Per the
-DuePlanner brand guide (v1.0, Sep 2026): `THEMES` (`src/themes.ts`) holds exactly two entries,
-`dueplanner` (light) and `dueplannerDark` (the guide's own "Inverse" — Ink fill, White text),
-reusing the same nine named grays (Ink/Graphite/Stone/Ash/Smoke/Fog/Mist/Paper/White) in opposite
-roles — no accent colors, no per-user theme choice. `themeName` in `App.tsx` is a plain derived
-`const` (`effectiveThemeMode==="light"?"dueplanner":"dueplannerDark"`), not state — light/dark/auto
-(`themeMode`) is still a real user choice (incl. following system preference), but which of the two
-themes that resolves to is fully determined by it, so there's nothing left to persist, sync, or
-correct. `FONTS` (`App.tsx`) is a single-entry object, kept as a `FONTS`/`fontName` indirection
-(rather than removed) so existing `F.heading`/`F.body` call sites throughout the file didn't need
-to change -- currently the app's pre-rebrand default pairing (DM Serif Display/DM Mono), kept
-deliberately instead of the guide's own choice of Inter. `LAYOUTS` (12 task-list display modes, still in
-`App.tsx`) is unrelated to branding and untouched. The brand guide also mandates "no emoji" and "no
+**Design-system constants** drive both the inline styles and the runtime stylesheet. On the
+`rebrand-monochrome` branch, `THEMES` (`src/themes.ts`) went from the original 26 themes to the
+DuePlanner brand guide's strict monochrome palette, then to Notion's actual documented colors --
+`notion` (light) and `notionDark`, using Notion's own published hex values (not guessed): light
+text `#37352F`/secondary `#787774`/tertiary `#9B9A97` on a `#F7F6F3` card/sidebar surface, "Notion
+Blue" `#2EAADC` as the accent; dark mode `#191919` page/`#202020` panel/`#252525` menu with
+`#F0EFED`/`#ADA9A3` text. Two entries only (light + dark), no per-user theme choice. `themeName` in
+`App.tsx` is a plain derived `const` (`effectiveThemeMode==="light"?"notion":"notionDark"`), not
+state — light/dark/auto (`themeMode`) is still a real user choice (incl. following system
+preference), but which of the two themes that resolves to is fully determined by it, so there's
+nothing left to persist, sync, or correct. Note: `#787774`-on-`#F7F6F3` and the accent-on-white
+pairing fall slightly short of WCAG AA (4.14:1 and 2.66:1) -- left as-is rather than nudged, since
+these are Notion's real colors and deviating from them defeats the point of matching it
+authentically; real Notion has the same shortfall. `FONTS` (`App.tsx`) is a single-entry object,
+kept as a `FONTS`/`fontName` indirection (rather than removed) so existing `F.heading`/`F.body`
+call sites throughout the file didn't need to change -- currently the actual native OS font stack
+(`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`,
+`SYSTEM_FONT_STACK` in `App.tsx`), matching what Notion itself does (no single shared web font —
+San Francisco on Mac/iOS, Segoe UI on Windows, Roboto on Android). `google` is `""` for this entry,
+and the `@import` in the runtime stylesheet is conditional on `F.google` being non-empty so no
+pointless Google Fonts request fires. `LAYOUTS` (12 task-list display modes, still in `App.tsx`) is
+unrelated to branding and untouched. The brand guide also mandates "no emoji" and "no
 exclamation marks" in UI copy — enforced by convention (checked with a manual grep sweep when this
 was adopted), not by any lint rule.
 
@@ -223,11 +232,12 @@ taglines. Don't reintroduce bare "due." as the product's name or wordmark -- the
 same-category competitor app literally called "Due" (dueapp.com), which is exactly the naming
 collision this convention avoids.
 
-**Visual identity** follows the DuePlanner brand guide (v1.0, Sep 2026, not checked into the repo
-— ask the user for it if design-token values need re-checking): strictly monochrome (the nine grays
-in `src/themes.ts`, no accent colors), flat/bordered surfaces with no drop shadows, and calm/factual
-copy (sentence case, no exclamation marks, no emoji). Typeface is the one deliberate departure from
-the guide -- see Design-system constants above. The logo is a
+**Visual identity** started from the DuePlanner brand guide (v1.0, Sep 2026, not checked into the
+repo — ask the user for it if design-token values need re-checking): flat/bordered surfaces with no
+drop shadows, and calm/factual copy (sentence case, no exclamation marks, no emoji) still follow it
+as shipped. Color and typeface have since deliberately departed from the guide's own strict
+monochrome/Inter choices toward a Notion-inspired look instead -- see Design-system constants above
+for the actual current colors/font and why. The logo is a
 lowercase serif "dp" monogram (`public/favicon.svg`, `public/favicon-32/512.png`,
 `public/apple-touch-icon.png`) — `favicon-32.png` and `favicon.svg` deliberately use a flat,
 shadow-free rendering rather than the full soft-echo version the 512px/180px assets use, per the

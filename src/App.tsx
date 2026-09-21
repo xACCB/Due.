@@ -150,13 +150,19 @@ const LAYOUTS = {
 type LayoutName = keyof typeof LAYOUTS;
 
 // ─── FONTS ────────────────────────────────────────────────────────────────────
-// The app's original default pairing (from before the brand guide rebrand),
-// kept deliberately instead of the guide's own choice of Inter -- kept as a
-// single-entry FONTS/fontName indirection (rather than removed) so the many
-// existing `F.heading`/`F.body` call sites throughout the file don't need to
-// change.
+// Notion doesn't actually load a single web font for its UI -- it uses each
+// OS's own native system font (San Francisco on Mac/iOS, Segoe UI on Windows,
+// Roboto on Android), which is a real part of why it feels the way it does.
+// Matching that means no Google Fonts request at all (empty `google`, which
+// the @import below skips), and the rendered typeface differs per visitor's
+// OS rather than being one fixed look everywhere -- that's the actual
+// tradeoff of doing this authentically rather than picking a single lookalike
+// webfont. Kept as a single-entry FONTS/fontName indirection (rather than
+// removed) so the many existing `F.heading`/`F.body` call sites throughout
+// the file don't need to change.
+const SYSTEM_FONT_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 const FONTS = {
-  dmSerif: { name:"DM Serif", preview:"Homework.", heading:"'DM Serif Display', serif", body:"'DM Mono', monospace", google:"DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500" },
+  system: { name:"System", preview:"Homework.", heading:SYSTEM_FONT_STACK, body:SYSTEM_FONT_STACK, google:"" },
 } as const;
 type FontName = keyof typeof FONTS;
 
@@ -812,7 +818,7 @@ export default function HomeworkPlanner() {
   // monochrome palette and its Inverse), so the theme is fully determined by
   // effectiveThemeMode -- no independent theme choice, no per-category "last
   // picked" memory, and nothing to correct when the mode changes.
-  const themeName:ThemeName=effectiveThemeMode==="light"?"dueplanner":"dueplannerDark";
+  const themeName:ThemeName=effectiveThemeMode==="light"?"notion":"notionDark";
   const [layout,setLayout]=usePersistedState<LayoutName>("hw-layout","list");
   const [groupBy,setGroupBy]=usePersistedState("hw-group","none");
   const [showDone,setShowDone]=usePersistedState("hw-showdone",true);
@@ -909,7 +915,7 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
   },[notificationsEnabled,tasks,enabledOffsets]);
 
-  const [fontName]=usePersistedState<FontName>("hw-font","dmSerif");
+  const [fontName]=usePersistedState<FontName>("hw-font","system");
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
   // these only kick in above a min-width via CSS media queries, so phones/tablets
@@ -1683,7 +1689,7 @@ export default function HomeworkPlanner() {
   // (and reparsed by the browser) when the theme or font actually changes,
   // not on every task edit, scratchpad keystroke, or other unrelated render.
   const css=useMemo(()=>`
-    @import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');
+    ${F.google?`@import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');`:""}
     *{box-sizing:border-box;}
     body{margin:0;background:${T.bg};transition:background 0.4s;font-family:${F.body};}
     html{background:${T.bg};}

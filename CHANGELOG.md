@@ -8,11 +8,13 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
 
 ### Changed
 - **Rebrand** to the DuePlanner brand guide (v1.0, Sep 2026): replaced the 26-theme/16-font
-  personalization system with a single strict monochrome palette (light + dark/"Inverse", nine
-  named grays, no accent colors) and Inter as the only typeface. Removed the theme grid, custom
-  accent color picker, and font picker from Options accordingly. Flattened all drop shadows. Swept
-  UI copy for the guide's voice rules (no emoji, no exclamation marks, sentence case). New "dp"
-  monogram logo/favicon.
+  personalization system with a single palette + typeface (light + dark, no per-user choice).
+  Removed the theme grid, custom accent color picker, and font picker from Options accordingly.
+  Flattened all drop shadows. Swept UI copy for the guide's voice rules (no emoji, no exclamation
+  marks, sentence case). New "dp" monogram logo/favicon.
+- Color and typeface then departed from the guide's own strict monochrome/Inter choices toward a
+  Notion-inspired look: Notion's actual documented colors (not guessed) for light/dark, and the
+  real native OS font stack Notion itself uses (no single shared web font).
 
 ### Added
 - Unit tests (Vitest) for the pure date/priority/syllabus-parsing functions.

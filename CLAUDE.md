@@ -143,12 +143,10 @@ roles — no accent colors, no per-user theme choice. `themeName` in `App.tsx` i
 `const` (`effectiveThemeMode==="light"?"dueplanner":"dueplannerDark"`), not state — light/dark/auto
 (`themeMode`) is still a real user choice (incl. following system preference), but which of the two
 themes that resolves to is fully determined by it, so there's nothing left to persist, sync, or
-correct. `FONTS` (`App.tsx`) is a single-entry object, kept as a `FONTS`/`fontName` indirection
-(rather than removed) so existing `F.heading`/`F.body` call sites throughout the file didn't need
-to change -- currently Sora, weighted toward the bolder end (500/600/700/800, no 400 loaded; base
-`body` font-weight is set to 500 rather than the usual 400 default), a deliberate departure from
-the brand guide's own choice of Inter. `LAYOUTS` (12 task-list display modes, still in `App.tsx`)
-is unrelated to branding and untouched. The brand guide also mandates "no emoji" and "no
+correct. `FONTS` (`App.tsx`) is a single-entry object holding just Inter, kept as a
+`FONTS`/`fontName` indirection (rather than removed) so existing `F.heading`/`F.body` call sites
+throughout the file didn't need to change. `LAYOUTS` (12 task-list display modes, still in
+`App.tsx`) is unrelated to branding and untouched. The brand guide also mandates "no emoji" and "no
 exclamation marks" in UI copy — enforced by convention (checked with a manual grep sweep when this
 was adopted), not by any lint rule.
 
@@ -226,10 +224,8 @@ collision this convention avoids.
 
 **Visual identity** follows the DuePlanner brand guide (v1.0, Sep 2026, not checked into the repo
 — ask the user for it if design-token values need re-checking): strictly monochrome (the nine grays
-in `src/themes.ts`, no accent colors), a single typeface (the guide specifies Inter; the app
-currently deviates and uses Sora instead, weighted bold -- see Design-system constants above),
-flat/bordered surfaces with no drop shadows, and calm/factual copy (sentence case, no exclamation
-marks, no emoji). The logo is a
+in `src/themes.ts`, no accent colors), Inter as the only typeface, flat/bordered surfaces with no
+drop shadows, and calm/factual copy (sentence case, no exclamation marks, no emoji). The logo is a
 lowercase serif "dp" monogram (`public/favicon.svg`, `public/favicon-32/512.png`,
 `public/apple-touch-icon.png`) — `favicon-32.png` and `favicon.svg` deliberately use a flat,
 shadow-free rendering rather than the full soft-echo version the 512px/180px assets use, per the

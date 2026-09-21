@@ -7,6 +7,10 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
 ## [Unreleased]
 
 ### Added
+- "Stealth Light" theme -- a literal per-channel RGB inversion of the existing dark "Stealth"
+  theme's achromatic grays (near-white bg instead of near-black, pure black accent instead of pure
+  white), with `textMuted` nudged slightly to restore WCAG AA contrast that the naive inversion
+  narrowly missed.
 - Unit tests (Vitest) for the pure date/priority/syllabus-parsing functions.
 - `usePersistedState` hook, replacing repeated `useState` + localStorage
   `useEffect` boilerplate for most simple persisted settings.

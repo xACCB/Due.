@@ -52,9 +52,9 @@ pair. It JSON-serializes on write, and on read falls back to the raw string if `
 — several fields predate the hook and stored plain unquoted strings (e.g. `"list"`, not
 `'"list"'`), and this keeps those intact on the first load after adopting the hook rather than
 silently resetting them to the default. Fields with real extra logic on read (`tasks` — order
-backfill; `themeName` — validates against `THEMES`; `themeByMode` — derives from current theme;
-`subjectColors` — merges with defaults; `accentOverride` — `removeItem` instead of writing `null`;
-`scratchpad` — its own separate debounce, see below) are deliberately left as hand-written
+backfill; `subjectColors` — merges with defaults; `accentOverride` — `removeItem` instead of
+writing `null`; `scratchpad` — its own separate debounce, see below) are deliberately left as
+hand-written
 `useState`/`useEffect` pairs rather than forced into the generic hook.
 
 **Firebase.** The `firebaseConfig` (project `ai-homework-planner-92260`) is hardcoded directly in
@@ -95,9 +95,11 @@ discloses this; keep that page in sync if what's collected here changes.
 
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
-- `users/{uid}` — small "profile" fields only: `themeName`, `layout`, `scratchpad`. Synced as a
-  whole document (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so
-  the first write after sign-in can't race ahead of the first read.
+- `users/{uid}` — small "profile" fields only: `layout`, `scratchpad`. Synced as a whole document
+  (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so the first write
+  after sign-in can't race ahead of the first read. `themeName` isn't a field here (or in
+  `firestore.rules`'s `isValidProfile`) -- see Design-system constants below: it's a derived value
+  now, not independent state, so there's nothing to sync.
 - `users/{uid}/tasks/{taskId}` — one document per task (`taskId` is `String(task.id)`). Synced with
   a diff against `lastSyncedTasksRef` (a `Map<id, Task>` of what's last known to be in the
   subcollection), so only tasks that actually changed get written, via a `writeBatch`, instead of
@@ -133,14 +135,33 @@ require rewriting a user's entire history:
   given it's irreversible. Not chunked past Firestore's 500-op batch limit, matching the existing
   tasks-sync effect's `writeBatch` usage elsewhere.
 
-**Design-system constants** drive both the inline styles and the runtime stylesheet: `THEMES` (26
-color themes, 13 light / 13 dark, all freely selectable — data lives in `src/themes.ts`; `stealthLight`
-is a literal per-channel RGB inversion of `stealth`'s achromatic grays, nudged slightly on
-`textMuted` since a naive hex inversion doesn't perfectly preserve WCAG contrast ratios -- gamma
-non-linearity means inverting each channel isn't the same as mirroring relative luminance; the "BOW"
-theme that briefly existed alongside `stealthLight` has been removed again),
-`LAYOUTS` (12 task-list display modes, still in `App.tsx`), `FONTS` (16 heading/body pairings
-loaded from Google Fonts, still in `App.tsx`).
+**Design-system constants** drive both the inline styles and the runtime stylesheet. `THEMES`
+(`src/themes.ts`) went from 26 color themes down to exactly two -- `stealth` (dark) and
+`stealthLight`, a literal per-channel RGB inversion of `stealth`'s achromatic grays (near-white bg
+instead of near-black, pure black accent instead of pure white; `textMuted` needed a small manual
+nudge afterward, since a naive hex inversion doesn't perfectly preserve WCAG contrast ratios -- sRGB
+gamma correction means relative luminance isn't linear in raw channel space). With exactly one
+theme per light/dark category, `themeName` in `App.tsx` is a plain derived `const`
+(`effectiveThemeMode==="light"?"stealthLight":"stealth"`), not state -- light/dark/auto
+(`themeMode`, labeled "System" in the UI) is still a real user choice (incl. following system
+preference), but which of the two themes that resolves to is fully determined by it, so there's
+nothing left to persist, sync, or correct; the old `themeByMode` "remember last picked theme per
+category" mechanism and its Firestore/localStorage sync are gone entirely, since there's nothing
+left to remember. The "Theme" picker grid is gone from Options for the same reason (nothing to pick
+between); "Custom Accent" is still there and independent of which of the two base themes is active.
+One correctness fix from this worth knowing regardless of future palette changes: 21 call sites
+across the file style buttons/checkmarks as `background:T.accent, color:"#000"` (hardcoded,
+`border:"none"` on most), an assumption that only holds if `accent` is always bright enough for
+black text -- true for every one of the other 25 (now deleted) colorful themes, but broken by
+`stealthLight`'s pure-black accent (would've rendered black-on-black with no border to even show
+the button's shape). All of those now use the existing `contrastColor(T.accent)` helper
+(`src/lib/format.ts` -- WCAG-luminance-based black/white text picker, already used elsewhere e.g.
+the `Toggle` switch thumb) instead of a hardcoded color, so they stay correct under any accent color
+a future theme might use. A few needed a conditional version since they only sometimes render on a
+solid `T.accent` fill (e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`,
+in most layouts -- only the branches that actually use `T.accent` as the fill needed the fix).
+`LAYOUTS` (12 task-list display modes, still in `App.tsx`) and `FONTS` (16 heading/body pairings
+loaded from Google Fonts, still in `App.tsx`) are unchanged.
 
 **Domain logic as plain functions** (not hooks), all in `src/lib/` and unit-tested via `npm test`:
 - `dates.ts`: `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due

@@ -25,6 +25,16 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
 - CI: Dependabot for automated dependency updates; a pre-commit hook
   (husky + lint-staged) running ESLint on staged files.
 
+### Changed
+- Down to just two themes: "Stealth" (dark) and "Stealth Light", removing the other 24. With
+  exactly one theme per light/dark category, `themeName` is now a derived value (determined by
+  Light/Dark/System) rather than an independent, persisted, per-user choice -- the "Theme" picker
+  grid and the old "remember last theme per category" mechanism are both gone as a result. Fixed 21
+  buttons/checkmarks that hardcoded black text on a `T.accent` fill (safe when accent was always a
+  bright color; broken by Stealth Light's pure-black accent) to use the existing `contrastColor()`
+  helper instead.
+- Renamed the "Auto" appearance mode to "System" (label only, same behavior).
+
 ### Removed
 - Streak tracking, the 7-day activity dots, and streak-gated theme unlocks.
   The three previously-gated themes (matrix, dracula, rosepine) are now

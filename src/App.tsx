@@ -2534,7 +2534,7 @@ export default function HomeworkPlanner() {
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Appearance</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
-                  {([{k:"light",l:"Light",e:"☀️"},{k:"dark",l:"Dark",e:"🌙"},{k:"auto",l:"Auto",e:"🌗"}] as const).map(({k,l,e})=>(
+                  {([{k:"light",l:"Light",e:"☀️"},{k:"dark",l:"Dark",e:"🌙"},{k:"auto",l:"System",e:"🌗"}] as const).map(({k,l,e})=>(
                     <button key={k} onClick={()=>setThemeMode(k)} style={{background:themeMode===k?T.accent+"22":T.surface,border:`1.5px solid ${themeMode===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:themeMode===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                       <span style={{fontSize:15}}>{e}</span>
                       <span style={{fontWeight:500}}>{l}</span>

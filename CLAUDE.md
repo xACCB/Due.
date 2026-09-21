@@ -133,11 +133,12 @@ require rewriting a user's entire history:
   given it's irreversible. Not chunked past Firestore's 500-op batch limit, matching the existing
   tasks-sync effect's `writeBatch` usage elsewhere.
 
-**Design-system constants** drive both the inline styles and the runtime stylesheet: `THEMES` (27
-color themes, 14 light / 13 dark, all freely selectable — data lives in `src/themes.ts`; `stealthLight`
+**Design-system constants** drive both the inline styles and the runtime stylesheet: `THEMES` (26
+color themes, 13 light / 13 dark, all freely selectable — data lives in `src/themes.ts`; `stealthLight`
 is a literal per-channel RGB inversion of `stealth`'s achromatic grays, nudged slightly on
 `textMuted` since a naive hex inversion doesn't perfectly preserve WCAG contrast ratios -- gamma
-non-linearity means inverting each channel isn't the same as mirroring relative luminance),
+non-linearity means inverting each channel isn't the same as mirroring relative luminance; the "BOW"
+theme that briefly existed alongside `stealthLight` has been removed again),
 `LAYOUTS` (12 task-list display modes, still in `App.tsx`), `FONTS` (16 heading/body pairings
 loaded from Google Fonts, still in `App.tsx`).
 

@@ -29,6 +29,7 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
 - Streak tracking, the 7-day activity dots, and streak-gated theme unlocks.
   The three previously-gated themes (matrix, dracula, rosepine) are now
   available to everyone.
+- The "BOW" theme (added, then removed again shortly after) from the light theme menu.
 
 ## [0.1.0] — 2026-09-21
 Baseline tag for the start of changelog tracking. Recent work before this

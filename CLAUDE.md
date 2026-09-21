@@ -135,39 +135,34 @@ require rewriting a user's entire history:
   given it's irreversible. Not chunked past Firestore's 500-op batch limit, matching the existing
   tasks-sync effect's `writeBatch` usage elsewhere.
 
-**Design-system constants** drive both the inline styles and the runtime stylesheet. On the
-`rebrand-monochrome` branch, `THEMES` (`src/themes.ts`) went from the original 26 themes through
-the DuePlanner brand guide's strict monochrome palette and a Notion-colors attempt to its current
-state: truly black and white, every field literally `#000000` or `#FFFFFF`, no gray of any kind --
-not even a separate shade for borders or muted/faint text, which means `textMuted`/`textFaint` have
-no color signal left at all; de-emphasis can only come from size/weight/opacity in individual
-components now. `cardAlt` is deliberately `== card == bg` rather than an inverted fill, because it's
-used in several places as a plain chip/skeleton background paired with `color:T.text` (e.g. the
-subject and date/time quick-pick chips in the add-task flow) -- an inverted fill there would render
-text in the same color as its own background. That does mean the loading-skeleton shimmer and the
-`gradientCard` task-highlight background both lose their visible effect (nothing to gradient
-between); the border is the only remaining distinction for those. Two entries only (`bw` light /
-`bwDark` dark, the same "Inverse" concept as before), no per-user theme choice. `themeName` in
-`App.tsx` is a plain derived `const` (`effectiveThemeMode==="light"?"bw":"bwDark"`), not state --
-light/dark/auto (`themeMode`) is still a real user choice (incl. following system preference), but
-which of the two themes that resolves to is fully determined by it, so there's nothing left to
-persist, sync, or correct.
-Making `accent` literally black/white (matching `text`) broke an assumption baked into ~17 call
-sites across the file: buttons styled `background:T.accent, color:"#000"` (hardcoded, `border:
-"none"`), assuming accent is always bright enough for black text -- true for every previous
-colorful theme, but not anymore, and with no border either those buttons would've simply vanished
-(black-on-black or white-on-white). All of those now use the existing `contrastColor(T.accent)`
+**Design-system constants** drive both the inline styles and the runtime stylesheet. The
+`rebrand-monochrome` branch has been through several full palette/font direction changes (26 themes
+→ the DuePlanner brand guide's strict monochrome → Notion's real colors → truly black-and-white →
+its current Tesla-app-inspired look; `git log` on this branch has the blow-by-blow if it's ever
+useful) -- what matters going forward is the current shape, not the history. `THEMES`
+(`src/themes.ts`) currently holds exactly two entries, `tesla` (light) and `teslaDark`, using
+Tesla's own documented brand values (not guessed): their red `#E31937` as the one accent, and their
+dark navy-black `#171A20` for text instead of pure black. `bg` is a softened `#FAFAFA` rather than
+pure `#FFFFFF` -- pure white next to pure black read as too harsh. Two entries only, no per-user
+theme choice: `themeName` in `App.tsx` is a plain derived `const`
+(`effectiveThemeMode==="light"?"tesla":"teslaDark"`), not state -- light/dark/auto (`themeMode`) is
+still a real user choice (incl. following system preference), but which of the two themes that
+resolves to is fully determined by it, so there's nothing left to persist, sync, or correct.
+One correctness fix from this that's worth knowing regardless of which palette is active: ~17 call
+sites across the file style buttons as `background:T.accent, color:"#000"` (hardcoded, `border:
+"none"`), an assumption that only holds if `accent` is always bright enough for black text --
+true for every colorful theme this app has had, but broke completely during the truly-black-and-white
+attempt (accent became literal black, so those buttons would've rendered black-on-black with no
+border to even show their shape). All of those now use the existing `contrastColor(T.accent)`
 helper (`src/lib/format.ts` -- WCAG-luminance-based black/white text picker, already used elsewhere
-e.g. the `Toggle` switch thumb) instead of a hardcoded color, so they stay correct regardless of
-which of `bw`/`bwDark` is active. A few of these are conditional on a *different* fixed color when
-inactive (e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`) -- only the
-branches that actually render text on a solid `T.accent` fill needed the fix; the ones already using
-a fixed, always-light-enough color didn't.
-`FONTS` (`App.tsx`) is a single-entry object holding the app's original pre-rebrand pairing (DM
-Serif Display / DM Mono), kept as a `FONTS`/`fontName` indirection (rather than removed) so existing
-`F.heading`/`F.body` call sites throughout the file didn't need to change -- Inter, Sora, and the
-native OS system-font stack (Notion's actual approach) were all tried and reverted on this branch
-before landing back here; see `git log` on this branch for that history if it's useful context.
+e.g. the `Toggle` switch thumb) instead of a hardcoded color, so they stay correct under any accent
+color a future palette might use. A few are conditional on a *different* fixed color when inactive
+(e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`) -- only the branches
+that actually render text on a solid `T.accent` fill needed the fix.
+`FONTS` (`App.tsx`) is a single-entry object holding Manrope -- picked deliberately over trying to
+source or approximate Tesla's actual site/app font, which is a proprietary licensed typeface, not a
+public value like their brand colors are. Kept as a `FONTS`/`fontName` indirection (rather than
+removed) so existing `F.heading`/`F.body` call sites throughout the file didn't need to change.
 `LAYOUTS` (12 task-list display modes, still in `App.tsx`) is unrelated to branding and untouched.
 Voice rules (no emoji, no exclamation marks, sentence case) from the original brand guide adoption
 are still in effect, enforced by convention (checked with a manual grep sweep when adopted), not by
@@ -248,9 +243,9 @@ collision this convention avoids.
 **Visual identity** started from the DuePlanner brand guide (v1.0, Sep 2026, not checked into the
 repo — ask the user for it if design-token values need re-checking): flat/bordered surfaces with no
 drop shadows, and calm/factual copy (sentence case, no exclamation marks, no emoji) still follow it
-as shipped. Color has since gone further than the guide's own nine-gray palette, to literally just
-black and white; typeface reverted to the app's pre-rebrand original rather than the guide's own
-choice of Inter -- see Design-system constants above for why. The logo is a
+as shipped. Color and typeface have since moved away from the guide entirely, toward a Tesla-app-
+inspired look (their real brand red/dark navy-black, a softened off-white, Manrope instead of
+Inter) — see Design-system constants above for the current values and why. The logo is a
 lowercase serif "dp" monogram (`public/favicon.svg`, `public/favicon-32/512.png`,
 `public/apple-touch-icon.png`) — `favicon-32.png` and `favicon.svg` deliberately use a flat,
 shadow-free rendering rather than the full soft-echo version the 512px/180px assets use, per the

@@ -150,12 +150,15 @@ const LAYOUTS = {
 type LayoutName = keyof typeof LAYOUTS;
 
 // ─── FONTS ────────────────────────────────────────────────────────────────────
-// The app's original pairing (from before any of the rebrand experiments on
-// this branch) -- kept as a single-entry FONTS/fontName indirection (rather
-// than removed) so the many existing `F.heading`/`F.body` call sites
-// throughout the file don't need to change.
+// Tesla's own site/app font is a proprietary licensed typeface -- unlike the
+// brand colors (which are well-documented public values), that's not
+// something to source or approximate as "the real thing." Manrope instead:
+// free, clean, geometric-humanist, fits the tech/automotive feel without
+// pretending to be an exact match. Kept as a single-entry FONTS/fontName
+// indirection (rather than removed) so the many existing `F.heading`/
+// `F.body` call sites throughout the file don't need to change.
 const FONTS = {
-  dmSerif: { name:"DM Serif", preview:"Homework.", heading:"'DM Serif Display', serif", body:"'DM Mono', monospace", google:"DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500" },
+  manrope: { name:"Manrope", preview:"Homework.", heading:"'Manrope', sans-serif", body:"'Manrope', sans-serif", google:"Manrope:wght@400;500;600;700" },
 } as const;
 type FontName = keyof typeof FONTS;
 
@@ -811,7 +814,7 @@ export default function HomeworkPlanner() {
   // monochrome palette and its Inverse), so the theme is fully determined by
   // effectiveThemeMode -- no independent theme choice, no per-category "last
   // picked" memory, and nothing to correct when the mode changes.
-  const themeName:ThemeName=effectiveThemeMode==="light"?"bw":"bwDark";
+  const themeName:ThemeName=effectiveThemeMode==="light"?"tesla":"teslaDark";
   const [layout,setLayout]=usePersistedState<LayoutName>("hw-layout","list");
   const [groupBy,setGroupBy]=usePersistedState("hw-group","none");
   const [showDone,setShowDone]=usePersistedState("hw-showdone",true);
@@ -908,7 +911,7 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
   },[notificationsEnabled,tasks,enabledOffsets]);
 
-  const [fontName]=usePersistedState<FontName>("hw-font","dmSerif");
+  const [fontName]=usePersistedState<FontName>("hw-font","manrope");
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
   // these only kick in above a min-width via CSS media queries, so phones/tablets

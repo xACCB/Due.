@@ -12,12 +12,14 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   Removed the theme grid, custom accent color picker, and font picker from Options accordingly.
   Flattened all drop shadows. Swept UI copy for the guide's voice rules (no emoji, no exclamation
   marks, sentence case). New "dp" monogram logo/favicon.
-- Color and typeface then went through a Notion-inspired attempt (Notion's real documented colors
-  and native OS font stack), then settled on truly black-and-white (every color literally `#000000`
-  or `#FFFFFF`, no gray at all) with the app's original pre-rebrand font (DM Serif Display / DM
-  Mono). Fixed ~17 buttons/checkmarks across the file that hardcoded black text on `T.accent`
-  backgrounds (safe when accent was always a bright color; not once it's literally black) to use
-  the existing `contrastColor()` helper instead, so they stay correct in both light and dark.
+- Color and typeface went through several more direction changes after that (Notion-inspired real
+  colors + native OS font stack, then truly black-and-white) before landing on the current
+  Tesla-app-inspired look: their real brand red (`#E31937`) and dark navy-black text (`#171A20`),
+  a softened off-white background (`#FAFAFA`, not pure white), and Manrope in place of Inter (Tesla's
+  actual font is proprietary/licensed, unlike their public brand colors). Fixed ~17 buttons/
+  checkmarks across the file that hardcoded black text on `T.accent` backgrounds (only safe when
+  accent is always a bright color -- broke completely during the black-and-white attempt) to use the
+  existing `contrastColor()` helper instead, so they stay correct under any accent color.
 
 ### Added
 - Unit tests (Vitest) for the pure date/priority/syllabus-parsing functions.

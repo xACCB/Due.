@@ -150,11 +150,13 @@ const LAYOUTS = {
 type LayoutName = keyof typeof LAYOUTS;
 
 // ─── FONTS ────────────────────────────────────────────────────────────────────
-// One typeface for everything, per the brand guide -- kept as a single-entry
-// FONTS/fontName indirection (rather than removed) so the many existing
-// `F.heading`/`F.body` call sites throughout the file don't need to change.
+// The app's original default pairing (from before the brand guide rebrand),
+// kept deliberately instead of the guide's own choice of Inter -- kept as a
+// single-entry FONTS/fontName indirection (rather than removed) so the many
+// existing `F.heading`/`F.body` call sites throughout the file don't need to
+// change.
 const FONTS = {
-  inter: { name:"Inter", preview:"Homework.", heading:"'Inter', sans-serif", body:"'Inter', sans-serif", google:"Inter:wght@400;500;600;700" },
+  dmSerif: { name:"DM Serif", preview:"Homework.", heading:"'DM Serif Display', serif", body:"'DM Mono', monospace", google:"DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500" },
 } as const;
 type FontName = keyof typeof FONTS;
 
@@ -907,7 +909,7 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
   },[notificationsEnabled,tasks,enabledOffsets]);
 
-  const [fontName]=usePersistedState<FontName>("hw-font","inter");
+  const [fontName]=usePersistedState<FontName>("hw-font","dmSerif");
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
   // these only kick in above a min-width via CSS media queries, so phones/tablets

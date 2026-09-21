@@ -13,6 +13,8 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   accent color picker, and font picker from Options accordingly. Flattened all drop shadows. Swept
   UI copy for the guide's voice rules (no emoji, no exclamation marks, sentence case). New "dp"
   monogram logo/favicon.
+- Swapped the brand guide's Inter for Sora, weighted toward the bolder end (500-800, no regular
+  400 loaded).
 
 ### Added
 - Unit tests (Vitest) for the pure date/priority/syllabus-parsing functions.

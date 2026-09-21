@@ -150,11 +150,13 @@ const LAYOUTS = {
 type LayoutName = keyof typeof LAYOUTS;
 
 // ─── FONTS ────────────────────────────────────────────────────────────────────
-// One typeface for everything, per the brand guide -- kept as a single-entry
-// FONTS/fontName indirection (rather than removing it) so the many existing
-// `F.heading`/`F.body` call sites throughout the file don't need to change.
+// One typeface for everything -- kept as a single-entry FONTS/fontName
+// indirection (rather than removed) so the many existing `F.heading`/`F.body`
+// call sites throughout the file don't need to change. Sora, weighted toward
+// the bolder end (500/600/700/800, no 400) since the base body font-weight
+// below is set to 500 rather than the usual 400 default.
 const FONTS = {
-  inter: { name:"Inter", preview:"Homework.", heading:"'Inter', sans-serif", body:"'Inter', sans-serif", google:"Inter:wght@400;500;600;700" },
+  sora: { name:"Sora", preview:"Homework.", heading:"'Sora', sans-serif", body:"'Sora', sans-serif", google:"Sora:wght@500;600;700;800" },
 } as const;
 type FontName = keyof typeof FONTS;
 
@@ -907,7 +909,7 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
   },[notificationsEnabled,tasks,enabledOffsets]);
 
-  const [fontName]=usePersistedState<FontName>("hw-font","inter");
+  const [fontName]=usePersistedState<FontName>("hw-font","sora");
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
   // these only kick in above a min-width via CSS media queries, so phones/tablets
@@ -1683,7 +1685,7 @@ export default function HomeworkPlanner() {
   const css=useMemo(()=>`
     @import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');
     *{box-sizing:border-box;}
-    body{margin:0;background:${T.bg};transition:background 0.4s;font-family:${F.body};}
+    body{margin:0;background:${T.bg};transition:background 0.4s;font-family:${F.body};font-weight:500;}
     html{background:${T.bg};}
     .app-shell{min-height:100svh;min-height:100dvh;}
     .tc{transition:all 0.22s cubic-bezier(.34,1.2,.64,1);}

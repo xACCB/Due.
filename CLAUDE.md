@@ -96,7 +96,7 @@ discloses this; keep that page in sync if what's collected here changes.
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
 - `users/{uid}` — small "profile" fields only: `layout`, `colorCodeUrgency`, `subjects`,
-  `subjectColors` (a legacy `scratchpad` field may still exist on old docs; nothing reads it now that
+  `subjectColors`, `timeFormat` (`"12h"`/`"24h"`), `weekStart` (0 = Sunday, 1 = Monday) (a legacy `scratchpad` field may still exist on old docs; nothing reads it now that
   the Tools tab is gone). Synced as a whole document
   (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so the first write
   after sign-in can't race ahead of the first read. `themeName` isn't a field here (or in
@@ -259,6 +259,19 @@ which still exists as the outer safety net for anything else.
   duplicate. The copy gets unchecked subtasks and keeps no due date if the original had none.
 - `estMins` can be 0 (estimate step skipped); every display goes through `formatDuration()`
   (`src/lib/format.ts`), which returns "" for 0 so the label is hidden rather than showing "0m".
+
+**Undo history.** `HistoryAction` is either `"delete"` (ties into Recently deleted) or `"change"`:
+each affected task's full state before and after (`src/lib/history.ts`, `diffTasks`/
+`applyTaskStates`), recorded per task rather than as a whole-list copy so undoing one change
+can't roll back unrelated edits made since (e.g. synced from another device). Anything that
+should be undoable goes through `changeTasks(fn, label, toast)` -- completing (incl. the spawned
+repeat copy), the Edit panel (`editTask`), archive/restore, snooze, skip, and bulk actions.
+Subtask ticks, tags and priority overrides are deliberately not undoable (too noisy).
+
+**Settings extras.** Subjects can be renamed/recolored (`updateSubject`, carries the rename to
+tasks, trash and templates). Date & time: `timeFormat` (`formatTime(t, h24)`, passed to
+`TaskModal`/`MiniCard` as `h24`) and `weekStart` (`startOfWeek()` in `src/lib/dates.ts`, used by
+the Inbox's week stats). The Inbox starts with a "Done today" list (`doneToday`).
 
 **Task detail actions.** `TaskModal` can edit a task's own fields (an Edit panel, via
 `onUpdateTask(patch)` -> `updateTask`), snooze it (`snoozeTarget()`, module scope, since the

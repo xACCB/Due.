@@ -12,12 +12,14 @@ import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/anal
 import type { Priority, Recurrence } from "./types";
 import { THEMES } from "./themes";
 import type { ThemeName, ThemeObj } from "./themes";
-import { localDateStr, todayISO, advanceDate } from "./lib/dates";
+import { localDateStr, todayISO, advanceDate, startOfWeek } from "./lib/dates";
 import { nextId } from "./lib/id";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
 import { reconcile, changedFields, same } from "./lib/sync";
+import { diffTasks, applyTaskStates } from "./lib/history";
+import type { TaskStates } from "./lib/history";
 import type { SyncRecord, CloudRecord } from "./lib/sync";
 import { downloadFile } from "./lib/download";
 import { usePersistedState } from "./hooks/usePersistedState";
@@ -211,6 +213,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"settings-batch", date:"2026-09-22", title:"New feature", description:"Rename subjects and change their colors (✎ in Settings -> Subjects); a \"Done today\" list in the Inbox; 24-hour time and a Monday week start in Settings -> Date & time; and completing, editing, archiving and bulk changes can now be undone." },
   { id:"safer-sync", date:"2026-09-22", title:"Improvement", description:"Syncing between devices is safer: edits made at the same time on two devices are merged field by field instead of one overwriting the other, Recently deleted now syncs too, and the title menu shows when you last synced (or that you're offline)." },
   { id:"time-left-more", date:"2026-09-22", title:"New feature", description:"The \"Time left\" dropdown now splits time by due date, shows time worked per subject, flags tasks with no estimate, and can start Focus on the most urgent task in your biggest subject." },
   { id:"fewer-layouts", date:"2026-09-22", title:"UI change", description:"Trimmed the layouts to seven: Compact, Minimal, Sticky, Timeline and By Subject are gone. If you were using one, you're back on List." },
@@ -309,7 +312,9 @@ function buildSuggestion(tasks:Task[]):string {
 // One entry in the undo/redo history (see undoStack in HomeworkPlanner).
 type HistoryAction =
   | {type:"delete"; tasks:Task[]}
-  | {type:"edit"; taskId:number; before:Partial<Task>; after:Partial<Task>; label:string};
+  // Any other change (complete, edit, archive, snooze, ...): each affected
+  // task's state before and after -- see src/lib/history.ts.
+  | {type:"change"; before:TaskStates<Task>; after:TaskStates<Task>; label:string};
 
 // Recently deleted entries. Built at module scope because the React
 // Compiler's purity lint rejects Date.now() inside component functions.
@@ -356,8 +361,8 @@ function snoozeTarget(kind:SnoozeKind):{dueDate:string;dueTime?:string}{
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSkipOccurrence,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
-  task:Task; T:ThemeObj; F:typeof FONT; subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number;
+function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSkipOccurrence,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
+  task:Task; T:ThemeObj; F:typeof FONT; subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number; h24:boolean;
   sessionActive:boolean; sessionSecs:number;
   allTags:string[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
@@ -515,7 +520,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,session
           {/* Info row */}
           <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
             <div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` at ${formatTime(task.dueTime)}`:""}</span>
+              <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` at ${formatTime(task.dueTime,h24)}`:""}</span>
               {!task.done&&countdown(task.dueDate,task.dueTime,now)&&<span style={{fontFamily:F.body,fontSize:12,color:priColor(pr,colorCodeUrgency),fontWeight:500}}>· {countdown(task.dueDate,task.dueTime,now)}</span>}
             </div>
             {task.estMins>0&&<div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",gap:6}}>
@@ -705,9 +710,9 @@ function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:T
 // for every visible task across every layout, so being redefined (and every
 // instance's DOM torn down/recreated) on each unrelated render was the most
 // consequential case of this pattern in the file.
-function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,now,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
+function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,now,h24,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
   task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
-  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number;
+  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number; h24:boolean;
   dragTaskId:number|null; dragOffsetY:number;
   onOpen:(task:Task)=>void;
   onToggleDone:(id:number)=>void;
@@ -766,7 +771,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
             {task.tags?.map(tag=><span key={tag} style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>#{tag}</span>)}
           </div>
           <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
-            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
+            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime,h24)}`:""}</span>
             {task.estMins>0&&<span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDuration(task.estMins)}</span>}
             {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:priColor(pr,colorCodeUrgency),fontWeight:500}}>{dm}</span>}
           </div>
@@ -1045,6 +1050,10 @@ export default function HomeworkPlanner() {
   useEffect(()=>{ setTrash(pruneTrash); },[setTrash]);
   const trashRef=useRef(trash);
   useEffect(()=>{trashRef.current=trash;},[trash]);
+  // Date & time settings (Settings -> Date & time); synced with the profile.
+  const [timeFormat,setTimeFormat]=usePersistedState<"12h"|"24h">("hw-timeformat","12h");
+  const [weekStart,setWeekStart]=usePersistedState<number>("hw-weekstart",0); // 0 = Sunday, 1 = Monday
+  const h24=timeFormat==="24h";
   const [selectedTask,setSelectedTask]=useState<Task|null>(null);
   // Wall clock for live countdowns ("due in 2h 15m"), refreshed every 30s.
   const [now,setNow]=useState(()=>Date.now());
@@ -1158,7 +1167,7 @@ export default function HomeworkPlanner() {
           const minsLeft=Math.round((dueAt-now)/60000);
           const daysLeft=Math.round(minsLeft/1440);
           const when=minsLeft<=0?"now":minsLeft<60?`in ${minsLeft} min`:minsLeft<1440?`in ${formatDuration(minsLeft)}`:`in ${daysLeft} day${daysLeft===1?"":"s"}`;
-          notify(`"${t.title}" is due ${when}`,{body:`${formatDate(t.dueDate)} at ${formatTime(t.dueTime)}`});
+          notify(`"${t.title}" is due ${when}`,{body:`${formatDate(t.dueDate)} at ${formatTime(t.dueTime,h24)}`});
         }
         for(const o of eligible){ if(!sent[sentKey(o)]){ sent[sentKey(o)]=true; changed=true; } }
       }
@@ -1176,7 +1185,7 @@ export default function HomeworkPlanner() {
     // the tab regains focus, so also re-check periodically while it's open.
     const interval=setInterval(checkDue,60000);
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
-  },[notificationsEnabled,tasks,enabledOffsets]);
+  },[notificationsEnabled,tasks,enabledOffsets,h24]);
 
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
@@ -1221,6 +1230,21 @@ export default function HomeworkPlanner() {
     const color=SUBJECT_COLOR_PALETTE.find(c=>!used.has(c))||SUBJECT_COLOR_PALETTE[subjects.length%SUBJECT_COLOR_PALETTE.length];
     setSubjects(prev=>[...prev,trimmed]);
     setSubjectColors(prev=>({...prev,[trimmed]:color}));
+  }
+  // Rename and/or recolor a subject; a rename carries over to every task
+  // (including Recently deleted) and template using it. False if the new name
+  // is empty or taken.
+  function updateSubject(old:string,name:string,color:string):boolean{
+    const trimmed=name.trim();
+    if(!trimmed||subjects.some(s=>s!==old&&s.toLowerCase()===trimmed.toLowerCase()))return false;
+    setSubjects(prev=>prev.map(s=>s===old?trimmed:s));
+    setSubjectColors(prev=>{const next={...prev};delete next[old];next[trimmed]=color;return next;});
+    if(trimmed!==old){
+      setTasks(prev=>prev.map(t=>t.subject===old?{...t,subject:trimmed}:t));
+      setTrash(prev=>prev.map(e=>e.task.subject===old?{...e,task:{...e.task,subject:trimmed}}:e));
+      setTemplates(prev=>prev.map(tp=>tp.subject===old?{...tp,subject:trimmed}:tp));
+    }
+    return true;
   }
   function removeSubject(name:string){
     setSubjects(prev=>prev.filter(s=>s!==name));
@@ -1399,6 +1423,8 @@ export default function HomeworkPlanner() {
         // state and crash a render. Cheap shape checks before applying.
         if(typeof data.layout==="string"&&data.layout in LAYOUTS) setLayout(data.layout as LayoutName);
         if(typeof data.colorCodeUrgency==="boolean") setColorCodeUrgency(data.colorCodeUrgency);
+        if(data.timeFormat==="12h"||data.timeFormat==="24h") setTimeFormat(data.timeFormat);
+        if(data.weekStart===0||data.weekStart===1) setWeekStart(data.weekStart);
         if(Array.isArray(data.subjects)&&data.subjects.every((s:unknown)=>typeof s==="string")) setSubjects(data.subjects);
         if(data.subjectColors&&typeof data.subjectColors==="object"&&Object.values(data.subjectColors).every(v=>typeof v==="string")) setSubjectColors({...DEFAULT_SUBJECT_COLORS,...data.subjectColors});
       }
@@ -1409,7 +1435,7 @@ export default function HomeworkPlanner() {
       setSyncError("Couldn't sync with the cloud -- your changes are saved on this device, but may not reach your other devices until this is resolved.");
     });
     return unsub;
-  },[fbUser,readyForUid,setLayout,setColorCodeUrgency,setSubjects]);
+  },[fbUser,readyForUid,setLayout,setColorCodeUrgency,setSubjects,setTimeFormat,setWeekStart]);
 
   // Save the profile fields TO Firestore whenever they change. Gated on
   // profileSyncedForUid matching the current user so the very first write
@@ -1418,14 +1444,14 @@ export default function HomeworkPlanner() {
     if(!fbUser||profileSyncedForUid!==fbUser.uid)return;
     isSyncingProfile.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{layout,colorCodeUrgency,subjects,subjectColors},{merge:true})
+    setDoc(ref,{layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart},{merge:true})
       .then(()=>setSyncError(null))
       .catch(err=>{
         console.error(err);
         setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
       })
       .finally(()=>{isSyncingProfile.current=false;});
-  },[layout,colorCodeUrgency,subjects,subjectColors,fbUser,profileSyncedForUid]);
+  },[layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart,fbUser,profileSyncedForUid]);
 
   // Sync tasks FROM the tasks and trash subcollections.
   useEffect(()=>{
@@ -1766,6 +1792,8 @@ export default function HomeworkPlanner() {
   // survives that; an uncontrolled input's typed text would silently vanish.
   const [newSubjectText,setNewSubjectText]=useState("");
   const [pendingSubjectDelete,setPendingSubjectDelete]=useState<string|null>(null);
+  // The subject being renamed/recolored in Settings, and its draft values.
+  const [editingSubject,setEditingSubject]=useState<{old:string;name:string;color:string}|null>(null);
   // Drag-to-reorder (default list layout, pending tasks only)
   const [dragTaskId,setDragTaskId]=useState<number|null>(null);
   const [dragOffsetY,setDragOffsetY]=useState(0);
@@ -1921,6 +1949,10 @@ export default function HomeworkPlanner() {
   const heaviestSubject=timeBySubject[0];
   const heaviestNext=heaviestSubject?mostUrgent(openTasks.filter(t=>(t.subject||"")===heaviestSubject.name)):undefined;
   const fmtMins=(m:number)=>formatDuration(m)||"0m";
+  // Everything finished since local midnight, newest first (Inbox).
+  const todayStartMs=(()=>{const d=new Date(now);d.setHours(0,0,0,0);return d.getTime();})();
+  const doneToday=tasks.filter(t=>t.done&&(t.completedAt??0)>=todayStartMs).sort((a,b)=>(b.completedAt??0)-(a.completedAt??0));
+  const clockTime=(ms:number)=>{const d=new Date(ms);return formatTime(`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`,h24);};
   // One line for the title menu: where this device's changes stand.
   const syncStatus=!fbUser?null
     :!online?"Offline -- changes will sync when you're back online"
@@ -1930,11 +1962,11 @@ export default function HomeworkPlanner() {
 
   // Inbox stats. Archived tasks still count here -- archiving is just a view
   // filter, it doesn't erase completion history.
-  const startOfWeek=(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());d.setHours(0,0,0,0);return d.getTime();})();
+  const weekStartMs=startOfWeek(new Date(now),weekStart).getTime();
   const startOfMonth=(()=>{const d=new Date();d.setDate(1);d.setHours(0,0,0,0);return d.getTime();})();
   const startOfYear=(()=>{const d=new Date();d.setMonth(0,1);d.setHours(0,0,0,0);return d.getTime();})();
   // Inbox overview -- Week/Month/Year toggle over the same completedAt data.
-  const overviewStart=overviewPeriod==="week"?startOfWeek:overviewPeriod==="month"?startOfMonth:startOfYear;
+  const overviewStart=overviewPeriod==="week"?weekStartMs:overviewPeriod==="month"?startOfMonth:startOfYear;
   const overviewCompleted=tasks.filter(t=>t.completedAt&&t.completedAt>=overviewStart);
   const overviewFinished=overviewCompleted.length;
   // Real time from the task timer's logged sessions (not estimates), across
@@ -2042,7 +2074,8 @@ export default function HomeworkPlanner() {
   function toggleDone(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
-    setTasks(prev=>setDone(prev,[id],!task.done));
+    changeTasks(prev=>setDone(prev,[id],!task.done),`${task.done?"uncheck":"complete"} "${task.title}"`,
+      task.done?`"${task.title}" marked not done`:`"${task.title}" completed`);
   }
   // Every delete path (single, bulk, "clear completed") goes through here, so
   // they're all undoable the same way instead of some being permanent.
@@ -2062,14 +2095,22 @@ export default function HomeworkPlanner() {
     clearTimeout(undoToastTimer.current);
     undoToastTimer.current=setTimeout(()=>setUndoToast(null),5000);
   }
+  // Applies a change to the task list and records it in the undo history.
+  function changeTasks(fn:(prev:Task[])=>Task[],label:string,toast:string){
+    const next=fn(tasks);
+    const {before,after}=diffTasks(tasks,next);
+    if(before.length===0)return;
+    setTasks(next);
+    pushUndoable({type:"change",before,after,label},toast);
+  }
+  const plural=(n:number)=>`${n} ${n===1?"task":"tasks"}`;
   // "No quiz this week": moves a repeating task to its next occurrence without
   // marking it done (so no completion is recorded and nothing new is spawned).
   function skipOccurrence(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task||!task.recurrence||task.recurrence==="none")return;
     const after={dueDate:advanceDate(task.dueDate||todayISO(),task.recurrence)};
-    updateTask(id,after);
-    pushUndoable({type:"edit",taskId:id,before:{dueDate:task.dueDate},after,label:`skip "${task.title}"`},
+    changeTasks(prev=>prev.map(t=>t.id===id?{...t,...after}:t),`skip "${task.title}"`,
       `"${task.title}" skipped to ${formatDate(after.dueDate)}`);
   }
   function snoozeTask(id:number,kind:SnoozeKind){
@@ -2077,9 +2118,8 @@ export default function HomeworkPlanner() {
     if(!task)return;
     const target=snoozeTarget(kind);
     const after={dueDate:target.dueDate,dueTime:target.dueTime??task.dueTime};
-    updateTask(id,after);
-    pushUndoable({type:"edit",taskId:id,before:{dueDate:task.dueDate,dueTime:task.dueTime},after,label:`snooze "${task.title}"`},
-      `"${task.title}" snoozed to ${formatDate(after.dueDate)}${after.dueTime?` ${formatTime(after.dueTime)}`:""}`);
+    changeTasks(prev=>prev.map(t=>t.id===id?{...t,...after}:t),`snooze "${task.title}"`,
+      `"${task.title}" snoozed to ${formatDate(after.dueDate)}${after.dueTime?` ${formatTime(after.dueTime,h24)}`:""}`);
   }
   // Each action type's reversal lives in its branch here.
   function undo(){
@@ -2089,7 +2129,7 @@ export default function HomeworkPlanner() {
       setTasks(prev=>{const have=new Set(prev.map(t=>t.id));return [...prev,...action.tasks.filter(t=>!have.has(t.id))];});
       removeFromTrash(action.tasks.map(t=>t.id));
     }
-    if(action.type==="edit")updateTask(action.taskId,action.before);
+    if(action.type==="change")setTasks(prev=>applyTaskStates(prev,action.before));
     setUndoStack(prev=>prev.slice(0,-1));
     setRedoStack(prev=>[...prev,action]);
     setUndoToast(null);
@@ -2098,11 +2138,11 @@ export default function HomeworkPlanner() {
     if(redoStack.length===0)return;
     const action=redoStack[redoStack.length-1];
     if(action.type==="delete"){const ids=new Set(action.tasks.map(t=>t.id));setTasks(prev=>prev.filter(t=>!ids.has(t.id)));addToTrash(action.tasks);}
-    if(action.type==="edit")updateTask(action.taskId,action.after);
+    if(action.type==="change")setTasks(prev=>applyTaskStates(prev,action.after));
     setRedoStack(prev=>prev.slice(0,-1));
     setUndoStack(prev=>[...prev,action]);
   }
-  const describeAction=(action:HistoryAction)=>action.type==="edit"?action.label
+  const describeAction=(action:HistoryAction)=>action.type==="change"?action.label
     :`delete ${action.tasks.length===1?`"${action.tasks[0].title}"`:`${action.tasks.length} tasks`}`;
   function updateSubtasks(id:number,subtasks:Subtask[]){
     setTasks(prev=>prev.map(t=>t.id===id?{...t,subtasks}:t));
@@ -2112,9 +2152,6 @@ export default function HomeworkPlanner() {
   }
   function setTaskTags(id:number,tags:string[]){
     setTasks(prev=>prev.map(t=>t.id===id?{...t,tags}:t));
-  }
-  function updateTask(id:number,patch:Partial<Task>){
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,...patch}:t));
   }
   // A fresh copy: not done, no logged sessions, subtasks unchecked, and not
   // linked to the original's repeat chain.
@@ -2127,14 +2164,27 @@ export default function HomeworkPlanner() {
     return copy;
   }
   function archiveTask(id:number){
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,archived:true}:t));
+    const task=tasks.find(t=>t.id===id);
+    if(!task)return;
+    changeTasks(prev=>prev.map(t=>t.id===id?{...t,archived:true}:t),`archive "${task.title}"`,`"${task.title}" archived`);
+  }
+  function unarchiveTask(id:number){
+    const task=tasks.find(t=>t.id===id);
+    if(!task)return;
+    changeTasks(prev=>prev.map(t=>t.id===id?{...t,archived:false}:t),`restore "${task.title}"`,`"${task.title}" restored`);
+  }
+  // The task detail's Edit panel.
+  function editTask(id:number,patch:Partial<Task>){
+    const task=tasks.find(t=>t.id===id);
+    if(!task)return;
+    changeTasks(prev=>prev.map(t=>t.id===id?{...t,...patch}:t),`edit "${task.title}"`,`"${patch.title??task.title}" updated`);
   }
   function bulkMarkDone(ids:number[]){
-    setTasks(prev=>setDone(prev,ids,true));
+    changeTasks(prev=>setDone(prev,ids,true),`complete ${plural(ids.length)}`,`${plural(ids.length)} completed`);
     exitSelectionMode();
   }
   function bulkArchive(ids:number[]){
-    setTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,archived:true}:t));
+    changeTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,archived:true}:t),`archive ${plural(ids.length)}`,`${plural(ids.length)} archived`);
     exitSelectionMode();
   }
   function bulkDelete(ids:number[]){
@@ -2142,7 +2192,7 @@ export default function HomeworkPlanner() {
     exitSelectionMode();
   }
   function bulkSetSubject(ids:number[],subject:string){
-    setTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,subject}:t));
+    changeTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,subject}:t),`move ${plural(ids.length)} to ${subject||"no subject"}`,`${plural(ids.length)} moved to ${subject||"no subject"}`);
     exitSelectionMode();
   }
   function exportAllDataJSON(){
@@ -2418,7 +2468,7 @@ export default function HomeworkPlanner() {
     const pending=allSorted.filter(t=>!t.done);
     // Shared props for the (module-scope) MiniCard -- spread at each call site
     // below instead of repeating this whole list three times.
-    const miniCardProps={T,F,subjectColors,colorCodeUrgency,now,dragTaskId,dragOffsetY,
+    const miniCardProps={T,F,subjectColors,colorCodeUrgency,now,h24,dragTaskId,dragOffsetY,
       onOpen:(t:Task)=>{setSelectedTask(t);},
       onToggleDone:toggleDone,onDelete:deleteTask,
       swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,
@@ -2724,7 +2774,7 @@ export default function HomeworkPlanner() {
               )}
               <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{focusTask.title}</div>
               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(focusTask.dueDate)}{focusTask.dueTime?` ${formatTime(focusTask.dueTime)}`:""}</span>
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(focusTask.dueDate)}{focusTask.dueTime?` ${formatTime(focusTask.dueTime,h24)}`:""}</span>
                 {focusTask.estMins>0&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDuration(focusTask.estMins)}</span>}
               </div>
               <button onClick={()=>toggleDone(focusTask.id)} style={{marginTop:14,background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>✓ Mark done</button>
@@ -2761,6 +2811,19 @@ export default function HomeworkPlanner() {
                   </button>
                   {inboxMenuOpen&&(
                     <div style={{padding:"0 14px 12px"}}>
+                      {/* Done today */}
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Done today{doneToday.length?` (${doneToday.length})`:""}</div>
+                      {doneToday.length===0
+                        ?<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:12}}>Nothing finished yet today.</div>
+                        :<div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,maxHeight:180,overflowY:"auto"}}>
+                          {doneToday.map(t=>(
+                            <button key={t.id} onClick={()=>{setSelectedTask(t);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer",textAlign:"left"}}>
+                              <span style={{color:"#2ED573",fontSize:11,flexShrink:0}}>✓</span>
+                              <span style={{fontFamily:F.body,fontSize:12,color:T.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                              <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{clockTime(t.completedAt!)}</span>
+                            </button>
+                          ))}
+                        </div>}
                       {/* Personal */}
                       <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Personal</div>
                       <div style={{display:"flex",gap:6,marginBottom:10}}>
@@ -3195,7 +3258,7 @@ export default function HomeworkPlanner() {
                     <div style={{fontFamily:F.heading,fontSize:14,color:T.text}}>{newTask.title}</div>
                     <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
                       {newTask.subject&&<span style={{color:subjectColors[newTask.subject]||T.accent,fontFamily:F.body,fontSize:10}}>{newTask.subject}</span>}
-                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>{formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime)}`:""}</span>}
+                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>{formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime,h24)}`:""}</span>}
                       {newTask.recurrence&&newTask.recurrence!=="none"&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>↻ {newTask.recurrence}</span>}
                     </div>
                   </div>}
@@ -3295,16 +3358,51 @@ export default function HomeworkPlanner() {
               </div>
             </div>}
             </div>
+            {/* Date & time */}
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Date &amp; time</div>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Time format</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>
+                {([["12h","12-hour (3:05 PM)"],["24h","24-hour (15:05)"]] as const).map(([k,l])=>(
+                  <button key={k} onClick={()=>setTimeFormat(k)} aria-pressed={timeFormat===k} style={{background:timeFormat===k?T.accent+"22":T.surface,border:`1.5px solid ${timeFormat===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:timeFormat===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                ))}
+              </div>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Week starts on</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+                {([[0,"Sunday"],[1,"Monday"]] as const).map(([k,l])=>(
+                  <button key={k} onClick={()=>setWeekStart(k)} aria-pressed={weekStart===k} style={{background:weekStart===k?T.accent+"22":T.surface,border:`1.5px solid ${weekStart===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:weekStart===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                ))}
+              </div>
+            </div>
             {/* Subjects -- lives here (not in Profile) so it works signed out too */}
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
               <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Subjects</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {subjects.map(s=>{
                   const confirming=pendingSubjectDelete===s;
+                  if(editingSubject?.old===s) return (
+                    <form key={s} onSubmit={e=>{e.preventDefault();if(updateSubject(s,editingSubject.name,editingSubject.color))setEditingSubject(null);}} style={{display:"flex",flexDirection:"column",gap:8,background:T.surface,borderRadius:9,padding:"10px 12px"}}>
+                      <input autoFocus value={editingSubject.name} onChange={e=>setEditingSubject({...editingSubject,name:e.target.value})} aria-label="Subject name" maxLength={200}
+                        style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontSize:12,outline:"none"}}/>
+                      <div role="radiogroup" aria-label="Subject color" style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                        {SUBJECT_COLOR_PALETTE.map(c=>(
+                          <button key={c} type="button" role="radio" aria-checked={editingSubject.color===c} aria-label={c} onClick={()=>setEditingSubject({...editingSubject,color:c})}
+                            style={{width:22,height:22,borderRadius:"50%",background:c,border:editingSubject.color===c?`2px solid ${T.text}`:"2px solid transparent",cursor:"pointer",padding:0}}/>
+                        ))}
+                      </div>
+                      {subjects.some(x=>x!==s&&x.toLowerCase()===editingSubject.name.trim().toLowerCase())&&<div style={{fontFamily:F.body,fontSize:10,color:"#FF4757"}}>There's already a subject with that name</div>}
+                      <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                        <button type="button" onClick={()=>setEditingSubject(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:8,color:T.textMuted,fontSize:11,cursor:"pointer",padding:"5px 12px"}}>Cancel</button>
+                        <button type="submit" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,fontSize:11,cursor:"pointer",padding:"5px 12px"}}>Save</button>
+                      </div>
+                    </form>
+                  );
                   return (
                     <div key={s} style={{display:"flex",alignItems:"center",gap:10,background:T.surface,borderRadius:9,padding:"9px 12px"}}>
                       <div style={{width:10,height:10,borderRadius:"50%",background:subjectColors[s]||T.accent,flexShrink:0}}/>
                       <span style={{flex:1,fontFamily:F.body,fontSize:12,color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s}</span>
+                      <button onClick={()=>{setPendingSubjectDelete(null);setEditingSubject({old:s,name:s,color:subjectColors[s]||SUBJECT_COLOR_PALETTE[0]});}} aria-label={`Edit ${s}`} title="Rename or change color"
+                        style={{background:"none",border:"none",color:T.textFaint,fontSize:13,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>✎</button>
                       {/* Two-tap delete instead of a browser confirm() dialog */}
                       <button onClick={()=>{if(confirming){removeSubject(s);setPendingSubjectDelete(null);}else setPendingSubjectDelete(s);}} aria-label={confirming?`Confirm deleting ${s}`:`Delete ${s}`} title={confirming?"Tap again to delete (tasks keep their subject)":"Delete subject"}
                         style={{background:confirming?"#FF475722":"none",border:"none",borderRadius:6,color:confirming?"#FF4757":T.textFaint,fontSize:confirming?11:15,cursor:"pointer",lineHeight:1,padding:confirming?"4px 8px":"0 4px"}}>{confirming?"Delete?":"×"}</button>
@@ -3410,6 +3508,7 @@ export default function HomeworkPlanner() {
         </div>
       )}>
         <TaskModal
+          h24={h24}
           task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
           T={T} F={F} subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency} now={now}
           sessionActive={sessionActive} sessionSecs={sessionSecs}
@@ -3420,9 +3519,9 @@ export default function HomeworkPlanner() {
           onDelete={()=>{if(sessionActive)endSession();deleteTask(selectedTask.id);setSelectedTask(null);}}
           onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
           onArchive={()=>{if(sessionActive)endSession();archiveTask(selectedTask.id);setSelectedTask(null);}}
-          onRestore={()=>updateTask(selectedTask.id,{archived:false})}
+          onRestore={()=>unarchiveTask(selectedTask.id)}
           onDuplicate={()=>{const copy=duplicateTask(selectedTask.id);if(copy)setSelectedTask(copy);}}
-          onUpdateTask={patch=>updateTask(selectedTask.id,patch)}
+          onUpdateTask={patch=>editTask(selectedTask.id,patch)}
           onSnooze={kind=>snoozeTask(selectedTask.id,kind)}
           onSkipOccurrence={()=>skipOccurrence(selectedTask.id)}
           onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}

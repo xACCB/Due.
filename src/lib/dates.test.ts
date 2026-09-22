@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { localDateStr, advanceDate } from "./dates";
+import { localDateStr, advanceDate, startOfWeek } from "./dates";
 
 describe("localDateStr", () => {
   it("pads month and day to two digits", () => {
@@ -32,5 +32,18 @@ describe("advanceDate", () => {
   });
   it("leaves the date unchanged for recurrence 'none'", () => {
     expect(advanceDate("2024-03-10", "none")).toBe("2024-03-10");
+  });
+});
+
+describe("startOfWeek", () => {
+  it("goes back to Sunday or Monday", () => {
+    const wed = new Date(2026, 8, 23, 15, 30); // Wed Sep 23 2026
+    expect(localDateStr(startOfWeek(wed, 0))).toBe("2026-09-20");
+    expect(localDateStr(startOfWeek(wed, 1))).toBe("2026-09-21");
+  });
+  it("a Sunday is the last day of a Monday week", () => {
+    const sun = new Date(2026, 8, 27);
+    expect(localDateStr(startOfWeek(sun, 0))).toBe("2026-09-27");
+    expect(localDateStr(startOfWeek(sun, 1))).toBe("2026-09-21");
   });
 });

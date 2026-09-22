@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getPriority, csvField, daysUntil, contrastColor, formatDuration, countdown, formatAgo } from "./format";
+import { getPriority, csvField, daysUntil, contrastColor, formatDuration, countdown, formatAgo, formatTime } from "./format";
 
 describe("getPriority", () => {
   it("returns the manual override unconditionally", () => {
@@ -93,5 +93,14 @@ describe("formatAgo", () => {
     expect(formatAgo(now - 5 * 60_000, now)).toBe("5m ago");
     expect(formatAgo(now - 125 * 60_000, now)).toBe("2h ago");
     expect(formatAgo(now - 3 * 86_400_000, now)).toBe("3d ago");
+  });
+});
+
+describe("formatTime", () => {
+  it("formats 12- and 24-hour", () => {
+    expect(formatTime("15:05")).toBe("3:05 PM");
+    expect(formatTime("15:05", true)).toBe("15:05");
+    expect(formatTime("09:00", true)).toBe("09:00");
+    expect(formatTime("", true)).toBe("");
   });
 });

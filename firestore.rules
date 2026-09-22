@@ -18,7 +18,9 @@ service cloud.firestore {
       return (!('layout' in data) || data.layout is string)
         && (!('colorCodeUrgency' in data) || data.colorCodeUrgency is bool)
         && (!('subjects' in data) || (data.subjects is list && data.subjects.size() <= 200))
-        && (!('subjectColors' in data) || data.subjectColors is map);
+        && (!('subjectColors' in data) || data.subjectColors is map)
+        && (!('timeFormat' in data) || data.timeFormat in ['12h','24h'])
+        && (!('weekStart' in data) || data.weekStart in [0,1]);
     }
 
     function isValidTask(data) {

@@ -24,3 +24,10 @@ export function advanceDate(dateStr:string, recurrence:Recurrence):string {
   }
   return localDateStr(d);
 }
+// Local midnight at the start of the week containing `d`. weekStart: 0 =
+// Sunday, 1 = Monday (the "Week starts on" setting).
+export function startOfWeek(d:Date, weekStart:number):Date {
+  const out=new Date(d); out.setHours(0,0,0,0);
+  out.setDate(out.getDate()-((out.getDay()-weekStart+7)%7));
+  return out;
+}

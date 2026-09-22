@@ -51,6 +51,12 @@ describe("profile doc (users/{uid})", () => {
     const db = testEnv.authenticatedContext("alice").firestore();
     await assertFails(setDoc(doc(db, "users/alice"), { subjectColors:["#FF6B6B"] }, { merge:true }));
   });
+  it("accepts only known time formats and week starts", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(setDoc(doc(db, "users/alice"), { timeFormat:"24h", weekStart:1 }, { merge:true }));
+    await assertFails(setDoc(doc(db, "users/alice"), { timeFormat:"25h" }, { merge:true }));
+    await assertFails(setDoc(doc(db, "users/alice"), { weekStart:3 }, { merge:true }));
+  });
   it("rejects writing another user's profile", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
     await assertFails(setDoc(doc(db, "users/bob"), { layout:"list" }, { merge:true }));

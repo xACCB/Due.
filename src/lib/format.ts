@@ -24,9 +24,11 @@ export function csvField(v:string|number):string {
   const s=String(v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
 }
-export function formatTime(t:string):string {
+// "3:05 PM", or "15:05" with the 24-hour setting on.
+export function formatTime(t:string, h24=false):string {
   if (!t) return "";
   const [h,m]=t.split(":").map(Number);
+  if (h24) return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
   return new Date(2000,0,1,h,m).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
 }
 export function daysUntil(s:string):string|null {

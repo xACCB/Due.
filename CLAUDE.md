@@ -42,7 +42,7 @@ styled-components, or Tailwind. A tiny inline script in `index.html` reads a `hw
 key (kept in sync with the active theme's background by `App.tsx`) and paints it on `<html>`
 before React mounts, to avoid a flash of the default background for returning dark-theme users.
 
-**State & persistence.** All app state (tasks, theme, layout, subjects, scratchpad, notification
+**State & persistence.** All app state (tasks, theme, layout, subjects, notification
 prefs, etc.) lives in `HomeworkPlanner`, persisted to `localStorage` under `hw-*` keys.
 `localStorage` is the source of truth for signed-out/offline use; Firestore (when signed in with
 Google via Firebase Auth) is a sync layer on top of it. Most simple fields (no extra
@@ -53,8 +53,8 @@ pair. It JSON-serializes on write, and on read falls back to the raw string if `
 `'"list"'`), and this keeps those intact on the first load after adopting the hook rather than
 silently resetting them to the default. Fields with real extra logic on read (`tasks` — order
 backfill; `subjectColors` — merges with defaults; `accentOverride` — `removeItem` instead of
-writing `null`; `scratchpad` — its own separate debounce, see below) are deliberately left as
-hand-written
+writing `null`; `dismissedWhatsNew` — one-time migration from the old whole-feed `hw-whatsnew`
+key, see What's New below) are deliberately left as hand-written
 `useState`/`useEffect` pairs rather than forced into the generic hook.
 
 **Firebase.** The `firebaseConfig` (project `ai-homework-planner-92260`) is hardcoded directly in
@@ -95,7 +95,9 @@ discloses this; keep that page in sync if what's collected here changes.
 
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
-- `users/{uid}` — small "profile" fields only: `layout`, `scratchpad`, `colorCodeUrgency`. Synced as a whole document
+- `users/{uid}` — small "profile" fields only: `layout`, `colorCodeUrgency`, `subjects`,
+  `subjectColors` (a legacy `scratchpad` field may still exist on old docs; nothing reads it now that
+  the Tools tab is gone). Synced as a whole document
   (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so the first write
   after sign-in can't race ahead of the first read. `themeName` isn't a field here (or in
   `firestore.rules`'s `isValidProfile`) -- see Design-system constants below: it's a derived value
@@ -114,11 +116,12 @@ require rewriting a user's entire history:
   returning account that legitimately has zero tasks) -- `isNewAccountForUid` (set from whether a
   profile doc existed at all when migration was checked) disambiguates it, so a first sign-in
   doesn't wipe local starter tasks before they've had a chance to sync up.
-- The outbound tasks write is debounced 400ms behind local state (mirroring the scratchpad's own
-  debounce), since drag-to-reorder calls `setTasks()` once per card the dragged item passes over --
+- The outbound tasks write is debounced 400ms behind local state, since drag-to-reorder calls `setTasks()` once per card the dragged item passes over --
   without this, a single reorder drag would fire one Firestore write per intermediate step instead
   of one at the end. Local state and `localStorage` stay instant regardless; only the cloud write
-  is delayed.
+  is delayed. The pending write is kept in `pendingTasksWrite` so `signOutFirebase` can flush it
+  before signing out -- sign-out then clears local tasks/subjects from the device (they come back
+  from the cloud on the next sign-in), since signed-out use is local-only.
 - `firestore.rules` validates the shape of profile/task writes (required fields present, correct
   types, capped string lengths), not just who's making them -- a second layer beyond
   auth-based ownership, since `firebaseConfig` being public means anyone could otherwise script
@@ -196,11 +199,14 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
 - `download.ts`: `downloadFile` — the `Blob` + object URL + synthetic `<a download>` click pattern
   used by data export.
 
-**UI shape.** `HomeworkPlanner` renders a tab bar (`tasks` / `tools` / `import` / `options`, via
-`activeTab` state) plus a separate full-screen Focus Mode (`focusMode` state) with its own
-Pomodoro-style timer. The tab bar itself is an icon-only "liquid glass" pill (translucent
-`backdrop-filter: blur` container, active tab gets its own raised glass-pill highlight) -- the four
-icons (`IconTasks`/`IconTools`/`IconImport`/`IconSettings`, module scope, just above `FONT`) are
+**UI shape.** `HomeworkPlanner` renders a two-button tab bar -- Tasks, and Focus, which opens the
+separate full-screen Focus Mode (`focusMode` state) with its Pomodoro timer (the running time shows
+on the Focus button; finishing chimes via `playChime()`, notifies, and toasts). Settings
+(`activeTab==="options"`) is opened from the title menu, not the tab bar, so it has its own header
+with a back button. The title menu (the DuePlanner wordmark) holds Inbox (stats + What's New),
+History (undo/redo), Import/Export, Profile, and Settings; tapping "Time left" in the header opens a
+per-subject time breakdown. The tab bar icons and menu icons (`IconTasks`/`IconFocus`/
+`IconImport`/`IconSettings` etc., module scope, just above `FONT`) are
 small hand-built SVGs from plain primitives (line/circle/polyline) rather than Unicode glyphs or an
 icon library dependency, styled with `stroke="currentColor"` so they pick up the button's active/
 inactive `color` automatically; `aria-label`/`title` on each button carry the accessible name now
@@ -224,6 +230,22 @@ which still exists as the outer safety net for anything else.
 - `priorityOverride?: Priority` — manually pins a task's priority instead of always deriving it
   from due date/estimate. `getPriority(dueDate, estMins, override?)` checks this first; every call
   site was updated to pass `task.priorityOverride` as the third argument.
+- `sessions?: {mins, at}[]` — work sessions logged by `TaskModal`'s timer. Stored (and synced) on the
+  task so "Sessions today" survives closing the modal, and the Inbox's "Time spent" sums these
+  (real time) rather than estimates.
+- `spawnedNextId?: number|null` — set on a recurring task when completing it spawns the next
+  occurrence (see `setDone()`, module scope), so un-completing removes that copy instead of leaving a
+  duplicate. The copy gets unchecked subtasks and keeps no due date if the original had none.
+- `estMins` can be 0 (estimate step skipped); every display goes through `formatDuration()`
+  (`src/lib/format.ts`), which returns "" for 0 so the label is hidden rather than showing "0m".
+
+**What's New** (`WHATS_NEW`, the Inbox's Updates list) is hand-maintained, newest first -- add an
+entry whenever a user-facing change ships. Only dismissed ids are persisted
+(`hw-whatsnew-dismissed`), so new entries reach returning users; `LEGACY_WHATSNEW_IDS` is a frozen
+list used once to migrate the old whole-feed `hw-whatsnew` key, and must not be extended.
+
+**Subjects** are managed in Settings (not Profile), so they work signed out; they and their colors
+sync via the profile doc when signed in.
 
 **Urgency color coding** (`colorCodeUrgency` state, "Urgency Color Coding" toggle in Options ->
 Looks, default on) gates every place `PRIORITY_COLORS` (red/orange/green) would otherwise show.
@@ -251,7 +273,8 @@ markup, so extending selection to all of them was judged not worth the scope. `M
 `selectionMode`/`isSelected`/`onToggleSelect` and repurposes the done-toggle button into a selection
 checkbox when active, gating swipe/drag handlers off at the same time to avoid gesture conflicts.
 
-**Task templates** (`TaskTemplate`, `templates` state) are local-only — `localStorage`, not synced
+**Task templates** (`TaskTemplate`, `templates` state; shown as deletable chips under the add
+button) are local-only — `localStorage`, not synced
 to Firestore. Deliberate scope call: a personal convenience, not core data, not worth a second
 synced subcollection right now. Starting a task from a template (`startFromTemplate`) skips the
 normal step-by-step add-task wizard straight to the due-date question via `usingTemplate`/
@@ -259,7 +282,9 @@ normal step-by-step add-task wizard straight to the due-date question via `using
 
 **Reminders** (`REMINDER_OFFSETS`, `enabledOffsets` state) support multiple independently-toggleable
 lead times (1 day / 3 hours / 1 hour before, or at due time) for tasks with a specific due *time*;
-tasks with only a due date fall back to the original once-daily due/overdue summary. Sent-reminder
+tasks with only a due date fall back to the original once-daily due/overdue summary. Only the
+closest due offset is actually sent (earlier, now-stale ones are just marked sent), and "at due
+time" has a 15-minute grace window -- without it, its window would be empty and it could never fire. Sent-reminder
 tracking is keyed by `(taskId, offsetKey, dueDate+dueTime)` in `localStorage`, so editing a task's
 due date/time naturally resets what's still owed. A 1-minute `setInterval` re-checks while the tab
 is open, since offset reminders need to fire close to a specific time, not just on tab-focus.

@@ -25,10 +25,10 @@ export class ErrorBoundary extends Component<Props,State> {
     if(this.state.hasError){
       if(this.props.fallback)return this.props.fallback(this.reset);
       return (
-        <div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:24,fontFamily:"sans-serif",textAlign:"center",background:"#0F0F1A",color:"#EEE8D5"}}>
+        <div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:24,fontFamily:"'DM Mono', monospace",textAlign:"center",background:"#0a0a0a",color:"#cccccc"}}>
           <div style={{fontSize:18}}>Something went wrong.</div>
-          <div style={{fontSize:13,color:"#888"}}>Your data is safe -- reloading should fix it.</div>
-          <button onClick={()=>window.location.reload()} style={{background:"#F0A500",color:"#000",border:"none",borderRadius:10,padding:"10px 20px",fontSize:14,cursor:"pointer"}}>
+          <div style={{fontSize:13,color:"#7c7c7c"}}>Your data is safe -- reloading should fix it.</div>
+          <button onClick={()=>window.location.reload()} style={{background:"#ffffff",color:"#000",border:"none",borderRadius:10,padding:"10px 20px",fontSize:14,fontFamily:"inherit",cursor:"pointer"}}>
             Reload
           </button>
         </div>

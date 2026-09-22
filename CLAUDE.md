@@ -330,11 +330,12 @@ suffix to them (`T.border+"33"`); use `T.borderFaint` for a lighter divider, and
 wherever a real hex is required (e.g. `contrastColor()`).
 
 **Completing a task** (`toggleDone`) animates unless reduced motion is on: the id sits in
-`justDone` for 650ms, during which `allSorted`/`filteredTasks` keep the card where it was while
+`justDone` for 850ms, during which `allSorted`/`filteredTasks` keep the card where it was while
 `CheckMark` (module scope, an SVG stroke) draws in and the title's `.strike` (a background line,
 not `text-decoration`, so it can animate) draws across. Then `captureTaskRects()` records every
 `[data-task-id]` card's position and a `useLayoutEffect` FLIP-animates each card from its old spot
-to its new one. Only `MiniCard` has `data-task-id`, so only the list layouts glide; the others
+to its new one (a ~1s ease-in-out glide scaled by distance, the farthest-moving card raised above
+the rest; keyboard reordering passes `quick` for a 320ms version). Only `MiniCard` has `data-task-id`, so only the list layouts glide; the others
 get the check and strike but jump into place.
 
 **Accessibility conventions** (from the screen-reader/keyboard pass, checked with axe-core and the

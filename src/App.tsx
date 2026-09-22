@@ -2207,11 +2207,13 @@ export default function HomeworkPlanner() {
   }
   // Where each list card is, for animating it from there to its new place after
   // the list re-sorts (FLIP: the layout effect below plays the difference).
-  const taskRectsBefore=useRef<Map<string,number>|null>(null);
-  function captureTaskRects(){
-    const m=new Map<string,number>();
-    document.querySelectorAll<HTMLElement>("[data-task-id]").forEach(el=>m.set(el.dataset.taskId!,el.getBoundingClientRect().top));
-    taskRectsBefore.current=m;
+  // `quick` is for keyboard reordering, where a long glide would lag behind the
+  // arrow keys.
+  const taskRectsBefore=useRef<{tops:Map<string,number>;quick:boolean}|null>(null);
+  function captureTaskRects(quick=false){
+    const tops=new Map<string,number>();
+    document.querySelectorAll<HTMLElement>("[data-task-id]").forEach(el=>tops.set(el.dataset.taskId!,el.getBoundingClientRect().top));
+    taskRectsBefore.current={tops,quick};
   }
   function toggleDone(id:number){
     const task=tasks.find(t=>t.id===id);
@@ -2222,7 +2224,7 @@ export default function HomeworkPlanner() {
     if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
       if(!task.done){
         setJustDone(prev=>[...prev,id]);
-        setTimeout(()=>{captureTaskRects();setJustDone(prev=>prev.filter(x=>x!==id));},650);
+        setTimeout(()=>{captureTaskRects();setJustDone(prev=>prev.filter(x=>x!==id));},850);
       }else{
         setJustDone(prev=>prev.filter(x=>x!==id));
         captureTaskRects();
@@ -2235,13 +2237,23 @@ export default function HomeworkPlanner() {
     const before=taskRectsBefore.current;
     if(!before)return;
     taskRectsBefore.current=null;
-    document.querySelectorAll<HTMLElement>("[data-task-id]").forEach(el=>{
-      const top=before.get(el.dataset.taskId!);
-      if(top==null)return;
-      const dy=top-el.getBoundingClientRect().top;
-      if(Math.abs(dy)<1)return;
-      el.animate([{transform:`translateY(${dy}px)`},{transform:"translateY(0)"}],{duration:480,easing:"cubic-bezier(.22,.9,.3,1.04)"});
-    });
+    const cards=[...document.querySelectorAll<HTMLElement>("[data-task-id]")];
+    // Stop any glide still running first, or its offset would skew the new
+    // measurement (the "before" positions already include it, so nothing jumps).
+    cards.forEach(el=>el.getAnimations().forEach(a=>{if(a instanceof CSSAnimation||a instanceof CSSTransition)return;a.cancel();}));
+    const moves=cards.map(el=>{const top=before.tops.get(el.dataset.taskId!);return {el,dy:top==null?0:top-el.getBoundingClientRect().top};}).filter(m=>Math.abs(m.dy)>=1);
+    const farthest=Math.max(0,...moves.map(m=>Math.abs(m.dy)));
+    for(const {el,dy} of moves){
+      // A long, gentle ease-in-out (no overshoot): eases off the mark, glides,
+      // and settles softly -- a front-loaded ease-out read as a snap. Longer
+      // trips take a little longer. The card that travels farthest (the one
+      // just completed) rides above the others.
+      const duration=before.quick?320:Math.min(1300,900+Math.abs(dy)*0.6);
+      const lead=Math.abs(dy)===farthest&&moves.length>1;
+      if(lead)el.style.zIndex="3";
+      const anim=el.animate([{transform:`translateY(${dy}px)`},{transform:"translateY(0)"}],{duration,easing:before.quick?"cubic-bezier(.2,.8,.3,1)":"cubic-bezier(.45,.05,.2,1)"});
+      if(lead)anim.finished.then(()=>{el.style.zIndex="";},()=>{el.style.zIndex="";});
+    }
   });
   // Every delete path (single, bulk, "clear completed") goes through here, so
   // they're all undoable the same way instead of some being permanent.
@@ -2460,7 +2472,7 @@ export default function HomeworkPlanner() {
     if(from===-1||to<0||to>=ids.length)return;
     ids.splice(from,1); ids.splice(to,0,id);
     const orderMap=new Map(ids.map((tid,idx)=>[tid,idx]));
-    if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches)captureTaskRects();
+    if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches)captureTaskRects(true);
     setTasks(prev=>prev.map(t=>orderMap.has(t.id)?{...t,order:orderMap.get(t.id)!}:t));
     setSrMessage(`Moved to position ${to+1} of ${ids.length}`);
     requestAnimationFrame(()=>document.querySelector<HTMLElement>(`[data-task-id="${id}"] [data-reorder]`)?.focus());
@@ -2592,12 +2604,12 @@ export default function HomeworkPlanner() {
        title's strike-through draws left to right. .strike is a background line
        rather than text-decoration so it can animate; box-decoration-break
        repeats it on every line of a wrapped title. */
-    .check-draw polyline{stroke-dashoffset:1;animation:checkDraw .3s .08s cubic-bezier(.65,0,.35,1) forwards;}
+    .check-draw polyline{stroke-dashoffset:1;animation:checkDraw .42s .08s cubic-bezier(.65,0,.35,1) forwards;}
     @keyframes checkDraw{to{stroke-dashoffset:0}}
-    .check-pop{animation:checkPop .38s cubic-bezier(.34,1.56,.64,1);}
+    .check-pop{animation:checkPop .45s cubic-bezier(.34,1.56,.64,1);}
     @keyframes checkPop{0%{transform:scale(.7)}100%{transform:scale(1)}}
     .strike{text-decoration:none!important;background-image:linear-gradient(currentColor,currentColor);background-repeat:no-repeat;background-position:0 55%;background-size:100% 1.5px;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
-    .strike-anim{animation:strikeDraw .34s .2s cubic-bezier(.65,0,.35,1) both;}
+    .strike-anim{animation:strikeDraw .5s .22s cubic-bezier(.65,0,.35,1) both;}
     @keyframes strikeDraw{from{background-size:0% 1.5px}}
     @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim{animation:none;}}
     .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}

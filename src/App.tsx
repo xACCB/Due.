@@ -177,6 +177,11 @@ function IconChart(){
     <line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/>
   </svg>;
 }
+function IconFocus(){
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none"/>
+  </svg>;
+}
 function IconBell(){
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/>
@@ -2379,12 +2384,12 @@ export default function HomeworkPlanner() {
         <div className="app-sidebar">
         {/* Tabs */}
         <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4}}>
-          {(["tasks","tools","import"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"Tasks",tools:"Tools",import:"Import"};
-            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,tools:IconTools,import:IconImport};
+          {(["tasks","focus","tools","import"] as const).map(id=>{
+            const labels:Record<string,string>={tasks:"Tasks",focus:"Focus",tools:"Tools",import:"Import"};
+            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus,tools:IconTools,import:IconImport};
             const Icon=icons[id];
             const active=activeTab===id;
-            return <button key={id} onClick={()=>setActiveTab(id)} aria-label={labels[id]} aria-pressed={active} title={labels[id]}
+            return <button key={id} onClick={()=>id==="focus"?setFocusMode(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
               style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"all 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
               <Icon/>
             </button>;
@@ -2429,7 +2434,6 @@ export default function HomeworkPlanner() {
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
             {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
-            {topTask&&<button onClick={()=>setFocusMode(true)} style={{background:"none",border:`1px solid ${T.accent}55`,color:T.accent,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>Focus</button>}
             {layout==="list"&&(selectionMode
               ? <button onClick={exitSelectionMode} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>
               : <button onClick={()=>setSelectionMode(true)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Select</button>

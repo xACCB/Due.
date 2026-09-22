@@ -25,5 +25,14 @@ jobs:
 
       - run: npm test
 
+      # The Firestore emulator (used by the security-rules tests) needs Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Firestore security-rules tests
+        run: npm run test:rules
+
       - name: Dependency audit (non-blocking)
         run: npm audit --audit-level=high || true

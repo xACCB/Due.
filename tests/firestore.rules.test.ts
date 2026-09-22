@@ -30,24 +30,35 @@ beforeEach(async () => {
 describe("profile doc (users/{uid})", () => {
   it("lets an owner write a valid profile", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
-    await assertSucceeds(setDoc(doc(db, "users/alice"), { themeName:"midnight", layout:"list", scratchpad:"hi" }, { merge:true }));
+    await assertSucceeds(setDoc(doc(db, "users/alice"), {
+      layout:"list", colorCodeUrgency:true, subjects:["Math","English"], subjectColors:{ Math:"#FF6B6B" },
+    }, { merge:true }));
   });
-  it("rejects a wrong-typed field", async () => {
+  it("rejects a wrong-typed layout", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
-    await assertFails(setDoc(doc(db, "users/alice"), { themeName:123 }, { merge:true }));
+    await assertFails(setDoc(doc(db, "users/alice"), { layout:123 }, { merge:true }));
   });
-  it("rejects a scratchpad over the size cap", async () => {
+  it("rejects a non-boolean colorCodeUrgency", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
-    await assertFails(setDoc(doc(db, "users/alice"), { scratchpad:"x".repeat(50001) }, { merge:true }));
+    await assertFails(setDoc(doc(db, "users/alice"), { colorCodeUrgency:"yes" }, { merge:true }));
+  });
+  it("rejects subjects that aren't a list, or a list over the size cap", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(db, "users/alice"), { subjects:"Math" }, { merge:true }));
+    await assertFails(setDoc(doc(db, "users/alice"), { subjects:Array.from({length:201},(_,i)=>`S${i}`) }, { merge:true }));
+  });
+  it("rejects subjectColors that aren't a map", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(db, "users/alice"), { subjectColors:["#FF6B6B"] }, { merge:true }));
   });
   it("rejects writing another user's profile", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
-    await assertFails(setDoc(doc(db, "users/bob"), { themeName:"midnight" }, { merge:true }));
+    await assertFails(setDoc(doc(db, "users/bob"), { layout:"list" }, { merge:true }));
   });
   it("rejects reads and writes from a signed-out client", async () => {
     const db = testEnv.unauthenticatedContext().firestore();
     await assertFails(getDoc(doc(db, "users/alice")));
-    await assertFails(setDoc(doc(db, "users/alice"), { themeName:"midnight" }));
+    await assertFails(setDoc(doc(db, "users/alice"), { layout:"list" }));
   });
 });
 

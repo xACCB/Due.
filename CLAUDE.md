@@ -178,7 +178,7 @@ the `Toggle` switch thumb) instead of a hardcoded color, so they stay correct un
 a future theme might use. A few needed a conditional version since they only sometimes render on a
 solid `T.accent` fill (e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`,
 in most layouts -- only the branches that actually use `T.accent` as the fill needed the fix).
-`LAYOUTS` (12 task-list display modes, still in `App.tsx`) is unchanged. `FONTS` went the same way
+`LAYOUTS` (7 task-list display modes, still in `App.tsx`; Compact, Minimal, Sticky, Timeline and By Subject were removed -- a saved removed layout falls back to List via the derived `layout` const). `FONTS` went the same way
 as `THEMES` -- down from 16 selectable heading/body pairings to exactly one (`FONT`, still in
 `App.tsx`: the original DM Serif Display/DM Mono pairing), with the Font picker grid and its
 `fontName`/`setFontName` state gone entirely. `F` is now just `FONT` directly rather than a keyed
@@ -283,7 +283,7 @@ suffix to them (`T.border+"33"`); use `T.borderFaint` for a lighter divider, and
 wherever a real hex is required (e.g. `contrastColor()`).
 
 **Bulk edit / multi-select** (`selectionMode`/`selectedIds` state) is deliberately scoped to the
-default list layout only (`MiniCard`) — the other 11 layouts each render their own custom task row
+default list layout only (`MiniCard`) — the other 6 layouts each render their own custom task row
 markup, so extending selection to all of them was judged not worth the scope. `MiniCard` accepts
 `selectionMode`/`isSelected`/`onToggleSelect` and repurposes the done-toggle button into a selection
 checkbox when active, gating swipe/drag handlers off at the same time to avoid gesture conflicts.

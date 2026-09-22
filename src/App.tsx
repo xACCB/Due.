@@ -133,14 +133,9 @@ const STORAGE_BLOCKED_MESSAGE = "Sign-in was blocked by your browser's tracking 
 
 const LAYOUTS = {
   list:      { name:"List",       emoji:"☰",  desc:"Classic cards" },
-  compact:   { name:"Compact",    emoji:"⊟",  desc:"Slim rows" },
   board:     { name:"Board",      emoji:"⊞",  desc:"Grid cards" },
-  minimal:   { name:"Minimal",    emoji:"·",  desc:"Just text" },
   checklist: { name:"Checklist",  emoji:"☑",  desc:"Simple ticks" },
-  sticky:    { name:"Sticky",     emoji:"▤",  desc:"Sticky notes" },
   kanban:    { name:"Kanban",     emoji:"𝄘",  desc:"By status" },
-  timeline:  { name:"Timeline",   emoji:"↓",  desc:"Time ordered" },
-  subject:   { name:"By Subject", emoji:"▥", desc:"Subject tabs" },
   progress:  { name:"Progress",   emoji:"▓",  desc:"Subtask progress" },
   pyramid:   { name:"Pyramid",    emoji:"△",  desc:"By priority" },
   calendar:  { name:"Calendar",   emoji:"▦", desc:"Week view" },
@@ -212,6 +207,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"fewer-layouts", date:"2026-09-22", title:"UI change", description:"Trimmed the layouts to seven: Compact, Minimal, Sticky, Timeline and By Subject are gone. If you were using one, you're back on List." },
   { id:"recently-deleted", date:"2026-09-22", title:"New feature", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
   { id:"skip-occurrence", date:"2026-09-22", title:"New feature", description:"Repeating tasks have \"Skip this one\" in their detail view -- moves to the next occurrence without completing it. Undoable." },
   { id:"countdown", date:"2026-09-22", title:"New feature", description:"Tasks due today at a set time show a live countdown, like \"Due in 2h 15m\"." },
@@ -1038,7 +1034,9 @@ export default function HomeworkPlanner() {
   // theme choice, no per-category "last picked" memory, and nothing to correct
   // when the mode changes.
   const themeName:ThemeName=effectiveThemeMode==="light"?"stealthLight":"stealth";
-  const [layout,setLayout]=usePersistedState<LayoutName>("hw-layout","list");
+  const [savedLayout,setLayout]=usePersistedState<LayoutName>("hw-layout","list");
+  // A saved layout may be one that's since been removed -- fall back to List.
+  const layout:LayoutName=savedLayout in LAYOUTS?savedLayout:"list";
   const [groupBy,setGroupBy]=usePersistedState("hw-group","none");
   const [showDone,setShowDone]=usePersistedState("hw-showdone",true);
   const [showSuggestion,setShowSuggestion]=usePersistedState("hw-showsuggestion",true);
@@ -1624,7 +1622,6 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("pointerdown",onPointerDown);document.removeEventListener("keydown",onKeyDown);};
   },[timeMenuOpen]);
   const [looksOpen,setLooksOpen]=useState(false);
-  const [activeSubject,setActiveSubject]=useState("all");
   // Syllabus import: transient by design (a paste-and-review staging area, not
   // something worth persisting across reloads like tasks are).
   const [importText,setImportText]=useState("");
@@ -1674,7 +1671,7 @@ export default function HomeworkPlanner() {
   const [dragOffsetY,setDragOffsetY]=useState(0);
   const dragStartY=useRef(0);
   const dragOrderIds=useRef<number[]>([]);
-  // Swipe gestures (List/Compact/Checklist layouts): left deletes, right toggles
+  // Swipe gestures (List/Checklist layouts): left deletes, right toggles
   // done. Direction is locked on the first few px of movement so a mostly-vertical
   // drag (page scroll) is left alone instead of being hijacked as a swipe.
   const [swipeId,setSwipeId]=useState<number|null>(null);
@@ -1712,7 +1709,7 @@ export default function HomeworkPlanner() {
   }
   const undoToastTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   // Bulk edit / multi-select. Scoped to the default list layout (MiniCard) --
-  // the other 11 layouts each render their own custom task row markup, so
+  // the other 6 layouts each render their own custom task row markup, so
   // extending selection to all of them is a much bigger job than the value
   // justifies right now.
   const [selectionMode,setSelectionMode]=useState(false);
@@ -2224,11 +2221,8 @@ export default function HomeworkPlanner() {
        screens :hover sticks after a tap, leaving cards stuck "lifted". */
     @media (hover:hover){
       .tc:hover{transform:translateY(-2px);filter:brightness(1.05);}
-      .tc-flat:hover{background:${T.surface};}
       .chip:hover{transform:scale(1.05);filter:brightness(1.1);}
-      .sticky-note:hover{transform:rotate(0deg) scale(1.03);}
     }
-    .tc-flat{transition:background 0.15s;border-radius:6px;}
     .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
     .sli{animation:sli 0.22s ease forwards;}
@@ -2262,7 +2256,6 @@ export default function HomeworkPlanner() {
       background:${T.light?"rgba(255,255,255,0.72)":"rgba(30,30,30,0.66)"}!important;
       backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
     `:""}
-    .sticky-note{transition:all 0.2s;cursor:pointer;}
     .pomo-ring{animation:ring 1s linear infinite;}
     @keyframes ring{from{stroke-dashoffset:0}to{stroke-dashoffset:283}}
     .app-inner{max-width:580px;margin:0 auto;padding:20px 14px;width:100%;box-sizing:border-box;}
@@ -2280,7 +2273,7 @@ export default function HomeworkPlanner() {
     @media (max-width:600px){
       input,textarea{font-size:16px!important;}
     }
-  `,[T.bg,T.card,T.border,T.surface,T.light,liquidGlass,F.google,F.body]);
+  `,[T.bg,T.card,T.border,T.light,liquidGlass,F.google,F.body]);
 
   // Session timer
   useEffect(()=>{
@@ -2317,23 +2310,6 @@ export default function HomeworkPlanner() {
       startDrag,onDragMove,endDrag,
       selectionMode,onToggleSelect:toggleSelected};
 
-    if (layout==="minimal") return (
-      <div style={{display:"flex",flexDirection:"column",gap:2}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
-          <div key={t.id} className="tc-flat" onClick={()=>{setSelectedTask(t);}} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px",borderBottom:`1px solid ${T.borderFaint}`,cursor:"pointer"}}>
-            <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
-            </button>
-            <div style={{width:6,height:6,borderRadius:"50%",background:priColor(pr,colorCodeUrgency),flexShrink:0}}/>
-            <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-            {t.subject&&<span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
-            {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{daysUntil(t.dueDate)}</span>}
-            <button aria-label="Delete task" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 3px"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
-          </div>
-        );})}
-      </div>
-    );
-
     if (layout==="checklist") return (
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
         {tasks.map((t,i)=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);return(
@@ -2347,26 +2323,6 @@ export default function HomeworkPlanner() {
               <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
               {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>}
               <button aria-label="Delete task" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
-            </div>
-          </div>
-        );})}
-      </div>
-    );
-
-    if (layout==="compact") return (
-      <div style={{display:"flex",flexDirection:"column",gap:5}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;const dm=countdown(t.dueDate,t.dueTime,now)??daysUntil(t.dueDate);return(
-          <div key={t.id} style={{position:"relative",overflow:"hidden",borderRadius:9}}>
-            {renderSwipeReveal(t.id)}
-            <div className="tc" onClick={swipeClickGuard(()=>{setSelectedTask(t);})} {...swipeHandlers(t.id)} style={{background:T.card,borderRadius:9,padding:"8px 11px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,position:"relative",cursor:"pointer",...swipeContentStyle(t.id)}}>
-              <div style={{position:"absolute",left:0,top:0,bottom:0,width:2.5,background:priColor(pr,colorCodeUrgency)}}/>
-              <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
-                {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
-              </button>
-              <span style={{fontFamily:F.body,fontSize:13,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-              {t.subject&&<span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
-              {dm&&!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency),flexShrink:0}}>{dm}</span>}
-              <button aria-label="Delete task" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
             </div>
           </div>
         );})}
@@ -2395,27 +2351,6 @@ export default function HomeworkPlanner() {
       </div>
     );
 
-    if (layout==="sticky") return (
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:12}}>
-        {tasks.map((t,i)=>{
-          const sc=subjectColors[t.subject]||T.accent;
-          const rotations=[-2,-1,0,1,2]; const rot=rotations[i%rotations.length];
-          const stickyColors=["#fef08a","#bfdbfe","#bbf7d0","#fed7aa","#f5d0fe","#fecdd3"];
-          const bg=stickyColors[i%stickyColors.length];
-          return(
-            <div key={t.id} className="sticky-note" onClick={()=>{setSelectedTask(t);}} style={{background:bg,borderRadius:3,padding:"14px 12px",transform:`rotate(${rot}deg)`,boxShadow:"2px 3px 10px #00000033",minHeight:120,display:"flex",flexDirection:"column",gap:6,opacity:t.done?0.5:1,cursor:"pointer"}}>
-              <div style={{fontFamily:F.heading,fontSize:14,color:"#1a1a1a",textDecoration:t.done?"line-through":"none",lineHeight:1.3,flex:1}}>{t.title}</div>
-              <div style={{fontFamily:F.body,fontSize:10,color:"#555"}}>{t.subject&&<><span style={{color:"#1a1a1a",fontWeight:600}}><span style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:sc,marginRight:4,verticalAlign:"middle"}}/>{t.subject}</span> · </>}{t.done?"Completed":daysUntil(t.dueDate)||"No date"}</div>
-              <div style={{display:"flex",justifyContent:"space-between"}}>
-                <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"#ffffff88",border:"1.5px solid #33333333",borderRadius:4,padding:"2px 7px",cursor:"pointer",fontFamily:F.body,fontSize:10,color:"#333"}}>{t.done?"✓ Done":"Mark done"}</button>
-                <button aria-label="Delete task" style={{background:"none",border:"none",color:"#666",cursor:"pointer",fontSize:14}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-
     if (layout==="kanban") {
       const cols=[{key:"high",label:"Urgent",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"Soon",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"Later",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✓ Done",tasks:filteredTasks.filter(t=>t.done)}];
       return(
@@ -2437,54 +2372,6 @@ export default function HomeworkPlanner() {
               </div>
             </div>
           ))}
-        </div>
-      );
-    }
-
-    if (layout==="timeline") return (
-      <div style={{position:"relative",paddingLeft:24}}>
-        <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:`linear-gradient(${T.accent},${T.border})`}}/>
-        {[...tasks].sort((a,b)=>(a.dueDate||"9999")===(b.dueDate||"9999")?(a.dueTime||"99").localeCompare(b.dueTime||"99"):(a.dueDate||"9999").localeCompare(b.dueDate||"9999")).map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
-          <div key={t.id} className="tc" style={{position:"relative",marginBottom:14}}>
-            <div style={{position:"absolute",left:-19,top:14,width:12,height:12,borderRadius:"50%",background:t.done?"#2ED573":priColor(pr,colorCodeUrgency),border:`2px solid ${T.bg}`,cursor:"pointer"}} onClick={()=>toggleDone(t.id)}/>
-            <div onClick={()=>{setSelectedTask(t);}} style={{background:T.card,borderRadius:11,padding:"11px 13px",border:`1px solid ${T.border}`,marginLeft:6,cursor:"pointer"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-                <span style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none",flex:1}}>{t.title}</span>
-                <button aria-label="Delete task" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,flexShrink:0}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
-              </div>
-              <div style={{display:"flex",gap:10,marginTop:4,flexWrap:"wrap"}}>
-                {t.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
-                <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}</span>
-                {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>}
-              </div>
-            </div>
-          </div>
-        );})}
-      </div>
-    );
-
-    if (layout==="subject") {
-      const subs=[...new Set(filteredTasks.map(t=>t.subject))];
-      const allSubs=["all",...subs];
-      const shown=activeSubject==="all"?filteredTasks:filteredTasks.filter(t=>t.subject===activeSubject);
-      return(
-        <div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-            {allSubs.map(s=>{
-              // Tasks with no subject get their own "No subject" chip rather
-              // than an empty, label-less one.
-              const c=s===""?T.textMuted:(subjectColors[s]||T.accent);
-              return (
-              <button key={s||"__none"} className="chip" onClick={()=>setActiveSubject(s)}
-                style={{background:activeSubject===s?c+"33":"none",color:activeSubject===s?c:T.textMuted,border:`1.5px solid ${activeSubject===s?c:T.border}`}}>
-                {s==="all"?"All":s===""?"No subject":s}
-              </button>
-              );
-            })}
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:9}}>
-            {shown.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} {...miniCardProps} isSelected={selectedIds.includes(t.id)}/>)}
-          </div>
         </div>
       );
     }
@@ -3220,14 +3107,9 @@ export default function HomeworkPlanner() {
                     const dim=active?ic:T.textFaint;
                     const icons:Record<string,React.JSX.Element>={
                       list:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="3" rx="1.5" fill={dim}/><rect x="2" y="9.5" width="18" height="3" rx="1.5" fill={dim}/><rect x="2" y="15" width="18" height="3" rx="1.5" fill={dim}/></svg>,
-                      compact:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="8" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="12" width="18" height="2" rx="1" fill={dim}/><rect x="2" y="16" width="18" height="2" rx="1" fill={dim}/></svg>,
                       board:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="8" height="8" rx="2" fill={dim}/><rect x="12" y="2" width="8" height="8" rx="2" fill={dim}/><rect x="2" y="12" width="8" height="8" rx="2" fill={dim}/><rect x="12" y="12" width="8" height="8" rx="2" fill={dim}/></svg>,
-                      minimal:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="4" cy="6" r="1.5" fill={dim}/><rect x="7" y="5" width="13" height="2" rx="1" fill={dim}/><circle cx="4" cy="11" r="1.5" fill={dim}/><rect x="7" y="10" width="13" height="2" rx="1" fill={dim}/><circle cx="4" cy="16" r="1.5" fill={dim}/><rect x="7" y="15" width="13" height="2" rx="1" fill={dim}/></svg>,
                       checklist:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="5" height="5" rx="1.5" stroke={dim} strokeWidth="1.5"/><path d="M3.5 6.5l1.2 1.2L6.5 5" stroke={active?ic:T.textFaint} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><rect x="9" y="5.5" width="11" height="2" rx="1" fill={dim}/><rect x="2" y="13" width="5" height="5" rx="1.5" stroke={dim} strokeWidth="1.5"/><rect x="9" y="14.5" width="11" height="2" rx="1" fill={dim}/></svg>,
-                      sticky:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="8" height="9" rx="2" fill={dim} opacity="0.9" transform="rotate(-4 2 2)"/><rect x="12" y="3" width="8" height="9" rx="2" fill={dim} opacity="0.7" transform="rotate(3 12 3)"/><rect x="3" y="12" width="8" height="8" rx="2" fill={dim} opacity="0.6" transform="rotate(2 3 12)"/></svg>,
                       kanban:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="5" height="18" rx="1.5" fill={dim} opacity="0.4"/><rect x="9" y="2" width="5" height="13" rx="1.5" fill={dim} opacity="0.7"/><rect x="16" y="2" width="5" height="9" rx="1.5" fill={dim}/></svg>,
-                      timeline:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><line x1="6" y1="2" x2="6" y2="20" stroke={dim} strokeWidth="2" strokeLinecap="round"/><circle cx="6" cy="6" r="2.5" fill={dim}/><rect x="10" y="4.5" width="10" height="3" rx="1.5" fill={dim} opacity="0.7"/><circle cx="6" cy="12" r="2.5" fill={dim}/><rect x="10" y="10.5" width="7" height="3" rx="1.5" fill={dim} opacity="0.7"/><circle cx="6" cy="18" r="2.5" fill={dim}/><rect x="10" y="16.5" width="9" height="3" rx="1.5" fill={dim} opacity="0.7"/></svg>,
-                      subject:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="4" height="4" rx="1" fill={dim}/><rect x="8" y="2" width="4" height="4" rx="1" fill={dim} opacity="0.6"/><rect x="14" y="2" width="4" height="4" rx="1" fill={dim} opacity="0.4"/><rect x="2" y="9" width="18" height="11" rx="2" fill={dim} opacity="0.25"/><rect x="2" y="9" width="18" height="3" rx="1.5" fill={dim} opacity="0.5"/></svg>,
                       progress:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="4" width="14" height="3.5" rx="1.75" fill={dim}/><rect x="2" y="10" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="10" width="9" height="3.5" rx="1.75" fill={dim}/><rect x="2" y="16" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="16" width="16" height="3.5" rx="1.75" fill={dim}/></svg>,
                       pyramid:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="7" y="3" width="8" height="4" rx="1.5" fill={dim}/><rect x="4" y="9" width="14" height="4" rx="1.5" fill={dim} opacity="0.7"/><rect x="1" y="15" width="20" height="4" rx="1.5" fill={dim} opacity="0.4"/></svg>,
                       calendar:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="16" rx="2" stroke={dim} strokeWidth="1.5"/><line x1="2" y1="9" x2="20" y2="9" stroke={dim} strokeWidth="1.5"/><line x1="7" y1="2" x2="7" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><line x1="15" y1="2" x2="15" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><rect x="5" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="10" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="15" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.4"/></svg>,

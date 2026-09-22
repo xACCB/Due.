@@ -35,3 +35,12 @@ export function daysUntil(s:string):string|null {
   const d=Math.ceil((new Date(s+"T00:00:00").getTime()-now.getTime())/86400000);
   if (d<0) return "Overdue!"; if (d===0) return "Due today!"; if (d===1) return "Due tomorrow"; return `${d} days left`;
 }
+// One duration format everywhere ("45m", "1h", "1h 30m"). Returns "" for a
+// missing/zero estimate (e.g. the estimate step was skipped), so callers can
+// just hide the label instead of showing "0m".
+export function formatDuration(mins:number|undefined|null):string {
+  if (!mins || mins<=0) return "";
+  const h=Math.floor(mins/60), m=mins%60;
+  if (h===0) return `${m}m`;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getPriority, csvField, daysUntil, contrastColor } from "./format";
+import { getPriority, csvField, daysUntil, contrastColor, formatDuration } from "./format";
 
 describe("getPriority", () => {
   it("returns the manual override unconditionally", () => {
@@ -56,5 +56,17 @@ describe("contrastColor", () => {
   });
   it("picks light text on a dark background", () => {
     expect(contrastColor("#000000")).toBe("#ffffff");
+  });
+});
+
+describe("formatDuration", () => {
+  it("returns an empty string for a missing or zero estimate", () => {
+    expect(formatDuration(0)).toBe("");
+    expect(formatDuration(undefined)).toBe("");
+  });
+  it("formats minutes, whole hours, and mixed durations", () => {
+    expect(formatDuration(45)).toBe("45m");
+    expect(formatDuration(60)).toBe("1h");
+    expect(formatDuration(90)).toBe("1h 30m");
   });
 });

@@ -16,7 +16,9 @@ service cloud.firestore {
     // writes use merge:true and may only touch a subset of fields.
     function isValidProfile(data) {
       return (!('layout' in data) || data.layout is string)
-        && (!('colorCodeUrgency' in data) || data.colorCodeUrgency is bool);
+        && (!('colorCodeUrgency' in data) || data.colorCodeUrgency is bool)
+        && (!('subjects' in data) || (data.subjects is list && data.subjects.size() <= 200))
+        && (!('subjectColors' in data) || data.subjectColors is map);
     }
 
     function isValidTask(data) {

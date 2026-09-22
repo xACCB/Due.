@@ -1408,12 +1408,19 @@ export default function HomeworkPlanner() {
   // pressed and the tab that actually gets committed on release.
   const [tabBarSwipeId,setTabBarSwipeId]=useState<string|null>(null);
   function onTabBarPointerDown(e:React.PointerEvent){
+    // touch-action/overscroll-behavior CSS alone still let iOS Safari start
+    // its own scroll/bounce gesture for the first few px of a drag before
+    // they fully took over -- preventDefault directly on the pointer events
+    // themselves (unlike touchstart/touchmove, these aren't forced passive
+    // by React, so this actually has effect) tells it not to even try.
+    e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const el=(e.target as HTMLElement).closest("[data-tab-id]") as HTMLElement|null;
     setTabBarSwipeId(el?.dataset.tabId||null);
   }
   function onTabBarPointerMove(e:React.PointerEvent){
     if(tabBarSwipeId===null)return;
+    e.preventDefault();
     const el=document.elementFromPoint(e.clientX,e.clientY) as HTMLElement|null;
     const id=el?.closest("[data-tab-id]")?.getAttribute("data-tab-id");
     if(id&&id!==tabBarSwipeId)setTabBarSwipeId(id);

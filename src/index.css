@@ -13,15 +13,14 @@
    press-and-swipe gesture) can trigger iOS Safari's rubber-band overscroll
    bounce, which pulls the whole page aside and reveals Safari's own
    background -- not any element of ours, so no background-color fix alone
-   can cover it -- behind the left/right edge. overscroll-behavior-x alone
-   still let a brief flash of it through right at the start of a drag,
-   before it fully kicks in -- overflow-x:hidden removes horizontal
-   scrolling as a possibility at all, rather than just discouraging the
-   bounce once scrolling has already started. Vertical overscroll
-   (pull-to-refresh feel) is untouched by either. */
+   can cover it -- behind the left/right edge. Vertical overscroll
+   (pull-to-refresh feel) is untouched.
+   (overflow-x:hidden was also tried here for a residual split-second flash
+   on iOS Safari specifically, but made it worse there -- reverted; see the
+   tab bar's own pointer handlers in App.tsx for the preventDefault-based
+   fix instead.) */
 html, body {
   overscroll-behavior-x: none;
-  overflow-x: hidden;
 }
 
 body {

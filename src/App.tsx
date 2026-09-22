@@ -2443,7 +2443,16 @@ export default function HomeworkPlanner() {
         <div className="app-body">
         <div className="app-sidebar">
         {/* Tabs */}
-        <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4}}>
+        {/* touch-action:pan-y tells the browser this element only wants
+            vertical touch gestures, not horizontal ones -- a hint some
+            browsers factor into their own gesture-conflict resolution. It
+            is genuinely the ceiling of what a webpage can do here: a
+            browser's own chrome-level gesture (e.g. Arc's swipe-anywhere
+            tab switcher) lives outside the page's DOM entirely, the same
+            sandboxing that stops a page from closing the browser window or
+            touching the address bar, so this can reduce but can't
+            guarantee-eliminate a conflict with it. */}
+        <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"pan-y"}}>
           {(["tasks","focus"] as const).map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
             const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};

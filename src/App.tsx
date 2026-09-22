@@ -1321,6 +1321,7 @@ export default function HomeworkPlanner() {
   const [inboxMenuOpen,setInboxMenuOpen]=useState(false);
   const [overviewPeriod,setOverviewPeriod]=useState<"week"|"month"|"year">("week");
   const [statsMenuOpen,setStatsMenuOpen]=useState(false);
+  const [importExportMenuOpen,setImportExportMenuOpen]=useState(false);
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!titleMenuOpen)return;
@@ -2329,6 +2330,72 @@ export default function HomeworkPlanner() {
                     </div>
                   )}
                 </div>
+                <div style={{borderBottom:`1px solid ${T.border}`}}>
+                  <button onClick={()=>setImportExportMenuOpen(o=>!o)} aria-expanded={importExportMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
+                    <IconImport/>
+                    <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Import/Export</span>
+                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:importExportMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
+                  </button>
+                  {importExportMenuOpen&&(
+                    <div style={{padding:"0 14px 12px",maxHeight:400,overflowY:"auto"}}>
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Import from Syllabus</div>
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:10,lineHeight:1.5}}>
+                        Paste your syllabus below. Lines with a date (e.g. "Sept 20", "9/20", "2026-09-20") are picked up as assignments -- review and uncheck anything that isn't one before adding.
+                      </div>
+                      <textarea
+                        value={importText}
+                        onChange={e=>{setImportText(e.target.value);setImportPreview(null);setImportedCount(null);}}
+                        placeholder="Paste your syllabus text here..."
+                        style={{width:"100%",minHeight:100,maxHeight:200,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto",marginBottom:10}}
+                      />
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Add as subject</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                          {subjects.map(s=>{
+                            const active=(importSubject||subjects[0])===s;
+                            return <button key={s} className="chip" onClick={()=>setImportSubject(s)} style={{background:active?(subjectColors[s]||T.accent)+"33":"none",color:active?(subjectColors[s]||T.accent):T.textMuted,border:`1.5px solid ${active?(subjectColors[s]||T.accent):T.border}`}}>{s}</button>;
+                          })}
+                        </div>
+                      </div>
+                      <button onClick={scanSyllabus} disabled={!importText.trim()} style={{width:"100%",background:importText.trim()?T.accent:T.surface,color:importText.trim()?contrastColor(T.accent):T.textFaint,border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:importText.trim()?"pointer":"default"}}>
+                        Scan for assignments
+                      </button>
+                      {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:12,color:"#2ED573",marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
+                      {importPreview&&(
+                        <div style={{marginTop:12}}>
+                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8}}>
+                            Found {importPreview.length} assignment{importPreview.length===1?"":"s"}
+                          </div>
+                          {importPreview.length===0?(
+                            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"16px 0"}}>No dated lines found -- try a different format.</div>
+                          ):(<>
+                            <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,maxHeight:200,overflowY:"auto"}}>
+                              {importPreview.map((it,i)=>(
+                                <div key={i} onClick={()=>toggleImportItem(i)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:T.surface,borderRadius:9,cursor:"pointer",opacity:it.checked?1:0.45}}>
+                                  <div style={{width:18,height:18,border:`2px solid ${it.checked?T.accent:T.textFaint}`,borderRadius:5,background:it.checked?T.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                    {it.checked&&<span style={{color:contrastColor(T.accent),fontSize:11,fontWeight:"bold"}}>✓</span>}
+                                  </div>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.title}</div>
+                                    <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{formatDate(it.dueDate)}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <button onClick={commitImport} disabled={!importPreview.some(it=>it.checked)} style={{width:"100%",background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:"pointer"}}>
+                              + Add {importPreview.filter(it=>it.checked).length} task{importPreview.filter(it=>it.checked).length===1?"":"s"}
+                            </button>
+                          </>)}
+                        </div>
+                      )}
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,marginTop:14,paddingTop:12,borderTop:`1px solid ${T.border}`}}>Export</div>
+                      <div style={{display:"flex",gap:7}}>
+                        <button onClick={exportAllDataJSON} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export all (JSON)</button>
+                        <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export tasks (CSV)</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button role="menuitem" onClick={()=>{setShowProfile(true);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke={T.text} strokeWidth="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.text} strokeWidth="2" strokeLinecap="round"/></svg>
                   <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Profile</span>
@@ -2360,9 +2427,9 @@ export default function HomeworkPlanner() {
         <div className="app-sidebar">
         {/* Tabs */}
         <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4}}>
-          {(["tasks","focus","import"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"Tasks",focus:"Focus",import:"Import"};
-            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus,import:IconImport};
+          {(["tasks","focus"] as const).map(id=>{
+            const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
+            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};
             const Icon=icons[id];
             const active=activeTab===id;
             return <button key={id} onClick={()=>id==="focus"?setFocusMode(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
@@ -2546,65 +2613,6 @@ export default function HomeworkPlanner() {
           </div>
         </>}
 
-        {/* IMPORT TAB */}
-        {activeTab==="import"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Import from Syllabus</div>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:10,lineHeight:1.5}}>
-                Paste your syllabus below. Lines with a date (e.g. "Sept 20", "9/20", "2026-09-20") are picked up as assignments -- review and uncheck anything that isn't one before adding.
-              </div>
-              <textarea
-                value={importText}
-                onChange={e=>{setImportText(e.target.value);setImportPreview(null);setImportedCount(null);}}
-                placeholder="Paste your syllabus text here..."
-                style={{width:"100%",minHeight:160,maxHeight:320,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto",marginBottom:10}}
-              />
-              <div style={{marginBottom:10}}>
-                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Add as subject</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-                  {subjects.map(s=>{
-                    const active=(importSubject||subjects[0])===s;
-                    return <button key={s} className="chip" onClick={()=>setImportSubject(s)} style={{background:active?(subjectColors[s]||T.accent)+"33":"none",color:active?(subjectColors[s]||T.accent):T.textMuted,border:`1.5px solid ${active?(subjectColors[s]||T.accent):T.border}`}}>{s}</button>;
-                  })}
-                </div>
-              </div>
-              <button onClick={scanSyllabus} disabled={!importText.trim()} style={{width:"100%",background:importText.trim()?T.accent:T.surface,color:importText.trim()?contrastColor(T.accent):T.textFaint,border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:importText.trim()?"pointer":"default"}}>
-                Scan for assignments
-              </button>
-              {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:12,color:"#2ED573",marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
-            </div>
-
-            {importPreview&&(
-              <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>
-                  Found {importPreview.length} assignment{importPreview.length===1?"":"s"}
-                </div>
-                {importPreview.length===0?(
-                  <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"16px 0"}}>No dated lines found -- try a different format.</div>
-                ):(<>
-                  <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,maxHeight:320,overflowY:"auto"}}>
-                    {importPreview.map((it,i)=>(
-                      <div key={i} onClick={()=>toggleImportItem(i)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:T.surface,borderRadius:9,cursor:"pointer",opacity:it.checked?1:0.45}}>
-                        <div style={{width:18,height:18,border:`2px solid ${it.checked?T.accent:T.textFaint}`,borderRadius:5,background:it.checked?T.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                          {it.checked&&<span style={{color:contrastColor(T.accent),fontSize:11,fontWeight:"bold"}}>✓</span>}
-                        </div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.title}</div>
-                          <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{formatDate(it.dueDate)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={commitImport} disabled={!importPreview.some(it=>it.checked)} style={{width:"100%",background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:"pointer"}}>
-                    + Add {importPreview.filter(it=>it.checked).length} task{importPreview.filter(it=>it.checked).length===1?"":"s"}
-                  </button>
-                </>)}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* OPTIONS TAB */}
         {activeTab==="options"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -2782,14 +2790,6 @@ export default function HomeworkPlanner() {
                     <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>{label}</div>
                   </div>
                 ))}
-              </div>
-            </div>
-            {/* Export */}
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Your Data</div>
-              <div style={{display:"flex",gap:7}}>
-                <button onClick={exportAllDataJSON} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export all (JSON)</button>
-                <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export tasks (CSV)</button>
               </div>
             </div>
             <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>

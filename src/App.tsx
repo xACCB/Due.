@@ -2171,7 +2171,7 @@ export default function HomeworkPlanner() {
           )}
           <div style={{textAlign:"right"}}>
             <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>time left</div>
-            <div style={{fontFamily:F.heading,fontSize:20,color:"#4ECDC4"}}>{totalMins>=60?`${Math.floor(totalMins/60)}h ${totalMins%60}m`:`${totalMins}m`}</div>
+            <div style={{fontFamily:F.heading,fontSize:20,color:effectiveThemeMode==="dark"?"#fff":"#000"}}>{totalMins>=60?`${Math.floor(totalMins/60)}h ${totalMins%60}m`:`${totalMins}m`}</div>
           </div>
         </div>
         <div style={{height:1,background:`linear-gradient(90deg,${T.accent},transparent)`,marginBottom:16}}/>

@@ -477,7 +477,7 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
             <div style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,marginBottom:16}}>
               <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Sessions today</div>
               {sessionHistory.map((s,i)=>(
-                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<sessionHistory.length-1?`1px solid ${T.border}33`:"none"}}>
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<sessionHistory.length-1?`1px solid ${T.border}`:"none"}}>
                   <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>Session {i+1}</span>
                   <div style={{display:"flex",gap:10,alignItems:"center"}}>
                     <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>{s.date}</span>
@@ -523,7 +523,7 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
 // rendered from several places (toggles in the Settings tab) and stability
 // matters so it isn't torn down and recreated on every unrelated re-render.
 function Toggle({on,onChange,T}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeObj}){
-  const trackColor=on?T.accent:T.border;
+  const trackColor=on?T.accent:T.solidBorder;
   return <button className="tog" onClick={()=>onChange(!on)} style={{background:trackColor}}>
     <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),boxShadow:"0 1px 3px rgba(0,0,0,0.4)",transition:"left 0.2s",display:"block"}}/>
   </button>;
@@ -1432,7 +1432,14 @@ export default function HomeworkPlanner() {
   function exitSelectionMode(){ setSelectionMode(false); setSelectedIds([]); }
 
   const base=THEMES[themeName];
-  const T:ThemeObj={...base,accentGlow:base.accent+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:base.accent as typeof base.accent};
+  // Liquid glass: every surface token becomes a translucent tint over the
+  // page's soft background glow (see .app-shell::before in the stylesheet)
+  // instead of an opaque gray, and borders become a faint rim. The css string
+  // below keys its glass selectors off these exact border values.
+  const glass=base.light
+    ?{card:"rgba(255,255,255,0.6)",cardAlt:"rgba(255,255,255,0.42)",surface:"rgba(255,255,255,0.5)",border:"rgba(0,0,0,0.08)",borderAccent:"rgba(0,0,0,0.12)"}
+    :{card:"rgba(255,255,255,0.045)",cardAlt:"rgba(255,255,255,0.08)",surface:"rgba(255,255,255,0.035)",border:"rgba(255,255,255,0.11)",borderAccent:"rgba(255,255,255,0.16)"};
+  const T:ThemeObj={...base,...glass,solidBorder:base.border,accentGlow:base.accent+"44",gradientCard:`linear-gradient(135deg,${glass.cardAlt},${glass.card})`,accent:base.accent as typeof base.accent};
   // Mirrors just the resolved background color (not the whole theme) to its own
   // key, read synchronously by a tiny inline script in index.html before React
   // hydrates -- prevents a flash of the browser's default white background for
@@ -1809,6 +1816,25 @@ export default function HomeworkPlanner() {
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;opacity:0.45;}
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${T.border};border-radius:99px}
     .glass-tab:active{transform:scale(0.92);}
+    /* Liquid glass. The page gets a soft, fixed glow layer behind everything
+       so the translucent surfaces have something to show through. Cards are
+       matched by their inline glass border (React serializes inline styles,
+       so the rgba() spacing below is the browser's normalized form) and get
+       a specular top-edge highlight plus a soft drop shadow; floating ones
+       (menus, toasts, bars) also get a real backdrop blur and a stronger
+       tint so text underneath them doesn't bleed through. Anything with its
+       own inline box-shadow keeps it. */
+    .app-shell{position:relative;isolation:isolate;}
+    .app-shell::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:${T.light
+      ?"radial-gradient(circle at 12% 8%,rgba(255,255,255,0.95),transparent 42%),radial-gradient(circle at 88% 30%,rgba(0,0,0,0.06),transparent 45%),radial-gradient(circle at 30% 85%,rgba(0,0,0,0.05),transparent 45%),radial-gradient(circle at 80% 95%,rgba(255,255,255,0.8),transparent 40%)"
+      :"radial-gradient(circle at 12% 8%,rgba(255,255,255,0.08),transparent 42%),radial-gradient(circle at 88% 30%,rgba(255,255,255,0.05),transparent 45%),radial-gradient(circle at 30% 85%,rgba(255,255,255,0.045),transparent 45%)"};}
+    [style*="border: 1px solid ${T.border.replace(/,/g,", ")}"][style*="border-radius"]{box-shadow:${T.light
+      ?"inset 0 1px 0 rgba(255,255,255,0.9),0 4px 18px rgba(0,0,0,0.06)"
+      :"inset 0 1px 0 rgba(255,255,255,0.07),0 6px 22px rgba(0,0,0,0.35)"};}
+    [style*="position: absolute"][style*="border: 1px solid ${T.border.replace(/,/g,", ")}"],
+    [style*="position: fixed"][style*="border: 1px solid ${T.border.replace(/,/g,", ")}"]{
+      background:${T.light?"rgba(255,255,255,0.72)":"rgba(30,30,30,0.66)"}!important;
+      backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
     .sticky-note{transition:all 0.2s;cursor:default;}
     .sticky-note:hover{transform:rotate(0deg) scale(1.03);}
     .pomo-ring{animation:ring 1s linear infinite;}
@@ -1828,7 +1854,7 @@ export default function HomeworkPlanner() {
     @media (max-width:600px){
       input,textarea{font-size:16px!important;}
     }
-  `,[T.bg,T.card,T.cardAlt,T.border,F.google,F.body]);
+  `,[T.bg,T.card,T.cardAlt,T.border,T.light,F.google,F.body]);
 
   // Session timer
   useEffect(()=>{
@@ -1864,7 +1890,7 @@ export default function HomeworkPlanner() {
     if (layout==="minimal") return (
       <div style={{display:"flex",flexDirection:"column",gap:2}}>
         {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
-          <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px",borderBottom:`1px solid ${T.border}22`,cursor:"pointer"}}>
+          <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px",borderBottom:`1px solid ${T.border}`,cursor:"pointer"}}>
             <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
             </button>
@@ -2128,7 +2154,7 @@ export default function HomeworkPlanner() {
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;return(
-                    <div key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.border}33`,cursor:"pointer"}}>
+                    <div key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.border}`,cursor:"pointer"}}>
                       <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {t.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
                       </button>

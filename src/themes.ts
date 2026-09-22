@@ -11,4 +11,9 @@ export const THEMES = {
   stealthLight:{ light:true,  name:"Stealth Light", bg:"#f5f5f5", card:"#eeeeee", cardAlt:"#e5e5e5", border:"#dddddd", borderAccent:"#d5d5d5", text:"#333333", textMuted:"#6a6a6a", textFaint:"#888888", accent:"#000000", surface:"#f0f0f0" },
 } as const;
 export type ThemeName = keyof typeof THEMES;
-export type ThemeObj = Omit<typeof THEMES[ThemeName], "accent"> & { accent: string; accentGlow: string; gradientCard: string };
+// The surface tokens are widened to plain strings because App.tsx swaps them
+// for translucent rgba() "liquid glass" values at runtime; solidBorder keeps
+// the original opaque hex border for the few places that need a real hex
+// (e.g. contrastColor(), which parses one).
+type GlassTokens = "accent"|"card"|"cardAlt"|"surface"|"border"|"borderAccent";
+export type ThemeObj = Omit<typeof THEMES[ThemeName], GlassTokens> & { accent: string; card: string; cardAlt: string; surface: string; border: string; borderAccent: string; solidBorder: string; accentGlow: string; gradientCard: string };

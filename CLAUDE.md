@@ -329,6 +329,14 @@ breaks fixed backgrounds. Device tilt deliberately doesn't drive it. Since glass
 suffix to them (`T.border+"33"`); use `T.borderFaint` for a lighter divider, and `T.solidBorder`
 wherever a real hex is required (e.g. `contrastColor()`).
 
+**Completing a task** (`toggleDone`) animates unless reduced motion is on: the id sits in
+`justDone` for 650ms, during which `allSorted`/`filteredTasks` keep the card where it was while
+`CheckMark` (module scope, an SVG stroke) draws in and the title's `.strike` (a background line,
+not `text-decoration`, so it can animate) draws across. Then `captureTaskRects()` records every
+`[data-task-id]` card's position and a `useLayoutEffect` FLIP-animates each card from its old spot
+to its new one. Only `MiniCard` has `data-task-id`, so only the list layouts glide; the others
+get the check and strike but jump into place.
+
 **Bulk edit / multi-select** (`selectionMode`/`selectedIds` state) is deliberately scoped to the
 default list layout only (`MiniCard`) — the other 6 layouts each render their own custom task row
 markup, so extending selection to all of them was judged not worth the scope. `MiniCard` accepts

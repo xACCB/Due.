@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged, deleteUser } from "firebase/auth";
@@ -228,6 +228,7 @@ const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = 
   { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
   { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
+  { id:"complete-anim", date:"2026-09-22", title:"Improvement", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
   { id:"sheet-spring", date:"2026-09-22", title:"Improvement", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
   { id:"glass-cursor", date:"2026-09-22", title:"Improvement", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
   { id:"pomodoro-breaks", date:"2026-09-22", title:"New feature", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
@@ -753,6 +754,16 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
 // Defined at module scope for the same reason as TaskModal above: it's
 // rendered from several places (toggles in the Settings tab) and stability
 // matters so it isn't torn down and recreated on every unrelated re-render.
+// Done checkmark, drawn as a stroke so it can draw itself in (.check-draw in
+// the runtime css) the moment a task is completed; static everywhere else.
+function CheckMark({size=10,color="#111",animate=false}:{size?:number;color?:string;animate?:boolean}){
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" aria-hidden="true" className={animate?"check-draw":undefined} style={{display:"block"}}>
+      <polyline points="2.2,6.4 4.9,9 9.8,3.2" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" pathLength={1} strokeDasharray={1}/>
+    </svg>
+  );
+}
+
 function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeObj;label:string}){
   const trackColor=on?T.accent:T.solidBorder;
   return <button className="tog" role="switch" aria-checked={on} aria-label={label} onClick={()=>onChange(!on)} style={{background:trackColor}}>
@@ -765,7 +776,7 @@ function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:T
 // for every visible task across every layout, so being redefined (and every
 // instance's DOM torn down/recreated) on each unrelated render was the most
 // consequential case of this pattern in the file.
-function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,now,h24,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
+function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,now,h24,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect,justDone}:{
   task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
   T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number; h24:boolean;
   dragTaskId:number|null; dragOffsetY:number;
@@ -785,6 +796,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
   onDragMove:(e:React.PointerEvent)=>void;
   endDrag:()=>void;
   selectionMode?:boolean; isSelected?:boolean; onToggleSelect?:(id:number)=>void;
+  justDone?:boolean;
 }) {
   const pr=getPriority(task.dueDate,task.estMins,task.priorityOverride);
   const sc=subjectColors[task.subject]||T.accent;
@@ -812,14 +824,14 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
             ⠿
           </div>
         )}
-        <button aria-label={selectionMode?(isSelected?"Deselect task":"Select task"):task.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();if(selectionMode){onToggleSelect?.(task.id);}else{onToggleDone(task.id);}}} style={{background:selectionMode?(isSelected?T.accent:"none"):task.done?"#2ED573":"none",border:`2px solid ${selectionMode?(isSelected?T.accent:T.textFaint):task.done?"#2ED573":T.textFaint}`,borderRadius:selectionMode?4:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
-          {(selectionMode?isSelected:task.done)&&<span style={{color:selectionMode?contrastColor(T.accent):"#111",fontSize:10,fontWeight:"bold"}}>✓</span>}
+        <button aria-label={selectionMode?(isSelected?"Deselect task":"Select task"):task.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();if(selectionMode){onToggleSelect?.(task.id);}else{onToggleDone(task.id);}}} style={{background:selectionMode?(isSelected?T.accent:"none"):task.done?"#2ED573":"none",border:`2px solid ${selectionMode?(isSelected?T.accent:T.textFaint):task.done?"#2ED573":T.textFaint}`,borderRadius:selectionMode?4:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}} className={justDone&&!selectionMode?"check-pop":undefined}>
+          {(selectionMode?isSelected:task.done)&&<CheckMark size={11} color={selectionMode?contrastColor(T.accent):"#111"} animate={justDone&&!selectionMode}/>}
         </button>
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
             {isTop&&<span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>}
             {isNext&&<span className="rb" style={{background:T.text+"11",color:T.textMuted}}>next up</span>}
-            <span style={{fontFamily:F.heading,fontSize:15,textDecoration:task.done?"line-through":"none",color:task.done?T.textFaint:T.text}}>{task.title}</span>
+            <span className={task.done?(justDone?"strike strike-anim":"strike"):undefined} style={{fontFamily:F.heading,fontSize:15,color:task.done?T.textFaint:T.text,transition:"color 0.3s"}}>{task.title}</span>
             {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
             {task.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>}
             {task.priorityOverride&&<span className="rb" title="Priority set manually" style={{background:priColor(task.priorityOverride,colorCodeUrgency)+"22",color:priColor(task.priorityOverride,colorCodeUrgency)}}>{task.priorityOverride}</span>}
@@ -1947,6 +1959,10 @@ export default function HomeworkPlanner() {
   // refs mirror the resolved task and the after-break suggestion for the
   // Pomodoro-finished effect below, which is declared before they're computed.
   const [focusTaskId,setFocusTaskId]=useState<number|null>(null);
+  // Tasks completed a moment ago: they hold their place in the list while the
+  // check draws in and the title strikes through, then settle to the bottom
+  // (see toggleDone).
+  const [justDone,setJustDone]=useState<number[]>([]);
   const [focusPickerOpen,setFocusPickerOpen]=useState(false);
   const pomodoroTaskRef=useRef<number|null>(null);
   const nextSuggestionRef=useRef<string|null>(null);
@@ -1984,9 +2000,11 @@ export default function HomeworkPlanner() {
   // Every tag used on any task, deduplicated -- powers the "quick add" suggestion
   // chips in TaskModal's tag editor instead of retyping tags you've already used.
   const allTags=[...new Set(tasks.flatMap(t=>t.tags||[]))].sort();
-  // Pending tasks sort by their manual drag order; done tasks always sink to the bottom.
+  // Pending tasks sort by their manual drag order; done tasks always sink to the
+  // bottom -- except ones in justDone, which stay put until they settle.
   const allSorted=[...visibleTasks].sort((a,b)=>{
-    if(a.done!==b.done)return a.done?1:-1;
+    const ad=a.done&&!justDone.includes(a.id), bd=b.done&&!justDone.includes(b.id);
+    if(ad!==bd)return ad?1:-1;
     return a.order-b.order;
   });
   const searchLower=searchQuery.trim().toLowerCase();
@@ -1995,9 +2013,9 @@ export default function HomeworkPlanner() {
     if(filter==="archived")return !!t.archived;
     if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
     if(filter==="done")return t.done;
-    if(filter==="pending")return !t.done;
+    if(filter==="pending")return !t.done||justDone.includes(t.id);
     if(filter==="noest")return !t.done&&!t.estMins; // from the "Time left" dropdown; not a chip
-    return showDone?true:!t.done;
+    return showDone||!t.done||justDone.includes(t.id);
   }).filter(matchesSearch);
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const focusTask=tasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
@@ -2168,12 +2186,44 @@ export default function HomeworkPlanner() {
     setAdding(false);setStep(0);
     setUsingTemplate(false);setTemplateSubtasks(null);
   }
+  // Where each list card is, for animating it from there to its new place after
+  // the list re-sorts (FLIP: the layout effect below plays the difference).
+  const taskRectsBefore=useRef<Map<string,number>|null>(null);
+  function captureTaskRects(){
+    const m=new Map<string,number>();
+    document.querySelectorAll<HTMLElement>("[data-task-id]").forEach(el=>m.set(el.dataset.taskId!,el.getBoundingClientRect().top));
+    taskRectsBefore.current=m;
+  }
   function toggleDone(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
+    // Completing: the card holds its place while the check draws in and the
+    // title strikes through, then glides down to the done tasks. Unchecking
+    // glides it straight back up. Reduced motion skips all of it.
+    if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+      if(!task.done){
+        setJustDone(prev=>[...prev,id]);
+        setTimeout(()=>{captureTaskRects();setJustDone(prev=>prev.filter(x=>x!==id));},650);
+      }else{
+        setJustDone(prev=>prev.filter(x=>x!==id));
+        captureTaskRects();
+      }
+    }
     changeTasks(prev=>setDone(prev,[id],!task.done),`${task.done?"uncheck":"complete"} "${task.title}"`,
       task.done?`"${task.title}" marked not done`:`"${task.title}" completed`);
   }
+  useLayoutEffect(()=>{
+    const before=taskRectsBefore.current;
+    if(!before)return;
+    taskRectsBefore.current=null;
+    document.querySelectorAll<HTMLElement>("[data-task-id]").forEach(el=>{
+      const top=before.get(el.dataset.taskId!);
+      if(top==null)return;
+      const dy=top-el.getBoundingClientRect().top;
+      if(Math.abs(dy)<1)return;
+      el.animate([{transform:`translateY(${dy}px)`},{transform:"translateY(0)"}],{duration:480,easing:"cubic-bezier(.22,.9,.3,1.04)"});
+    });
+  });
   // Every delete path (single, bulk, "clear completed") goes through here, so
   // they're all undoable the same way instead of some being permanent.
   function deleteTasks(ids:number[]){
@@ -2496,6 +2546,18 @@ export default function HomeworkPlanner() {
     .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}
     .chip:active{transform:scale(.97);}
     input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);}
+    /* Completing a task: the check draws itself in on a little pop, and the
+       title's strike-through draws left to right. .strike is a background line
+       rather than text-decoration so it can animate; box-decoration-break
+       repeats it on every line of a wrapped title. */
+    .check-draw polyline{stroke-dashoffset:1;animation:checkDraw .3s .08s cubic-bezier(.65,0,.35,1) forwards;}
+    @keyframes checkDraw{to{stroke-dashoffset:0}}
+    .check-pop{animation:checkPop .38s cubic-bezier(.34,1.56,.64,1);}
+    @keyframes checkPop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+    .strike{text-decoration:none!important;background-image:linear-gradient(currentColor,currentColor);background-repeat:no-repeat;background-position:0 55%;background-size:100% 1.5px;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
+    .strike-anim{animation:strikeDraw .34s .2s cubic-bezier(.65,0,.35,1) both;}
+    @keyframes strikeDraw{from{background-size:0% 1.5px}}
+    @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim{animation:none;}}
     .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}
     .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background 0.2s;position:relative;flex-shrink:0;}
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;opacity:0.45;}
@@ -2629,6 +2691,7 @@ export default function HomeworkPlanner() {
       swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,
       startDrag,onDragMove,endDrag,
       selectionMode,onToggleSelect:toggleSelected};
+    const mc=(t:Task)=>({...miniCardProps,isSelected:selectedIds.includes(t.id),justDone:justDone.includes(t.id)});
 
     if (layout==="checklist") return (
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -2638,9 +2701,9 @@ export default function HomeworkPlanner() {
             <div className="tc" onClick={swipeClickGuard(()=>{setSelectedTask(t);})} {...swipeHandlers(t.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.card,borderRadius:10,border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
               <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,minWidth:18}}>{String(i+1).padStart(2,"0")}</span>
               <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:4,background:t.done?"#2ED573":"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
-                {t.done&&<span style={{color:"#111",fontSize:11,fontWeight:"bold"}}>✓</span>}
+                {t.done&&<CheckMark size={12} animate={justDone.includes(t.id)}/>}
               </button>
-              <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
+              <span className={t.done?(justDone.includes(t.id)?"strike strike-anim":"strike"):undefined} style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
               {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>}
               <button aria-label="Delete task" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
             </div>
@@ -2663,7 +2726,7 @@ export default function HomeworkPlanner() {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"auto"}}>
               {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
               <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:17,height:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
-                {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
+                {t.done&&<CheckMark size={9} animate={justDone.includes(t.id)}/>}
               </button>
             </div>
           </div>
@@ -2682,9 +2745,9 @@ export default function HomeworkPlanner() {
                 {col.tasks.map(t=>(
                   <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);}} style={{background:T.card,borderRadius:8,padding:"9px 10px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7,cursor:"pointer"}}>
                     <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:14,height:14,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {t.done&&<span style={{color:"#111",fontSize:8}}>✓</span>}
+                      {t.done&&<CheckMark size={9} animate={justDone.includes(t.id)}/>}
                     </button>
-                    <span style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
+                    <span className={t.done?(justDone.includes(t.id)?"strike strike-anim":"strike"):undefined} style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
                     <button aria-label="Delete task" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:12,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
                   </div>
                 ))}
@@ -2708,9 +2771,9 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:18,height:18,cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {t.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
+                    {t.done&&<CheckMark size={10} animate={justDone.includes(t.id)}/>}
                   </button>
-                  <span style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
+                  <span className={t.done?(justDone.includes(t.id)?"strike strike-anim":"strike"):undefined} style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text}}>{t.title}</span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   {t.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
@@ -2746,7 +2809,7 @@ export default function HomeworkPlanner() {
                   {tier.tasks.map(t=>(
                     <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);}} style={{background:T.card,borderRadius:9,padding:"9px 12px",border:`1px solid ${tier.color}44`,display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
                       <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {t.done&&<span style={{color:"#111",fontSize:8}}>✓</span>}
+                        {t.done&&<CheckMark size={9} animate={justDone.includes(t.id)}/>}
                       </button>
                       <span style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
                       {t.subject&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.subject}</span>}
@@ -2776,7 +2839,7 @@ export default function HomeworkPlanner() {
                 {list.map(t=>(
                   <div key={t.id} onClick={()=>{setSelectedTask(t);}} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
                     <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {t.done&&<span style={{color:"#111",fontSize:9}}>✓</span>}
+                      {t.done&&<CheckMark size={10} animate={justDone.includes(t.id)}/>}
                     </button>
                     <span style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
                     {t.dueDate&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDate(t.dueDate)}</span>}
@@ -2802,9 +2865,9 @@ export default function HomeworkPlanner() {
                   {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;return(
                     <div key={t.id} onClick={()=>{setSelectedTask(t);}} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.borderFaint}`,cursor:"pointer"}}>
                       <button aria-label={t.done?"Mark not done":"Mark done"} onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {t.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
+                        {t.done&&<CheckMark size={10} animate={justDone.includes(t.id)}/>}
                       </button>
-                      <span style={{fontFamily:F.body,fontSize:12,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
+                      <span className={t.done?(justDone.includes(t.id)?"strike strike-anim":"strike"):undefined} style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
                       {t.subject&&<span style={{color:sc,fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
                       {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
                       <button aria-label="Delete task" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
@@ -2848,13 +2911,13 @@ export default function HomeworkPlanner() {
           <div key={k}>
             <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{labelFor(k)} ({groups.get(k)!.length})</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} swipeable {...miniCardProps} isSelected={selectedIds.includes(t.id)}/>)}
+              {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} swipeable {...mc(t)}/>)}
             </div>
           </div>
         ))}
       </div>;
     }
-    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable swipeable {...miniCardProps} isSelected={selectedIds.includes(t.id)}/>)}</div>;
+    return <div style={{display:"flex",flexDirection:"column",gap:10}}>{tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} reorderable swipeable {...mc(t)}/>)}</div>;
   }
 
 

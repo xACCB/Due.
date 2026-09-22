@@ -159,13 +159,6 @@ function IconTasks(){
     <circle cx="4" cy="18" r="1.3"/><line x1="8.5" y1="18" x2="20" y2="18"/>
   </svg>;
 }
-function IconTools(){
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="6" y1="4" x2="6" y2="20"/><circle cx="6" cy="14" r="2.1"/>
-    <line x1="12" y1="4" x2="12" y2="20"/><circle cx="12" cy="8" r="2.1"/>
-    <line x1="18" y1="4" x2="18" y2="20"/><circle cx="18" cy="16" r="2.1"/>
-  </svg>;
-}
 function IconImport(){
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="3" x2="12" y2="14"/><polyline points="7.5,10 12,14.5 16.5,10"/>
@@ -967,21 +960,6 @@ export default function HomeworkPlanner() {
   function saveAsTemplate(task:Task,name:string){
     setTemplates(prev=>[...prev,{id:String(nextId()),name,subject:task.subject,estMins:task.estMins,recurrence:task.recurrence,subtasks:(task.subtasks||[]).map(s=>({text:s.text}))}]);
   }
-  function deleteTemplate(id:string){
-    setTemplates(prev=>prev.filter(t=>t.id!==id));
-  }
-  // Scratchpad: the textarea itself is fully responsive (plain local state), but
-  // what gets written to localStorage/Firestore is debounced ~500ms behind it so
-  // typing doesn't fire a write (and a Firestore sync) on every keystroke.
-  const [scratchpad,setScratchpad]=useState(()=>localStorage.getItem("hw-scratchpad")||"");
-  const [scratchpadSynced,setScratchpadSynced]=useState(scratchpad);
-  const scratchpadTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  function updateScratchpad(val:string){
-    setScratchpad(val);
-    clearTimeout(scratchpadTimer.current);
-    scratchpadTimer.current=setTimeout(()=>setScratchpadSynced(val),500);
-  }
-  useEffect(()=>{localStorage.setItem("hw-scratchpad",scratchpadSynced);},[scratchpadSynced]);
   function addSubject(name:string){
     const trimmed=name.trim();
     if(!trimmed||subjects.includes(trimmed))return;
@@ -1148,7 +1126,6 @@ export default function HomeworkPlanner() {
         // console) could otherwise inject a wrong-shaped value straight into
         // state and crash a render. Cheap shape checks before applying.
         if(typeof data.layout==="string"&&data.layout in LAYOUTS) setLayout(data.layout as LayoutName);
-        if(typeof data.scratchpad==="string"){ setScratchpad(data.scratchpad); setScratchpadSynced(data.scratchpad); }
       }
       setProfileSyncedForUid(fbUser.uid);
       setSyncError(null);
@@ -1166,14 +1143,14 @@ export default function HomeworkPlanner() {
     if(!fbUser||profileSyncedForUid!==fbUser.uid)return;
     isSyncingProfile.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{layout,scratchpad:scratchpadSynced},{merge:true})
+    setDoc(ref,{layout},{merge:true})
       .then(()=>setSyncError(null))
       .catch(err=>{
         console.error(err);
         setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
       })
       .finally(()=>{isSyncingProfile.current=false;});
-  },[layout,scratchpadSynced,fbUser,profileSyncedForUid]);
+  },[layout,fbUser,profileSyncedForUid]);
 
   // Sync tasks FROM the tasks subcollection.
   useEffect(()=>{
@@ -1212,8 +1189,8 @@ export default function HomeworkPlanner() {
   // instead of one array field: toggling a single task no longer rewrites
   // every other task along with it.
   //
-  // Debounced (like the scratchpad above) so a burst of rapid local changes
-  // collapses into one write instead of one per change -- most notably,
+  // Debounced so a burst of rapid local changes collapses into one write
+  // instead of one per change -- most notably,
   // drag-to-reorder calls setTasks() on every card the dragged item passes
   // over, which without this would fire a separate Firestore batch write per
   // intermediate step of a single drag gesture instead of just one at the
@@ -1356,7 +1333,7 @@ export default function HomeworkPlanner() {
   const [looksOpen,setLooksOpen]=useState(false);
   const [activeSubject,setActiveSubject]=useState("all");
   // Syllabus import: transient by design (a paste-and-review staging area, not
-  // something worth persisting across reloads like tasks/scratchpad are).
+  // something worth persisting across reloads like tasks are).
   const [importText,setImportText]=useState("");
   const [importSubject,setImportSubject]=useState<string|null>(null);
   const [importPreview,setImportPreview]=useState<{title:string;dueDate:string;checked:boolean}[]|null>(null);
@@ -1659,7 +1636,6 @@ export default function HomeworkPlanner() {
       exportedAt:new Date().toISOString(),
       tasks,subjects,subjectColors,templates,
       themeName,layout,groupBy,
-      scratchpad,
     };
     downloadFile(`dueplanner-export-${todayISO()}.json`,JSON.stringify(data,null,2),"application/json");
   }
@@ -1791,7 +1767,7 @@ export default function HomeworkPlanner() {
   // those are fresh object literals every render) so this multi-hundred-line
   // stylesheet string, injected via <style>{css}</style>, only gets rebuilt
   // (and reparsed by the browser) when the theme or font actually changes,
-  // not on every task edit, scratchpad keystroke, or other unrelated render.
+  // not on every task edit or other unrelated render.
   const css=useMemo(()=>`
     @import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');
     *{box-sizing:border-box;}
@@ -2384,9 +2360,9 @@ export default function HomeworkPlanner() {
         <div className="app-sidebar">
         {/* Tabs */}
         <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4}}>
-          {(["tasks","focus","tools","import"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"Tasks",focus:"Focus",tools:"Tools",import:"Import"};
-            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus,tools:IconTools,import:IconImport};
+          {(["tasks","focus","import"] as const).map(id=>{
+            const labels:Record<string,string>={tasks:"Tasks",focus:"Focus",import:"Import"};
+            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus,import:IconImport};
             const Icon=icons[id];
             const active=activeTab===id;
             return <button key={id} onClick={()=>id==="focus"?setFocusMode(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
@@ -2569,44 +2545,6 @@ export default function HomeworkPlanner() {
             )}
           </div>
         </>}
-
-        {/* TOOLS TAB */}
-        {activeTab==="tools"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {/* Pomodoro */}
-            {renderPomodoroCard()}
-
-            {/* Scratchpad */}
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Scratchpad</div>
-              <textarea
-                value={scratchpad}
-                onChange={e=>updateScratchpad(e.target.value)}
-                placeholder="Jot something down..."
-                style={{width:"100%",minHeight:120,maxHeight:280,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto"}}
-              />
-            </div>
-
-            {/* Templates */}
-            {templates.length>0&&(
-              <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Templates</div>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {templates.map(tpl=>(
-                    <div key={tpl.id} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,borderRadius:9,padding:"9px 12px"}}>
-                      <span style={{flex:1,fontFamily:F.body,fontSize:12,color:T.text}}>{tpl.name}</span>
-                      <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{tpl.subject}</span>
-                      <button onClick={()=>{if(window.confirm(`Delete the "${tpl.name}" template?`))deleteTemplate(tpl.id);}} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 2px"}}>×</button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>
-                  Save a task as a template from its detail view -- templates show up as quick-start chips above "add homework".
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* IMPORT TAB */}
         {activeTab==="import"&&(

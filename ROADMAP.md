@@ -230,6 +230,121 @@ Things most people expect from an app like this that are missing today.
 | Help / FAQ page and in-app "What's this?" hints | ⬜ | F | M | |
 | In-app feedback form (replaces the Google Form link) | ⬜ | F | S | |
 
+## 17. Accepted ideas (from `IDEAS.md`)
+Picked from the ideas list; `#` is the item's number in `IDEAS.md`. Every
+feature is free for now, so these have no tier.
+
+**Label:** **Yes** = accepted as written · **With tweaks** = accepted, but the details need deciding before building · **Maybe** = still undecided
+
+### Smart planning
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 1 | Auto-scheduler: split a big task into daily chunks before its due date, based on free time | Yes | XL | Works best once the timetable (section 1) and the workload heatmap (section 2) exist |
+| 6 | "I have 20 minutes": pick the best task that fits the time available | Yes | S | |
+| 8 | Overload forecast ("Thursday is packed — start the lab report Monday") | Yes | M | Builds on the workload heatmap and conflict detection |
+| 11 | Per-subject defaults (e.g. Math always due 8:00 AM, 30 minutes) | With tweaks | S | |
+| 12 | Energy-based scheduling (morning person / night owl) | Maybe | L | Only useful together with the auto-scheduler |
+
+### Task details
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 13 | Difficulty rating (easy / medium / hard), separate from time | Yes | S | Could feed the auto-scheduler and priority |
+| 14 | Progress slider (% done) for tasks without subtasks | Yes | S | Would also give the Progress layout something to show for tasks without subtasks |
+| 16 | Custom repeat patterns (Mon/Wed/Fri, every 2 weeks, last day of the month) | Yes | M | |
+| 17 | Repeat end date or count | With tweaks | S | Pairs with #16 |
+| 18 | Duplicate task | Yes | S | |
+| 19 | Task history (created, edited, completed) | Maybe | M | |
+| 20 | "Waiting on" status (e.g. waiting for teacher feedback) | With tweaks | S | |
+| 21 | Submission checklist ("Submitted on Canvas ✓", optional screenshot) | With tweaks | M | A screenshot needs file storage (see Attachments, section 5) |
+| 22 | Assignment types (homework, quiz, test, project, lab) with icons and default estimates | With tweaks | M | Overlaps with per-subject defaults (#11); worth designing together |
+| 24 | Group project notes (teammates, who's doing what) | Maybe | S | |
+
+### Grades & academics
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 25 | Grade received on finished tasks | Yes | S | First step toward grade-weighted priority (section 3) |
+| 29 | Terms / semesters: archive a term and start a new one | With tweaks | M | |
+| 30 | Report-card view per term | Maybe | M | Depends on #25 and #29 |
+| 32 | Reading tracker (pages per day to finish by the due date) | Yes | M | |
+| 37 | Extracurricular layer (clubs, sports, practices on the calendar) | Maybe | M | Shares plumbing with the class timetable (section 1) |
+
+### Focus & wellbeing
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 40 | Daily focus goal (e.g. 90 minutes) with a streak | With tweaks | S | Work sessions are already logged |
+| 43 | Quiet hours for notifications | Maybe | S | |
+| 47 | Session goal ("finish the intro"), checked at the end | Yes | S | Pairs with the post-session reflection log (section 8) |
+
+### Motivation & fun
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 49 | XP and levels for finishing on time | Maybe | M | |
+| 54 | Semester "Wrapped" recap | Yes | M | Partly exists: the Inbox's week/month/year stats. Build it together with the recap card in section 7 |
+| 55 | Daily challenge ("finish 3 tasks before 6 PM") | Maybe | S | |
+| 56 | Sound effect on completing a task (toggle) | Yes | S | Can reuse the Pomodoro chime's Web Audio approach |
+
+### Look & layout
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 60 | Desktop split view (list left, task detail right) | Yes | M | |
+| 62 | Alternate app icons | Maybe | M | Needs the native app (L1) on iOS |
+| 63 | Customizable home dashboard | With tweaks | L | |
+| 64 | Text size and density settings | Yes | S | |
+| 67 | Haptic feedback on mobile | Yes | S | Limited on iOS Safari; full support needs the native app (L1) |
+| 68 | Mac menu-bar app / desktop widget with the next task | Yes | L | Needs a desktop wrapper (e.g. Tauri or Electron) |
+| 69 | Chrome new-tab page with today's tasks | Maybe | M | Could ship as part of the browser extension (section 13) |
+
+### Quick capture
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 72 | Siri Shortcuts / Google Assistant actions | Yes | L | Needs the native app (L1) |
+| 74 | Paste a list → one task per line | With tweaks | S | Could run each line through natural-language quick add (section 6) |
+| 76 | Complete or snooze from the notification itself | Yes | M | Needs service-worker notification actions; best alongside push (section 0.2) |
+
+### Notifications
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 91 | Morning briefing notification with today's plan | Yes | M | Reliable delivery needs push (section 0.2) |
+| 92 | Escalating urgency (gentle first, firmer near the deadline) | With tweaks | S | Extends the existing multi-offset reminders |
+
+### Insights
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 95 | Productivity insights (best hours, slowest subject) | Yes | M | Uses the logged work sessions |
+| 97 | On-time rate over time chart | Yes | S | The Inbox already computes the on-time % |
+| 99 | Year-over-year history of past terms | Maybe | M | Depends on terms (#29) |
+
+### Accounts & privacy
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 100 | "Last synced" time and offline indicator | Yes | S | |
+| 101 | Multiple spaces (school, personal, work) | With tweaks | L | Data-model change: each task belongs to a space |
+| 102 | More sign-in options (email link / passkey, Apple, Microsoft) | Yes | M | Sign in with Apple is required anyway for the iOS app (L1) |
+| 103 | Switch between accounts without signing out | Yes | M | |
+
+### Integrations
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 106 | Import from Todoist / TickTick | Maybe | M | |
+
+## 18. Teachers & schools
+A possible second market: teachers publish assignments, students receive
+them. All of this section was accepted from `IDEAS.md` (#78–82).
+
+| # | Item | Size | Notes |
+|---|---|---|---|
+| 78 | Teacher accounts that publish assignments to their students | XL | Needs a new data model (classes, memberships, published assignments) and account roles |
+| 79 | Class codes: students join a teacher's feed with a code | L | Published assignments appear as tasks the student owns and can edit |
+| 80 | Teacher insights: how many students have started an assignment | L | Needs a clear privacy model: students should know what teachers can see |
+| 81 | School / district licensing | XL | Contracts, invoicing, admin dashboards; schools often require data agreements |
+| 82 | Tutor view: a tutor sees a student's upcoming work, with permission | M | Shares the permission system with the parent/guardian view (section 9) |
+
+Things to decide before building this section:
+- **Privacy and law.** Student data in schools falls under FERPA (US), COPPA for under-13s, and state student-privacy laws. Districts usually require a signed data-privacy agreement.
+- **Integrations overlap.** Google Classroom and Canvas (section 10) cover some of the same ground. This section is for teachers who don't use an LMS, or who want DuePlanner-specific features.
+- **Who signs up first.** Teacher-first (teachers invite classes) or student-first (students ask teachers to join). This changes onboarding and marketing.
+- **Moderation.** Teacher accounts need verification so strangers can't create a "class" to contact students.
+
 ---
 
 ## Launch & infrastructure

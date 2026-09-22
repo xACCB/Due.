@@ -477,7 +477,7 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
             <div style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,marginBottom:16}}>
               <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Sessions today</div>
               {sessionHistory.map((s,i)=>(
-                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<sessionHistory.length-1?`1px solid ${T.border}`:"none"}}>
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<sessionHistory.length-1?`1px solid ${T.borderFaint}`:"none"}}>
                   <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>Session {i+1}</span>
                   <div style={{display:"flex",gap:10,alignItems:"center"}}>
                     <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>{s.date}</span>
@@ -952,6 +952,7 @@ export default function HomeworkPlanner() {
   // Red/orange/green priority coloring, toggleable off in favor of one neutral
   // gray (NEUTRAL_PRIORITY_COLOR) everywhere urgency is shown -- default on.
   const [colorCodeUrgency,setColorCodeUrgency]=usePersistedState("hw-colorcode-urgency",true);
+  const [liquidGlass,setLiquidGlass]=usePersistedState("hw-liquid-glass",false);
   const [subjects,setSubjects]=usePersistedState<string[]>("hw-subjects",DEFAULT_SUBJECTS);
   const [whatsNew,setWhatsNew]=usePersistedState("hw-whatsnew",WHATS_NEW);
   function dismissWhatsNew(id:string){setWhatsNew(prev=>prev.filter(w=>w.id!==id));}
@@ -1432,14 +1433,17 @@ export default function HomeworkPlanner() {
   function exitSelectionMode(){ setSelectionMode(false); setSelectedIds([]); }
 
   const base=THEMES[themeName];
-  // Liquid glass: every surface token becomes a translucent tint over the
-  // page's soft background glow (see .app-shell::before in the stylesheet)
-  // instead of an opaque gray, and borders become a faint rim. The css string
-  // below keys its glass selectors off these exact border values.
-  const glass=base.light
+  // Liquid glass (optional, "Liquid Glass" toggle in Options -> Looks): every
+  // surface token becomes a translucent tint over the page's soft background
+  // glow (see .app-shell::before in the stylesheet) instead of an opaque gray,
+  // and borders become a faint rim. The css string below keys its glass
+  // selectors off these exact border values. Off = the original opaque theme.
+  const glass=!liquidGlass
+    ?{card:base.card as string,cardAlt:base.cardAlt as string,surface:base.surface as string,border:base.border as string,borderAccent:base.borderAccent as string}
+    :base.light
     ?{card:"rgba(255,255,255,0.6)",cardAlt:"rgba(255,255,255,0.42)",surface:"rgba(255,255,255,0.5)",border:"rgba(0,0,0,0.08)",borderAccent:"rgba(0,0,0,0.12)"}
     :{card:"rgba(255,255,255,0.045)",cardAlt:"rgba(255,255,255,0.08)",surface:"rgba(255,255,255,0.035)",border:"rgba(255,255,255,0.11)",borderAccent:"rgba(255,255,255,0.16)"};
-  const T:ThemeObj={...base,...glass,solidBorder:base.border,accentGlow:base.accent+"44",gradientCard:`linear-gradient(135deg,${glass.cardAlt},${glass.card})`,accent:base.accent as typeof base.accent};
+  const T:ThemeObj={...base,...glass,solidBorder:base.border,borderFaint:liquidGlass?glass.border:base.border+"33",accentGlow:base.accent+"44",gradientCard:`linear-gradient(135deg,${glass.cardAlt},${glass.card})`,accent:base.accent as typeof base.accent};
   // Mirrors just the resolved background color (not the whole theme) to its own
   // key, read synchronously by a tiny inline script in index.html before React
   // hydrates -- prevents a flash of the browser's default white background for
@@ -1816,6 +1820,7 @@ export default function HomeworkPlanner() {
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;opacity:0.45;}
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${T.border};border-radius:99px}
     .glass-tab:active{transform:scale(0.92);}
+    ${liquidGlass?`
     /* Liquid glass. The page gets a soft, fixed glow layer behind everything
        so the translucent surfaces have something to show through. Cards are
        matched by their inline glass border (React serializes inline styles,
@@ -1835,6 +1840,7 @@ export default function HomeworkPlanner() {
     [style*="position: fixed"][style*="border: 1px solid ${T.border.replace(/,/g,", ")}"]{
       background:${T.light?"rgba(255,255,255,0.72)":"rgba(30,30,30,0.66)"}!important;
       backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
+    `:""}
     .sticky-note{transition:all 0.2s;cursor:default;}
     .sticky-note:hover{transform:rotate(0deg) scale(1.03);}
     .pomo-ring{animation:ring 1s linear infinite;}
@@ -1854,7 +1860,7 @@ export default function HomeworkPlanner() {
     @media (max-width:600px){
       input,textarea{font-size:16px!important;}
     }
-  `,[T.bg,T.card,T.cardAlt,T.border,T.light,F.google,F.body]);
+  `,[T.bg,T.card,T.cardAlt,T.border,T.light,liquidGlass,F.google,F.body]);
 
   // Session timer
   useEffect(()=>{
@@ -1890,7 +1896,7 @@ export default function HomeworkPlanner() {
     if (layout==="minimal") return (
       <div style={{display:"flex",flexDirection:"column",gap:2}}>
         {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
-          <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px",borderBottom:`1px solid ${T.border}`,cursor:"pointer"}}>
+          <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 4px",borderBottom:`1px solid ${T.borderFaint}`,cursor:"pointer"}}>
             <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
             </button>
@@ -2154,7 +2160,7 @@ export default function HomeworkPlanner() {
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;return(
-                    <div key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.border}`,cursor:"pointer"}}>
+                    <div key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.borderFaint}`,cursor:"pointer"}}>
                       <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {t.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
                       </button>
@@ -2488,17 +2494,23 @@ export default function HomeworkPlanner() {
           // thickness, and a separate raised "lens" pill that slides between
           // tabs on a slightly springy curve instead of each button just
           // swapping its own background.
+          // With the Liquid Glass setting off, this falls back to the original
+          // flat pill: opaque surface, and each active button just gets its
+          // own card-colored background (no sheen, no sliding lens).
           const dark=effectiveThemeMode==="dark";
           const tabIds=["tasks","focus"] as const;
           const activeIdx=tabIds.indexOf(activeTab as typeof tabIds[number]);
           return (
-        <div className="tab-bar" style={{position:"relative",display:"flex",gap:0,marginBottom:16,padding:5,borderRadius:999,touchAction:"pan-y",
+        <div className="tab-bar" style={!liquidGlass
+          ?{position:"relative",display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"pan-y"}
+          :{position:"relative",display:"flex",gap:0,marginBottom:16,padding:5,borderRadius:999,touchAction:"pan-y",
           background:dark?"rgba(38,38,38,0.45)":"rgba(255,255,255,0.55)",
           backdropFilter:"blur(24px) saturate(180%)",WebkitBackdropFilter:"blur(24px) saturate(180%)",
           border:`1px solid ${dark?"rgba(255,255,255,0.10)":"rgba(255,255,255,0.85)"}`,
           boxShadow:dark
             ?"inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -1px 0 rgba(0,0,0,0.45), 0 10px 30px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.3)"
             :"inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.08)"}}>
+          {liquidGlass&&<>
           <div className="glass-sheen" aria-hidden="true" style={{position:"absolute",inset:0,borderRadius:"inherit",pointerEvents:"none",
             background:`linear-gradient(180deg, rgba(255,255,255,${dark?0.07:0.5}) 0%, rgba(255,255,255,0) 55%)`}}/>
           <div className="glass-lens" aria-hidden="true" style={{position:"absolute",top:5,bottom:5,left:5,width:`calc((100% - 10px) / ${tabIds.length})`,borderRadius:999,pointerEvents:"none",
@@ -2508,13 +2520,14 @@ export default function HomeworkPlanner() {
               :"inset 0 1px 0 #fff, 0 0 0 0.5px rgba(0,0,0,0.05), 0 3px 10px rgba(0,0,0,0.10)",
             transform:`translateX(${Math.max(activeIdx,0)*100}%)`,opacity:activeIdx<0?0:1,
             transition:"transform 0.45s cubic-bezier(.34,1.3,.64,1), opacity 0.2s"}}/>
+          </>}
           {tabIds.map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
             const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};
             const Icon=icons[id];
             const active=activeTab===id;
             return <button key={id} className="glass-tab" onClick={()=>id==="focus"?setFocusModeAnimated(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
-              style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color 0.2s, transform 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
+              style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:!liquidGlass&&active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color 0.2s, transform 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
               <Icon/>
             </button>;
           })}
@@ -2804,6 +2817,11 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
                 <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Urgency Color Coding</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4}}>Red for urgent, green for not urgent</div></div>
                 <Toggle on={colorCodeUrgency} onChange={setColorCodeUrgency} T={T}/>
+              </div>
+              {/* Liquid glass */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Liquid Glass</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4}}>Translucent, glassy cards and tab bar</div></div>
+                <Toggle on={liquidGlass} onChange={setLiquidGlass} T={T}/>
               </div>
             </div>}
             </div>

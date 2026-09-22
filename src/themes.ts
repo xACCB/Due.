@@ -12,8 +12,10 @@ export const THEMES = {
 } as const;
 export type ThemeName = keyof typeof THEMES;
 // The surface tokens are widened to plain strings because App.tsx swaps them
-// for translucent rgba() "liquid glass" values at runtime; solidBorder keeps
-// the original opaque hex border for the few places that need a real hex
-// (e.g. contrastColor(), which parses one).
+// for translucent rgba() "liquid glass" values at runtime when that setting is
+// on; solidBorder keeps the original opaque hex border for the few places that
+// need a real hex (e.g. contrastColor(), which parses one), and borderFaint is
+// a lighter divider that works in either mode (a hex+alpha suffix can't be
+// appended to an rgba() value).
 type GlassTokens = "accent"|"card"|"cardAlt"|"surface"|"border"|"borderAccent";
-export type ThemeObj = Omit<typeof THEMES[ThemeName], GlassTokens> & { accent: string; card: string; cardAlt: string; surface: string; border: string; borderAccent: string; solidBorder: string; accentGlow: string; gradientCard: string };
+export type ThemeObj = Omit<typeof THEMES[ThemeName], GlassTokens> & { accent: string; card: string; cardAlt: string; surface: string; border: string; borderAccent: string; solidBorder: string; borderFaint: string; accentGlow: string; gradientCard: string };

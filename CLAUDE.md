@@ -233,6 +233,18 @@ Rather than each call site branching on the setting itself, they all go through
 swapping which color resolves. This is the same "single helper, many call sites" shape as
 `contrastColor()`.
 
+**Liquid Glass** (`liquidGlass` state, `hw-liquid-glass` localStorage key, "Liquid Glass" toggle in
+Options -> Looks, default off, local-only) swaps the theme's surface tokens (`card`/`cardAlt`/
+`surface`/`border`/`borderAccent`) for translucent `rgba()` values when building `T`, adds a fixed
+background glow (`.app-shell::before`), and gives the tab bar a sheen plus a sliding "lens" pill.
+Card highlights/shadows and floating-element blur are applied from the runtime stylesheet via
+attribute selectors matching the glass border value in the browser-normalized inline `style`
+(e.g. `border: 1px solid rgba(255, 255, 255, 0.11)`), not by editing each inline style -- so
+changing those border values means the selectors follow automatically, but a new card that uses a
+different border won't pick up the effect. Since glass tokens aren't hex, never append a hex alpha
+suffix to them (`T.border+"33"`); use `T.borderFaint` for a lighter divider, and `T.solidBorder`
+wherever a real hex is required (e.g. `contrastColor()`).
+
 **Bulk edit / multi-select** (`selectionMode`/`selectedIds` state) is deliberately scoped to the
 default list layout only (`MiniCard`) — the other 11 layouts each render their own custom task row
 markup, so extending selection to all of them was judged not worth the scope. `MiniCard` accepts

@@ -239,6 +239,17 @@ which still exists as the outer safety net for anything else.
 - `estMins` can be 0 (estimate step skipped); every display goes through `formatDuration()`
   (`src/lib/format.ts`), which returns "" for 0 so the label is hidden rather than showing "0m".
 
+**Task detail actions.** `TaskModal` can edit a task's own fields (an Edit panel, via
+`onUpdateTask(patch)` -> `updateTask`), snooze it (`snoozeTarget()`, module scope, since the
+React Compiler's purity lint rejects `Date.now()` inside component functions), duplicate it
+(`duplicateTask`: fresh id, unchecked subtasks, no sessions, detached from any repeat chain) and
+restore it from the archive. **Focus Mode** targets `focusTask` (`focusTaskId`, falling back to
+the first pending task); a finished Pomodoro logs a 25-minute session to it (read through
+`pomodoroTaskRef`, since the finish effect is declared before `focusTask` is computed), and a
+Screen Wake Lock is held while Focus Mode is open. **JSON import** (`importBackupJSON`) merges an
+export: tasks with ids already present are skipped, subjects/templates added if missing, existing
+subject colors win, settings untouched.
+
 **What's New** (`WHATS_NEW`, the Inbox's Updates list) is hand-maintained, newest first -- add an
 entry whenever a user-facing change ships. Only dismissed ids are persisted
 (`hw-whatsnew-dismissed`), so new entries reach returning users; `LEGACY_WHATSNEW_IDS` is a frozen

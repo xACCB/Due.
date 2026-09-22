@@ -212,6 +212,12 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"edit-tasks", date:"2026-09-22", title:"New feature", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view -- tap Edit." },
+  { id:"snooze", date:"2026-09-22", title:"New feature", description:"Snooze a task to later today, tomorrow, or next week from its detail view." },
+  { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
+  { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
+  { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
+  { id:"focus-picker", date:"2026-09-22", title:"New feature", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
   { id:"liquid-glass", date:"2026-09-22", title:"New feature", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
   { id:"time-left-breakdown", date:"2026-09-22", title:"New feature", description:"Tap \"Time left\" in the header to see how much time each subject needs." },
   { id:"sync-more", date:"2026-09-22", title:"New feature", description:"Subjects, subject colors, and Urgency Color Coding now sync across your devices." },
@@ -237,6 +243,7 @@ const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = 
 // frozen, so entries added after that aren't mistaken for dismissed ones.
 const LEGACY_WHATSNEW_IDS = ["icon-color-fix","history-collapsible","undo-redo","settings-in-menu","title-menu","wizard-cancel-moved","wizard-back-skip","subject-colors-fix","time-left-color"];
 const REMINDER_OFFSETS = [
+  { key:"1w", label:"1 week before", mins:10080 },
   { key:"1d", label:"1 day before", mins:1440 },
   { key:"3h", label:"3 hours before", mins:180 },
   { key:"1h", label:"1 hour before", mins:60 },
@@ -293,17 +300,31 @@ function buildSuggestion(tasks:Task[]):string {
   return `Most urgent: "${top.title}"\n${urgencyWord}${timeStr?`, ~${timeStr}`:""}`;
 }
 
+// Snooze moves a task's due date (and, for "later today", its time) forward.
+type SnoozeKind="later"|"tomorrow"|"week";
+function snoozeTarget(kind:SnoozeKind):{dueDate:string;dueTime?:string}{
+  if(kind==="later"){
+    // Three hours from now, rounded up to the next quarter hour.
+    const d=new Date(Date.now()+3*3600000);
+    d.setMinutes(Math.ceil(d.getMinutes()/15)*15,0,0);
+    return {dueDate:localDateStr(d),dueTime:`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
+  }
+  const d=new Date(); d.setDate(d.getDate()+(kind==="tomorrow"?1:7));
+  return {dueDate:localDateStr(d)};
+}
+
 // ─── TASK SESSION MODAL ───────────────────────────────────────────────────────
 // Defined at module scope (not nested in HomeworkPlanner) so its identity stays
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
-  task:Task; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
+function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
+  task:Task; T:ThemeObj; F:typeof FONT; subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
   sessionActive:boolean; sessionSecs:number;
   allTags:string[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
-  onUpdateSubtasks:(subtasks:Subtask[])=>void; onArchive:()=>void;
+  onUpdateSubtasks:(subtasks:Subtask[])=>void; onArchive:()=>void; onRestore:()=>void; onDuplicate:()=>void;
+  onUpdateTask:(patch:Partial<Task>)=>void;
   onSetPriorityOverride:(override:Priority|null)=>void; onSetTags:(tags:string[])=>void;
   onSaveAsTemplate:(name:string)=>void;
 }){
@@ -324,6 +345,20 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
   }
   const tags=task.tags||[];
   const [newTagText,setNewTagText]=useState("");
+  // Editing the task's own fields (title, subject, due date/time, estimate,
+  // repeat) -- previously these could only be set while adding a task.
+  const [draft,setDraft]=useState<{title:string;subject:string;dueDate:string;dueTime:string;estH:number;estM:number;recurrence:Recurrence}|null>(null);
+  function startEdit(){
+    setDraft({title:task.title,subject:task.subject,dueDate:task.dueDate,dueTime:task.dueTime,
+      estH:Math.floor((task.estMins||0)/60),estM:(task.estMins||0)%60,recurrence:task.recurrence||"none"});
+  }
+  function saveEdit(){
+    if(!draft)return;
+    onUpdateTask({title:draft.title.trim()||task.title,subject:draft.subject,dueDate:draft.dueDate,
+      dueTime:draft.dueDate?draft.dueTime:"",estMins:Math.max(0,draft.estH*60+draft.estM),recurrence:draft.recurrence});
+    setDraft(null);
+  }
+  function snooze(kind:SnoozeKind){ onUpdateTask(snoozeTarget(kind)); }
   // Inline "name this template" field (replaces a browser prompt() dialog).
   const [templateName,setTemplateName]=useState<string|null>(null);
   const [templateSaved,setTemplateSaved]=useState(false);
@@ -396,8 +431,49 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
               </div>
               <div style={{fontFamily:F.heading,fontSize:22,color:T.text,lineHeight:1.2}}>{task.title}</div>
             </div>
-            {!sessionActive&&<button onClick={onClose} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",padding:"0 0 0 8px",lineHeight:1}}>×</button>}
+            <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              {!draft&&<button onClick={startEdit} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:8,color:T.textMuted,fontSize:11,cursor:"pointer",padding:"5px 10px"}}>Edit</button>}
+              {!sessionActive&&<button onClick={onClose} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",padding:"0 0 0 8px",lineHeight:1}}>×</button>}
+            </div>
           </div>
+
+          {/* Edit panel */}
+          {draft&&(()=>{
+            const field={background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"8px 10px",fontSize:12,outline:"none",width:"100%",boxSizing:"border-box" as const};
+            const label={fontSize:10,color:T.textMuted,textTransform:"uppercase" as const,letterSpacing:"0.08em",marginBottom:4,display:"block"};
+            const subjectOptions=draft.subject&&!subjects.includes(draft.subject)?[...subjects,draft.subject]:subjects;
+            return (
+            <form onSubmit={e=>{e.preventDefault();saveEdit();}} style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.accent}44`,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
+              <label><span style={label}>Title</span>
+                <input autoFocus value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})} style={field}/></label>
+              <label><span style={label}>Subject</span>
+                <select value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})} style={field}>
+                  <option value="">No subject</option>
+                  {subjectOptions.map(s=><option key={s} value={s}>{s}</option>)}
+                </select></label>
+              <div style={{display:"flex",gap:8}}>
+                <label style={{flex:1}}><span style={label}>Due date</span>
+                  <input type="date" value={draft.dueDate} onChange={e=>setDraft({...draft,dueDate:e.target.value})} style={field}/></label>
+                <label style={{flex:1}}><span style={label}>Time</span>
+                  <input type="time" value={draft.dueTime} disabled={!draft.dueDate} onChange={e=>setDraft({...draft,dueTime:e.target.value})} style={{...field,opacity:draft.dueDate?1:0.5}}/></label>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <label style={{flex:1}}><span style={label}>Estimate (hours)</span>
+                  <input type="number" min={0} max={23} value={draft.estH} onChange={e=>setDraft({...draft,estH:Math.min(23,Math.max(0,Number(e.target.value)||0))})} style={field}/></label>
+                <label style={{flex:1}}><span style={label}>Minutes</span>
+                  <input type="number" min={0} max={59} step={5} value={draft.estM} onChange={e=>setDraft({...draft,estM:Math.min(59,Math.max(0,Number(e.target.value)||0))})} style={field}/></label>
+              </div>
+              <label><span style={label}>Repeats</span>
+                <select value={draft.recurrence} onChange={e=>setDraft({...draft,recurrence:e.target.value as Recurrence})} style={field}>
+                  <option value="none">Doesn't repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
+                </select></label>
+              <div style={{display:"flex",gap:8}}>
+                <button type="button" onClick={()=>setDraft(null)} style={{flex:1,background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px",color:T.textMuted,cursor:"pointer",fontSize:12}}>Cancel</button>
+                <button type="submit" style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px",cursor:"pointer",fontSize:12,fontWeight:500}}>Save</button>
+              </div>
+            </form>
+            );
+          })()}
 
           {/* Info row */}
           <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
@@ -414,6 +490,16 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
               <span style={{fontFamily:F.body,fontSize:12,color:"#2ED573"}}>{formatDuration(totalSessionMins)} spent today</span>
             </div>}
           </div>
+
+          {/* Snooze */}
+          {!task.done&&!draft&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:-8,marginBottom:18}}>
+              <span style={{fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginRight:2}}>Snooze</span>
+              {([["later","Later today"],["tomorrow","Tomorrow"],["week","Next week"]] as const).map(([k,l])=>(
+                <button key={k} onClick={()=>snooze(k)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:11}}>{l}</button>
+              ))}
+            </div>
+          )}
 
           {/* Priority override */}
           <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
@@ -521,7 +607,7 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
           )}
 
           {/* Action buttons */}
-          <div style={{display:"grid",gridTemplateColumns:task.done&&!task.archived?"1fr 1fr 1fr":"1fr 1fr",gap:8}}>
+          <div style={{display:"grid",gridTemplateColumns:task.done?"1fr 1fr 1fr":"1fr 1fr",gap:8}}>
             <button onClick={onToggleDone}
               style={{background:task.done?"#FF475722":"#2ED57322",color:task.done?"#FF4757":"#2ED573",border:`1px solid ${task.done?"#FF475744":"#2ED57344"}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
               {task.done?"↩ Mark undone":"✓ Mark done"}
@@ -532,11 +618,21 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
                 Archive
               </button>
             )}
+            {task.archived&&(
+              <button onClick={onRestore}
+                style={{background:T.surface,color:T.text,border:`1px solid ${T.border}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
+                Restore
+              </button>
+            )}
             <button onClick={onDelete}
               style={{background:"#FF475711",color:"#FF4757",border:"1px solid #FF475733",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
               Delete task
             </button>
           </div>
+          <button onClick={onDuplicate}
+            style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
+            Duplicate task
+          </button>
           {templateName===null&&<button onClick={()=>{setTemplateSaved(false);setTemplateName(task.title);}}
             style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
             {templateSaved?"✓ Saved -- find it under \"+ Add homework\"":"Save as template"}
@@ -1007,7 +1103,8 @@ export default function HomeworkPlanner() {
         const closest=eligible.reduce((a,b)=>b.mins<a.mins?b:a);
         if(!sent[sentKey(closest)]){
           const minsLeft=Math.round((dueAt-now)/60000);
-          const when=minsLeft<=0?"now":minsLeft<60?`in ${minsLeft} min`:`in ${formatDuration(minsLeft)}`;
+          const daysLeft=Math.round(minsLeft/1440);
+          const when=minsLeft<=0?"now":minsLeft<60?`in ${minsLeft} min`:minsLeft<1440?`in ${formatDuration(minsLeft)}`:`in ${daysLeft} day${daysLeft===1?"":"s"}`;
           notify(`"${t.title}" is due ${when}`,{body:`${formatDate(t.dueDate)} at ${formatTime(t.dueTime)}`});
         }
         for(const o of eligible){ if(!sent[sentKey(o)]){ sent[sentKey(o)]=true; changed=true; } }
@@ -1612,10 +1709,19 @@ export default function HomeworkPlanner() {
   // it used to just silently snap back to 25:00.
   useEffect(()=>{if(!pomodoroActive)return;const t=setInterval(()=>setPomodoroSecs(s=>Math.max(0,s-1)),1000);return()=>clearInterval(t);},[pomodoroActive]);
   const [pomodoroDone,setPomodoroDone]=useState(false);
+  // Which task Focus Mode is about (null = the first pending task). The
+  // ref mirrors the resolved task for the Pomodoro-finished effect below,
+  // which is declared before that task is computed.
+  const [focusTaskId,setFocusTaskId]=useState<number|null>(null);
+  const [focusPickerOpen,setFocusPickerOpen]=useState(false);
+  const pomodoroTaskRef=useRef<number|null>(null);
   useEffect(()=>{
     if(!pomodoroActive||pomodoroSecs>0)return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPomodoroActive(false);setPomodoroSecs(25*60);setPomodoroDone(true);
+    // A finished Pomodoro counts as a 25-minute work session on the focus task.
+    const logId=pomodoroTaskRef.current;
+    if(logId!=null)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:[...(t.sessions||[]),{mins:25,at:Date.now()}]}:t));
     playChime();
     try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:"Nice work -- time for a short break."}); }catch{/* notifications unavailable */}
   },[pomodoroActive,pomodoroSecs]);
@@ -1644,6 +1750,20 @@ export default function HomeworkPlanner() {
     return showDone?true:!t.done;
   }).filter(matchesSearch);
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
+  const focusTask=tasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
+  useEffect(()=>{pomodoroTaskRef.current=focusTask?.id??null;});
+  // Keep the screen on in Focus Mode (Screen Wake Lock API, where supported).
+  // The browser drops the lock whenever the tab is hidden, so it's re-taken
+  // when the tab comes back.
+  useEffect(()=>{
+    if(!focusMode||!("wakeLock" in navigator))return;
+    let lock:WakeLockSentinel|null=null; let cancelled=false;
+    const acquire=()=>{navigator.wakeLock.request("screen").then(l=>{if(cancelled)l.release().catch(()=>{});else lock=l;}).catch(()=>{});};
+    acquire();
+    const onVisible=()=>{if(document.visibilityState==="visible")acquire();};
+    document.addEventListener("visibilitychange",onVisible);
+    return()=>{cancelled=true;document.removeEventListener("visibilitychange",onVisible);lock?.release().catch(()=>{});};
+  },[focusMode]);
   const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
   // Per-subject split of totalMins for the header's "time left" popover, largest
   // first; tasks with no subject are pooled under "" (shown as "No subject").
@@ -1811,6 +1931,19 @@ export default function HomeworkPlanner() {
   function setTaskTags(id:number,tags:string[]){
     setTasks(prev=>prev.map(t=>t.id===id?{...t,tags}:t));
   }
+  function updateTask(id:number,patch:Partial<Task>){
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,...patch}:t));
+  }
+  // A fresh copy: not done, no logged sessions, subtasks unchecked, and not
+  // linked to the original's repeat chain.
+  function duplicateTask(id:number):Task|null{
+    const src=tasks.find(t=>t.id===id);
+    if(!src)return null;
+    const copy:Task={...src,id:nextId(),done:false,completedAt:null,archived:false,spawnedNextId:null,sessions:[],
+      order:nextOrder(tasks),...(src.subtasks?{subtasks:src.subtasks.map(s=>({...s,id:String(nextId()),done:false}))}:{})};
+    setTasks(prev=>[...prev,copy]);
+    return copy;
+  }
   function archiveTask(id:number){
     setTasks(prev=>prev.map(t=>t.id===id?{...t,archived:true}:t));
   }
@@ -1837,6 +1970,46 @@ export default function HomeworkPlanner() {
       settings:{themeMode,layout,groupBy,desktopLayout,colorCodeUrgency,liquidGlass,showDone,showSuggestion,autoArchiveDays,notificationsEnabled,enabledOffsets},
     };
     downloadFile(`dueplanner-export-${todayISO()}.json`,JSON.stringify(data,null,2),"application/json");
+  }
+  // Restores an "Export all (JSON)" file. Merges rather than replaces: tasks
+  // already here (same id) are left alone, subjects and templates are added
+  // if missing, and existing subject colors win. Settings aren't touched.
+  const importFileRef=useRef<HTMLInputElement>(null);
+  const [importBackupNote,setImportBackupNote]=useState<string|null>(null);
+  async function importBackupJSON(file:File){
+    try{
+      const data=JSON.parse(await file.text());
+      const raw:unknown[]=Array.isArray(data?.tasks)?data.tasks:[];
+      const incoming:Task[]=raw.filter((t):t is Task=>!!t&&typeof (t as Task).id==="number"&&typeof (t as Task).title==="string")
+        .map(t=>({...t,subject:typeof t.subject==="string"?t.subject:"",dueDate:typeof t.dueDate==="string"?t.dueDate:"",
+          dueTime:typeof t.dueTime==="string"?t.dueTime:"",estMins:typeof t.estMins==="number"?t.estMins:0,done:!!t.done}));
+      if(incoming.length===0&&!Array.isArray(data?.subjects)){
+        setImportBackupNote("That file doesn't look like a DuePlanner export.");
+        return;
+      }
+      const have=new Set(tasks.map(t=>t.id));
+      const base=nextOrder(tasks);
+      const fresh=incoming.filter(t=>!have.has(t.id)).map((t,i)=>({...t,order:base+i}));
+      if(fresh.length)setTasks(prev=>[...prev,...fresh]);
+      if(Array.isArray(data?.subjects)){
+        const extra=(data.subjects as unknown[]).filter((s):s is string=>typeof s==="string"&&!subjects.some(x=>x.toLowerCase()===s.toLowerCase()));
+        if(extra.length)setSubjects(prev=>[...prev,...extra]);
+      }
+      if(data?.subjectColors&&typeof data.subjectColors==="object"){
+        const cols=Object.fromEntries(Object.entries(data.subjectColors).filter(([,v])=>typeof v==="string")) as Record<string,string>;
+        setSubjectColors(prev=>({...cols,...prev}));
+      }
+      if(Array.isArray(data?.templates)){
+        setTemplates(prev=>{
+          const ids=new Set(prev.map(t=>t.id));
+          return [...prev,...(data.templates as TaskTemplate[]).filter(t=>t&&typeof t.id==="string"&&typeof t.name==="string"&&!ids.has(t.id))];
+        });
+      }
+      const skipped=incoming.length-fresh.length;
+      setImportBackupNote(`Imported ${fresh.length} task${fresh.length===1?"":"s"}${skipped?` (${skipped} already here)`:""}.`);
+    }catch{
+      setImportBackupNote("Couldn't read that file. Pick a .json file from \"Export all (JSON)\".");
+    }
   }
   function exportTasksCSV(){
     const headers=["title","subject","dueDate","dueTime","estMins","done","priority","tags","recurrence"];
@@ -2460,18 +2633,29 @@ export default function HomeworkPlanner() {
           <button onClick={()=>setFocusModeAnimated(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>✕ Exit</button>
         </div>
         <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
-          {topTask?(
+          {focusTask?(
             <div className="pop" style={{background:T.gradientCard,borderRadius:16,padding:"20px",border:`1px solid ${T.accent}44`}}>
-              <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-                <span className="rb" style={{background:T.accent+"33",color:T.accent}}>up next</span>
-                {topTask.subject&&<span style={{background:(subjectColors[topTask.subject]||T.accent)+"22",color:subjectColors[topTask.subject]||T.accent,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{topTask.subject}</span>}
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <span className="rb" style={{background:T.accent+"33",color:T.accent}}>{focusTask===topTask?"up next":"focusing on"}</span>
+                {focusTask.subject&&<span style={{background:(subjectColors[focusTask.subject]||T.accent)+"22",color:subjectColors[focusTask.subject]||T.accent,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{focusTask.subject}</span>}
+                <button onClick={()=>setFocusPickerOpen(o=>!o)} style={{marginLeft:"auto",background:"none",border:`1px solid ${T.border}`,borderRadius:999,padding:"2px 10px",color:T.textMuted,fontSize:10,cursor:"pointer"}}>{focusPickerOpen?"Close":"Change task"}</button>
               </div>
-              <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{topTask.title}</div>
+              {focusPickerOpen&&(
+                <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,maxHeight:180,overflowY:"auto"}}>
+                  {allSorted.filter(t=>!t.done&&!t.archived).map(t=>(
+                    <button key={t.id} onClick={()=>{setFocusTaskId(t.id);setFocusPickerOpen(false);}}
+                      style={{textAlign:"left",background:t.id===focusTask.id?T.accent+"22":T.surface,border:`1px solid ${t.id===focusTask.id?T.accent:T.border}`,borderRadius:8,padding:"7px 10px",color:T.text,fontSize:12,cursor:"pointer"}}>
+                      {t.title}{t.subject&&<span style={{color:T.textFaint}}> · {t.subject}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{focusTask.title}</div>
               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(topTask.dueDate)}{topTask.dueTime?` ${formatTime(topTask.dueTime)}`:""}</span>
-                {topTask.estMins>0&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDuration(topTask.estMins)}</span>}
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(focusTask.dueDate)}{focusTask.dueTime?` ${formatTime(focusTask.dueTime)}`:""}</span>
+                {focusTask.estMins>0&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDuration(focusTask.estMins)}</span>}
               </div>
-              <button onClick={()=>toggleDone(topTask.id)} style={{marginTop:14,background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>✓ Mark done</button>
+              <button onClick={()=>toggleDone(focusTask.id)} style={{marginTop:14,background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>✓ Mark done</button>
             </div>
           ):(
             <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on</div>
@@ -2630,11 +2814,14 @@ export default function HomeworkPlanner() {
                           </>)}
                         </div>
                       )}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,marginTop:14,paddingTop:12,borderTop:`1px solid ${T.border}`}}>Export</div>
-                      <div style={{display:"flex",gap:7}}>
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,marginTop:14,paddingTop:12,borderTop:`1px solid ${T.border}`}}>Backup &amp; export</div>
+                      <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                        <button onClick={()=>importFileRef.current?.click()} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Import backup (JSON)</button>
+                        <input ref={importFileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)importBackupJSON(f);e.target.value="";}}/>
                         <button onClick={exportAllDataJSON} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export all (JSON)</button>
                         <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export tasks (CSV)</button>
                       </div>
+                      {importBackupNote&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:8}}>{importBackupNote}</div>}
                     </div>
                   )}
                 </div>
@@ -3127,7 +3314,7 @@ export default function HomeworkPlanner() {
       )}>
         <TaskModal
           task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
-          T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
+          T={T} F={F} subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
           sessionActive={sessionActive} sessionSecs={sessionSecs}
           allTags={allTags}
           onClose={()=>{setSelectedTask(null);}}
@@ -3136,6 +3323,9 @@ export default function HomeworkPlanner() {
           onDelete={()=>{if(sessionActive)endSession();deleteTask(selectedTask.id);setSelectedTask(null);}}
           onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
           onArchive={()=>{if(sessionActive)endSession();archiveTask(selectedTask.id);setSelectedTask(null);}}
+          onRestore={()=>updateTask(selectedTask.id,{archived:false})}
+          onDuplicate={()=>{const copy=duplicateTask(selectedTask.id);if(copy)setSelectedTask(copy);}}
+          onUpdateTask={patch=>updateTask(selectedTask.id,patch)}
           onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
           onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
           onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}

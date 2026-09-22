@@ -778,35 +778,6 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
           </div>
         </div>
 
-        {/* Add to home screen */}
-        <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:10}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-            <div style={{width:36,height:36,borderRadius:10,background:T.accent+"22",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.accent} strokeWidth="2" strokeLinecap="round"/></svg>
-            </div>
-            <div>
-              <div style={{fontFamily:F.body,fontSize:13,color:T.text,fontWeight:500}}>Add to Home Screen</div>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Access like a native app on iOS</div>
-            </div>
-          </div>
-          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,lineHeight:1.7,marginBottom:12}}>
-            1. Tap the <span style={{color:T.accent}}>Share button</span> <span style={{fontSize:13}}>⎋</span> at the bottom of Safari<br/>
-            2. Scroll down and tap <span style={{color:T.accent}}>"Add to Home Screen"</span><br/>
-            3. Tap <span style={{color:T.accent}}>"Add"</span> in the top right
-          </div>
-          <button onClick={()=>{
-            if(navigator.share){
-              navigator.share({title:"DuePlanner",url:window.location.href}).catch(()=>{});
-            } else {
-              navigator.clipboard?.writeText(window.location.href);
-              alert("Link copied! Open Safari on your iPhone and paste the link, then use Share → Add to Home Screen.");
-            }
-          }} style={{width:"100%",background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer",fontWeight:500,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke="#000" strokeWidth="2.5" strokeLinecap="round"/></svg>
-            Share / Make Bookmark
-          </button>
-        </div>
-
         {/* Sign out */}
         <button onClick={async()=>{await signOutFirebase();setShowProfile(false);}}
           style={{width:"100%",background:"none",border:`1px solid #FF475744`,borderRadius:12,padding:"13px",color:"#FF4757",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>

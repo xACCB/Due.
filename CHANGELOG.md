@@ -73,6 +73,8 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   invisible-text bug above -- a stray override doesn't make sense anymore now that there are only
   two themes and the accent is meant to always be exactly black or white. Any existing stale
   override in a user's browser is cleared automatically on next load.
+- The "Add to Home Screen" card from the Profile tab (Current setup section down through the
+  Share/Make Bookmark button). The pre-sign-in screen's own bookmark button is unaffected.
 
 ## [0.1.0] — 2026-09-21
 Baseline tag for the start of changelog tracking. Recent work before this

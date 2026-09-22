@@ -1128,6 +1128,7 @@ export default function HomeworkPlanner() {
         // console) could otherwise inject a wrong-shaped value straight into
         // state and crash a render. Cheap shape checks before applying.
         if(typeof data.layout==="string"&&data.layout in LAYOUTS) setLayout(data.layout as LayoutName);
+        if(typeof data.colorCodeUrgency==="boolean") setColorCodeUrgency(data.colorCodeUrgency);
       }
       setProfileSyncedForUid(fbUser.uid);
       setSyncError(null);
@@ -1136,7 +1137,7 @@ export default function HomeworkPlanner() {
       setSyncError("Couldn't sync with the cloud -- your changes are saved on this device, but may not reach your other devices until this is resolved.");
     });
     return unsub;
-  },[fbUser,readyForUid,setLayout]);
+  },[fbUser,readyForUid,setLayout,setColorCodeUrgency]);
 
   // Save the profile fields TO Firestore whenever they change. Gated on
   // profileSyncedForUid matching the current user so the very first write
@@ -1145,14 +1146,14 @@ export default function HomeworkPlanner() {
     if(!fbUser||profileSyncedForUid!==fbUser.uid)return;
     isSyncingProfile.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{layout},{merge:true})
+    setDoc(ref,{layout,colorCodeUrgency},{merge:true})
       .then(()=>setSyncError(null))
       .catch(err=>{
         console.error(err);
         setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
       })
       .finally(()=>{isSyncingProfile.current=false;});
-  },[layout,fbUser,profileSyncedForUid]);
+  },[layout,colorCodeUrgency,fbUser,profileSyncedForUid]);
 
   // Sync tasks FROM the tasks subcollection.
   useEffect(()=>{

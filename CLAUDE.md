@@ -95,7 +95,7 @@ discloses this; keep that page in sync if what's collected here changes.
 
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
-- `users/{uid}` — small "profile" fields only: `layout`, `scratchpad`. Synced as a whole document
+- `users/{uid}` — small "profile" fields only: `layout`, `scratchpad`, `colorCodeUrgency`. Synced as a whole document
   (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so the first write
   after sign-in can't race ahead of the first read. `themeName` isn't a field here (or in
   `firestore.rules`'s `isValidProfile`) -- see Design-system constants below: it's a derived value

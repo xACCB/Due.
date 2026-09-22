@@ -15,7 +15,8 @@ service cloud.firestore {
     // Optional fields are only type-checked when present, since profile
     // writes use merge:true and may only touch a subset of fields.
     function isValidProfile(data) {
-      return (!('layout' in data) || data.layout is string);
+      return (!('layout' in data) || data.layout is string)
+        && (!('colorCodeUrgency' in data) || data.colorCodeUrgency is bool);
     }
 
     function isValidTask(data) {

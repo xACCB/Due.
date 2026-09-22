@@ -22,20 +22,6 @@ html, body {
   overscroll-behavior-x: none;
 }
 
-/* overscroll-behavior-x above covers a quick imprecise tap, but a real
-   sustained drag across the page can still show the same artifact
-   momentarily on iOS Safari. overflow-x:hidden was tried for this before
-   and made things worse -- but that was while the tab bar still had its
-   own custom pointer-capture/touchmove-blocking JS actively fighting the
-   browser over the same gesture; that JS is now gone entirely (the tab
-   bar is plain tap-only buttons), so this is a materially different
-   situation, not a blind retry of the same fix. Removes horizontal
-   scrolling as a possibility outright, rather than discouraging the
-   bounce after a scroll attempt has already begun. */
-html, body {
-  overflow-x: hidden;
-}
-
 body {
   margin: 0;
   /* Without this, text can render rough/jagged (reported as "pixelated") in

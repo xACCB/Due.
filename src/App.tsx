@@ -1300,6 +1300,16 @@ export default function HomeworkPlanner() {
   const [suggestion,setSuggestion]=useState("");
   const [suggestionLoading,setSuggestionLoading]=useState(false);
   const [activeTab,setActiveTab]=useState("tasks");
+  const [titleMenuOpen,setTitleMenuOpen]=useState(false);
+  const titleMenuRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!titleMenuOpen)return;
+    function onPointerDown(e:PointerEvent){if(titleMenuRef.current&&!titleMenuRef.current.contains(e.target as Node))setTitleMenuOpen(false);}
+    function onKeyDown(e:KeyboardEvent){if(e.key==="Escape")setTitleMenuOpen(false);}
+    document.addEventListener("pointerdown",onPointerDown);
+    document.addEventListener("keydown",onKeyDown);
+    return ()=>{document.removeEventListener("pointerdown",onPointerDown);document.removeEventListener("keydown",onKeyDown);};
+  },[titleMenuOpen]);
   const [looksOpen,setLooksOpen]=useState(false);
   const [activeSubject,setActiveSubject]=useState("all");
   // Syllabus import: transient by design (a paste-and-review staging area, not
@@ -1423,10 +1433,15 @@ export default function HomeworkPlanner() {
   const filteredTasks=allSorted.filter(t=>{
     if(filter==="archived")return !!t.archived;
     if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
+    if(filter==="inbox")return !t.done&&(!t.dueDate||!t.subject);
     if(filter==="done")return t.done;
     if(filter==="pending")return !t.done;
     return showDone?true:!t.done;
   }).filter(matchesSearch);
+  // Untriaged -- tasks whose due date and/or subject were skipped rather than answered
+  // (see the add-wizard's skip arrow), surfaced via the title menu's Inbox entry.
+  const inboxCount=visibleTasks.filter(t=>!t.done&&!t.archived&&(!t.dueDate||!t.subject)).length;
+  const recentlyCompleted=[...visibleTasks].filter(t=>t.done&&t.completedAt).sort((a,b)=>(b.completedAt as number)-(a.completedAt as number)).slice(0,5);
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
 
@@ -2164,9 +2179,42 @@ export default function HomeworkPlanner() {
 
         {/* Header */}
         <div style={{position:"relative",display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
-          <div>
-            <div style={{fontFamily:F.heading,fontSize:28,lineHeight:1,color:T.accent}}>Due<span style={{color:T.text}}>Planner</span></div>
-            <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2}}>by due. studios</div>
+          <div ref={titleMenuRef} style={{position:"relative"}}>
+            <button onClick={()=>setTitleMenuOpen(o=>!o)} aria-haspopup="menu" aria-expanded={titleMenuOpen} aria-label="DuePlanner menu" style={{background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",display:"block"}}>
+              <div style={{fontFamily:F.heading,fontSize:28,lineHeight:1,color:T.accent}}>Due<span style={{color:T.text}}>Planner</span></div>
+              <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2}}>by due. studios</div>
+            </button>
+            {titleMenuOpen&&(
+              <div role="menu" style={{position:"absolute",top:"calc(100% + 8px)",left:0,zIndex:200,width:280,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",overflow:"hidden"}}>
+                <button role="menuitem" onClick={()=>{setFilter("inbox");setActiveTab("tasks");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`}}>
+                  <IconTasks/>
+                  <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Inbox</span>
+                  {inboxCount>0&&<span style={{background:T.accent,color:contrastColor(T.accent),borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{inboxCount}</span>}
+                </button>
+                <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.border}`}}>
+                  <div style={{fontFamily:F.body,fontSize:13,color:T.text,marginBottom:8}}>History</div>
+                  {recentlyCompleted.length===0
+                    ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing completed yet</div>
+                    : <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                        {recentlyCompleted.map(t=>(
+                          <button key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left"}}>
+                            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                            <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(localDateStr(new Date(t.completedAt as number)))}</span>
+                          </button>
+                        ))}
+                      </div>
+                  }
+                </div>
+                <button role="menuitem" onClick={()=>{setShowProfile(true);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`}}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke={T.text} strokeWidth="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.text} strokeWidth="2" strokeLinecap="round"/></svg>
+                  <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Profile</span>
+                </button>
+                <button role="menuitem" onClick={()=>{setActiveTab("options");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left"}}>
+                  <IconSettings/>
+                  <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Settings</span>
+                </button>
+              </div>
+            )}
           </div>
           {/* Profile button - always visible, absolutely centered in the header regardless of the side content's widths */}
           {!fbLoading&&(
@@ -2188,9 +2236,9 @@ export default function HomeworkPlanner() {
         <div className="app-sidebar">
         {/* Tabs */}
         <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4}}>
-          {(["tasks","tools","import","options"] as const).map(id=>{
-            const labels:Record<string,string>={tasks:"Tasks",tools:"Tools",import:"Import",options:"Settings"};
-            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,tools:IconTools,import:IconImport,options:IconSettings};
+          {(["tasks","tools","import"] as const).map(id=>{
+            const labels:Record<string,string>={tasks:"Tasks",tools:"Tools",import:"Import"};
+            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,tools:IconTools,import:IconImport};
             const Icon=icons[id];
             const active=activeTab===id;
             return <button key={id} onClick={()=>setActiveTab(id)} aria-label={labels[id]} aria-pressed={active} title={labels[id]}
@@ -2237,7 +2285,7 @@ export default function HomeworkPlanner() {
 
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
-            {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
+            {["all","pending","done","archived","inbox"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
             {topTask&&<button onClick={()=>setFocusMode(true)} style={{background:"none",border:`1px solid ${T.accent}55`,color:T.accent,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>Focus</button>}
             {layout==="list"&&(selectionMode
               ? <button onClick={exitSelectionMode} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>

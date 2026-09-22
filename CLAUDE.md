@@ -312,6 +312,14 @@ is open, since offset reminders need to fire close to a specific time, not just 
 (`Blob` + object URL + a synthetic `<a download>` click) — the standard client-side download
 pattern, no server involved.
 
+## Planning (Notion)
+
+Planning docs live in Notion, not just the repo. Before adding a feature, check the Notion page
+**DuePlanner — Roadmap** and its **Roadmap items** database. If the feature is listed, build it
+to that item's Notes. When it ships, update the item: set Status to **Done**, and put the commit
+hash in Notes along with anything that differs from the plan. New ideas go in **DuePlanner —
+Feature ideas**; accepted ones get added as Roadmap items.
+
 ## Branding
 
 The company is **Due Studios**; this product is **DuePlanner** (the intended umbrella structure is

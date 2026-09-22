@@ -1808,6 +1808,7 @@ export default function HomeworkPlanner() {
     .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background 0.2s;position:relative;flex-shrink:0;}
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;opacity:0.45;}
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${T.border};border-radius:99px}
+    .glass-tab:active{transform:scale(0.92);}
     .sticky-note{transition:all 0.2s;cursor:default;}
     .sticky-note:hover{transform:rotate(0deg) scale(1.03);}
     .pomo-ring{animation:ring 1s linear infinite;}
@@ -1819,7 +1820,9 @@ export default function HomeworkPlanner() {
       .dl-sidebar .app-body{display:flex;align-items:flex-start;gap:24px;}
       .dl-sidebar .app-sidebar{width:168px;flex-shrink:0;position:sticky;top:24px;}
       .dl-sidebar .app-main{flex:1;min-width:0;}
-      .dl-sidebar .app-sidebar .tab-bar{flex-direction:column;background:none!important;border:none!important;padding:0!important;gap:6px!important;}
+      .dl-sidebar .app-sidebar .tab-bar{flex-direction:column;background:none!important;border:none!important;padding:0!important;gap:6px!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+      .dl-sidebar .app-sidebar .tab-bar .glass-lens,.dl-sidebar .app-sidebar .tab-bar .glass-sheen{display:none;}
+      .dl-sidebar .app-sidebar .tab-bar button[aria-pressed="true"]{background:${T.card}!important;}
       .dl-sidebar .app-sidebar .tab-bar button{flex:none!important;justify-content:center!important;padding:12px!important;}
     }
     @media (max-width:600px){
@@ -2452,18 +2455,46 @@ export default function HomeworkPlanner() {
             sandboxing that stops a page from closing the browser window or
             touching the address bar, so this can reduce but can't
             guarantee-eliminate a conflict with it. */}
-        <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"pan-y"}}>
-          {(["tasks","focus"] as const).map(id=>{
+        {(()=>{
+          // Liquid-glass styling, modeled on Apple's iOS 26 tab bar: a
+          // translucent, saturation-boosted blur for the bar itself, a
+          // specular top-edge highlight + soft sheen gradient to give it
+          // thickness, and a separate raised "lens" pill that slides between
+          // tabs on a slightly springy curve instead of each button just
+          // swapping its own background.
+          const dark=effectiveThemeMode==="dark";
+          const tabIds=["tasks","focus"] as const;
+          const activeIdx=tabIds.indexOf(activeTab as typeof tabIds[number]);
+          return (
+        <div className="tab-bar" style={{position:"relative",display:"flex",gap:0,marginBottom:16,padding:5,borderRadius:999,touchAction:"pan-y",
+          background:dark?"rgba(38,38,38,0.45)":"rgba(255,255,255,0.55)",
+          backdropFilter:"blur(24px) saturate(180%)",WebkitBackdropFilter:"blur(24px) saturate(180%)",
+          border:`1px solid ${dark?"rgba(255,255,255,0.10)":"rgba(255,255,255,0.85)"}`,
+          boxShadow:dark
+            ?"inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -1px 0 rgba(0,0,0,0.45), 0 10px 30px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.3)"
+            :"inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.08)"}}>
+          <div className="glass-sheen" aria-hidden="true" style={{position:"absolute",inset:0,borderRadius:"inherit",pointerEvents:"none",
+            background:`linear-gradient(180deg, rgba(255,255,255,${dark?0.07:0.5}) 0%, rgba(255,255,255,0) 55%)`}}/>
+          <div className="glass-lens" aria-hidden="true" style={{position:"absolute",top:5,bottom:5,left:5,width:`calc((100% - 10px) / ${tabIds.length})`,borderRadius:999,pointerEvents:"none",
+            background:dark?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.92)",
+            boxShadow:dark
+              ?"inset 0 1px 0 rgba(255,255,255,0.22), inset 0 0 0 0.5px rgba(255,255,255,0.08), 0 2px 8px rgba(0,0,0,0.35)"
+              :"inset 0 1px 0 #fff, 0 0 0 0.5px rgba(0,0,0,0.05), 0 3px 10px rgba(0,0,0,0.10)",
+            transform:`translateX(${Math.max(activeIdx,0)*100}%)`,opacity:activeIdx<0?0:1,
+            transition:"transform 0.45s cubic-bezier(.34,1.3,.64,1), opacity 0.2s"}}/>
+          {tabIds.map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
             const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};
             const Icon=icons[id];
             const active=activeTab===id;
-            return <button key={id} onClick={()=>id==="focus"?setFocusModeAnimated(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
-              style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"all 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
+            return <button key={id} className="glass-tab" onClick={()=>id==="focus"?setFocusModeAnimated(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
+              style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color 0.2s, transform 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
               <Icon/>
             </button>;
           })}
         </div>
+          );
+        })()}
         </div>
         <div className="app-main">
 

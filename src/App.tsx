@@ -1372,12 +1372,16 @@ export default function HomeworkPlanner() {
   const swipeLocked=useRef(false);
   const swipeMoved=useRef(false);
   const SWIPE_THRESHOLD=90;
-  // Undo Delete: soft-delete-with-toast. The task stays in `tasks` (so nothing is
-  // lost if the tab closes mid-toast) but is filtered out of every view via
-  // `visibleTasks` below; only one delete can be pending at a time.
-  const [pendingDeleteId,setPendingDeleteId]=useState<number|null>(null);
-  const [pendingDeleteTitle,setPendingDeleteTitle]=useState("");
-  const pendingDeleteTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  // Undo/redo action history -- deletion happens immediately (so Firestore sync,
+  // which just diffs against `tasks`, doesn't need special-casing), and the
+  // deleted task is kept here instead so it can be restored. Scoped to just
+  // "delete" for now; other action types (edit, complete, ...) can join the
+  // same union later. A new action always clears redoStack, same as any
+  // standard undo/redo history.
+  const [undoStack,setUndoStack]=useState<{type:"delete";task:Task}[]>([]);
+  const [redoStack,setRedoStack]=useState<{type:"delete";task:Task}[]>([]);
+  const [deleteToast,setDeleteToast]=useState<string|null>(null);
+  const deleteToastTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   // Bulk edit / multi-select. Scoped to the default list layout (MiniCard) --
   // the other 11 layouts each render their own custom task row markup, so
   // extending selection to all of them is a much bigger job than the value
@@ -1417,9 +1421,7 @@ export default function HomeworkPlanner() {
   // Pomodoro timer
   useEffect(()=>{if(!pomodoroActive)return;const t=setInterval(()=>setPomodoroSecs(s=>{if(s<=1){setPomodoroActive(false);return 25*60;}return s-1;}),1000);return()=>clearInterval(t);},[pomodoroActive]);
 
-  // Soft-deleted (pending undo) tasks are filtered out here, once, so every layout
-  // and view downstream just stops seeing them without needing its own check.
-  const visibleTasks=tasks.filter(t=>t.id!==pendingDeleteId);
+  const visibleTasks=tasks;
   // Every tag used on any task, deduplicated -- powers the "quick add" suggestion
   // chips in TaskModal's tag editor instead of retyping tags you've already used.
   const allTags=[...new Set(tasks.flatMap(t=>t.tags||[]))].sort();
@@ -1441,7 +1443,6 @@ export default function HomeworkPlanner() {
   // Untriaged -- tasks whose due date and/or subject were skipped rather than answered
   // (see the add-wizard's skip arrow), surfaced via the title menu's Inbox entry.
   const inboxCount=visibleTasks.filter(t=>!t.done&&!t.archived&&(!t.dueDate||!t.subject)).length;
-  const recentlyCompleted=[...visibleTasks].filter(t=>t.done&&t.completedAt).sort((a,b)=>(b.completedAt as number)-(a.completedAt as number)).slice(0,5);
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
 
@@ -1533,24 +1534,33 @@ export default function HomeworkPlanner() {
       return next;
     });
   }
-  function finalizeDelete(id:number){setTasks(prev=>prev.filter(t=>t.id!==id));}
   function deleteTask(id:number){
-    // Only one delete can be pending at a time -- finalize any earlier one immediately.
-    if(pendingDeleteId!=null){
-      clearTimeout(pendingDeleteTimer.current);
-      finalizeDelete(pendingDeleteId);
-    }
     const task=tasks.find(t=>t.id===id);
-    setPendingDeleteId(id);
-    setPendingDeleteTitle(task?.title||"Task");
-    pendingDeleteTimer.current=setTimeout(()=>{
-      finalizeDelete(id);
-      setPendingDeleteId(null);
-    },5000);
+    if(!task)return;
+    setTasks(prev=>prev.filter(t=>t.id!==id));
+    setUndoStack(prev=>[...prev,{type:"delete",task}]);
+    setRedoStack([]);
+    setDeleteToast(task.title);
+    clearTimeout(deleteToastTimer.current);
+    deleteToastTimer.current=setTimeout(()=>setDeleteToast(null),5000);
   }
-  function undoDelete(){
-    clearTimeout(pendingDeleteTimer.current);
-    setPendingDeleteId(null);
+  // Undo/redo currently only understand the "delete" action type -- each
+  // branch below is where a future action type (edit, complete, ...) would
+  // add its own reversal.
+  function undo(){
+    if(undoStack.length===0)return;
+    const action=undoStack[undoStack.length-1];
+    if(action.type==="delete")setTasks(prev=>[...prev,action.task]);
+    setUndoStack(prev=>prev.slice(0,-1));
+    setRedoStack(prev=>[...prev,action]);
+    setDeleteToast(null);
+  }
+  function redo(){
+    if(redoStack.length===0)return;
+    const action=redoStack[redoStack.length-1];
+    if(action.type==="delete")setTasks(prev=>prev.filter(t=>t.id!==action.task.id));
+    setRedoStack(prev=>prev.slice(0,-1));
+    setUndoStack(prev=>[...prev,action]);
   }
   function updateSubtasks(id:number,subtasks:Subtask[]){
     setTasks(prev=>prev.map(t=>t.id===id?{...t,subtasks}:t));
@@ -2193,17 +2203,16 @@ export default function HomeworkPlanner() {
                 </button>
                 <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.border}`}}>
                   <div style={{fontFamily:F.body,fontSize:13,color:T.text,marginBottom:8}}>History</div>
-                  {recentlyCompleted.length===0
-                    ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing completed yet</div>
-                    : <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                        {recentlyCompleted.map(t=>(
-                          <button key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left"}}>
-                            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-                            <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(localDateStr(new Date(t.completedAt as number)))}</span>
-                          </button>
-                        ))}
-                      </div>
-                  }
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: delete "${undoStack[undoStack.length-1].task.title}"`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
+                      Undo
+                    </button>
+                    <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: delete "${redoStack[redoStack.length-1].task.title}"`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                      Redo
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <button role="menuitem" onClick={()=>{setShowProfile(true);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke={T.text} strokeWidth="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.text} strokeWidth="2" strokeLinecap="round"/></svg>
@@ -2790,10 +2799,10 @@ export default function HomeworkPlanner() {
       />}
       {/* Undo Delete toast -- bottom-center so it never collides with the
           bottom-right smart-suggestion icon or the tab bar above it. */}
-      {pendingDeleteId!=null&&(
+      {deleteToast!=null&&(
         <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
-          <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:180}}>"{pendingDeleteTitle}" deleted</span>
-          <button onClick={undoDelete} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
+          <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:180}}>"{deleteToast}" deleted</span>
+          <button onClick={undo} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
         </div>
       )}
       {/* Bulk action bar -- only reachable via the "Select" toggle, list layout only */}

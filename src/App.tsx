@@ -771,6 +771,14 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
 // WCAG AA as text on the light theme's near-white cards.
 function ink(color:string,light:boolean):string{ return readableOn(color,light?"#e6e6e6":"#1a1a1a"); }
 
+// Enter/Space activation for plain elements given role="button". Task titles
+// and the reorder handle deliberately aren't <button>s: they sit in the path of
+// swipe and drag gestures, and a real <button> there can swallow the touch on
+// iOS Safari. click() bubbles to the card's own handler, same as a tap.
+function activateOnKey(e:React.KeyboardEvent<HTMLElement>){
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();e.currentTarget.click();}
+}
+
 // Done checkmark, drawn as a stroke so it can draw itself in (.check-draw in
 // the runtime css) the moment a task is completed; static everywhere else.
 function CheckMark({size=10,color="#111",animate=false}:{size?:number;color?:string;animate?:boolean}){
@@ -834,8 +842,8 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
       <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
         {reorderable&&!task.done&&!selectionMode&&(
           // Drag handle, and the keyboard way to reorder: focus it and use the
-          // arrow keys.
-          <button type="button" data-reorder aria-label={`Reorder ${task.title}`} title="Drag, or use the arrow keys"
+          // arrow keys. A div, not a <button> -- see activateOnKey.
+          <div role="button" tabIndex={0} data-reorder aria-label={`Reorder ${task.title}`} title="Drag, or use the arrow keys"
             onClick={e=>e.stopPropagation()}
             onKeyDown={e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();e.stopPropagation();onMoveBy?.(task.id,e.key==="ArrowUp"?-1:1);}}}
             onPointerDown={e=>{e.stopPropagation();startDrag(task.id,e);}}
@@ -844,7 +852,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
             onPointerCancel={endDrag}
             style={{background:"none",border:"none",color:T.textFaint,cursor:isDragging?"grabbing":"grab",fontSize:14,lineHeight:1,marginTop:2,padding:"0 2px",touchAction:"none",flexShrink:0,fontFamily:"inherit"}}>
             <span aria-hidden="true">⠿</span>
-          </button>
+          </div>
         )}
         <button aria-label={selectionMode?(isSelected?`Deselect ${task.title}`:`Select ${task.title}`):task.done?`Mark ${task.title} not done`:`Mark ${task.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode){onToggleSelect?.(task.id);}else{onToggleDone(task.id);}}} style={{background:selectionMode?(isSelected?T.accent:"none"):task.done?"#2ED573":"none",border:`2px solid ${selectionMode?(isSelected?T.accent:T.textFaint):task.done?"#2ED573":T.textFaint}`,borderRadius:selectionMode?4:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}} className={justDone&&!selectionMode?"check-pop":undefined}>
           {(selectionMode?isSelected:task.done)&&<CheckMark size={11} color={selectionMode?contrastColor(T.accent):"#111"} animate={justDone&&!selectionMode}/>}
@@ -853,7 +861,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
           <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
             {isTop&&<span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>}
             {isNext&&<span className="rb" style={{background:T.text+"11",color:T.text}}>next up</span>}
-            <button type="button" className={"title-btn"+(task.done?(justDone?" strike strike-anim":" strike"):"")} aria-haspopup={selectionMode?undefined:"dialog"} style={{fontFamily:F.heading,fontSize:15,color:task.done?T.textFaint:T.text,transition:"color 0.3s"}}>{task.title}</button>
+            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(task.done?(justDone?" strike strike-anim":" strike"):"")} aria-haspopup={selectionMode?undefined:"dialog"} style={{fontFamily:F.heading,fontSize:15,color:task.done?T.textFaint:T.text,transition:"color 0.3s"}}>{task.title}</span>
             {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
             {task.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>}
             {task.priorityOverride&&<span className="rb" title="Priority set manually" style={{background:priColor(task.priorityOverride,colorCodeUrgency)+"22",color:ink(priColor(task.priorityOverride,colorCodeUrgency),T.light)}}>{task.priorityOverride}</span>}
@@ -2233,7 +2241,7 @@ export default function HomeworkPlanner() {
     if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
       if(!task.done){
         setJustDone(prev=>[...prev,id]);
-        setTimeout(()=>{captureTaskRects();setJustDone(prev=>prev.filter(x=>x!==id));},850);
+        setTimeout(()=>{captureTaskRects();setJustDone(prev=>prev.filter(x=>x!==id));},750);
       }else{
         setJustDone(prev=>prev.filter(x=>x!==id));
         captureTaskRects();
@@ -2253,15 +2261,29 @@ export default function HomeworkPlanner() {
     const moves=cards.map(el=>{const top=before.tops.get(el.dataset.taskId!);return {el,dy:top==null?0:top-el.getBoundingClientRect().top};}).filter(m=>Math.abs(m.dy)>=1);
     const farthest=Math.max(0,...moves.map(m=>Math.abs(m.dy)));
     for(const {el,dy} of moves){
-      // A long, gentle ease-in-out (no overshoot): eases off the mark, glides,
-      // and settles softly -- a front-loaded ease-out read as a snap. Longer
-      // trips take a little longer. The card that travels farthest (the one
-      // just completed) rides above the others.
-      const duration=before.quick?320:Math.min(1300,900+Math.abs(dy)*0.6);
+      if(before.quick){
+        el.animate([{transform:`translateY(${dy}px)`},{transform:"translateY(0)"}],{duration:320,easing:"cubic-bezier(.2,.8,.3,1)"});
+        continue;
+      }
+      // The card that travels farthest (the one just completed) is the star:
+      // it lifts slightly, slides the whole way down at an even pace over about
+      // 1.5-2s, and sets down softly, riding above the cards it passes. The
+      // others just make room, quicker and without the lift.
       const lead=Math.abs(dy)===farthest&&moves.length>1;
-      if(lead)el.style.zIndex="3";
-      const anim=el.animate([{transform:`translateY(${dy}px)`},{transform:"translateY(0)"}],{duration,easing:before.quick?"cubic-bezier(.2,.8,.3,1)":"cubic-bezier(.45,.05,.2,1)"});
-      if(lead)anim.finished.then(()=>{el.style.zIndex="";},()=>{el.style.zIndex="";});
+      if(lead){
+        const duration=Math.min(2100,1300+Math.abs(dy)*1.1);
+        el.style.zIndex="3";
+        const anim=el.animate([
+          {transform:`translateY(${dy}px) scale(1)`,easing:"cubic-bezier(.3,0,.2,1)"},
+          {transform:`translateY(${dy*0.92}px) scale(1.025)`,offset:0.1,easing:"cubic-bezier(.45,0,.25,1)"},
+          {transform:"translateY(0) scale(1.025)",offset:0.9,easing:"cubic-bezier(.3,0,.2,1)"},
+          {transform:"translateY(0) scale(1)"},
+        ],{duration});
+        const done=()=>{el.style.zIndex="";};
+        anim.finished.then(done,done);
+      }else{
+        el.animate([{transform:`translateY(${dy}px)`},{transform:"translateY(0)"}],{duration:Math.min(1200,700+Math.abs(dy)*0.8),easing:"cubic-bezier(.45,0,.2,1)"});
+      }
     }
   });
   // Every delete path (single, bulk, "clear completed") goes through here, so
@@ -2618,9 +2640,9 @@ export default function HomeworkPlanner() {
     :focus-visible{outline:2px solid ${T.accent}!important;outline-offset:2px;}
     [data-selected]{outline:2px solid ${T.accent};outline-offset:-1px;}
     .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
-    /* Task titles are buttons (so they can be reached and opened from the
-       keyboard) that look like plain text. Declared before .strike so the
-       strike-through line still applies. */
+    /* Task titles are role="button" spans (so they can be reached and opened
+       from the keyboard) that look like plain text. Declared before .strike so
+       the strike-through line still applies. */
     .title-btn{all:unset;cursor:pointer;overflow-wrap:anywhere;}
     /* Completing a task: the check draws itself in on a little pop, and the
        title's strike-through draws left to right. .strike is a background line
@@ -2783,7 +2805,7 @@ export default function HomeworkPlanner() {
               <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:4,background:chk(t).on?chk(t).color:"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
                 {chk(t).on&&<CheckMark size={12} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
-              <button type="button" className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</button>
+              <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
               {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light)}}>{daysUntil(t.dueDate)}</span>}
               {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
@@ -2801,7 +2823,7 @@ export default function HomeworkPlanner() {
               {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
               {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:"auto"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
-            <button type="button" className="title-btn" aria-haspopup="dialog" style={{display:"block",fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.title}</button>
+            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className="title-btn" aria-haspopup="dialog" style={{display:"block",fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.title}</span>
             <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}{!t.done&&t.dueDate?<span style={{color:ink(priColor(pr,colorCodeUrgency),T.light)}}> · {daysUntil(t.dueDate)}</span>:null}</div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"auto"}}>
               {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
@@ -2827,7 +2849,7 @@ export default function HomeworkPlanner() {
                     <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:14,height:14,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                     </button>
-                    <button type="button" className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</button>
+                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
                     {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:12,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
                   </div>
                 ))}
@@ -2853,7 +2875,7 @@ export default function HomeworkPlanner() {
                   <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:18,height:18,cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                   </button>
-                  <button type="button" className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text}}>{t.title}</button>
+                  <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text}}>{t.title}</span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
@@ -2891,7 +2913,7 @@ export default function HomeworkPlanner() {
                       <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                       </button>
-                      <button type="button" className={"title-btn"} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</button>
+                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
                       {t.subject&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.subject}</span>}
                       {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
                     </div>
@@ -2921,7 +2943,7 @@ export default function HomeworkPlanner() {
                     <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                     </button>
-                    <button type="button" className={"title-btn"} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</button>
+                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
                     {t.dueDate&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDate(t.dueDate)}</span>}
                     {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
                   </div>
@@ -2947,7 +2969,7 @@ export default function HomeworkPlanner() {
                       <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                       </button>
-                      <button type="button" className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</button>
+                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
                       {t.subject&&<span style={{color:ink(sc,T.light),fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
                       {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
                       {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}

@@ -330,20 +330,23 @@ suffix to them (`T.border+"33"`); use `T.borderFaint` for a lighter divider, and
 wherever a real hex is required (e.g. `contrastColor()`).
 
 **Completing a task** (`toggleDone`) animates unless reduced motion is on: the id sits in
-`justDone` for 850ms, during which `allSorted`/`filteredTasks` keep the card where it was while
+`justDone` for 750ms, during which `allSorted`/`filteredTasks` keep the card where it was while
 `CheckMark` (module scope, an SVG stroke) draws in and the title's `.strike` (a background line,
 not `text-decoration`, so it can animate) draws across. Then `captureTaskRects()` records every
 `[data-task-id]` card's position and a `useLayoutEffect` FLIP-animates each card from its old spot
-to its new one (a ~1s ease-in-out glide scaled by distance, the farthest-moving card raised above
-the rest; keyboard reordering passes `quick` for a 320ms version). Only `MiniCard` has `data-task-id`, so only the list layouts glide; the others
+to its new one: the farthest-moving card (the completed one) lifts slightly (scale 1.025, raised
+z-index) and slides the whole way down over ~1.5-2s at an even pace, while the others make room in
+~1s; keyboard reordering passes `quick` for a plain 320ms version. Only `MiniCard` has `data-task-id`, so only the list layouts glide; the others
 get the check and strike but jump into place.
 
 **Accessibility conventions** (from the screen-reader/keyboard pass, checked with axe-core and the
 Chrome accessibility tree):
-- Task titles are `<button className="title-btn">` (looks like text, `all:unset`) with no handler of
-  their own: Enter/click bubbles to the card's existing onClick, so swipe guards still apply.
+- Task titles are `<span role="button" tabIndex={0} className="title-btn">` (looks like text,
+  `all:unset`), and the reorder handle is a `div role="button"` -- not real `<button>`s, since those
+  sit in the path of swipe/drag gestures and a `<button>` there can swallow the touch on iOS Safari.
+  `activateOnKey` (module scope) gives them Enter/Space; they have no click handler of their own: Enter/click bubbles to the card's existing onClick, so swipe guards still apply.
   Per-task buttons carry the task's name (`Mark X done`, `Delete X`, `Reorder X`).
-- The drag handle is a button; ArrowUp/Down call `moveTaskBy`, which announces the new position
+- On the drag handle, ArrowUp/Down call `moveTaskBy`, which announces the new position
   through the `srMessage` live region (`.sr-only`, next to the task modal).
 - `.app-inner` is `inert` while `TaskModal` is open. `TaskModal` records its opener in a layout
   effect (inert blurs it before a normal effect runs) so focus returns there on close.

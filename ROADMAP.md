@@ -35,6 +35,18 @@ tier, and a rough size.
 | Crash and error monitoring (e.g. Sentry) | ⬜ | S | Include sync errors, not just crashes |
 | Split `App.tsx` (about 3,100 lines) into layout, page and wizard components | ⬜ | L | Makes every item below safer to build |
 | Shared UI components (Card, Chip, IconButton, SectionLabel) instead of repeated inline styles | ⬜ | L | Makes Liquid Glass and future themes much simpler |
+| Separate dev/staging and production Firebase projects | ⬜ | S | Today there is one project, so every test hits real user data and real rules. Use the emulators locally and a staging project for previews |
+| Budget alerts and hard spending caps in Google Cloud | ⬜ | S | Must exist before switching to the Blaze plan, so a bug or abuse can't run up a surprise bill |
+| Cloud Functions for anything that must be trusted (entitlements, deleting accounts, sending email/push) | ⬜ | L | The client is public; anything security-sensitive belongs on the server |
+| Versioned data migrations (a `schemaVersion` on tasks and the profile) | ⬜ | M | Today, shape changes rely on ad-hoc backfills; this makes future changes safe |
+| End-to-end tests (Playwright) for the main flows: add task, complete, sync, sign in/out | ⬜ | M | Catches the kind of bugs the audit found before users do |
+| Content-Security-Policy header, tested on a preview deploy first | ⬜ | M | Deliberately skipped so far (risk of breaking Google Sign-In/reCAPTCHA); worth doing carefully before launch |
+| HSTS and other security headers on the custom domain | ⬜ | S | See L3 |
+| Dependency and secret scanning (Dependabot is on; add GitHub secret scanning, and make `npm audit` fail on high severity) | 🟡 | S | |
+| Feature flags (Firebase Remote Config) | ⬜ | S | Turn features on gradually, or off quickly if something breaks |
+| Admin tooling: look up a user, grant Pro manually, see sync errors | ⬜ | M | Needed as soon as there are paying users asking for help |
+| Uptime monitor and public status page | ⬜ | S | |
+| Data-retention policy: what happens to deleted and inactive accounts, and when | ⬜ | S | Also belongs in the privacy policy |
 
 ---
 
@@ -202,16 +214,112 @@ tier, and a rough size.
 | Liquid Glass extras: highlight that follows the cursor or tilts with the phone | ⬜ | S | |
 | Respect reduced motion (`prefers-reduced-motion`) for all of the above | ⬜ | S | Do this alongside the animations, not after |
 
+## 16. Product basics
+Things most people expect from an app like this that are missing today.
+| Item | Status | Tier | Size | Notes |
+|---|---|---|---|---|
+| First-run onboarding (a short tour, or 3 questions: school level, subjects, reminders) | ⬜ | F | M | New users currently land on sample tasks with no explanation |
+| Edit every task field in the detail view (title, subject, due date/time, estimate, recurrence) | ⬜ | F | M | Today most fields can only be set while adding a task |
+| Rename subjects and change their colors (not just add/delete) | ⬜ | F | S | |
+| Undo for more than deletes (completing, editing, archiving) | 🟡 | F | M | History is delete-only |
+| "Restore" button in the Archived view | 🟡 | F | S | Archived tasks can be viewed, but there's no explicit restore |
+| Keyboard shortcuts (n = new task, / = search, j/k to move, x = complete) | ⬜ | F | S | Pairs with the command palette |
+| Full accessibility pass (screen reader, keyboard-only use, contrast, focus rings) | 🟡 | F | M | Button labels were added in the audit; needs a real screen-reader pass |
+| Other languages (start with Spanish) | ⬜ | F | L | Move all text into one strings file first |
+| Date/time settings: 12h/24h, week starts Monday or Sunday | ⬜ | F | S | The week currently always starts Sunday |
+| Help / FAQ page and in-app "What's this?" hints | ⬜ | F | M | |
+| In-app feedback form (replaces the Google Form link) | ⬜ | F | S | |
+
+---
+
+## Launch & infrastructure
+
+### L1. Mobile app
+| Item | Status | Size | Notes |
+|---|---|---|---|
+| Decide the approach | ⬜ | S | **Recommended: Capacitor.** It wraps the existing web app as a real iOS/Android app with little rewriting and adds native plugins (push, widgets, haptics). React Native/Expo feels more native but is close to a rewrite. The installable web app already exists and costs nothing |
+| Apple Developer account ($99/year) and Google Play account ($25 once) | ⬜ | S | |
+| Native Google Sign-In (plugin) | ⬜ | M | The web popup flow doesn't work inside a native app |
+| **Sign in with Apple** | ⬜ | M | Apple requires it on iOS when an app offers another third-party login such as Google |
+| Native push notifications (APNs/FCM) | ⬜ | L | Uses the same server-side reminder system as web push |
+| In-app purchases for Pro on iOS/Android | ⬜ | L | Apple and Google require their own billing for digital subscriptions bought inside apps (15–30% cut). RevenueCat can unify this with Stripe on the web |
+| Home-screen widgets (next tasks) | ⬜ | XL | Needs native Swift (iOS) and Kotlin (Android) code, even with Capacitor |
+| Store listings: screenshots, description, privacy labels, age rating | ⬜ | M | |
+| Beta testing (TestFlight on iOS, internal testing on Android) | ⬜ | S | |
+| App review preparation (demo account, notes on background features) | ⬜ | S | |
+
+### L2. Firebase optimization (and whether to switch)
+| Item | Status | Size | Notes |
+|---|---|---|---|
+| Lazy-load Firebase after the first paint | ⬜ | M | The Firebase SDK is most of the bundle; the app can render from local storage first and connect just after |
+| Load Analytics and Performance Monitoring only once the app is idle | ⬜ | S | They don't need to block startup |
+| Stop re-reading archived tasks on every load (separate collection, or a query that skips them) | ⬜ | M | Long-time users will build up hundreds of archived tasks, each one a read |
+| Check read/write counts against the free tier (50k reads / 20k writes per day) | ⬜ | S | Firebase console → Usage. Estimate the cost per 1,000 users before setting Pro prices |
+| Fewer settings writes (one per change burst, not one per toggle) | ⬜ | S | |
+| **Decision: stay on Firebase or switch?** | ⬜ | S | **Recommendation: stay for now.** Firebase's offline cache, real-time sync and sign-in do a lot of work for free, and migrating means weeks of risk. Revisit only if cost or limits become a real problem. If switching, **Supabase** (Postgres, row-level security, real-time, SQL for analytics, open source) is the most likely pick; Convex, Appwrite and PocketBase are alternatives. Decide **before** building Stripe entitlements and Cloud Functions, since those deepen the lock-in |
+
+### L3. Custom domain
+| Item | Status | Size | Notes |
+|---|---|---|---|
+| Buy a domain (e.g. `dueplanner.app` or `dueplanner.com`), plus one for Due Studios | ⬜ | S | `.app` domains force HTTPS, which is good |
+| Point it at Vercel, and redirect `dueplanner.vercel.app` to it | ⬜ | S | |
+| **Update sign-in for the new domain** | ⬜ | S | `authDomain` in `App.tsx` is `dueplanner.vercel.app` (through the `/__/auth` proxy in `vercel.json`). Change it, and add the new domain to Firebase → Authentication → Authorized domains and to the Google OAuth client's redirect URIs, or sign-in breaks |
+| Decide the split: marketing site at the root, app on an `app.` subdomain (or at `/app`) | ⬜ | S | Lets the landing page change without touching the app |
+| Update links: `privacy.html`, the install manifest, social preview tags, `CLAUDE.md` | ⬜ | S | |
+
+### L4. Business email
+| Item | Status | Size | Notes |
+|---|---|---|---|
+| Choose a provider | ⬜ | S | **Google Workspace** (about $7/user/month, works like Gmail) or **Zoho Mail** (has a free tier). Cheapest start: Cloudflare Email Routing (free forwarding to your Gmail) |
+| Addresses: `hello@`, `support@`, `privacy@`, `billing@` | ⬜ | S | Aliases of one inbox are enough at first |
+| Replace the personal Gmail address in `privacy.html` with `privacy@` | ⬜ | S | |
+| SPF, DKIM and DMARC records | ⬜ | S | Without these, emails land in spam |
+| A sending service for digests and receipts (e.g. Resend or Postmark) | ⬜ | M | Separate from your inbox; needed for the email digest |
+
+### L5. Landing page
+| Item | Status | Size | Notes |
+|---|---|---|---|
+| Hero: one sentence on what DuePlanner is, a screenshot or short video, and an "Open the app" button | ⬜ | M | |
+| Feature sections with real screenshots, pricing, FAQ, and a footer with privacy/terms | ⬜ | M | |
+| Waitlist / email signup before launch | ⬜ | S | |
+| A designed social preview image | ⬜ | S | Links currently preview with the app icon |
+| SEO basics: titles, descriptions, sitemap, fast load | ⬜ | S | |
+| Tech: a static site (e.g. Astro) or a separate page in this repo | ⬜ | S | Static keeps it fast and independent of the app |
+| Blog or study-tips pages for search traffic | ⬜ | L | Later |
+| Testimonials from beta users | ⬜ | S | After the beta |
+
+### L6. Pre-launch checklist
+| Item | Status | Size | Notes |
+|---|---|---|---|
+| **Legal:** Terms of Service; privacy policy updated for Stripe, Sentry, the email provider and data retention | ⬜ | M | Consider a lawyer's review before charging money |
+| **Age:** decide on under-13 users (COPPA) and add an age question at sign-up if needed | ⬜ | M | The privacy page says the app isn't for under-13s, but nothing enforces it |
+| **Privacy laws:** GDPR/CCPA basics, analytics consent for visitors from the EU | ⬜ | M | |
+| **Trademark check** for "DuePlanner" and "Due Studios" | ⬜ | S | There's already an app called "Due" in the same category |
+| Claim social handles (Instagram, TikTok, X, YouTube) | ⬜ | S | |
+| Test on real devices: iPhone Safari, Android Chrome, desktop Chrome/Firefox/Safari/Edge, Arc | ⬜ | M | |
+| Performance: Lighthouse score; test on a slow phone and a slow network | ⬜ | S | |
+| Accessibility check (see section 16) | ⬜ | M | |
+| Security review: rules, headers, dependencies, App Check enforced | ⬜ | M | |
+| Test the backups by actually restoring one | ⬜ | S | |
+| Stripe: switch from test mode to live; test refunds and failed payments | ⬜ | S | |
+| Support: `support@` inbox, help page, a response-time goal | ⬜ | S | |
+| Analytics: choose the key numbers (sign-ups, day-7 retention, tasks created, upgrades) | ⬜ | S | |
+| Closed beta with 20–50 students, and fix what they run into | ⬜ | L | |
+| Launch plan: Product Hunt, Reddit (e.g. r/GetStudying), school clubs, TikTok study content | ⬜ | M | |
+| Rollback plan: revert a bad deploy fast (Vercel instant rollback, feature flags) | ⬜ | S | |
+
 ---
 
 ## Suggested order
 
-1. **Groundwork (weeks 1–3):** safer sync, rules tests in CI, error monitoring, splitting `App.tsx` and adding shared components. Nothing user-visible, but it makes everything else safer.
+1. **Groundwork (weeks 1–3):** safer sync, rules tests in CI, error monitoring, a separate dev/staging Firebase project, splitting `App.tsx` and adding shared components. Nothing user-visible, but it makes everything else safer. Also make the Firebase-or-switch decision now (L2), before anything deepens the lock-in. Cheap side tasks that can start any time: buy the domain and set up business email (L3, L4).
 2. **Cheap, high-value free features (weeks 3–6):** natural-language quick add and the command palette, snooze, JSON import, Today/Upcoming/Someday, the workload heatmap, pinning and P1–P4, "1 week before" reminders, and the animation pass.
-3. **Freemium launch (weeks 6–9):** Stripe, server-side entitlements, the upgrade screen, and the first Pro features that are cheap to run and clearly valuable: saved filters (unlimited), My Day and Evening review, the Eisenhower matrix, the habit tracker, and reflection logs.
+3. **Freemium launch (weeks 6–9):** budget alerts first, then Stripe, server-side entitlements, the upgrade screen, and the first Pro features that are cheap to run and clearly valuable: saved filters (unlimited), My Day and Evening review, the Eisenhower matrix, the habit tracker, and reflection logs.
 4. **Server-side reminders and email (weeks 9–12):** push notifications with the app closed, the inactivity nudge, and the email digest. These make the app feel "real" and support Pro.
 5. **Integrations (ongoing):** the .ics feeds first (both directions), then Google Calendar, then Google Classroom and Canvas.
 6. **Social and collaboration (later):** after a privacy and safety review. Start with read-only share links.
+
+**Alongside phases 2–4:** the landing page and waitlist (L5), then the pre-launch checklist (L6) before the public launch. **Once the web launch is stable:** the mobile app (L1).
 
 ---
 

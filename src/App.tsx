@@ -204,8 +204,8 @@ const REMINDER_OFFSETS = [
   { key:"0",  label:"At due time",   mins:0 },
 ] as const;
 const QUESTIONS = [
-  { key:"subject", label:"What subject? ▥", type:"select" },
-  { key:"dueDate", label:"When is it due? ▦", type:"date" },
+  { key:"subject", label:"What subject?", type:"select" },
+  { key:"dueDate", label:"When is it due?", type:"date" },
   { key:"estMins", label:"How long will it take?", type:"time" },
   { key:"recurrence", label:"Does this repeat?", type:"recurrence" },
 ];
@@ -1475,6 +1475,14 @@ export default function HomeworkPlanner() {
     if(inputRef.current) inputRef.current.value="";
     setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
   }
+  function goBackStep(){
+    if(QUESTIONS[step]?.type==="date"&&pendingDueDate!==null){setPendingDueDate(null);return;}
+    if(step>-1)setStep(s=>s-1);
+  }
+  function goForwardStep(){
+    if(QUESTIONS[step]?.type==="date"&&pendingDueDate!==null){confirmDueTime("");return;}
+    if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(newTask as Task);
+  }
   function handleDateInput(val:string){
     setPendingDueDate(val);
     inputValRef.current="";
@@ -2260,7 +2268,7 @@ export default function HomeworkPlanner() {
                     <div>
                       <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>What's the assignment?</div>
                       <form onSubmit={handleTitleSubmit} style={{display:"flex",gap:8}}>
-                        <input ref={inputRef} defaultValue="" placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,flex:1,outline:"none"}}/>
+                        <input ref={inputRef} defaultValue={newTask.title||""} placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,flex:1,outline:"none"}}/>
                         <button type="submit" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer"}}>→</button>
                       </form>
                     </div>
@@ -2357,7 +2365,11 @@ export default function HomeworkPlanner() {
                     </div>
                   </div>}
                 </div>
-                <button onClick={()=>setAdding(false)} style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:11,cursor:"pointer",marginTop:12}}>cancel</button>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}>
+                  {step>-1&&<button onClick={goBackStep} aria-label="Go back" title="Go back" style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:13,cursor:"pointer",padding:0}}>‹</button>}
+                  <button onClick={()=>setAdding(false)} style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:11,cursor:"pointer",padding:0}}>cancel</button>
+                  {step>-1&&<button onClick={goForwardStep} aria-label="Skip" title="Skip" style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:13,cursor:"pointer",padding:0}}>›</button>}
+                </div>
               </div>
             )}
           </div>

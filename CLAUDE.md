@@ -316,11 +316,12 @@ Card highlights/shadows and floating-element blur are applied from the runtime s
 attribute selectors matching the glass border value in the browser-normalized inline `style`
 (e.g. `border: 1px solid rgba(255, 255, 255, 0.11)`), not by editing each inline style -- so
 changing those border values means the selectors follow automatically, but a new card that uses a
-different border won't pick up the effect. On mouse/trackpad devices a cursor highlight follows the pointer: an effect sets
-`--glass-x`/`--glass-y` on the hovered glass card (and glass cards containing it), relative to
+different border won't pick up the effect. A pointer highlight follows the mouse, or a finger while it's touching the screen (touch
+events, since they keep firing during scroll; cleared 250ms after lift): an effect sets
+`--glass-x`/`--glass-y` on the glass card under the point (and glass cards containing it), relative to
 each card's own box, and a radial gradient keyed to `glassCardSel` draws it -- per-card rather than
 one `background-attachment:fixed` layer because task cards lift with a transform on hover, which
-breaks fixed backgrounds. Touch and device tilt deliberately don't drive it. Since glass tokens aren't hex, never append a hex alpha
+breaks fixed backgrounds. Device tilt deliberately doesn't drive it. Since glass tokens aren't hex, never append a hex alpha
 suffix to them (`T.border+"33"`); use `T.borderFaint` for a lighter divider, and `T.solidBorder`
 wherever a real hex is required (e.g. `contrastColor()`).
 

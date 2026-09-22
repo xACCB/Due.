@@ -9,6 +9,19 @@
   box-sizing: border-box;
 }
 
+/* A horizontal drag anywhere on the page -- not just the tab bar's own
+   press-and-swipe gesture, which has since been removed entirely -- can
+   still trigger iOS Safari's rubber-band overscroll bounce on an imprecise
+   touch, revealing Safari's own background at the edge (not any element of
+   ours, so a background-color fix alone can't cover it). This was in place
+   earlier and confirmed fixing that; a later cleanup wrongly assumed it
+   only existed for the (now-removed) custom gesture and dropped it along
+   with that code, which was the actual regression. Vertical overscroll
+   (pull-to-refresh feel) is untouched. */
+html, body {
+  overscroll-behavior-x: none;
+}
+
 body {
   margin: 0;
   /* Without this, text can render rough/jagged (reported as "pixelated") in

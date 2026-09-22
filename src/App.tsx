@@ -362,7 +362,7 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
             <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
-                <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{task.subject}</span>
+                {task.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{task.subject}</span>}
                 <span style={{background:priColor(pr,colorCodeUrgency)+"22",color:priColor(pr,colorCodeUrgency),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{pr} priority</span>
                 {task.done&&<span style={{background:"#2ED57322",color:"#2ED573",borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>✓ done</span>}
               </div>
@@ -590,7 +590,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
             {isNext&&<span className="rb" style={{background:T.text+"11",color:T.textMuted}}>next up</span>}
             <span style={{fontFamily:F.heading,fontSize:15,textDecoration:task.done?"line-through":"none",color:task.done?T.textFaint:T.text}}>{task.title}</span>
             {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
-            <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>
+            {task.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>}
             {task.priorityOverride&&<span title="Manually set priority" style={{color:T.textFaint,fontSize:10}}>•</span>}
             {task.tags?.map(tag=><span key={tag} style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>#{tag}</span>)}
           </div>
@@ -1867,7 +1867,7 @@ export default function HomeworkPlanner() {
             </button>
             <div style={{width:6,height:6,borderRadius:"50%",background:priColor(pr,colorCodeUrgency),flexShrink:0}}/>
             <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-            <span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>
+            {t.subject&&<span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
             <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{daysUntil(t.dueDate)}</span>
             <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 3px"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
           </div>
@@ -1905,7 +1905,7 @@ export default function HomeworkPlanner() {
                 {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
               </button>
               <span style={{fontFamily:F.body,fontSize:13,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-              <span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>
+              {t.subject&&<span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
               {dm&&!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency),flexShrink:0}}>{dm}</span>}
               <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
             </div>
@@ -1920,7 +1920,7 @@ export default function HomeworkPlanner() {
           <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7,cursor:"pointer"}}>
             <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:priColor(pr,colorCodeUrgency),borderRadius:"12px 12px 0 0"}}/>
             <div style={{display:"flex",justifyContent:"space-between"}}>
-              <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>
+              {t.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
               <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
             </div>
             <div style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.title}</div>
@@ -1945,7 +1945,7 @@ export default function HomeworkPlanner() {
           return(
             <div key={t.id} className="sticky-note" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:bg,borderRadius:3,padding:"14px 12px",transform:`rotate(${rot}deg)`,boxShadow:"2px 3px 10px #00000033",minHeight:120,display:"flex",flexDirection:"column",gap:6,opacity:t.done?0.5:1,cursor:"pointer"}}>
               <div style={{fontFamily:F.heading,fontSize:14,color:"#1a1a1a",textDecoration:t.done?"line-through":"none",lineHeight:1.3,flex:1}}>{t.title}</div>
-              <div style={{fontFamily:F.body,fontSize:10,color:"#555"}}><span style={{color:sc,fontWeight:600}}>{t.subject}</span> · {daysUntil(t.dueDate)||"no date"}</div>
+              <div style={{fontFamily:F.body,fontSize:10,color:"#555"}}>{t.subject&&<><span style={{color:sc,fontWeight:600}}>{t.subject}</span> · </>}{daysUntil(t.dueDate)||"no date"}</div>
               <div style={{display:"flex",justifyContent:"space-between"}}>
                 <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#22c55e":"#ffffff88",border:"1.5px solid #33333333",borderRadius:4,padding:"2px 7px",cursor:"pointer",fontFamily:F.body,fontSize:10,color:"#333"}}>{t.done?"✓ done":"mark done"}</button>
                 <button style={{background:"none",border:"none",color:"#666",cursor:"pointer",fontSize:14}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
@@ -1993,7 +1993,7 @@ export default function HomeworkPlanner() {
                 <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,flexShrink:0}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
               </div>
               <div style={{display:"flex",gap:10,marginTop:4,flexWrap:"wrap"}}>
-                <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>
+                {t.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
                 <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}</span>
                 <span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>
               </div>
@@ -2039,7 +2039,7 @@ export default function HomeworkPlanner() {
                   <span style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>
+                  {t.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
                   <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
                 </div>
               </div>
@@ -2074,7 +2074,7 @@ export default function HomeworkPlanner() {
                         {t.done&&<span style={{color:"#111",fontSize:8}}>✓</span>}
                       </button>
                       <span style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
-                      <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.subject}</span>
+                      {t.subject&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.subject}</span>}
                       <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
                     </div>
                   ))}
@@ -2108,7 +2108,7 @@ export default function HomeworkPlanner() {
                         {t.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
                       </button>
                       <span style={{fontFamily:F.body,fontSize:12,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
-                      <span style={{color:sc,fontFamily:F.body,fontSize:10}}>{t.subject}</span>
+                      {t.subject&&<span style={{color:sc,fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
                       <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{t.estMins}m</span>
                       <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
                     </div>

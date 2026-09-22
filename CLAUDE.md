@@ -11,17 +11,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm test` — Vitest, unit tests for the pure functions in `src/lib/` (dates, priority/format
   helpers, syllabus parsing). Fast, no external services; this is what CI runs.
 - `npm run test:rules` — Firestore emulator + `@firebase/rules-unit-testing`, verifying
-  `firestore.rules` actually rejects malformed writes and cross-user access. Not run in CI (needs
-  the emulator, which needs a JRE); run locally before changing `firestore.rules`.
+  `firestore.rules` actually rejects malformed writes and cross-user access. Needs Java (a JRE) for
+  the emulator; CI installs one and runs it. Run it locally before changing `firestore.rules`.
 - `npm run audit:contrast` — diagnostic script (`scripts/check-theme-contrast.ts`, run via `node
   --experimental-strip-types`) that checks every theme in `src/themes.ts` against WCAG AA contrast
   ratios and prints failures. Reports only; doesn't fix anything, since adjusting a theme's hex
   values is a design call on a live, user-facing palette.
 - A pre-commit hook (husky + lint-staged, `.husky/pre-commit`) runs `eslint --fix` on staged
   `.ts`/`.tsx` files. Dependabot (`.github/dependabot.yml`) opens weekly npm dependency-update PRs.
-- `.github/workflows/ci.yml` runs `npm run build` + `npm run lint` + `npm test` (plus a
-  non-blocking `npm audit`) on every push/PR to `main` — Vercel's own build would already catch a
-  broken build, but not lint/test failures, which this exists to catch.
+- `.github/workflows/ci.yml` runs on every push/PR to `main` and weekly (Monday cron). Job
+  `build-and-lint`: `npm run build`, `npm run lint`, `npm test`, `npm run test:rules`. Job
+  `security`: `npm audit --audit-level=high` (blocking, dev dependencies included; Dependabot's PRs
+  are the usual fix) and a gitleaks secret scan of the full git history (pinned binary, config in
+  `.gitleaks.toml`, which allowlists only the public Firebase web API key by exact value). Vercel's
+  own build would catch a broken build, but not these. GitHub's own secret scanning and push
+  protection are repo settings (Settings -> Advanced Security), not files in the repo.
 
 ## Architecture
 

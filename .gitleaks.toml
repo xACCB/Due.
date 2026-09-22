@@ -1,0 +1,13 @@
+# Secret scanning config for gitleaks (run in CI, .github/workflows/ci.yml).
+# Uses gitleaks' full default rule set, plus the one known false positive below.
+[extend]
+useDefault = true
+
+# The Firebase web API key in src/App.tsx's firebaseConfig. It's a public
+# client identifier, not a secret -- access is enforced by firestore.rules (see
+# CLAUDE.md) -- so it's allowlisted by its exact value only. Any *other* key
+# anywhere in the repo, including elsewhere in App.tsx, still fails the scan.
+[[allowlists]]
+description = "Public Firebase web API key (by design, not a secret)"
+regexTarget = "match"
+regexes = ['''AIzaSyD9W3eTvKjthiEZ_0MjeCHBIZ6BevMKgSo''']

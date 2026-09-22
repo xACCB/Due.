@@ -6,13 +6,13 @@ export const DUE_BUCKETS: { key: DueBucket; label: string }[] = [
   { key: "overdue", label: "Overdue" },
   { key: "today", label: "Due today" },
   { key: "tomorrow", label: "Tomorrow" },
-  { key: "week", label: "This week" },
+  { key: "week", label: "Next 7 days" },
   { key: "later", label: "Later" },
   { key: "none", label: "No date" },
 ];
 
 // Which bucket a due date falls in, relative to `today` (a local YYYY-MM-DD).
-// "This week" is the rest of the next seven days, not the calendar week.
+// "week" is the rest of the next seven days (labeled "Next 7 days"), not the calendar week.
 export function dueBucket(dueDate: string, today: string): DueBucket {
   if (!dueDate) return "none";
   // Math.round: across a DST change two local midnights are 23h or 25h apart.

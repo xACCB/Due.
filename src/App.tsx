@@ -141,10 +141,10 @@ const LAYOUTS = {
   list:      { name:"List",       emoji:"☰",  desc:"Classic cards" },
   board:     { name:"Board",      emoji:"⊞",  desc:"Grid cards" },
   checklist: { name:"Checklist",  emoji:"☑",  desc:"Simple ticks" },
-  kanban:    { name:"Kanban",     emoji:"𝄘",  desc:"By status" },
+  kanban:    { name:"Kanban",     emoji:"𝄘",  desc:"By urgency" },
   progress:  { name:"Progress",   emoji:"▓",  desc:"Subtask progress" },
   pyramid:   { name:"Pyramid",    emoji:"△",  desc:"By priority" },
-  calendar:  { name:"Calendar",   emoji:"▦", desc:"Week view" },
+  calendar:  { name:"Calendar",   emoji:"▦", desc:"Next 7 days" },
 } as const;
 type LayoutName = keyof typeof LAYOUTS;
 
@@ -213,6 +213,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"fixes-sep22", date:"2026-09-22", title:"Bug fix", description:"Un-completing an archived task no longer makes it disappear; long titles and subject names are capped instead of failing to sync; swiping a finished task now says \"Mark not done\"; Empty in Recently deleted asks to confirm; 24-hour time now applies everywhere; and a few labels say what they actually do (\"In 3 hours\", \"Next 7 days\")." },
   { id:"settings-batch", date:"2026-09-22", title:"New feature", description:"Rename subjects and change their colors (✎ in Settings -> Subjects); a \"Done today\" list in the Inbox; 24-hour time and a Monday week start in Settings -> Date & time; and completing, editing, archiving and bulk changes can now be undone." },
   { id:"safer-sync", date:"2026-09-22", title:"Improvement", description:"Syncing between devices is safer: edits made at the same time on two devices are merged field by field instead of one overwriting the other, Recently deleted now syncs too, and the title menu shows when you last synced (or that you're offline)." },
   { id:"time-left-more", date:"2026-09-22", title:"New feature", description:"The \"Time left\" dropdown now splits time by due date, shows time worked per subject, flags tasks with no estimate, and can start Focus on the most urgent task in your biggest subject." },
@@ -343,7 +344,7 @@ function cloudRecord(d:QueryDocumentSnapshot,deleted:boolean):CloudRecord<Task>|
   return rec;
 }
 
-// Snooze moves a task's due date (and, for "later today", its time) forward.
+// Snooze moves a task's due date (and, for "in 3 hours", its time) forward.
 type SnoozeKind="later"|"tomorrow"|"week";
 function snoozeTarget(kind:SnoozeKind):{dueDate:string;dueTime?:string}{
   if(kind==="later"){
@@ -376,7 +377,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   const sh=Math.floor(sessionSecs/3600); const sm=Math.floor(sessionSecs/60)%60; const ss=sessionSecs%60;
   const today=todayISO();
   const sessionHistory=(task.sessions||[]).filter(s=>localDateStr(new Date(s.at))===today)
-    .map(s=>({mins:s.mins,date:new Date(s.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}));
+    .map(s=>{const d=new Date(s.at);return {mins:s.mins,date:formatTime(`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`,h24)};});
   const totalSessionMins=sessionHistory.reduce((a,b)=>a+b.mins,0);
   const subtasks=task.subtasks||[];
   const [newSubtaskText,setNewSubtaskText]=useState("");
@@ -487,7 +488,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
             return (
             <form onSubmit={e=>{e.preventDefault();saveEdit();}} style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.accent}44`,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
               <label><span style={label}>Title</span>
-                <input autoFocus value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})} style={field}/></label>
+                <input autoFocus value={draft.title} maxLength={500} onChange={e=>setDraft({...draft,title:e.target.value})} style={field}/></label>
               <label><span style={label}>Subject</span>
                 <select value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})} style={field}>
                   <option value="">No subject</option>
@@ -538,7 +539,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
           {!task.done&&!draft&&(
             <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:-8,marginBottom:18}}>
               <span style={{fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginRight:2}}>Snooze</span>
-              {([["later","Later today"],["tomorrow","Tomorrow"],["week","Next week"]] as const).map(([k,l])=>(
+              {([["later","In 3 hours"],["tomorrow","Tomorrow"],["week","Next week"]] as const).map(([k,l])=>(
                 <button key={k} onClick={()=>onSnooze(k)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:11}}>{l}</button>
               ))}
               {task.recurrence&&task.recurrence!=="none"&&(
@@ -811,9 +812,9 @@ function isStandalone(){
 // wipe out the text. newSubjectText/setNewSubjectText are lifted to the
 // parent specifically so they survive that; being hoisted now means this
 // component itself is no longer being recreated in the first place either.
-function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,setShowProfile,signInWithFirebase,signOutFirebase}:{
+function ProfileModal({T,F,fbUser,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,setShowProfile,signInWithFirebase,signOutFirebase}:{
   T:ThemeObj; F:typeof FONT;
-  fbUser:User|null; signInError:string|null; syncError:string|null;
+  fbUser:User|null; signInError:string|null; syncError:string|null; syncStatus:string|null;
   visibleTasks:Task[]; totalMins:number;
   subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
   setShowProfile:(v:boolean)=>void;
@@ -895,7 +896,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
           <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:8}}>{fbUser.email}</div>
           <div style={{display:"flex",alignItems:"center",gap:6,background:syncError?"#FF475722":"#2ED57322",borderRadius:999,padding:"4px 12px",border:`1px solid ${syncError?"#FF475744":"#2ED57344"}`}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:syncError?"#FF4757":"#2ED573"}}/>
-            <span style={{fontFamily:F.body,fontSize:11,color:syncError?"#FF4757":"#2ED573"}}>{syncError?"Sync issue":"Synced across devices"}</span>
+            <span style={{fontFamily:F.body,fontSize:11,color:syncError?"#FF4757":"#2ED573"}}>{syncError?"Sync issue":syncStatus||"Synced across devices"}</span>
           </div>
           {syncError&&<div style={{fontFamily:F.body,fontSize:11,color:"#FF4757",marginTop:8,textAlign:"center",maxWidth:280,lineHeight:1.5}}>{syncError}</div>}
         </div>
@@ -975,7 +976,9 @@ function setDone(prev:Task[],ids:number[],done:boolean):Task[]{
   for(const id of ids){
     const task=next.find(t=>t.id===id);
     if(!task||task.done===done)continue;
-    next=next.map(t=>t.id===id?{...t,done,completedAt:done?Date.now():null}:t);
+    // Un-completing also un-archives: an archived task that isn't done would
+    // otherwise be hidden from every view except Archived.
+    next=next.map(t=>t.id===id?{...t,done,completedAt:done?Date.now():null,...(done?{}:{archived:false})}:t);
     const recurring=task.recurrence&&task.recurrence!=="none";
     if(done&&recurring&&!(task.spawnedNextId&&next.some(t=>t.id===task.spawnedNextId))){
       const copyId=nextId();
@@ -1080,7 +1083,7 @@ export default function HomeworkPlanner() {
   const [showDone,setShowDone]=usePersistedState("hw-showdone",true);
   const [showSuggestion,setShowSuggestion]=usePersistedState("hw-showsuggestion",true);
   // 0 = never auto-archive. Otherwise the number of days after completion before
-  // a done task is automatically archived (checked once on load).
+  // a done task is automatically archived (re-checked whenever tasks change).
   const [autoArchiveDays,setAutoArchiveDays]=usePersistedState("hw-autoarchive",7);
   // Auto-archive: re-checked whenever tasks (local edits, or a Firestore sync
   // landing) or the setting change. Idempotent -- once a task is archived this
@@ -1754,6 +1757,7 @@ export default function HomeworkPlanner() {
   const [importSubject,setImportSubject]=useState<string|null>(null);
   const [importPreview,setImportPreview]=useState<{title:string;dueDate:string;checked:boolean}[]|null>(null);
   const [importedCount,setImportedCount]=useState<number|null>(null);
+  const importSubjectEff=importSubject&&subjects.includes(importSubject)?importSubject:subjects[0]||"";
   function scanSyllabus(){
     const found=parseSyllabus(importText);
     setImportPreview(found.map(f=>({...f,checked:true})));
@@ -1764,7 +1768,7 @@ export default function HomeworkPlanner() {
   }
   function commitImport(){
     if(!importPreview)return;
-    const subject=importSubject||subjects[0]||"";
+    const subject=importSubjectEff;
     const toAdd=importPreview.filter(it=>it.checked);
     if(toAdd.length===0)return;
     setTasks(prev=>[
@@ -1794,6 +1798,7 @@ export default function HomeworkPlanner() {
   const [pendingSubjectDelete,setPendingSubjectDelete]=useState<string|null>(null);
   // The subject being renamed/recolored in Settings, and its draft values.
   const [editingSubject,setEditingSubject]=useState<{old:string;name:string;color:string}|null>(null);
+  const [confirmEmptyTrash,setConfirmEmptyTrash]=useState(false);
   // Drag-to-reorder (default list layout, pending tasks only)
   const [dragTaskId,setDragTaskId]=useState<number|null>(null);
   const [dragOffsetY,setDragOffsetY]=useState(0);
@@ -1810,9 +1815,9 @@ export default function HomeworkPlanner() {
   const SWIPE_THRESHOLD=90;
   // Undo/redo action history. Actions apply immediately (so Firestore sync,
   // which just diffs against `tasks`, doesn't need special-casing) and keep
-  // what's needed to reverse them: "delete" keeps the removed tasks; "edit"
-  // keeps the changed fields before and after (used by snooze). A new action
-  // always clears redoStack, same as any standard undo/redo history.
+  // what's needed to reverse them: "delete" keeps the removed tasks; "change"
+  // keeps each affected task's full state before and after (see changeTasks).
+  // A new action always clears redoStack, same as any standard undo/redo history.
   const [undoStack,setUndoStack]=useState<HistoryAction[]>([]);
   const [redoStack,setRedoStack]=useState<HistoryAction[]>([]);
   const [undoToast,setUndoToast]=useState<string|null>(null);
@@ -2199,7 +2204,7 @@ export default function HomeworkPlanner() {
     const data={
       exportedAt:new Date().toISOString(),
       tasks,subjects,subjectColors,templates,
-      settings:{themeMode,layout,groupBy,desktopLayout,colorCodeUrgency,liquidGlass,showDone,showSuggestion,autoArchiveDays,notificationsEnabled,enabledOffsets},
+      settings:{themeMode,layout,groupBy,desktopLayout,colorCodeUrgency,liquidGlass,showDone,showSuggestion,autoArchiveDays,notificationsEnabled,enabledOffsets,timeFormat,weekStart},
     };
     downloadFile(`dueplanner-export-${todayISO()}.json`,JSON.stringify(data,null,2),"application/json");
   }
@@ -2359,8 +2364,9 @@ export default function HomeworkPlanner() {
   function renderSwipeReveal(id:number){
     if(swipeId!==id||swipeX===0)return null;
     const isRight=swipeX>0;
+    const done=tasks.find(t=>t.id===id)?.done;
     return <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:isRight?"flex-start":"flex-end",padding:"0 20px",background:isRight?"#2ED57333":"#FF475733",pointerEvents:"none"}}>
-      <span style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:isRight?"#2ED573":"#FF4757"}}>{isRight?"✓ Mark done":"Delete"}</span>
+      <span style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:isRight?"#2ED573":"#FF4757"}}>{isRight?(done?"↩ Mark not done":"✓ Mark done"):"Delete"}</span>
     </div>;
   }
   const currentQ=step>=0?QUESTIONS[step]:null;
@@ -2890,7 +2896,7 @@ export default function HomeworkPlanner() {
                       </div>
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:12,marginBottom:6}}>
                         <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recently deleted{trash.length?` (${trash.length})`:""}</span>
-                        {trash.length>0&&<button onClick={()=>setTrash([])} style={{background:"none",border:"none",color:T.textFaint,fontSize:11,cursor:"pointer",padding:0}}>Empty</button>}
+                        {trash.length>0&&<button onClick={()=>{if(confirmEmptyTrash){setTrash([]);setConfirmEmptyTrash(false);}else setConfirmEmptyTrash(true);}} onBlur={()=>setConfirmEmptyTrash(false)} title={confirmEmptyTrash?"Tap again to delete these for good":"Delete everything here for good"} style={{background:confirmEmptyTrash?"#FF475722":"none",border:"none",borderRadius:6,color:confirmEmptyTrash?"#FF4757":T.textFaint,fontSize:11,cursor:"pointer",padding:confirmEmptyTrash?"2px 8px":0}}>{confirmEmptyTrash?"Delete for good?":"Empty"}</button>}
                       </div>
                       {trash.length===0
                         ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here. Deleted tasks stay for 30 days.</div>
@@ -2930,7 +2936,7 @@ export default function HomeworkPlanner() {
                         <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Add as subject</div>
                         <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
                           {subjects.map(s=>{
-                            const active=(importSubject||subjects[0])===s;
+                            const active=importSubjectEff===s;
                             return <button key={s} className="chip" onClick={()=>setImportSubject(s)} style={{background:active?(subjectColors[s]||T.accent)+"33":"none",color:active?(subjectColors[s]||T.accent):T.textMuted,border:`1.5px solid ${active?(subjectColors[s]||T.accent):T.border}`}}>{s}</button>;
                           })}
                         </div>
@@ -2993,12 +2999,12 @@ export default function HomeworkPlanner() {
             )}
           </div>
           <div ref={timeMenuRef} style={{position:"relative"}}>
-            <button onClick={()=>setTimeMenuOpen(o=>!o)} aria-haspopup="dialog" aria-expanded={timeMenuOpen} aria-label="Time left by subject" style={{background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"right",display:"block"}}>
+            <button onClick={()=>setTimeMenuOpen(o=>!o)} aria-haspopup="dialog" aria-expanded={timeMenuOpen} aria-label="Time left breakdown" style={{background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"right",display:"block"}}>
               <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>Time left</div>
               <div style={{fontFamily:F.heading,fontSize:20,color:effectiveThemeMode==="dark"?"#fff":"#000"}}>{fmtMins(totalMins)}</div>
             </button>
             {timeMenuOpen&&(
-              <div role="dialog" aria-label="Time left by subject" style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,width:250,maxWidth:"calc(100vw - 28px)",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",padding:"12px 14px"}}>
+              <div role="dialog" aria-label="Time left breakdown" style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,width:250,maxWidth:"calc(100vw - 28px)",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",padding:"12px 14px"}}>
                 <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By due date</div>
                 {timeByDue.length===0
                   ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Nothing left to do</div>
@@ -3175,7 +3181,7 @@ export default function HomeworkPlanner() {
                     <div>
                       <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>What's the assignment?</div>
                       <form onSubmit={handleTitleSubmit} style={{display:"flex",gap:8}}>
-                        <input ref={inputRef} defaultValue={newTask.title||""} placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,flex:1,outline:"none"}}/>
+                        <input ref={inputRef} defaultValue={newTask.title||""} maxLength={500} placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,flex:1,outline:"none"}}/>
                         <button type="submit" aria-label="Next" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer"}}>→</button>
                       </form>
                     </div>
@@ -3193,7 +3199,7 @@ export default function HomeworkPlanner() {
                         <div>
                           <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10}}>Due {formatDate(pendingDueDate)} -- what time?</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:12}}>
-                            {[{l:"Any time",v:""},{l:"9:00 AM",v:"09:00"},{l:"3:00 PM",v:"15:00"},{l:"11:59 PM",v:"23:59"}].map(({l,v})=>(
+                            {[{l:"Any time",v:""},{l:formatTime("09:00",h24),v:"09:00"},{l:formatTime("15:00",h24),v:"15:00"},{l:formatTime("23:59",h24),v:"23:59"}].map(({l,v})=>(
                               <button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>confirmDueTime(v)}>{l}</button>
                             ))}
                           </div>
@@ -3411,7 +3417,7 @@ export default function HomeworkPlanner() {
                 })}
               </div>
               <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectText);setNewSubjectText("");}} style={{display:"flex",gap:8,marginTop:8}}>
-                <input value={newSubjectText} onChange={e=>setNewSubjectText(e.target.value)} placeholder="Add a subject..." style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:12,outline:"none"}}/>
+                <input value={newSubjectText} maxLength={200} onChange={e=>setNewSubjectText(e.target.value)} placeholder="Add a subject..." style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:12,outline:"none"}}/>
                 <button type="submit" disabled={!newSubjectText.trim()} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:newSubjectText.trim()?"pointer":"default",opacity:newSubjectText.trim()?1:0.5,fontSize:12,fontWeight:500}}>Add</button>
               </form>
             </div>
@@ -3472,7 +3478,8 @@ export default function HomeworkPlanner() {
               </div>
             </div>
             <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>
-            <button onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived -- you can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:"#FF4757",fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Clear completed tasks</button>
+            {(()=>{const n=tasks.filter(t=>t.done&&!t.archived).length;return(
+            <button disabled={n===0} onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived -- you can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:"#FF4757",fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:n?"pointer":"default",opacity:n?1:0.45,width:"100%"}}>{n?`Clear ${plural(n)} completed`:"No completed tasks to clear"}</button>);})()}
             {fbUser&&(
               <div style={{background:T.card,borderRadius:12,padding:"14px",border:"1px solid #FF475744"}}>
                 <div className="sl" style={{color:"#FF4757",paddingTop:0}}>Danger Zone</div>
@@ -3508,6 +3515,7 @@ export default function HomeworkPlanner() {
         </div>
       )}>
         <TaskModal
+          key={selectedTask.id}
           h24={h24}
           task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
           T={T} F={F} subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency} now={now}
@@ -3531,7 +3539,7 @@ export default function HomeworkPlanner() {
       </ErrorBoundary>}
       {showProfile&&<ProfileModal
         T={T} F={F}
-        fbUser={fbUser} signInError={signInError} syncError={syncError}
+        fbUser={fbUser} signInError={signInError} syncError={syncError} syncStatus={syncStatus}
         visibleTasks={visibleTasks} totalMins={totalMins}
         subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         setShowProfile={setShowProfile}
@@ -3539,9 +3547,10 @@ export default function HomeworkPlanner() {
         signOutFirebase={signOutFirebase}
       />}
       {renderPomodoroToast()}
-      {/* Undo toast (deletes, snoozes) -- bottom-center, clear of the tab bar above it. */}
+      {/* Undo toast (any undoable change) -- bottom-center; lifted above the
+          bulk-action bar when that's showing. */}
       {undoToast!=null&&(
-        <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
+        <div style={{position:"fixed",left:"50%",bottom:selectionMode&&selectedIds.length>0?84:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
           <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:200}}>{undoToast}</span>
           <button onClick={undo} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
         </div>

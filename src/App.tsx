@@ -1349,6 +1349,18 @@ export default function HomeworkPlanner() {
     document.addEventListener("keydown",onKeyDown);
     return ()=>{document.removeEventListener("pointerdown",onPointerDown);document.removeEventListener("keydown",onKeyDown);};
   },[titleMenuOpen]);
+  // "time left" breakdown popover in the header -- same outside-click /
+  // Escape-to-close handling as the title menu above.
+  const [timeMenuOpen,setTimeMenuOpen]=useState(false);
+  const timeMenuRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!timeMenuOpen)return;
+    function onPointerDown(e:PointerEvent){if(timeMenuRef.current&&!timeMenuRef.current.contains(e.target as Node))setTimeMenuOpen(false);}
+    function onKeyDown(e:KeyboardEvent){if(e.key==="Escape")setTimeMenuOpen(false);}
+    document.addEventListener("pointerdown",onPointerDown);
+    document.addEventListener("keydown",onKeyDown);
+    return ()=>{document.removeEventListener("pointerdown",onPointerDown);document.removeEventListener("keydown",onKeyDown);};
+  },[timeMenuOpen]);
   const [looksOpen,setLooksOpen]=useState(false);
   const [activeSubject,setActiveSubject]=useState("all");
   // Syllabus import: transient by design (a paste-and-review staging area, not
@@ -1490,6 +1502,14 @@ export default function HomeworkPlanner() {
   }).filter(matchesSearch);
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
+  // Per-subject split of totalMins for the header's "time left" popover, largest
+  // first; tasks with no subject are pooled under "" (shown as "No subject").
+  const timeBySubject=(()=>{
+    const m:Record<string,number>={};
+    visibleTasks.filter(t=>!t.done&&!t.archived).forEach(t=>{m[t.subject||""]=(m[t.subject||""]||0)+(t.estMins||0);});
+    return Object.entries(m).filter(([,mins])=>mins>0).sort((a,b)=>b[1]-a[1]).map(([name,mins])=>({name,mins,pct:totalMins?Math.round(mins/totalMins*100):0}));
+  })();
+  const fmtMins=(m:number)=>m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
 
   // Stats (title menu). Archived tasks still count here -- archiving is just a
   // view filter, it doesn't erase completion history.
@@ -2467,10 +2487,33 @@ export default function HomeworkPlanner() {
               </div>
             )}
           </div>
-          {/* Absolutely centered in the header regardless of the title's width */}
-          <div style={{position:"absolute",left:"50%",bottom:0,transform:"translateX(-50%)",textAlign:"center",whiteSpace:"nowrap",pointerEvents:"none"}}>
-            <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>time left</div>
-            <div style={{fontFamily:F.heading,fontSize:20,color:effectiveThemeMode==="dark"?"#fff":"#000"}}>{totalMins>=60?`${Math.floor(totalMins/60)}h ${totalMins%60}m`:`${totalMins}m`}</div>
+          <div ref={timeMenuRef} style={{position:"relative"}}>
+            <button onClick={()=>setTimeMenuOpen(o=>!o)} aria-haspopup="dialog" aria-expanded={timeMenuOpen} aria-label="Time left by subject" style={{background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"right",display:"block"}}>
+              <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>time left</div>
+              <div style={{fontFamily:F.heading,fontSize:20,color:effectiveThemeMode==="dark"?"#fff":"#000"}}>{fmtMins(totalMins)}</div>
+            </button>
+            {timeMenuOpen&&(
+              <div role="dialog" aria-label="Time left by subject" style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,width:250,maxWidth:"calc(100vw - 28px)",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",padding:"12px 14px"}}>
+                <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Time left by subject</div>
+                {timeBySubject.length===0
+                  ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Nothing left to do</div>
+                  :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    {timeBySubject.map(r=>{const c=r.name?(subjectColors[r.name]||T.accent):T.textMuted;return(
+                      <div key={r.name}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{width:8,height:8,borderRadius:"50%",background:c,flexShrink:0}}/>
+                          <span style={{fontFamily:F.body,fontSize:12,color:r.name?T.text:T.textMuted,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name||"No subject"}</span>
+                          <span style={{fontFamily:F.body,fontSize:12,color:T.text,flexShrink:0}}>{fmtMins(r.mins)}</span>
+                          <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted,width:34,textAlign:"right",flexShrink:0}}>{r.pct}%</span>
+                        </div>
+                        <div style={{height:3,borderRadius:99,background:T.cardAlt,marginTop:5,marginLeft:16,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${r.pct}%`,background:c,borderRadius:99}}/>
+                        </div>
+                      </div>
+                    );})}
+                  </div>}
+              </div>
+            )}
           </div>
         </div>
         <div style={{height:1,background:`linear-gradient(90deg,${T.accent},transparent)`,marginBottom:16}}/>

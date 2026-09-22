@@ -225,6 +225,14 @@ which still exists as the outer safety net for anything else.
   from due date/estimate. `getPriority(dueDate, estMins, override?)` checks this first; every call
   site was updated to pass `task.priorityOverride` as the third argument.
 
+**Urgency color coding** (`colorCodeUrgency` state, "Urgency Color Coding" toggle in Options ->
+Looks, default on) gates every place `PRIORITY_COLORS` (red/orange/green) would otherwise show.
+Rather than each call site branching on the setting itself, they all go through
+`priColor(pr, colorCode)`, which returns `PRIORITY_COLORS[pr]` when on or one flat neutral gray
+(`NEUTRAL_PRIORITY_COLOR`) when off -- so turning it off doesn't require touching layout, only
+swapping which color resolves. This is the same "single helper, many call sites" shape as
+`contrastColor()`.
+
 **Bulk edit / multi-select** (`selectionMode`/`selectedIds` state) is deliberately scoped to the
 default list layout only (`MiniCard`) — the other 11 layouts each render their own custom task row
 markup, so extending selection to all of them was judged not worth the scope. `MiniCard` accepts

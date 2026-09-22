@@ -192,6 +192,11 @@ const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE"];
 const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#4ECDC4",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA" };
 const SUBJECT_COLOR_PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#F7DC6F","#BB8FCE","#82E0AA","#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#a78bfa","#fbbf24","#60a5fa"];
 const PRIORITY_COLORS: Record<Priority,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
+// Fallback for every priority color/text when the "Urgency color coding" toggle
+// (Options -> Looks) is off -- one neutral gray instead of red/orange/green, so
+// urgency still reads through position/text ("Overdue!" etc.) without color.
+const NEUTRAL_PRIORITY_COLOR = "#8a8a8a";
+function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORITY_COLORS[pr]:NEUTRAL_PRIORITY_COLOR; }
 const REMINDER_OFFSETS = [
   { key:"1d", label:"1 day before", mins:1440 },
   { key:"3h", label:"3 hours before", mins:180 },
@@ -253,8 +258,8 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHistory,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
-  task:Task; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>;
+function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessionSecs,sessionHistory,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
+  task:Task; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
   sessionActive:boolean; sessionSecs:number; sessionHistory:{mins:number;date:string}[];
   allTags:string[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
@@ -327,7 +332,7 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
             <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
                 <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{task.subject}</span>
-                <span style={{background:PRIORITY_COLORS[pr]+"22",color:PRIORITY_COLORS[pr],borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{pr} priority</span>
+                <span style={{background:priColor(pr,colorCodeUrgency)+"22",color:priColor(pr,colorCodeUrgency),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{pr} priority</span>
                 {task.done&&<span style={{background:"#2ED57322",color:"#2ED573",borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>✓ done</span>}
               </div>
               <div style={{fontFamily:F.heading,fontSize:22,color:T.text,lineHeight:1.2}}>{task.title}</div>
@@ -358,7 +363,7 @@ function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHist
               {([null,"low","medium","high"] as const).map(p=>{
                 const active=p===null?!task.priorityOverride:task.priorityOverride===p;
                 const label=p===null?"Auto":p[0].toUpperCase()+p.slice(1);
-                const color=p===null?T.accent:PRIORITY_COLORS[p];
+                const color=p===null?T.accent:priColor(p,colorCodeUrgency);
                 return <button key={p??"auto"} onClick={()=>onSetPriorityOverride(p)}
                   style={{background:active?color+"22":T.surface,border:`1.5px solid ${active?color:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:active?color:T.textMuted,fontFamily:F.body,fontSize:11}}>
                   {label}
@@ -498,9 +503,9 @@ function Toggle({on,onChange,T}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeOb
 // for every visible task across every layout, so being redefined (and every
 // instance's DOM torn down/recreated) on each unrelated render was the most
 // consequential case of this pattern in the file.
-function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
+function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
   task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
-  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>;
+  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
   dragTaskId:number|null; dragOffsetY:number;
   onOpen:(task:Task)=>void;
   onToggleDone:(id:number)=>void;
@@ -532,7 +537,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
       {...(swipeable&&!selectionMode?swipeHandlers(task.id):{})}
       style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isSelected?T.accent:isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
       {swipeable&&!selectionMode&&renderSwipeReveal(task.id)}
-      {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:PRIORITY_COLORS[pr],borderRadius:"13px 0 0 13px"}}/>}
+      {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:priColor(pr,colorCodeUrgency),borderRadius:"13px 0 0 13px"}}/>}
       <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
         {reorderable&&!task.done&&!selectionMode&&(
           <div
@@ -561,7 +566,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
           <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
             <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
             <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{task.estMins>=60?`${Math.floor(task.estMins/60)}h${task.estMins%60?` ${task.estMins%60}m`:""}`:` ${task.estMins}m`}</span>
-            {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",fontWeight:500}}>{dm}</span>}
+            {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:priColor(pr,colorCodeUrgency),fontWeight:500}}>{dm}</span>}
           </div>
           {!!task.subtasks?.length&&(
             <div style={{display:"flex",alignItems:"center",gap:6,marginTop:5}}>
@@ -587,11 +592,11 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
 // wipe out the text. newSubjectText/setNewSubjectText are lifted to the
 // parent specifically so they survive that; being hoisted now means this
 // component itself is no longer being recreated in the first place either.
-function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,subjects,subjectColors,themeName,newSubjectText,setNewSubjectText,profileTab,setProfileTab,setShowProfile,signInWithFirebase,signOutFirebase,addSubject,removeSubject}:{
+function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,themeName,newSubjectText,setNewSubjectText,profileTab,setProfileTab,setShowProfile,signInWithFirebase,signOutFirebase,addSubject,removeSubject}:{
   T:ThemeObj; F:typeof FONT;
   fbUser:User|null; signInError:string|null; syncError:string|null;
   visibleTasks:Task[]; totalMins:number;
-  subjects:string[]; subjectColors:Record<string,string>;
+  subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
   themeName:ThemeName;
   newSubjectText:string; setNewSubjectText:(v:string)=>void;
   profileTab:"profile"|"personalize"; setProfileTab:(v:"profile"|"personalize")=>void;
@@ -721,7 +726,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
           <div style={{flex:1}}>
             <div style={{fontFamily:F.heading,fontSize:13,color:T.textMuted,marginBottom:10}}>completion</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {[{l:"Total",v:totalTasks,c:T.text},{l:"Done",v:doneTasks,c:"#2ED573"},{l:"Pending",v:totalTasks-doneTasks,c:T.accent},{l:"Urgent",v:highPri,c:"#FF4757"}].map(s=>(
+              {[{l:"Total",v:totalTasks,c:T.text},{l:"Done",v:doneTasks,c:"#2ED573"},{l:"Pending",v:totalTasks-doneTasks,c:T.accent},{l:"Urgent",v:highPri,c:priColor("high",colorCodeUrgency)}].map(s=>(
                 <div key={s.l}>
                   <div style={{fontFamily:F.heading,fontSize:20,color:s.c}}>{s.v}</div>
                   <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{s.l}</div>
@@ -913,6 +918,9 @@ export default function HomeworkPlanner() {
   // these only kick in above a min-width via CSS media queries, so phones/tablets
   // always render the same single narrow column regardless of this setting.
   const [desktopLayout,setDesktopLayout]=usePersistedState("hw-desktoplayout","narrow");
+  // Red/orange/green priority coloring, toggleable off in favor of one neutral
+  // gray (NEUTRAL_PRIORITY_COLOR) everywhere urgency is shown -- default on.
+  const [colorCodeUrgency,setColorCodeUrgency]=usePersistedState("hw-colorcode-urgency",true);
   const [subjects,setSubjects]=usePersistedState<string[]>("hw-subjects",DEFAULT_SUBJECTS);
   const [subjectColors,setSubjectColors]=useState<Record<string,string>>(()=>{try{const s=localStorage.getItem("hw-subjectcolors");return {...DEFAULT_SUBJECT_COLORS,...(s?JSON.parse(s):{})};}catch{return DEFAULT_SUBJECT_COLORS;}});
   useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
@@ -1753,7 +1761,7 @@ export default function HomeworkPlanner() {
     const pending=allSorted.filter(t=>!t.done);
     // Shared props for the (module-scope) MiniCard -- spread at each call site
     // below instead of repeating this whole list three times.
-    const miniCardProps={T,F,subjectColors,dragTaskId,dragOffsetY,
+    const miniCardProps={T,F,subjectColors,colorCodeUrgency,dragTaskId,dragOffsetY,
       onOpen:(t:Task)=>{setSelectedTask(t);setSessionHistory([]);},
       onToggleDone:toggleDone,onDelete:deleteTask,
       swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,
@@ -1767,7 +1775,7 @@ export default function HomeworkPlanner() {
             <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
             </button>
-            <div style={{width:6,height:6,borderRadius:"50%",background:PRIORITY_COLORS[pr],flexShrink:0}}/>
+            <div style={{width:6,height:6,borderRadius:"50%",background:priColor(pr,colorCodeUrgency),flexShrink:0}}/>
             <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
             <span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>
             <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{daysUntil(t.dueDate)}</span>
@@ -1788,7 +1796,7 @@ export default function HomeworkPlanner() {
                 {t.done&&<span style={{color:contrastColor(T.accent),fontSize:11,fontWeight:"bold"}}>✓</span>}
               </button>
               <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
-              <span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573"}}>{daysUntil(t.dueDate)}</span>
+              <span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>
               <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
             </div>
           </div>
@@ -1802,13 +1810,13 @@ export default function HomeworkPlanner() {
           <div key={t.id} style={{position:"relative",overflow:"hidden",borderRadius:9}}>
             {renderSwipeReveal(t.id)}
             <div className="tc" onClick={swipeClickGuard(()=>{setSelectedTask(t);setSessionHistory([]);})} {...swipeHandlers(t.id)} style={{background:T.card,borderRadius:9,padding:"8px 11px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,position:"relative",cursor:"pointer",...swipeContentStyle(t.id)}}>
-              <div style={{position:"absolute",left:0,top:0,bottom:0,width:2.5,background:PRIORITY_COLORS[pr]}}/>
+              <div style={{position:"absolute",left:0,top:0,bottom:0,width:2.5,background:priColor(pr,colorCodeUrgency)}}/>
               <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
                 {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
               </button>
               <span style={{fontFamily:F.body,fontSize:13,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
               <span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>
-              {dm&&!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",flexShrink:0}}>{dm}</span>}
+              {dm&&!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency),flexShrink:0}}>{dm}</span>}
               <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
             </div>
           </div>
@@ -1820,7 +1828,7 @@ export default function HomeworkPlanner() {
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))",gap:10}}>
         {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7,cursor:"pointer"}}>
-            <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:PRIORITY_COLORS[pr],borderRadius:"12px 12px 0 0"}}/>
+            <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:priColor(pr,colorCodeUrgency),borderRadius:"12px 12px 0 0"}}/>
             <div style={{display:"flex",justifyContent:"space-between"}}>
               <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>
               <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
@@ -1888,7 +1896,7 @@ export default function HomeworkPlanner() {
         <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:`linear-gradient(${T.accent},${T.border})`}}/>
         {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" style={{position:"relative",marginBottom:14}}>
-            <div style={{position:"absolute",left:-19,top:14,width:12,height:12,borderRadius:"50%",background:t.done?"#2ED573":PRIORITY_COLORS[pr],border:`2px solid ${T.bg}`,cursor:"pointer"}} onClick={()=>toggleDone(t.id)}/>
+            <div style={{position:"absolute",left:-19,top:14,width:12,height:12,borderRadius:"50%",background:t.done?"#2ED573":priColor(pr,colorCodeUrgency),border:`2px solid ${T.bg}`,cursor:"pointer"}} onClick={()=>toggleDone(t.id)}/>
             <div onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:T.card,borderRadius:11,padding:"11px 13px",border:`1px solid ${T.border}`,marginLeft:6,cursor:"pointer"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
                 <span style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none",flex:1}}>{t.title}</span>
@@ -1897,7 +1905,7 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",gap:10,marginTop:4,flexWrap:"wrap"}}>
                 <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>
                 <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}</span>
-                <span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573"}}>{daysUntil(t.dueDate)}</span>
+                <span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>
               </div>
             </div>
           </div>
@@ -1947,10 +1955,10 @@ export default function HomeworkPlanner() {
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{flex:1,height:7,background:T.border,borderRadius:999}}>
-                  <div style={{width:t.done?"100%":`${pct}%`,height:"100%",background:t.done?"#2ED573":PRIORITY_COLORS[pr],borderRadius:999,transition:"width 0.5s"}}/>
+                  <div style={{width:t.done?"100%":`${pct}%`,height:"100%",background:t.done?"#2ED573":priColor(pr,colorCodeUrgency),borderRadius:999,transition:"width 0.5s"}}/>
                 </div>
                 <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.estMins}m</span>
-                <span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573",flexShrink:0}}>{daysUntil(t.dueDate)}</span>
+                <span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency),flexShrink:0}}>{daysUntil(t.dueDate)}</span>
               </div>
             </div>
           );
@@ -1965,7 +1973,7 @@ export default function HomeworkPlanner() {
       const doneT=tasks.filter(t=>t.done);
       return(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {[{tasks:highT,color:"#FF4757",label:"High Priority",w:"100%"},{tasks:medT,color:"#FFA502",label:"Medium Priority",w:"85%"},{tasks:lowT,color:"#2ED573",label:"Low Priority",w:"65%"},{tasks:doneT,color:T.textFaint,label:"✓ Done",w:"45%"}].map(tier=>(
+          {[{tasks:highT,color:priColor("high",colorCodeUrgency),label:"High Priority",w:"100%"},{tasks:medT,color:priColor("medium",colorCodeUrgency),label:"Medium Priority",w:"85%"},{tasks:lowT,color:priColor("low",colorCodeUrgency),label:"Low Priority",w:"65%"},{tasks:doneT,color:T.textFaint,label:"✓ Done",w:"45%"}].map(tier=>(
             tier.tasks.length>0&&(
               <div key={tier.label} style={{margin:"0 auto",width:tier.w}}>
                 <div style={{fontFamily:F.body,fontSize:10,color:tier.color,marginBottom:5,textAlign:"center"}}>{tier.label}</div>
@@ -2571,6 +2579,11 @@ export default function HomeworkPlanner() {
                   Only changes anything on wider screens -- phones always get the narrow view
                 </div>
               </div>
+              {/* Urgency color coding */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Urgency Color Coding</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4}}>Red for urgent, green for not urgent</div></div>
+                <Toggle on={colorCodeUrgency} onChange={setColorCodeUrgency} T={T}/>
+              </div>
             </div>}
             </div>
             {/* Group by */}
@@ -2687,7 +2700,7 @@ export default function HomeworkPlanner() {
       )}>
         <TaskModal
           task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
-          T={T} F={F} subjectColors={subjectColors}
+          T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
           sessionActive={sessionActive} sessionSecs={sessionSecs} sessionHistory={sessionHistory}
           allTags={allTags}
           onClose={()=>{setSelectedTask(null);setSessionHistory([]);}}
@@ -2705,7 +2718,7 @@ export default function HomeworkPlanner() {
         T={T} F={F}
         fbUser={fbUser} signInError={signInError} syncError={syncError}
         visibleTasks={visibleTasks} totalMins={totalMins}
-        subjects={subjects} subjectColors={subjectColors}
+        subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         themeName={themeName}
         newSubjectText={newSubjectText} setNewSubjectText={setNewSubjectText}
         profileTab={profileTab} setProfileTab={setProfileTab}

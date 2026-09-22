@@ -24,6 +24,12 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
 - Focus trap + focus-return on the task detail modal for keyboard users.
 - CI: Dependabot for automated dependency updates; a pre-commit hook
   (husky + lint-staged) running ESLint on staged files.
+- "Urgency Color Coding" toggle (Options -> Looks, on by default). Off, every place priority
+  color normally shows (task-card accent strips/dots, the due-in-N-days text, the priority badge
+  and override buttons in the task detail modal, the Stats "Urgent" count, the Pyramid layout's
+  tier bars) falls back to one neutral gray (`NEUTRAL_PRIORITY_COLOR`) instead of red/orange/green,
+  via a new `priColor(pr, colorCode)` helper that every one of those call sites now goes through
+  instead of reading `PRIORITY_COLORS` directly.
 
 ### Changed
 - Down to just two themes: "Stealth" (dark) and "Stealth Light", removing the other 24. With

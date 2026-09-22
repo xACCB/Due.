@@ -241,7 +241,9 @@ which still exists as the outer safety net for anything else.
 
 **Task detail actions.** `TaskModal` can edit a task's own fields (an Edit panel, via
 `onUpdateTask(patch)` -> `updateTask`), snooze it (`snoozeTarget()`, module scope, since the
-React Compiler's purity lint rejects `Date.now()` inside component functions), duplicate it
+React Compiler's purity lint rejects `Date.now()` inside component functions; `snoozeTask` records it
+in the undo history as an `"edit"` `HistoryAction` with the before/after due date and time, so it
+shares the undo toast and History menu with deletes), duplicate it
 (`duplicateTask`: fresh id, unchecked subtasks, no sessions, detached from any repeat chain) and
 restore it from the archive. **Focus Mode** targets `focusTask` (`focusTaskId`, falling back to
 the first pending task); a finished Pomodoro logs a 25-minute session to it (read through

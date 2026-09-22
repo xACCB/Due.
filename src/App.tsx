@@ -213,7 +213,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
   { id:"edit-tasks", date:"2026-09-22", title:"New feature", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view -- tap Edit." },
-  { id:"snooze", date:"2026-09-22", title:"New feature", description:"Snooze a task to later today, tomorrow, or next week from its detail view." },
+  { id:"snooze", date:"2026-09-22", title:"New feature", description:"Snooze a task to later today, tomorrow, or next week from its detail view -- and undo it if you change your mind." },
   { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
   { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
@@ -300,6 +300,11 @@ function buildSuggestion(tasks:Task[]):string {
   return `Most urgent: "${top.title}"\n${urgencyWord}${timeStr?`, ~${timeStr}`:""}`;
 }
 
+// One entry in the undo/redo history (see undoStack in HomeworkPlanner).
+type HistoryAction =
+  | {type:"delete"; tasks:Task[]}
+  | {type:"edit"; taskId:number; before:Partial<Task>; after:Partial<Task>; label:string};
+
 // Snooze moves a task's due date (and, for "later today", its time) forward.
 type SnoozeKind="later"|"tomorrow"|"week";
 function snoozeTarget(kind:SnoozeKind):{dueDate:string;dueTime?:string}{
@@ -318,13 +323,13 @@ function snoozeTarget(kind:SnoozeKind):{dueDate:string;dueTime?:string}{
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
+function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
   task:Task; T:ThemeObj; F:typeof FONT; subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
   sessionActive:boolean; sessionSecs:number;
   allTags:string[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
   onUpdateSubtasks:(subtasks:Subtask[])=>void; onArchive:()=>void; onRestore:()=>void; onDuplicate:()=>void;
-  onUpdateTask:(patch:Partial<Task>)=>void;
+  onUpdateTask:(patch:Partial<Task>)=>void; onSnooze:(kind:SnoozeKind)=>void;
   onSetPriorityOverride:(override:Priority|null)=>void; onSetTags:(tags:string[])=>void;
   onSaveAsTemplate:(name:string)=>void;
 }){
@@ -358,7 +363,6 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,sessionActi
       dueTime:draft.dueDate?draft.dueTime:"",estMins:Math.max(0,draft.estH*60+draft.estM),recurrence:draft.recurrence});
     setDraft(null);
   }
-  function snooze(kind:SnoozeKind){ onUpdateTask(snoozeTarget(kind)); }
   // Inline "name this template" field (replaces a browser prompt() dialog).
   const [templateName,setTemplateName]=useState<string|null>(null);
   const [templateSaved,setTemplateSaved]=useState(false);
@@ -496,7 +500,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,sessionActi
             <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:-8,marginBottom:18}}>
               <span style={{fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginRight:2}}>Snooze</span>
               {([["later","Later today"],["tomorrow","Tomorrow"],["week","Next week"]] as const).map(([k,l])=>(
-                <button key={k} onClick={()=>snooze(k)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:11}}>{l}</button>
+                <button key={k} onClick={()=>onSnooze(k)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:11}}>{l}</button>
               ))}
             </div>
           )}
@@ -1659,16 +1663,15 @@ export default function HomeworkPlanner() {
   const swipeLocked=useRef(false);
   const swipeMoved=useRef(false);
   const SWIPE_THRESHOLD=90;
-  // Undo/redo action history -- deletion happens immediately (so Firestore sync,
-  // which just diffs against `tasks`, doesn't need special-casing), and the
-  // deleted task is kept here instead so it can be restored. Scoped to just
-  // "delete" for now; other action types (edit, complete, ...) can join the
-  // same union later. A new action always clears redoStack, same as any
-  // standard undo/redo history.
-  const [undoStack,setUndoStack]=useState<{type:"delete";tasks:Task[]}[]>([]);
-  const [redoStack,setRedoStack]=useState<{type:"delete";tasks:Task[]}[]>([]);
-  const [deleteToast,setDeleteToast]=useState<string|null>(null);
-  const deleteToastTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  // Undo/redo action history. Actions apply immediately (so Firestore sync,
+  // which just diffs against `tasks`, doesn't need special-casing) and keep
+  // what's needed to reverse them: "delete" keeps the removed tasks; "edit"
+  // keeps the changed fields before and after (used by snooze). A new action
+  // always clears redoStack, same as any standard undo/redo history.
+  const [undoStack,setUndoStack]=useState<HistoryAction[]>([]);
+  const [redoStack,setRedoStack]=useState<HistoryAction[]>([]);
+  const [undoToast,setUndoToast]=useState<string|null>(null);
+  const undoToastTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   // Bulk edit / multi-select. Scoped to the default list layout (MiniCard) --
   // the other 11 layouts each render their own custom task row markup, so
   // extending selection to all of them is a much bigger job than the value
@@ -1896,32 +1899,46 @@ export default function HomeworkPlanner() {
     const removed=tasks.filter(t=>ids.includes(t.id));
     if(removed.length===0)return;
     setTasks(prev=>prev.filter(t=>!ids.includes(t.id)));
-    setUndoStack(prev=>[...prev,{type:"delete",tasks:removed}]);
-    setRedoStack([]);
-    setDeleteToast(removed.length===1?`"${removed[0].title}" deleted`:`${removed.length} tasks deleted`);
-    clearTimeout(deleteToastTimer.current);
-    deleteToastTimer.current=setTimeout(()=>setDeleteToast(null),5000);
+    pushUndoable({type:"delete",tasks:removed},removed.length===1?`"${removed[0].title}" deleted`:`${removed.length} tasks deleted`);
   }
   function deleteTask(id:number){ deleteTasks([id]); }
-  // Undo/redo currently only understand the "delete" action type -- each
-  // branch below is where a future action type (edit, complete, ...) would
-  // add its own reversal.
+  // Records an already-applied action in the history and shows the undo toast.
+  function pushUndoable(action:HistoryAction,toast:string){
+    setUndoStack(prev=>[...prev,action]);
+    setRedoStack([]);
+    setUndoToast(toast);
+    clearTimeout(undoToastTimer.current);
+    undoToastTimer.current=setTimeout(()=>setUndoToast(null),5000);
+  }
+  function snoozeTask(id:number,kind:SnoozeKind){
+    const task=tasks.find(t=>t.id===id);
+    if(!task)return;
+    const target=snoozeTarget(kind);
+    const after={dueDate:target.dueDate,dueTime:target.dueTime??task.dueTime};
+    updateTask(id,after);
+    pushUndoable({type:"edit",taskId:id,before:{dueDate:task.dueDate,dueTime:task.dueTime},after,label:`snooze "${task.title}"`},
+      `"${task.title}" snoozed to ${formatDate(after.dueDate)}${after.dueTime?` ${formatTime(after.dueTime)}`:""}`);
+  }
+  // Each action type's reversal lives in its branch here.
   function undo(){
     if(undoStack.length===0)return;
     const action=undoStack[undoStack.length-1];
     if(action.type==="delete")setTasks(prev=>{const have=new Set(prev.map(t=>t.id));return [...prev,...action.tasks.filter(t=>!have.has(t.id))];});
+    if(action.type==="edit")updateTask(action.taskId,action.before);
     setUndoStack(prev=>prev.slice(0,-1));
     setRedoStack(prev=>[...prev,action]);
-    setDeleteToast(null);
+    setUndoToast(null);
   }
   function redo(){
     if(redoStack.length===0)return;
     const action=redoStack[redoStack.length-1];
     if(action.type==="delete"){const ids=new Set(action.tasks.map(t=>t.id));setTasks(prev=>prev.filter(t=>!ids.has(t.id)));}
+    if(action.type==="edit")updateTask(action.taskId,action.after);
     setRedoStack(prev=>prev.slice(0,-1));
     setUndoStack(prev=>[...prev,action]);
   }
-  const describeDeleted=(list:Task[])=>list.length===1?`"${list[0].title}"`:`${list.length} tasks`;
+  const describeAction=(action:HistoryAction)=>action.type==="edit"?action.label
+    :`delete ${action.tasks.length===1?`"${action.tasks[0].title}"`:`${action.tasks.length} tasks`}`;
   function updateSubtasks(id:number,subtasks:Subtask[]){
     setTasks(prev=>prev.map(t=>t.id===id?{...t,subtasks}:t));
   }
@@ -2607,7 +2624,7 @@ export default function HomeworkPlanner() {
   function renderPomodoroToast(){
     if(!pomodoroDone)return null;
     return (
-      <div role="status" style={{position:"fixed",left:"50%",bottom:deleteToast!=null&&!focusMode?76:20,transform:"translateX(-50%)",zIndex:1600,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
+      <div role="status" style={{position:"fixed",left:"50%",bottom:undoToast!=null&&!focusMode?76:20,transform:"translateX(-50%)",zIndex:1600,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
         <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>Pomodoro done -- take a short break</span>
         <button onClick={()=>setPomodoroDone(false)} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>OK</button>
       </div>
@@ -2744,11 +2761,11 @@ export default function HomeworkPlanner() {
                   {historyMenuOpen&&(
                     <div style={{padding:"0 14px 12px"}}>
                       <div style={{display:"flex",gap:8}}>
-                        <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: delete ${describeDeleted(undoStack[undoStack.length-1].tasks)}`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                        <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: ${describeAction(undoStack[undoStack.length-1])}`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
                           Undo
                         </button>
-                        <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: delete ${describeDeleted(redoStack[redoStack.length-1].tasks)}`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                        <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: ${describeAction(redoStack[redoStack.length-1])}`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
                           Redo
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
                         </button>
@@ -3326,6 +3343,7 @@ export default function HomeworkPlanner() {
           onRestore={()=>updateTask(selectedTask.id,{archived:false})}
           onDuplicate={()=>{const copy=duplicateTask(selectedTask.id);if(copy)setSelectedTask(copy);}}
           onUpdateTask={patch=>updateTask(selectedTask.id,patch)}
+          onSnooze={kind=>snoozeTask(selectedTask.id,kind)}
           onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
           onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
           onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}
@@ -3341,10 +3359,10 @@ export default function HomeworkPlanner() {
         signOutFirebase={signOutFirebase}
       />}
       {renderPomodoroToast()}
-      {/* Undo Delete toast -- bottom-center, clear of the tab bar above it. */}
-      {deleteToast!=null&&(
+      {/* Undo toast (deletes, snoozes) -- bottom-center, clear of the tab bar above it. */}
+      {undoToast!=null&&(
         <div style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
-          <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:200}}>{deleteToast}</span>
+          <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:200}}>{undoToast}</span>
           <button onClick={undo} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
         </div>
       )}

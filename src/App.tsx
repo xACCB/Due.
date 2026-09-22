@@ -17,6 +17,7 @@ import { nextId } from "./lib/id";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
+import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "./lib/spring";
 import { reconcile, changedFields, same } from "./lib/sync";
 import { diffTasks, applyTaskStates } from "./lib/history";
 import type { TaskStates } from "./lib/history";
@@ -227,6 +228,7 @@ const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = 
   { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
   { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
+  { id:"sheet-spring", date:"2026-09-22", title:"Improvement", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
   { id:"glass-cursor", date:"2026-09-22", title:"Improvement", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
   { id:"pomodoro-breaks", date:"2026-09-22", title:"New feature", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
   { id:"focus-picker", date:"2026-09-22", title:"New feature", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
@@ -407,10 +409,6 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   // Inline "name this template" field (replaces a browser prompt() dialog).
   const [templateName,setTemplateName]=useState<string|null>(null);
   const [templateSaved,setTemplateSaved]=useState(false);
-  // Drag the top handle down to dismiss, like a native bottom sheet.
-  const [dragY,setDragY]=useState(0);
-  const dragStartY=useRef<number|null>(null);
-  const [dragging,setDragging]=useState(false);
   function addTag(){
     const t=newTagText.trim();
     if(!t||tags.includes(t))return;
@@ -449,18 +447,72 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
     document.addEventListener("keydown",handleKeyDown);
     return ()=>{document.removeEventListener("keydown",handleKeyDown);previouslyFocused?.focus();};
   },[]);
+  // Drag the top handle to move the sheet, like a native bottom sheet: it
+  // follows the finger (with rubber-band resistance if pulled up), the backdrop
+  // fades as it goes, and on release it springs back into place or -- if dragged
+  // far enough or flicked -- flies off the bottom and closes, keeping the
+  // finger's speed either way (physics in src/lib/spring.ts). Driven through
+  // refs and direct style writes, not state, so a drag doesn't re-render the
+  // whole modal every frame. Declared below onCloseRef on purpose (see the
+  // React Compiler note in CLAUDE.md about forward references).
+  const sheetRef=useRef<HTMLDivElement>(null);
+  const overlayRef=useRef<HTMLDivElement>(null);
+  const sheetDrag=useRef<{startY:number;samples:{t:number;y:number}[]}|null>(null);
+  const sheetY=useRef(0);
+  const sheetAnim=useRef(0);
+  function setSheetY(y:number){
+    sheetY.current=y;
+    if(sheetRef.current)sheetRef.current.style.transform=y?`translateY(${y}px)`:"";
+    const h=sheetRef.current?.offsetHeight||window.innerHeight;
+    if(overlayRef.current)overlayRef.current.style.background=`rgba(0,0,0,${(0.53*(1-Math.min(1,Math.max(0,y)/h))).toFixed(3)})`;
+  }
+  function releaseSheet(vel:number,dismiss:boolean){
+    cancelAnimationFrame(sheetAnim.current);
+    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){if(dismiss)onCloseRef.current();else setSheetY(0);return;}
+    const h=sheetRef.current?.offsetHeight||window.innerHeight;
+    let v=dismiss?Math.max(vel,1400):vel, last=performance.now();
+    const frame=(now:number)=>{
+      const dt=Math.min(0.05,(now-last)/1000); last=now;
+      if(dismiss){
+        v+=4000*dt; // keeps accelerating off the screen
+        const y=sheetY.current+v*dt; setSheetY(y);
+        if(y>=h){onCloseRef.current();return;}
+      }else{
+        const st=stepSpring(sheetY.current,v,0,dt); v=st.vel;
+        if(springSettled(st.pos,st.vel,0)){setSheetY(0);return;}
+        setSheetY(st.pos);
+      }
+      sheetAnim.current=requestAnimationFrame(frame);
+    };
+    sheetAnim.current=requestAnimationFrame(frame);
+  }
+  useEffect(()=>()=>cancelAnimationFrame(sheetAnim.current),[]);
   return(
-    <div style={{position:"fixed",inset:0,background:"#00000088",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
+    <div ref={overlayRef} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.53)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
       {/* The drag offset lives on this wrapper, not the panel: the panel's "pop"
           entrance animation (fill-mode forwards) would override its transform. */}
-      <div style={{width:"100%",maxWidth:580,transform:dragY?`translateY(${dragY}px)`:undefined,transition:dragging?"none":"transform 0.2s ease"}}>
+      <div ref={sheetRef} style={{width:"100%",maxWidth:580}}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label={task.title} className="pop" style={{background:T.bg,borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"90vh",overflowY:"auto",border:`1px solid ${T.border}`,borderBottom:"none"}}>
         {/* Handle -- drag down to close (not while a session is running) */}
         {!sessionActive&&<div
-          onPointerDown={e=>{dragStartY.current=e.clientY;setDragging(true);(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);}}
-          onPointerMove={e=>{if(dragStartY.current!=null)setDragY(Math.max(0,e.clientY-dragStartY.current));}}
-          onPointerUp={()=>{if(dragStartY.current==null)return;dragStartY.current=null;setDragging(false);if(dragY>100)onClose();else setDragY(0);}}
-          onPointerCancel={()=>{dragStartY.current=null;setDragging(false);setDragY(0);}}
+          onPointerDown={e=>{
+            cancelAnimationFrame(sheetAnim.current); // catch the sheet mid-spring
+            sheetDrag.current={startY:e.clientY-sheetY.current,samples:[{t:e.timeStamp,y:e.clientY}]};
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={e=>{
+            const d=sheetDrag.current; if(!d)return;
+            d.samples.push({t:e.timeStamp,y:e.clientY}); if(d.samples.length>8)d.samples.shift();
+            const raw=e.clientY-d.startY;
+            setSheetY(raw>=0?raw:-rubberBand(-raw));
+          }}
+          onPointerUp={e=>{
+            const d=sheetDrag.current; if(!d)return; sheetDrag.current=null;
+            d.samples.push({t:e.timeStamp,y:e.clientY});
+            const v=releaseVelocity(d.samples);
+            releaseSheet(v,shouldDismiss(sheetY.current,v));
+          }}
+          onPointerCancel={()=>{sheetDrag.current=null;releaseSheet(0,false);}}
           style={{display:"flex",justifyContent:"center",padding:"12px 0 8px",cursor:"grab",touchAction:"none"}}>
           <div style={{width:36,height:4,borderRadius:999,background:T.border}}/>
         </div>}

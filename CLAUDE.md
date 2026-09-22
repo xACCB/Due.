@@ -238,7 +238,11 @@ focus trap (Tab/Shift+Tab cycle within the panel, focus-return to whatever opene
 Escape-to-close unless a session is active) since it's a custom `<div>` overlay rather than a
 native `<dialog>`; the trap effect intentionally runs once (mount/unmount only) and reads
 `sessionActive`/`onClose` through refs rather than including them as effect deps, so it doesn't
-re-steal focus into the first element on every unrelated re-render. `TaskModal`'s render site in
+re-steal focus into the first element on every unrelated re-render. Dragging its top handle moves the sheet
+(follows the finger, rubber-bands upward, backdrop fades) and on release it springs back or flies
+off and closes, carrying the finger's velocity (`src/lib/spring.ts`, unit-tested; driven through refs
+and direct style writes, not state, so a drag doesn't re-render the modal per frame; reduced motion
+snaps/closes instantly). `TaskModal`'s render site in
 `HomeworkPlanner` is wrapped in `<ErrorBoundary>` (`src/components/ErrorBoundary.tsx`, also reused
 by `main.tsx` for the app-wide boundary) with a small inline fallback, so a malformed task object
 only closes the modal instead of blanking the whole app -- narrower than the app-wide boundary,

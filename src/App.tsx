@@ -209,17 +209,20 @@ const PRIORITY_COLORS: Record<Priority,string> = { high:"#FF4757",medium:"#FFA50
 const NEUTRAL_PRIORITY_COLOR = "#8a8a8a";
 function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORITY_COLORS[pr]:NEUTRAL_PRIORITY_COLOR; }
 // What's New feed shown in the title menu's Inbox section -- hand-maintained,
-// newest first; add an entry here whenever a user-facing change ships.
-const WHATS_NEW: {date:string; title:string; description:string}[] = [
-  { date:"2026-09-22", title:"Bug fix", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
-  { date:"2026-09-22", title:"UI change", description:"History is now a collapsible section in the title menu instead of always expanded." },
-  { date:"2026-09-22", title:"New feature", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
-  { date:"2026-09-22", title:"Navigation", description:"Settings moved out of the tab bar -- open it from the title menu instead." },
-  { date:"2026-09-22", title:"UI change", description:"The DuePlanner title is now a menu with quick access to Inbox, History, Profile, and Settings." },
-  { date:"2026-09-22", title:"UI change", description:"Cancel moved out from between the add-task wizard's back/skip buttons to avoid accidental taps." },
-  { date:"2026-09-22", title:"New feature", description:"Added back and skip buttons to the add-task wizard, so you can revisit or skip a question." },
-  { date:"2026-09-22", title:"Bug fix", description:"Subject colors for English and Science no longer look nearly identical." },
-  { date:"2026-09-22", title:"UI change", description:"The time-left number in the header now follows the theme instead of always being teal." },
+// newest first; add an entry here whenever a user-facing change ships. Seeds
+// the persisted `hw-whatsnew` state (see whatsNew/setWhatsNew below); each
+// entry needs a stable id since the user can dismiss individual entries,
+// which just removes it from that persisted array, not from this seed list.
+const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"icon-color-fix", date:"2026-09-22", title:"Bug fix", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
+  { id:"history-collapsible", date:"2026-09-22", title:"UI change", description:"History is now a collapsible section in the title menu instead of always expanded." },
+  { id:"undo-redo", date:"2026-09-22", title:"New feature", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
+  { id:"settings-in-menu", date:"2026-09-22", title:"Navigation", description:"Settings moved out of the tab bar -- open it from the title menu instead." },
+  { id:"title-menu", date:"2026-09-22", title:"UI change", description:"The DuePlanner title is now a menu with quick access to Inbox, History, Profile, and Settings." },
+  { id:"wizard-cancel-moved", date:"2026-09-22", title:"UI change", description:"Cancel moved out from between the add-task wizard's back/skip buttons to avoid accidental taps." },
+  { id:"wizard-back-skip", date:"2026-09-22", title:"New feature", description:"Added back and skip buttons to the add-task wizard, so you can revisit or skip a question." },
+  { id:"subject-colors-fix", date:"2026-09-22", title:"Bug fix", description:"Subject colors for English and Science no longer look nearly identical." },
+  { id:"time-left-color", date:"2026-09-22", title:"UI change", description:"The time-left number in the header now follows the theme instead of always being teal." },
 ];
 const REMINDER_OFFSETS = [
   { key:"1d", label:"1 day before", mins:1440 },
@@ -946,6 +949,8 @@ export default function HomeworkPlanner() {
   // gray (NEUTRAL_PRIORITY_COLOR) everywhere urgency is shown -- default on.
   const [colorCodeUrgency,setColorCodeUrgency]=usePersistedState("hw-colorcode-urgency",true);
   const [subjects,setSubjects]=usePersistedState<string[]>("hw-subjects",DEFAULT_SUBJECTS);
+  const [whatsNew,setWhatsNew]=usePersistedState("hw-whatsnew",WHATS_NEW);
+  function dismissWhatsNew(id:string){setWhatsNew(prev=>prev.filter(w=>w.id!==id));}
   const [subjectColors,setSubjectColors]=useState<Record<string,string>>(()=>{try{const s=localStorage.getItem("hw-subjectcolors");return {...DEFAULT_SUBJECT_COLORS,...(s?JSON.parse(s):{})};}catch{return DEFAULT_SUBJECT_COLORS;}});
   useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
   const [templates,setTemplates]=usePersistedState<TaskTemplate[]>("hw-templates",[]);
@@ -2226,13 +2231,18 @@ export default function HomeworkPlanner() {
                   </button>
                   {inboxMenuOpen&&(
                     <div style={{padding:"0 14px 12px",display:"flex",flexDirection:"column",gap:10,maxHeight:220,overflowY:"auto"}}>
-                      {WHATS_NEW.map((item,i)=>(
-                        <div key={i}>
-                          <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
-                            <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.title}</span>
-                            <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
+                      {whatsNew.length===0
+                        ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>
+                        : whatsNew.map(item=>(
+                        <div key={item.id} style={{display:"flex",gap:8}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                              <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.title}</span>
+                              <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
+                            </div>
+                            <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
                           </div>
-                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
+                          <button onClick={()=>dismissWhatsNew(item.id)} aria-label="Dismiss" title="Dismiss" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
                         </div>
                       ))}
                     </div>

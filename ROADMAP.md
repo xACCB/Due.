@@ -231,7 +231,7 @@ Things most people expect from an app like this that are missing today.
 | In-app feedback form (replaces the Google Form link) | ⬜ | F | S | |
 
 ## 17. Accepted ideas (from `IDEAS.md`)
-Picked from the ideas list; `#` is the item's number in `IDEAS.md`. Every
+Picked from the ideas list in two review batches (#1–112, then #113–162); `#` is the item's number in `IDEAS.md`. Every
 feature is free for now, so these have no tier.
 
 **Label:** **Yes** = accepted as written · **With tweaks** = accepted, but the details need deciding before building · **Maybe** = still undecided
@@ -244,6 +244,8 @@ feature is free for now, so these have no tier.
 | 8 | Overload forecast ("Thursday is packed — start the lab report Monday") | Yes | M | Builds on the workload heatmap and conflict detection |
 | 11 | Per-subject defaults (e.g. Math always due 8:00 AM, 30 minutes) | With tweaks | S | |
 | 12 | Energy-based scheduling (morning person / night owl) | Maybe | L | Only useful together with the auto-scheduler |
+| 161 | Ask DuePlanner: type a question ("what's due Thursday?", "how much Math is left?") and get an answer | Yes | L | Common questions can be answered with simple rules first; a full AI version needs a server, since an AI API key can't live in the app |
+| 162 | Tidy titles: fix capitalization and typos in task titles | Yes | S | Capitalization is simple rules; typo fixing needs a dictionary or AI |
 
 ### Task details
 | # | Item | Label | Size | Notes |
@@ -267,6 +269,7 @@ feature is free for now, so these have no tier.
 | 30 | Report-card view per term | Maybe | M | Depends on #25 and #29 |
 | 32 | Reading tracker (pages per day to finish by the due date) | Yes | M | |
 | 37 | Extracurricular layer (clubs, sports, practices on the calendar) | Maybe | M | Shares plumbing with the class timetable (section 1) |
+| 153 | Free-period suggestions: during a free period on your timetable, suggest a task that fits | With tweaks | M | Needs the class timetable (section 1) |
 
 ### Focus & wellbeing
 | # | Item | Label | Size | Notes |
@@ -274,6 +277,12 @@ feature is free for now, so these have no tier.
 | 40 | Daily focus goal (e.g. 90 minutes) with a streak | With tweaks | S | Work sessions are already logged |
 | 43 | Quiet hours for notifications | Maybe | S | |
 | 47 | Session goal ("finish the intro"), checked at the end | Yes | S | Pairs with the post-session reflection log (section 8) |
+| 132 | Pick which task Focus Mode is about, not only the first one | Yes | S | |
+| 133 | Pomodoro time counts as a work session on that task | Yes | S | Work sessions are already stored on tasks; pairs with #132 |
+| 135 | Keep the screen awake during Focus Mode | Yes | S | Screen Wake Lock API; not every browser supports it |
+| 136 | Next-task suggestion when a break ends | Yes | S | The Pomodoro has no break phase yet; build with configurable Pomodoro (section 8) |
+| 137 | End-of-day shutdown: review what you finished, roll leftovers to tomorrow | Yes | M | Close to Evening review (section 2); design them together |
+| 138 | Flow mode: hide clocks and counts while focusing | Yes | S | |
 
 ### Motivation & fun
 | # | Item | Label | Size | Notes |
@@ -282,6 +291,10 @@ feature is free for now, so these have no tier.
 | 54 | Semester "Wrapped" recap | Yes | M | Partly exists: the Inbox's week/month/year stats. Build it together with the recap card in section 7 |
 | 55 | Daily challenge ("finish 3 tasks before 6 PM") | Maybe | S | |
 | 56 | Sound effect on completing a task (toggle) | Yes | S | Can reuse the Pomodoro chime's Web Audio approach |
+| 139 | "Done today" list: everything finished today in one place | With tweaks | S | |
+| 140 | Weekly progress bar in the header ("7 of 12 done this week") | With tweaks | S | |
+| 142 | Subject cleared: a small celebration when a subject has nothing left | With tweaks | S | Pairs with the completion celebration (section 7) |
+| 143 | Personal greeting ("Good evening — 3 things left today") | Yes | M | **As a greeting screen when the app opens** (your note). Overlaps with the morning briefing (#91) and My Day (section 2) |
 
 ### Look & layout
 | # | Item | Label | Size | Notes |
@@ -306,6 +319,9 @@ feature is free for now, so these have no tier.
 |---|---|---|---|---|
 | 91 | Morning briefing notification with today's plan | Yes | M | Reliable delivery needs push (section 0.2) |
 | 92 | Escalating urgency (gentle first, firmer near the deadline) | With tweaks | S | Extends the existing multi-offset reminders |
+| 155 | Choose when the daily summary arrives (e.g. 7 AM or 6 PM) | Yes | S | Arriving at a set time with the app closed needs push (section 0.2) |
+| 156 | Good-news notification: "Nothing due tomorrow" | Yes | S | Needs push to arrive with the app closed |
+| 157 | Reminder sound and vibration choice | Yes | M | Web notifications give little control over sound; full choice needs the native app (L1) |
 
 ### Insights
 | # | Item | Label | Size | Notes |
@@ -321,6 +337,28 @@ feature is free for now, so these have no tier.
 | 101 | Multiple spaces (school, personal, work) | With tweaks | L | Data-model change: each task belongs to a space |
 | 102 | More sign-in options (email link / passkey, Apple, Microsoft) | Yes | M | Sign in with Apple is required anyway for the iOS app (L1) |
 | 103 | Switch between accounts without signing out | Yes | M | |
+| 158 | Recently deleted: a 30-day trash for restoring tasks after the undo toast is gone | Yes | M | Deleted tasks become "soft deleted" (hidden, still synced) and are purged after 30 days |
+
+### Planning & deadlines
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 113 | Soft deadlines: your own "done by" date before the real due date; reminders and urgency use it | With tweaks | M | Still show the real due date alongside it |
+| 116 | "Start by" date, worked out from the estimate and due date | With tweaks | S | Needs an estimate; pairs with #113 |
+| 118 | Skip one occurrence of a repeating task ("no quiz this week") | Yes | S | Builds on how repeating tasks spawn their next copy |
+| 119 | Snow day button: push everything due today to tomorrow in one tap | With tweaks | S | Should be undoable |
+| 120 | "Fix my overdue": one screen to reschedule, finish or drop every overdue task | With tweaks | M | Close to the smart rescheduling nudge (section 4) |
+| 122 | Live countdown on tasks due today with a time ("due in 2h 15m") | Yes | S | |
+| 123 | Task age ("added 12 days ago") to spot tasks that keep sitting there | With tweaks | S | Tasks don't store a creation time yet; needs a `createdAt` field |
+| 124 | Custom reminder time on a single task ("remind me at 7 PM") | Maybe | M | Extends the existing reminder system |
+
+### Adding & editing
+| # | Item | Label | Size | Notes |
+|---|---|---|---|---|
+| 125 | Quick add option: a one-line add instead of the wizard (setting: Wizard / Quick) | With tweaks | M | Pairs with natural-language quick add (section 6) |
+| 127 | Long-press / right-click menu on a task: done, snooze, duplicate, change date, delete | With tweaks | M | |
+| 128 | Choose what swiping left and right does | Yes | S | |
+| 129 | Inline editing: tap a task's title or date in the list to change it | Yes | M | Overlaps with editing every field in the detail view (section 16) |
+| 131 | Pinned note to yourself at the top of the list | With tweaks | S | |
 
 ### Integrations
 | # | Item | Label | Size | Notes |

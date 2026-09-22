@@ -227,6 +227,7 @@ const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = 
   { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
   { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
+  { id:"glass-cursor", date:"2026-09-22", title:"Improvement", description:"Liquid Glass now catches the light: cards glow softly where your mouse is." },
   { id:"pomodoro-breaks", date:"2026-09-22", title:"New feature", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
   { id:"focus-picker", date:"2026-09-22", title:"New feature", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
   { id:"liquid-glass", date:"2026-09-22", title:"New feature", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
@@ -2417,6 +2418,9 @@ export default function HomeworkPlanner() {
   // stylesheet string, injected via <style>{css}</style>, only gets rebuilt
   // (and reparsed by the browser) when the theme or font actually changes,
   // not on every task edit or other unrelated render.
+  // Glass cards that get the cursor highlight, matched by their inline border
+  // the same way as the other glass rules in the css below.
+  const glassCardSel=`[style*="border: 1px solid ${T.border.replace(/,/g,", ")}"][style*="border-radius"]:not([style*="gradient"])`;
   const css=useMemo(()=>`
     @import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');
     *{box-sizing:border-box;}
@@ -2465,6 +2469,18 @@ export default function HomeworkPlanner() {
     [style*="position: fixed"][style*="border: 1px solid ${T.border.replace(/,/g,", ")}"]{
       background:${T.light?"rgba(255,255,255,0.72)":"rgba(30,30,30,0.66)"}!important;
       backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
+    /* Cursor highlight: a soft glow (a faint sheen in light mode) on the glass card under the mouse (and
+       any glass card containing it), positioned by --glass-x/--glass-y, which
+       the pointermove effect below sets on those cards relative to their own
+       box. Registered as non-inheriting so a nested card never picks up its
+       parent's position. Mouse/trackpad only -- touch screens and phone tilt
+       don't move it. Cards with their own inline gradient keep it untouched. */
+    @property --glass-x{syntax:"<length>";inherits:false;initial-value:-9999px;}
+    @property --glass-y{syntax:"<length>";inherits:false;initial-value:-9999px;}
+    @media (hover:hover) and (pointer:fine){
+      ${glassCardSel}{
+        background-image:radial-gradient(circle 220px at var(--glass-x,-9999px) var(--glass-y,-9999px),${T.light?"rgba(0,0,0,0.07)":"rgba(255,255,255,0.13)"},transparent 70%)!important;}
+    }
     `:""}
     .pomo-ring{animation:ring 1s linear infinite;}
     @keyframes ring{from{stroke-dashoffset:0}to{stroke-dashoffset:283}}
@@ -2483,7 +2499,36 @@ export default function HomeworkPlanner() {
     @media (max-width:600px){
       input,textarea{font-size:16px!important;}
     }
-  `,[T.bg,T.card,T.border,T.light,liquidGlass,F.google,F.body]);
+  `,[T.bg,T.card,T.border,T.light,liquidGlass,glassCardSel,F.google,F.body]);
+
+  // Feeds the Liquid Glass cursor highlight (see the css above): the mouse
+  // position, relative to each glass card it's over, as CSS variables on those
+  // cards -- at most once per frame. Only mouse and pen move it; it's cleared
+  // from cards the pointer leaves, and everywhere when it leaves the window.
+  useEffect(()=>{
+    if(!liquidGlass||!window.matchMedia("(hover:hover) and (pointer:fine)").matches)return;
+    let lit:HTMLElement[]=[];
+    let raf=0,x=0,y=0,target:Element|null=null;
+    const unlight=(els:HTMLElement[])=>els.forEach(el=>{el.style.removeProperty("--glass-x");el.style.removeProperty("--glass-y");});
+    const update=()=>{
+      raf=0;
+      const next:HTMLElement[]=[];
+      for(let el=target?.closest<HTMLElement>(glassCardSel)??null;el;el=el.parentElement?.closest<HTMLElement>(glassCardSel)??null)next.push(el);
+      unlight(lit.filter(el=>!next.includes(el)));
+      for(const el of next){const r=el.getBoundingClientRect();el.style.setProperty("--glass-x",(x-r.left)+"px");el.style.setProperty("--glass-y",(y-r.top)+"px");}
+      lit=next;
+    };
+    const move=(e:PointerEvent)=>{
+      if(e.pointerType==="touch")return;
+      x=e.clientX;y=e.clientY;target=e.target instanceof Element?e.target:null;
+      if(!raf)raf=requestAnimationFrame(update);
+    };
+    const clear=()=>{cancelAnimationFrame(raf);raf=0;unlight(lit);lit=[];};
+    window.addEventListener("pointermove",move,{passive:true});
+    document.documentElement.addEventListener("pointerleave",clear);
+    window.addEventListener("blur",clear);
+    return()=>{window.removeEventListener("pointermove",move);document.documentElement.removeEventListener("pointerleave",clear);window.removeEventListener("blur",clear);clear();};
+  },[liquidGlass,glassCardSel]);
 
   // Session timer
   useEffect(()=>{

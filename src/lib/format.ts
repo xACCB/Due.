@@ -46,3 +46,16 @@ export function formatDuration(mins:number|undefined|null):string {
   if (h===0) return `${m}m`;
   return m ? `${h}h ${m}m` : `${h}h`;
 }
+// Live countdown for a task due *today at a specific time*: "Due in 2h 15m",
+// "Due in <1m", or "Overdue by 20m". Returns null for anything else (no time
+// set, or due on another day), so callers fall back to daysUntil().
+export function countdown(dueDate:string, dueTime:string, now:number):string|null {
+  if (!dueDate || !dueTime) return null;
+  const n=new Date(now);
+  const today=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;
+  if (dueDate!==today) return null;
+  const mins=Math.round((new Date(`${dueDate}T${dueTime}:00`).getTime()-now)/60000);
+  if (mins>0) return `Due in ${formatDuration(mins)}`;
+  if (mins===0) return "Due in <1m";
+  return `Overdue by ${formatDuration(-mins)}`;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getPriority, csvField, daysUntil, contrastColor, formatDuration } from "./format";
+import { getPriority, csvField, daysUntil, contrastColor, formatDuration, countdown } from "./format";
 
 describe("getPriority", () => {
   it("returns the manual override unconditionally", () => {
@@ -68,5 +68,20 @@ describe("formatDuration", () => {
     expect(formatDuration(45)).toBe("45m");
     expect(formatDuration(60)).toBe("1h");
     expect(formatDuration(90)).toBe("1h 30m");
+  });
+});
+
+describe("countdown", () => {
+  const at = (h:number, m:number) => new Date(2026, 8, 22, h, m).getTime(); // Sep 22 2026, local time
+  it("counts down to a timed task due today", () => {
+    expect(countdown("2026-09-22", "17:15", at(15, 0))).toBe("Due in 2h 15m");
+    expect(countdown("2026-09-22", "15:00", at(15, 0))).toBe("Due in <1m");
+  });
+  it("shows how overdue a timed task due today is", () => {
+    expect(countdown("2026-09-22", "14:40", at(15, 0))).toBe("Overdue by 20m");
+  });
+  it("returns null without a time or for another day", () => {
+    expect(countdown("2026-09-22", "", at(15, 0))).toBeNull();
+    expect(countdown("2026-09-23", "09:00", at(15, 0))).toBeNull();
   });
 });

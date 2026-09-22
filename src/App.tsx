@@ -14,7 +14,7 @@ import type { ThemeName, ThemeObj } from "./themes";
 import { localDateStr, todayISO, advanceDate } from "./lib/dates";
 import { nextId } from "./lib/id";
 import { parseSyllabus } from "./lib/syllabus";
-import { contrastColor, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration } from "./lib/format";
+import { contrastColor, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown } from "./lib/format";
 import { downloadFile } from "./lib/download";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -212,6 +212,9 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"skip-occurrence", date:"2026-09-22", title:"New feature", description:"Repeating tasks have \"Skip this one\" in their detail view -- moves to the next occurrence without completing it. Undoable." },
+  { id:"countdown", date:"2026-09-22", title:"New feature", description:"Tasks due today at a set time show a live countdown, like \"Due in 2h 15m\"." },
+  { id:"profile-in-menu", date:"2026-09-22", title:"UI change", description:"Profile now lives only in the title menu, which also shows when there's a sync issue." },
   { id:"edit-tasks", date:"2026-09-22", title:"New feature", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view -- tap Edit." },
   { id:"snooze", date:"2026-09-22", title:"New feature", description:"Snooze a task to later today, tomorrow, or next week from its detail view -- and undo it if you change your mind." },
   { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
@@ -323,13 +326,13 @@ function snoozeTarget(kind:SnoozeKind):{dueDate:string;dueTime?:string}{
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
-  task:Task; T:ThemeObj; F:typeof FONT; subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
+function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSkipOccurrence,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
+  task:Task; T:ThemeObj; F:typeof FONT; subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number;
   sessionActive:boolean; sessionSecs:number;
   allTags:string[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
   onUpdateSubtasks:(subtasks:Subtask[])=>void; onArchive:()=>void; onRestore:()=>void; onDuplicate:()=>void;
-  onUpdateTask:(patch:Partial<Task>)=>void; onSnooze:(kind:SnoozeKind)=>void;
+  onUpdateTask:(patch:Partial<Task>)=>void; onSnooze:(kind:SnoozeKind)=>void; onSkipOccurrence:()=>void;
   onSetPriorityOverride:(override:Priority|null)=>void; onSetTags:(tags:string[])=>void;
   onSaveAsTemplate:(name:string)=>void;
 }){
@@ -483,6 +486,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,sessionActi
           <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
             <div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` at ${formatTime(task.dueTime)}`:""}</span>
+              {!task.done&&countdown(task.dueDate,task.dueTime,now)&&<span style={{fontFamily:F.body,fontSize:12,color:priColor(pr,colorCodeUrgency),fontWeight:500}}>· {countdown(task.dueDate,task.dueTime,now)}</span>}
             </div>
             {task.estMins>0&&<div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontFamily:F.body,fontSize:12,color:T.accent,fontWeight:500}}>
@@ -502,6 +506,9 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,sessionActi
               {([["later","Later today"],["tomorrow","Tomorrow"],["week","Next week"]] as const).map(([k,l])=>(
                 <button key={k} onClick={()=>onSnooze(k)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:11}}>{l}</button>
               ))}
+              {task.recurrence&&task.recurrence!=="none"&&(
+                <button onClick={onSkipOccurrence} title="Move this repeating task to its next occurrence without completing it" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:11}}>Skip this one ↻</button>
+              )}
             </div>
           )}
 
@@ -668,9 +675,9 @@ function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:T
 // for every visible task across every layout, so being redefined (and every
 // instance's DOM torn down/recreated) on each unrelated render was the most
 // consequential case of this pattern in the file.
-function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
+function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,now,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
   task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
-  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
+  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number;
   dragTaskId:number|null; dragOffsetY:number;
   onOpen:(task:Task)=>void;
   onToggleDone:(id:number)=>void;
@@ -691,7 +698,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
 }) {
   const pr=getPriority(task.dueDate,task.estMins,task.priorityOverride);
   const sc=subjectColors[task.subject]||T.accent;
-  const dm=daysUntil(task.dueDate);
+  const dm=countdown(task.dueDate,task.dueTime,now)??daysUntil(task.dueDate);
   const isTop=rank===0&&!task.done; const isNext=rank===1&&!task.done;
   const isDragging=dragTaskId===task.id;
   return(
@@ -1002,6 +1009,9 @@ export default function HomeworkPlanner() {
   const tasksRef=useRef(tasks);
   useEffect(()=>{tasksRef.current=tasks;},[tasks]);
   const [selectedTask,setSelectedTask]=useState<Task|null>(null);
+  // Wall clock for live countdowns ("due in 2h 15m"), refreshed every 30s.
+  const [now,setNow]=useState(()=>Date.now());
+  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(t);},[]);
   const [themeMode,setThemeMode]=usePersistedState<"light"|"dark"|"auto">("hw-thememode","auto");
   const [systemPrefersDark,setSystemPrefersDark]=useState(()=>typeof window!=="undefined"&&!!window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
   useEffect(()=>{
@@ -1190,7 +1200,6 @@ export default function HomeworkPlanner() {
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
-  const [fbLoading,setFbLoading]=useState(true);
   const [signInError,setSignInError]=useState<string|null>(null);
   // Surfaces a failure from either half of the Firestore sync (read or write)
   // -- previously both failed completely silently, so a permission error or
@@ -1251,7 +1260,6 @@ export default function HomeworkPlanner() {
   useEffect(()=>{
     const unsub=onAuthStateChanged(auth,user=>{
       setFbUser(user);
-      setFbLoading(false);
       if(user) localStorage.removeItem("hw-signin-redirect-pending");
       else { setProfileSyncedForUid(null); setTasksSyncedForUid(null); setReadyForUid(null); setIsNewAccountForUid(null); }
     });
@@ -1910,6 +1918,16 @@ export default function HomeworkPlanner() {
     clearTimeout(undoToastTimer.current);
     undoToastTimer.current=setTimeout(()=>setUndoToast(null),5000);
   }
+  // "No quiz this week": moves a repeating task to its next occurrence without
+  // marking it done (so no completion is recorded and nothing new is spawned).
+  function skipOccurrence(id:number){
+    const task=tasks.find(t=>t.id===id);
+    if(!task||!task.recurrence||task.recurrence==="none")return;
+    const after={dueDate:advanceDate(task.dueDate||todayISO(),task.recurrence)};
+    updateTask(id,after);
+    pushUndoable({type:"edit",taskId:id,before:{dueDate:task.dueDate},after,label:`skip "${task.title}"`},
+      `"${task.title}" skipped to ${formatDate(after.dueDate)}`);
+  }
   function snoozeTask(id:number,kind:SnoozeKind){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
@@ -2257,7 +2275,7 @@ export default function HomeworkPlanner() {
     const pending=allSorted.filter(t=>!t.done);
     // Shared props for the (module-scope) MiniCard -- spread at each call site
     // below instead of repeating this whole list three times.
-    const miniCardProps={T,F,subjectColors,colorCodeUrgency,dragTaskId,dragOffsetY,
+    const miniCardProps={T,F,subjectColors,colorCodeUrgency,now,dragTaskId,dragOffsetY,
       onOpen:(t:Task)=>{setSelectedTask(t);},
       onToggleDone:toggleDone,onDelete:deleteTask,
       swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,
@@ -2302,7 +2320,7 @@ export default function HomeworkPlanner() {
 
     if (layout==="compact") return (
       <div style={{display:"flex",flexDirection:"column",gap:5}}>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;const dm=daysUntil(t.dueDate);return(
+        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;const dm=countdown(t.dueDate,t.dueTime,now)??daysUntil(t.dueDate);return(
           <div key={t.id} style={{position:"relative",overflow:"hidden",borderRadius:9}}>
             {renderSwipeReveal(t.id)}
             <div className="tc" onClick={swipeClickGuard(()=>{setSelectedTask(t);})} {...swipeHandlers(t.id)} style={{background:T.card,borderRadius:9,padding:"8px 11px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,position:"relative",cursor:"pointer",...swipeContentStyle(t.id)}}>
@@ -2844,7 +2862,8 @@ export default function HomeworkPlanner() {
                 </div>
                 <button role="menuitem" onClick={()=>{setShowProfile(true);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke={T.text} strokeWidth="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.text} strokeWidth="2" strokeLinecap="round"/></svg>
-                  <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Profile</span>
+                  <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Profile</span>
+                  {syncError&&<span title="Sync issue -- open Profile for details" style={{fontFamily:F.body,fontSize:11,color:"#FF4757"}}>⚠ Sync issue</span>}
                 </button>
                 <button role="menuitem" onClick={()=>{setActiveTab("options");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
                   <IconSettings/>
@@ -3119,22 +3138,6 @@ export default function HomeworkPlanner() {
               <div style={{fontFamily:F.heading,fontSize:20,color:T.text}}>Settings</div>
             </div>
 
-            {/* Account */}
-            {!fbLoading&&(
-              <button onClick={()=>setShowProfile(true)} style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer",width:"100%",textAlign:"left"}}>
-                {fbUser?.photoURL
-                  ? <img src={fbUser.photoURL} alt="" style={{width:38,height:38,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>
-                  : <div style={{width:38,height:38,borderRadius:"50%",background:T.surface,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill={T.textMuted}/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
-                    </div>
-                }
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontFamily:F.body,fontSize:13,color:T.text,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?(fbUser.displayName||"Your account"):"Not signed in"}</div>
-                  <div style={{fontFamily:F.body,fontSize:11,color:fbUser&&syncError?"#FF4757":T.textFaint,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?(syncError?"⚠ Sync issue -- tap for details":fbUser.email):"Tap to sign in & sync"}</div>
-                </div>
-                <span style={{color:T.textFaint,fontSize:16,flexShrink:0}}>›</span>
-              </button>
-            )}
             {/* Looks */}
             <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
               <button onClick={()=>setLooksOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:0,outline:"none",WebkitTapHighlightColor:"transparent"}}>
@@ -3331,7 +3334,7 @@ export default function HomeworkPlanner() {
       )}>
         <TaskModal
           task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
-          T={T} F={F} subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
+          T={T} F={F} subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency} now={now}
           sessionActive={sessionActive} sessionSecs={sessionSecs}
           allTags={allTags}
           onClose={()=>{setSelectedTask(null);}}
@@ -3344,6 +3347,7 @@ export default function HomeworkPlanner() {
           onDuplicate={()=>{const copy=duplicateTask(selectedTask.id);if(copy)setSelectedTask(copy);}}
           onUpdateTask={patch=>updateTask(selectedTask.id,patch)}
           onSnooze={kind=>snoozeTask(selectedTask.id,kind)}
+          onSkipOccurrence={()=>skipOccurrence(selectedTask.id)}
           onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
           onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
           onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}

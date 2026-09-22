@@ -1,85 +1,79 @@
 # Feature ideas
 
-Ideas reviewed on 2026-09-22. Every idea you picked moved to `ROADMAP.md`
-(sections 17 and 18) and is listed here with its label, so the numbers
-still match. Ideas you passed on were removed.
+A fresh batch of ideas to review. None of these are in `ROADMAP.md` yet, and
+none repeat ideas you passed on before. Numbers continue from the previous
+batch (#1–112, whose picks are now in the roadmap), so they never clash with
+the roadmap's "Idea #" column. Everything is free for now, so there are no
+Free/Pro tags.
 
-New ideas can be added at the end, continuing from #113. To review them
-quickly, put a tag in front of each line (`+` yes, `~` with tweaks, `?`
-maybe, `-` no), with any tweak written on the same line.
+**To review:** reply with the numbers you like (e.g. "113, 119, 127–130"),
+or tag each line in the file: `+` yes, `~` with tweaks, `?` maybe, `-` no,
+with any tweak written on the same line.
 
-## A. Smart planning
-1. **Auto-scheduler** — splits a big task into daily chunks between now and the due date, based on your free time. — **→ roadmap (Yes)**
-6. **"I have 20 minutes"** — picks the best task that fits the time you have right now. — **→ roadmap (Yes)**
-8. **Overload forecast** — "Thursday is packed — start the lab report on Monday." — **→ roadmap (Yes)**
-11. **Per-subject defaults** — e.g. Math homework always due 8:00 AM, 30 minutes. — **→ roadmap (With tweaks)**
-12. **Energy-based scheduling** — morning person or night owl; hard tasks go in your best hours. — **→ roadmap (Maybe)**
+## A. Planning & deadlines
+113. **Soft deadlines** — set your own "done by" date a few days before the real due date; reminders and urgency use it.
+114. **Do date vs. due date** — pick the day you'll work on something separately from when it's due.
+115. **Daily time budget** — say how much time you have each weekday; it warns when a day goes over.
+116. **"Start by" date** — works out from the estimate and due date when you need to start.
+117. **No-school days** — mark holidays and breaks; repeating tasks and warnings skip them.
+118. **Skip one occurrence** of a repeating task ("no quiz this week").
+119. **Snow day button** — push everything due today to tomorrow in one tap.
+120. **"Fix my overdue"** — one screen to reschedule, finish or drop every overdue task at once.
+121. **Drag to reschedule** — drag a task onto another day in the Calendar layout.
+122. **Live countdown** on tasks due today with a time ("due in 2h 15m").
+123. **Task age** — a quiet "added 12 days ago" to spot tasks that keep sitting there.
+124. **Custom reminder time** on a single task ("remind me at 7 PM"), on top of the standard offsets.
 
-## B. Task details
-13. **Difficulty rating** (easy / medium / hard), separate from time. — **→ roadmap (Yes)**
-14. **Progress slider** (% done) for tasks without subtasks. — **→ roadmap (Yes)**
-16. **Custom repeat patterns** — every Mon/Wed/Fri, every 2 weeks, last day of the month. — **→ roadmap (Yes)**
-17. **Repeat end date or count** — "repeat weekly until Dec 15" / "8 times". — **→ roadmap (With tweaks)**
-18. **Duplicate task** button. — **→ roadmap (Yes)**
-19. **Task history** — when it was created, edited and completed. — **→ roadmap (Maybe)**
-20. **"Waiting on" status** — e.g. waiting for teacher feedback. — **→ roadmap (With tweaks)**
-21. **Submission checklist** — "Submitted on Canvas ✓", optionally with a screenshot as proof. — **→ roadmap (With tweaks)**
-22. **Assignment types** — homework, quiz, test, project, lab — each with its own icon and default estimate. — **→ roadmap (With tweaks)**
-24. **Group project notes** — record teammates and who's doing what (no shared account needed). — **→ roadmap (Maybe)**
+## B. Adding & editing tasks
+125. **Quick add option** — a one-line add instead of the step-by-step wizard (a setting: Wizard / Quick).
+126. **Title suggestions** from your past tasks as you type.
+127. **Long-press / right-click menu** on a task: done, snooze, duplicate, change date, delete.
+128. **Choose what swiping does** (left and right).
+129. **Inline editing** — tap a task's title or date in the list to change it right there.
+130. **Estimate nudge** — a gentle prompt to add estimates to tasks that don't have one.
+131. **Pinned note** — a short note to yourself pinned at the top of the list.
 
-## C. Grades & academics
-25. **Grade received** field on finished tasks. — **→ roadmap (Yes)**
-29. **Terms / semesters** — archive a term and start a new one with a setup wizard. — **→ roadmap (With tweaks)**
-30. **Report-card view** per term. — **→ roadmap (Maybe)**
-32. **Reading tracker** — pages per day to finish a book by its due date. — **→ roadmap (Yes)**
-37. **Extracurricular layer** — clubs, sports and practice times on the calendar. — **→ roadmap (Maybe)**
+## C. Focus
+132. **Pick the Focus task** — choose which task Focus Mode is about, not only the first one.
+133. **Pomodoro time counts as a work session** on that task.
+134. **Floating mini timer** — a small window that stays on top of other windows on desktop (picture-in-picture).
+135. **Keep the screen awake** during Focus Mode.
+136. **Next-task suggestion** when a break ends.
+137. **End-of-day shutdown** — review what you finished and roll leftovers to tomorrow.
+138. **Flow mode** — hide clocks and counts while focusing.
 
-## D. Focus & wellbeing
-40. **Daily focus goal** — "90 deep-work minutes today" with a streak. — **→ roadmap (With tweaks)**
-43. **Quiet hours** for notifications. — **→ roadmap (Maybe)**
-47. **Session goal** — "finish the intro paragraph", then a quick "did you?" at the end. — **→ roadmap (Yes)**
+## D. Motivation (no streaks or badges)
+139. **"Done today" list** — everything you've finished today in one place.
+140. **Weekly progress bar** in the header ("7 of 12 done this week").
+141. **Personal bests** ("most tasks finished in a day").
+142. **Subject cleared** — a small celebration when a subject has nothing left.
+143. **Personal greeting** ("Good evening — 3 things left today").
 
-## E. Motivation & fun
-49. **XP and levels** for finishing tasks on time. — **→ roadmap (Maybe)**
-54. **Semester "Wrapped"** — a Spotify-Wrapped-style recap to share. — **→ roadmap (Yes)**
-55. **Daily challenge** — "finish 3 tasks before 6 PM." — **→ roadmap (Maybe)**
-56. **Sound effect on completing** a task (toggle). — **→ roadmap (Yes)**
+## E. Look & comfort
+144. **Dark mode by time of day** (after sunset), not only by the system setting.
+145. **Color-blind-friendly urgency colors.**
+146. **High-contrast mode.**
+147. **Reduce-motion setting** inside the app.
+148. **Left-handed layout** — main buttons on the left.
+149. **App icon badge** with the number of tasks due today (installed app).
+150. **Browser tab count** — the tab title shows what's due today, e.g. "(3) DuePlanner".
 
-## F. Look & layout
-60. **Desktop split view** — the list on the left, the task detail on the right. — **→ roadmap (Yes)**
-62. **Alternate app icons.** — **→ roadmap (Maybe)**
-63. **Customizable home dashboard** — choose cards: next task, heatmap, streak, time left. — **→ roadmap (With tweaks)**
-64. **Text size and density settings.** — **→ roadmap (Yes)**
-67. **Haptic feedback** on mobile. — **→ roadmap (Yes)**
-68. **Mac menu-bar app** / desktop widget showing the next task. — **→ roadmap (Yes)**
-69. **Chrome new-tab page** showing today's tasks. — **→ roadmap (Maybe)**
+## F. Subjects & school
+151. **Archive a subject** at the end of a term instead of deleting it.
+152. **Subject importance** — e.g. AP classes weigh more in priority.
+153. **Free-period suggestions** — during a free period on your timetable, suggest a task that fits.
+154. **Class details on tasks** — room and teacher from the timetable shown next to that class's tasks.
 
-## G. Quick capture
-72. **Siri Shortcuts / Google Assistant** actions ("Add homework…"). — **→ roadmap (Yes)**
-74. **Paste a list** → one task per line. — **→ roadmap (With tweaks)**
-76. **Complete or snooze from the notification itself.** — **→ roadmap (Yes)**
+## G. Notifications
+155. **Choose when the daily summary arrives** (e.g. 7 AM or 6 PM).
+156. **Good-news notification** — "Nothing due tomorrow."
+157. **Reminder sound and vibration choice.**
 
-## H. Teachers & schools (a new market)
-78. **Teacher accounts** that publish assignments to their students. — **→ roadmap (Yes, own section)**
-79. **Class codes** — students join a teacher's feed with a code. — **→ roadmap (Yes, own section)**
-80. **Teacher insights** — how many students have started an assignment. — **→ roadmap (Yes, own section)**
-81. **School / district licensing** (B2B pricing). — **→ roadmap (Yes, own section)**
-82. **Tutor view** — a tutor sees a student's upcoming work, with permission. — **→ roadmap (Yes, own section)**
+## H. Data & safety
+158. **Recently deleted** — a 30-day trash, for restoring tasks after the undo toast is gone.
+159. **Backup reminder** — a periodic nudge to download an export.
+160. **Sync status page** — what's synced, when, and any errors.
 
-## J. Notifications
-91. **Morning briefing** notification with today's plan. — **→ roadmap (Yes)**
-92. **Escalating urgency** — gentle reminder first, firmer as the deadline gets close. — **→ roadmap (With tweaks)**
-
-## K. Insights
-95. **Productivity insights** — your best hours, which subject takes longest. — **→ roadmap (Yes)**
-97. **On-time rate over time** chart. — **→ roadmap (Yes)**
-99. **Year-over-year history** of past terms. — **→ roadmap (Maybe)**
-
-## L. Accounts & privacy
-100. **"Last synced" time and an offline indicator.** — **→ roadmap (Yes)**
-101. **Multiple spaces** — school, personal, work — each with their own tasks. — **→ roadmap (With tweaks)**
-102. **More sign-in options** — email link / passkey, Apple, Microsoft. — **→ roadmap (Yes)**
-103. **Switch between accounts** without signing out. — **→ roadmap (Yes)**
-
-## M. More integrations
-106. **Import from Todoist / TickTick** (to win over their users). — **→ roadmap (Maybe)**
+## I. Smart extras
+161. **Ask DuePlanner** — type a question ("what's due Thursday?", "how much Math is left?") and get an answer.
+162. **Tidy titles** — fix capitalization and typos in task titles.

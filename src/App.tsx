@@ -227,6 +227,7 @@ const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = 
   { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
   { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
+  { id:"pomodoro-breaks", date:"2026-09-22", title:"New feature", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
   { id:"focus-picker", date:"2026-09-22", title:"New feature", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
   { id:"liquid-glass", date:"2026-09-22", title:"New feature", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
   { id:"time-left-breakdown", date:"2026-09-22", title:"New feature", description:"Tap \"Time left\" in the header to see how much time each subject needs." },
@@ -1199,6 +1200,11 @@ export default function HomeworkPlanner() {
   // gray (NEUTRAL_PRIORITY_COLOR) everywhere urgency is shown -- default on.
   const [colorCodeUrgency,setColorCodeUrgency]=usePersistedState("hw-colorcode-urgency",true);
   const [liquidGlass,setLiquidGlass]=usePersistedState("hw-liquid-glass",false);
+  // Pomodoro lengths (minutes) and whether a break starts on its own when a
+  // focus session ends. Local-only, like the other Looks/Focus preferences.
+  const [pomodoroWorkMins,setPomodoroWorkMins]=usePersistedState("hw-pomodoro-work",25);
+  const [pomodoroBreakMins,setPomodoroBreakMins]=usePersistedState("hw-pomodoro-break",5);
+  const [autoStartBreaks,setAutoStartBreaks]=usePersistedState("hw-pomodoro-autobreak",true);
   const [subjects,setSubjects]=usePersistedState<string[]>("hw-subjects",DEFAULT_SUBJECTS);
   // Only the ids the user dismissed are stored, and the feed itself always
   // comes from WHATS_NEW -- storing the whole feed (the old approach) meant a
@@ -1780,7 +1786,8 @@ export default function HomeworkPlanner() {
     setImportPreview(null);
   }
   const [pomodoroActive,setPomodoroActive]=useState(false);
-  const [pomodoroSecs,setPomodoroSecs]=useState(25*60);
+  const [pomodoroSecs,setPomodoroSecs]=useState(()=>pomodoroWorkMins*60);
+  const [pomodoroPhase,setPomodoroPhase]=useState<"work"|"break">("work");
   const [timeHours,setTimeHours]=useState(0);
   const [timeMins,setTimeMins]=useState(30);
   const [showProfile,setShowProfile]=useState(false);
@@ -1871,33 +1878,54 @@ export default function HomeworkPlanner() {
   // focus input when adding starts
   useEffect(()=>{if(adding){setTimeout(()=>inputRef.current?.focus(),50);}},[adding,step]);
 
-  // Pomodoro timer. Finishing is handled in its own effect (not inside the
-  // countdown's state updater, where side effects don't belong): it plays a
-  // short chime, sends a notification if they're allowed, and shows a toast --
-  // it used to just silently snap back to 25:00.
+  // Pomodoro timer: a focus session, then a break. Finishing either phase is
+  // handled in its own effect (not inside the countdown's state updater, where
+  // side effects don't belong): it plays a short chime, sends a notification
+  // if they're allowed, and moves to the other phase.
   useEffect(()=>{if(!pomodoroActive)return;const t=setInterval(()=>setPomodoroSecs(s=>Math.max(0,s-1)),1000);return()=>clearInterval(t);},[pomodoroActive]);
   const [pomodoroDone,setPomodoroDone]=useState(false);
+  // Set when a break runs out; shows the "next up" suggestion until it's
+  // started or dismissed.
+  const [breakEnded,setBreakEnded]=useState(false);
+  // The task the last focus session was logged to, so the suggestion after the
+  // break can offer to keep going on it.
+  const [lastWorkedTaskId,setLastWorkedTaskId]=useState<number|null>(null);
   // Which task Focus Mode is about (null = the first pending task). The
-  // ref mirrors the resolved task for the Pomodoro-finished effect below,
-  // which is declared before that task is computed.
+  // refs mirror the resolved task and the after-break suggestion for the
+  // Pomodoro-finished effect below, which is declared before they're computed.
   const [focusTaskId,setFocusTaskId]=useState<number|null>(null);
   const [focusPickerOpen,setFocusPickerOpen]=useState(false);
   const pomodoroTaskRef=useRef<number|null>(null);
+  const nextSuggestionRef=useRef<string|null>(null);
   useEffect(()=>{
     if(!pomodoroActive||pomodoroSecs>0)return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPomodoroActive(false);setPomodoroSecs(25*60);setPomodoroDone(true);
-    // A finished Pomodoro counts as a 25-minute work session on the focus task.
-    const logId=pomodoroTaskRef.current;
-    if(logId!=null)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:[...(t.sessions||[]),{mins:25,at:Date.now()}]}:t));
     playChime();
-    try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:"Nice work -- time for a short break."}); }catch{/* notifications unavailable */}
-  },[pomodoroActive,pomodoroSecs]);
+    if(pomodoroPhase==="work"){
+      // A finished focus session counts as a work session on the focus task.
+      const logId=pomodoroTaskRef.current;
+      if(logId!=null)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:[...(t.sessions||[]),{mins:pomodoroWorkMins,at:Date.now()}]}:t));
+      setLastWorkedTaskId(logId);setPomodoroPhase("break");setPomodoroSecs(pomodoroBreakMins*60);setPomodoroActive(autoStartBreaks);setPomodoroDone(true);setBreakEnded(false);
+      try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:autoStartBreaks?`Nice work -- your ${pomodoroBreakMins}-minute break has started.`:`Nice work -- time for a ${pomodoroBreakMins}-minute break.`}); }catch{/* notifications unavailable */}
+    }else{
+      setPomodoroPhase("work");setPomodoroSecs(pomodoroWorkMins*60);setPomodoroActive(false);setPomodoroDone(false);setBreakEnded(true);
+      const next=nextSuggestionRef.current;
+      try{ if("Notification" in window&&Notification.permission==="granted") notify("Break's over",{body:next?`Next up: ${next}`:"Ready for another round?"}); }catch{/* notifications unavailable */}
+    }
+  },[pomodoroActive,pomodoroSecs,pomodoroPhase,pomodoroWorkMins,pomodoroBreakMins,autoStartBreaks]);
   useEffect(()=>{
     if(!pomodoroDone)return;
     const t=setTimeout(()=>setPomodoroDone(false),8000);
     return()=>clearTimeout(t);
   },[pomodoroDone]);
+  // Back to a fresh focus session (also how a break is skipped).
+  function resetPomodoro(){setPomodoroActive(false);setPomodoroPhase("work");setPomodoroSecs(pomodoroWorkMins*60);}
+  // Changing a length only moves the timer if it's sitting untouched at the
+  // start of that phase -- a paused session keeps its remaining time.
+  function changePomodoroLength(phase:"work"|"break",mins:number){
+    const cur=phase==="work"?pomodoroWorkMins:pomodoroBreakMins;
+    if(!pomodoroActive&&pomodoroPhase===phase&&pomodoroSecs===cur*60)setPomodoroSecs(mins*60);
+    (phase==="work"?setPomodoroWorkMins:setPomodoroBreakMins)(mins);
+  }
 
   const visibleTasks=tasks;
   // Every tag used on any task, deduplicated -- powers the "quick add" suggestion
@@ -1921,6 +1949,17 @@ export default function HomeworkPlanner() {
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const focusTask=tasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
   useEffect(()=>{pomodoroTaskRef.current=focusTask?.id??null;});
+  // What to do when a break ends: keep going on the task from the last session
+  // if it's still open, otherwise the most urgent open task.
+  const nextSuggestion=tasks.find(t=>t.id===lastWorkedTaskId&&!t.done&&!t.archived)||mostUrgent(tasks.filter(t=>!t.done&&!t.archived));
+  const suggestionIsContinue=nextSuggestion!=null&&nextSuggestion.id===lastWorkedTaskId;
+  useEffect(()=>{nextSuggestionRef.current=nextSuggestion?.title??null;});
+  function startSuggested(){
+    if(!nextSuggestion)return;
+    setFocusTaskId(nextSuggestion.id);setBreakEnded(false);setFocusPickerOpen(false);
+    setPomodoroPhase("work");setPomodoroSecs(pomodoroWorkMins*60);setPomodoroActive(true);
+    if(!focusMode)setFocusModeAnimated(true);
+  }
   // Keep the screen on in Focus Mode (Screen Wake Lock API, where supported).
   // The browser drops the lock whenever the tab is hidden, so it's re-taken
   // when the tab comes back.
@@ -2204,7 +2243,7 @@ export default function HomeworkPlanner() {
     const data={
       exportedAt:new Date().toISOString(),
       tasks,subjects,subjectColors,templates,
-      settings:{themeMode,layout,groupBy,desktopLayout,colorCodeUrgency,liquidGlass,showDone,showSuggestion,autoArchiveDays,notificationsEnabled,enabledOffsets,timeFormat,weekStart},
+      settings:{themeMode,layout,groupBy,desktopLayout,colorCodeUrgency,liquidGlass,showDone,showSuggestion,autoArchiveDays,notificationsEnabled,enabledOffsets,timeFormat,weekStart,pomodoroWorkMins,pomodoroBreakMins,autoStartBreaks},
     };
     downloadFile(`dueplanner-export-${todayISO()}.json`,JSON.stringify(data,null,2),"application/json");
   }
@@ -2710,34 +2749,67 @@ export default function HomeworkPlanner() {
 
 
   const pomMin=Math.floor(pomodoroSecs/60); const pomSec=pomodoroSecs%60;
-  const pomPct=pomodoroSecs/(25*60);
+  const pomPct=Math.min(1,pomodoroSecs/((pomodoroPhase==="work"?pomodoroWorkMins:pomodoroBreakMins)*60));
+  const onBreak=pomodoroPhase==="break";
   function renderPomodoroCard(){
     return (
       <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
-        <div className="sl" style={{color:T.textMuted,textAlign:"left"}}>Pomodoro Timer</div>
+        <div className="sl" style={{color:onBreak?"#2ED573":T.textMuted,textAlign:"left"}}>{onBreak?"Break":"Pomodoro Timer"}</div>
         <div style={{position:"relative",width:100,height:100,margin:"10px auto"}}>
           <svg width="100" height="100" style={{transform:"rotate(-90deg)"}}>
             <circle cx="50" cy="50" r="45" fill="none" stroke={T.border} strokeWidth="6"/>
-            <circle cx="50" cy="50" r="45" fill="none" stroke={T.accent} strokeWidth="6" strokeDasharray="283" strokeDashoffset={283*(1-pomPct)} strokeLinecap="round" style={{transition:"stroke-dashoffset 1s linear"}}/>
+            <circle cx="50" cy="50" r="45" fill="none" stroke={onBreak?"#2ED573":T.accent} strokeWidth="6" strokeDasharray="283" strokeDashoffset={283*(1-pomPct)} strokeLinecap="round" style={{transition:"stroke-dashoffset 1s linear"}}/>
           </svg>
           <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
             <div style={{fontFamily:F.body,fontSize:18,color:T.text,fontWeight:500}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</div>
           </div>
         </div>
         <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-          <button onClick={()=>setPomodoroActive(a=>!a)} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"⏸ Pause":"▶ Start"}</button>
-          <button onClick={()=>{setPomodoroSecs(25*60);setPomodoroActive(false);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>↺ Reset</button>
+          <button onClick={()=>{setPomodoroActive(a=>!a);setBreakEnded(false);}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"⏸ Pause":onBreak?"▶ Start break":"▶ Start"}</button>
+          <button onClick={resetPomodoro} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{onBreak?"Skip break":"↺ Reset"}</button>
         </div>
       </div>
     );
   }
 
   function renderPomodoroToast(){
+    const shell:React.CSSProperties={position:"fixed",left:"50%",bottom:undoToast!=null&&!focusMode?76:20,transform:"translateX(-50%)",zIndex:1600,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"};
+    // Outside Focus Mode, the end of a break shows its suggestion here; in
+    // Focus Mode it's a card above the task instead (renderBreakSuggestion).
+    if(breakEnded&&!focusMode&&nextSuggestion) return (
+      <div role="status" style={shell}>
+        <span style={{fontFamily:F.body,fontSize:12,color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Break's over -- {suggestionIsContinue?"keep going on":"next up:"} {nextSuggestion.title}</span>
+        <button onClick={startSuggested} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Start</button>
+        <button onClick={()=>setBreakEnded(false)} aria-label="Dismiss" style={{background:"none",border:"none",color:T.textMuted,fontSize:15,cursor:"pointer",flexShrink:0,padding:"0 4px"}}>×</button>
+      </div>
+    );
     if(!pomodoroDone)return null;
     return (
-      <div role="status" style={{position:"fixed",left:"50%",bottom:undoToast!=null&&!focusMode?76:20,transform:"translateX(-50%)",zIndex:1600,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
-        <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>Pomodoro done -- take a short break</span>
+      <div role="status" style={shell}>
+        <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{autoStartBreaks?`Pomodoro done -- ${pomodoroBreakMins}-minute break started`:"Pomodoro done -- take a short break"}</span>
         <button onClick={()=>setPomodoroDone(false)} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>OK</button>
+      </div>
+    );
+  }
+
+  // Focus Mode's "break's over" card: one tap starts the next focus session on
+  // the suggested task; "Pick another" opens the task picker instead.
+  function renderBreakSuggestion(){
+    if(!breakEnded)return null;
+    return (
+      <div className="pop" role="status" style={{background:T.card,borderRadius:14,padding:"14px 16px",border:"1px solid #2ED57355"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:nextSuggestion?8:0}}>
+          <span style={{fontFamily:F.body,fontSize:12,color:"#2ED573",fontWeight:500}}>Break's over</span>
+          <button onClick={()=>setBreakEnded(false)} aria-label="Dismiss" style={{background:"none",border:"none",color:T.textMuted,fontSize:15,cursor:"pointer",padding:"0 2px",lineHeight:1}}>×</button>
+        </div>
+        {nextSuggestion?<>
+          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:2}}>{suggestionIsContinue?"Keep going on":"Next up"}</div>
+          <div style={{fontFamily:F.heading,fontSize:17,color:T.text,marginBottom:12,overflowWrap:"anywhere"}}>{nextSuggestion.title}</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={startSuggested} style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 12px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>▶ Start {pomodoroWorkMins} min</button>
+            <button onClick={()=>{setBreakEnded(false);setFocusPickerOpen(true);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Pick another</button>
+          </div>
+        </>:<div style={{fontFamily:F.body,fontSize:12,color:T.textMuted,marginTop:6}}>Nothing left on your list -- nice.</div>}
       </div>
     );
   }
@@ -2761,6 +2833,7 @@ export default function HomeworkPlanner() {
           <button onClick={()=>setFocusModeAnimated(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>✕ Exit</button>
         </div>
         <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
+          {renderBreakSuggestion()}
           {focusTask?(
             <div className="pop" style={{background:T.gradientCard,borderRadius:16,padding:"20px",border:`1px solid ${T.accent}44`}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
@@ -3378,6 +3451,26 @@ export default function HomeworkPlanner() {
                 {([[0,"Sunday"],[1,"Monday"]] as const).map(([k,l])=>(
                   <button key={k} onClick={()=>setWeekStart(k)} aria-pressed={weekStart===k} style={{background:weekStart===k?T.accent+"22":T.surface,border:`1.5px solid ${weekStart===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:weekStart===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
                 ))}
+              </div>
+            </div>
+            {/* Focus timer (Pomodoro) */}
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Focus timer</div>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Focus length</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:12}}>
+                {[15,25,45,60].map(v=>(
+                  <button key={v} onClick={()=>changePomodoroLength("work",v)} aria-pressed={pomodoroWorkMins===v} style={{background:pomodoroWorkMins===v?T.accent+"22":T.surface,border:`1.5px solid ${pomodoroWorkMins===v?T.accent:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:pomodoroWorkMins===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{v} min</button>
+                ))}
+              </div>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Break length</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:12}}>
+                {[5,10,15,20].map(v=>(
+                  <button key={v} onClick={()=>changePomodoroLength("break",v)} aria-pressed={pomodoroBreakMins===v} style={{background:pomodoroBreakMins===v?T.accent+"22":T.surface,border:`1.5px solid ${pomodoroBreakMins===v?T.accent:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:pomodoroBreakMins===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{v} min</button>
+                ))}
+              </div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Start breaks automatically</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>When a focus session ends. After a break, you get a suggestion for what to work on next.</div></div>
+                <Toggle on={autoStartBreaks} onChange={setAutoStartBreaks} T={T} label="Start breaks automatically"/>
               </div>
             </div>
             {/* Subjects -- lives here (not in Profile) so it works signed out too */}

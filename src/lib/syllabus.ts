@@ -12,6 +12,13 @@ export const MONTH_NAMES:Record<string,number> = {
   oct:9,october:9,nov:10,november:10,dec:11,december:11,
 };
 export interface ParsedSyllabusItem { title:string; dueDate:string; }
+// new Date() silently rolls impossible dates over ("13/45" -> a date next
+// year, "Feb 30" -> Mar 2); treat those as "no date on this line" instead.
+function makeDate(year:number, month0:number, day:number):Date|null {
+  if(month0<0||month0>11||day<1||day>31)return null;
+  const d=new Date(year,month0,day);
+  return d.getMonth()===month0&&d.getDate()===day?d:null;
+}
 export function parseSyllabus(text:string):ParsedSyllabusItem[] {
   const today=new Date(); today.setHours(0,0,0,0);
   const results:ParsedSyllabusItem[]=[];
@@ -20,12 +27,12 @@ export function parseSyllabus(text:string):ParsedSyllabusItem[] {
     if(!line)continue;
     let d:Date|null=null, matched="";
     let m=line.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
-    if(m){ d=new Date(+m[1],+m[2]-1,+m[3]); matched=m[0]; }
+    if(m){ d=makeDate(+m[1],+m[2]-1,+m[3]); matched=m[0]; }
     if(!d){
       m=line.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
       if(m){
         const year=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):today.getFullYear();
-        d=new Date(year,+m[1]-1,+m[2]);
+        d=makeDate(year,+m[1]-1,+m[2]);
         matched=m[0];
       }
     }
@@ -33,7 +40,7 @@ export function parseSyllabus(text:string):ParsedSyllabusItem[] {
       m=line.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/i);
       if(m){
         const year=m[3]?+m[3]:today.getFullYear();
-        d=new Date(year,MONTH_NAMES[m[1].toLowerCase()],+m[2]);
+        d=makeDate(year,MONTH_NAMES[m[1].toLowerCase()],+m[2]);
         matched=m[0];
       }
     }

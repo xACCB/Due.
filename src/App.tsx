@@ -840,7 +840,7 @@ function setDone(prev:Task[],ids:number[],done:boolean):Task[]{
       next=next.map(t=>t.id===id?{...t,spawnedNextId:copyId}:t);
       next.push({...task,id:copyId,done:false,completedAt:null,archived:false,spawnedNextId:null,
         dueDate:task.dueDate?advanceDate(task.dueDate,task.recurrence as Recurrence):"",
-        order:next.length,sessions:[],
+        order:nextOrder(next),sessions:[],
         ...(task.subtasks?{subtasks:task.subtasks.map(s=>({...s,id:String(nextId()),done:false}))}:{})});
     }
     if(!done&&task.spawnedNextId){
@@ -850,6 +850,21 @@ function setDone(prev:Task[],ids:number[],done:boolean):Task[]{
     }
   }
   return next;
+}
+
+// `new Notification()` throws on Android Chrome (pages there may only show
+// notifications through a service worker), so fall back to the PWA's service
+// worker registration. Best-effort either way.
+function notify(title:string,options?:NotificationOptions){
+  try{ new Notification(title,options); }
+  catch{ navigator.serviceWorker?.ready.then(reg=>reg.showNotification(title,options)).catch(()=>{}); }
+}
+
+// Next free manual-order slot. Using list.length collided with existing
+// orders once tasks had been deleted (orders keep their gaps), which made
+// new tasks sort unpredictably among old ones.
+function nextOrder(list:Task[]):number{
+  return list.reduce((m,t)=>Math.max(m,t.order??0),-1)+1;
 }
 
 // Short two-note chime for the end of a Pomodoro -- synthesized with Web Audio
@@ -882,6 +897,10 @@ export default function HomeworkPlanner() {
       return loaded.map((t,i)=>t.order===undefined?{...t,order:i}:t);
     }catch{return DEFAULT_TASKS;}
   });
+  // Latest tasks, readable from long-lived callbacks (the Firestore listener)
+  // without re-subscribing on every change.
+  const tasksRef=useRef(tasks);
+  useEffect(()=>{tasksRef.current=tasks;},[tasks]);
   const [selectedTask,setSelectedTask]=useState<Task|null>(null);
   const [themeMode,setThemeMode]=usePersistedState<"light"|"dark"|"auto">("hw-thememode","auto");
   const [systemPrefersDark,setSystemPrefersDark]=useState(()=>typeof window!=="undefined"&&!!window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -960,7 +979,7 @@ export default function HomeworkPlanner() {
         if(due.length>0){
           localStorage.setItem("hw-last-notified",today);
           const title=due.length===1?`"${due[0].title}" is due`:`${due.length} tasks due or overdue`;
-          new Notification(title,{body:due.slice(0,3).map(t=>t.title).join(", ")});
+          notify(title,{body:due.slice(0,3).map(t=>t.title).join(", ")});
         }
       }
       // Offset-based reminders, only for tasks with a specific due time --
@@ -989,9 +1008,15 @@ export default function HomeworkPlanner() {
         if(!sent[sentKey(closest)]){
           const minsLeft=Math.round((dueAt-now)/60000);
           const when=minsLeft<=0?"now":minsLeft<60?`in ${minsLeft} min`:`in ${formatDuration(minsLeft)}`;
-          new Notification(`"${t.title}" is due ${when}`,{body:`${formatDate(t.dueDate)} at ${formatTime(t.dueTime)}`});
+          notify(`"${t.title}" is due ${when}`,{body:`${formatDate(t.dueDate)} at ${formatTime(t.dueTime)}`});
         }
         for(const o of eligible){ if(!sent[sentKey(o)]){ sent[sentKey(o)]=true; changed=true; } }
+      }
+      // Drop records for tasks that are finished, deleted, or rescheduled --
+      // they can never match again, and would otherwise pile up forever.
+      const live=tasks.filter(t=>!t.done&&!t.archived&&t.dueDate&&t.dueTime).map(t=>[`${t.id}-`,`-${t.dueDate}T${t.dueTime}`]);
+      for(const k of Object.keys(sent)){
+        if(!live.some(([pre,post])=>k.startsWith(pre)&&k.endsWith(post))){ delete sent[k]; changed=true; }
       }
       if(changed)localStorage.setItem("hw-sent-reminders",JSON.stringify(sent));
     }
@@ -1098,6 +1123,12 @@ export default function HomeworkPlanner() {
   // created, and the whole document could hit Firestore's 1MB size limit for
   // a long-time user).
   const lastSyncedTasksRef=useRef<Map<number,Task>>(new Map());
+  // Set only for an explicit sign-in (not a restored session): the first
+  // cloud snapshot after it keeps any tasks created while signed out instead
+  // of replacing them. Limited to explicit sign-ins because on a normal page
+  // load, a local task missing from the cloud usually means it was deleted
+  // on another device, and must not be resurrected.
+  const mergeLocalOnSignIn=useRef(false);
   // Gates both live listeners below until any one-time legacy-data migration
   // for this uid has been checked (and, if needed, completed) -- see
   // migrateLegacyTasks. Without this, the tasks-subcollection listener could
@@ -1251,9 +1282,17 @@ export default function HomeworkPlanner() {
           const loaded=snap.docs
             .map(d=>d.data())
             .filter((t):t is Task=>typeof t.id==="number"&&typeof t.title==="string"); // shape guard, see profile sync above
-          setTasks(loaded);
           lastSyncedTasksRef.current=new Map(loaded.map(t=>[t.id,t]));
+          if(mergeLocalOnSignIn.current){
+            const cloudIds=new Set(loaded.map(t=>t.id));
+            const isStarter=(t:Task)=>!t.done&&DEFAULT_TASKS.some(d=>d.id===t.id&&d.title===t.title);
+            const localOnly=tasksRef.current.filter(t=>!cloudIds.has(t.id)&&!isStarter(t));
+            setTasks(localOnly.length?[...loaded,...localOnly]:loaded); // the save effect then uploads localOnly
+          } else {
+            setTasks(loaded);
+          }
         }
+        mergeLocalOnSignIn.current=false;
       }
       setTasksSyncedForUid(fbUser.uid);
       setSyncError(null);
@@ -1312,9 +1351,13 @@ export default function HomeworkPlanner() {
 
   async function signInWithFirebase(){
     setSignInError(null);
+    // Set before the popup resolves: the auth listener can fire (and start
+    // syncing) before signInWithPopup's promise does.
+    mergeLocalOnSignIn.current=true;
     try{
       await signInWithPopup(auth,googleProvider);
     } catch(e){
+      mergeLocalOnSignIn.current=false;
       console.error(e);
       const code=(e as {code?:string})?.code||"unknown";
       if(code==="auth/popup-closed-by-user"||code==="auth/cancelled-popup-request"){
@@ -1411,6 +1454,12 @@ export default function HomeworkPlanner() {
   // straight back to a plain instant setFocusMode on browsers that don't
   // have the API yet (anything pre Safari 18 -- Chrome/Edge have had it for
   // years), so this never breaks anything, only sometimes fails to animate.
+  useEffect(()=>{
+    if(!focusMode)return;
+    const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")setFocusMode(false);};
+    document.addEventListener("keydown",onKey);
+    return()=>document.removeEventListener("keydown",onKey);
+  },[focusMode]);
   function setFocusModeAnimated(value:boolean){
     if(typeof document.startViewTransition==="function"){
       document.startViewTransition(()=>{flushSync(()=>setFocusMode(value));});
@@ -1476,7 +1525,7 @@ export default function HomeworkPlanner() {
     if(toAdd.length===0)return;
     setTasks(prev=>[
       ...prev,
-      ...toAdd.map((it,i):Task=>({id:nextId(),title:it.title,subject,dueDate:it.dueDate,dueTime:"",estMins:0,done:false,order:prev.length+i})),
+      ...toAdd.map((it,i):Task=>({id:nextId(),title:it.title,subject,dueDate:it.dueDate,dueTime:"",estMins:0,done:false,order:nextOrder(prev)+i})),
     ]);
     setImportedCount(toAdd.length);
     setImportText("");
@@ -1568,7 +1617,7 @@ export default function HomeworkPlanner() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPomodoroActive(false);setPomodoroSecs(25*60);setPomodoroDone(true);
     playChime();
-    try{ if("Notification" in window&&Notification.permission==="granted") new Notification("Pomodoro done",{body:"Nice work -- time for a short break."}); }catch{/* notifications unavailable */}
+    try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:"Nice work -- time for a short break."}); }catch{/* notifications unavailable */}
   },[pomodoroActive,pomodoroSecs]);
   useEffect(()=>{
     if(!pomodoroDone)return;
@@ -1586,7 +1635,7 @@ export default function HomeworkPlanner() {
     return a.order-b.order;
   });
   const searchLower=searchQuery.trim().toLowerCase();
-  const matchesSearch=(t:Task)=>!searchLower||t.title.toLowerCase().includes(searchLower)||t.subject.toLowerCase().includes(searchLower);
+  const matchesSearch=(t:Task)=>!searchLower||t.title.toLowerCase().includes(searchLower)||t.subject.toLowerCase().includes(searchLower)||(t.tags||[]).some(g=>g.toLowerCase().includes(searchLower));
   const filteredTasks=allSorted.filter(t=>{
     if(filter==="archived")return !!t.archived;
     if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
@@ -1664,19 +1713,28 @@ export default function HomeworkPlanner() {
     if(inputRef.current) inputRef.current.value="";
     setStep(0);
   }
+  // A wizard answer advances after a 100ms beat; this ignores a second tap in
+  // that window, which could otherwise add the task twice or skip a question.
+  const wizardAdvancing=useRef(false);
+  function afterBeat(fn:()=>void){
+    wizardAdvancing.current=true;
+    setTimeout(()=>{wizardAdvancing.current=false;fn();},100);
+  }
   function handleAnswer(val:string){
+    if(wizardAdvancing.current)return;
     const q=QUESTIONS[step];
     const value = q.type==="time" ? parseInt(val) : val;
     const updated={...newTask,[q.key]:value};setNewTask(updated);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
-    setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
+    afterBeat(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);});
   }
   function goBackStep(){
     if(QUESTIONS[step]?.type==="date"&&pendingDueDate!==null){setPendingDueDate(null);return;}
     if(step>-1)setStep(s=>s-1);
   }
   function goForwardStep(){
+    if(wizardAdvancing.current)return;
     if(QUESTIONS[step]?.type==="date"&&pendingDueDate!==null){confirmDueTime("");return;}
     // Skipping leaves that answer blank -- for the estimate that means 0 (shown
     // as no estimate), not the wizard's hidden 30-minute starting value.
@@ -1690,19 +1748,20 @@ export default function HomeworkPlanner() {
     if(inputRef.current) inputRef.current.value="";
   }
   function confirmDueTime(time:string){
+    if(wizardAdvancing.current)return;
     const updated={...newTask,dueDate:pendingDueDate||"",dueTime:time};setNewTask(updated);
     setPendingDueDate(null);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
     if(usingTemplate){
-      setTimeout(()=>finishTask(updated as Task),100);
+      afterBeat(()=>finishTask(updated as Task));
     } else {
-      setTimeout(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);},100);
+      afterBeat(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);});
     }
   }
   function finishTask(task:Task){
     const subtasks=templateSubtasks?templateSubtasks.map(s=>({id:String(nextId()),text:s.text,done:false})):undefined;
-    setTasks(prev=>[...prev,{...task,id:nextId(),done:false,order:prev.length,...(subtasks?{subtasks}:{})}]);
+    setTasks(prev=>[...prev,{...task,id:nextId(),done:false,order:nextOrder(prev),...(subtasks?{subtasks}:{})}]);
     setAdding(false);setStep(0);
     setUsingTemplate(false);setTemplateSubtasks(null);
   }
@@ -1730,7 +1789,7 @@ export default function HomeworkPlanner() {
   function undo(){
     if(undoStack.length===0)return;
     const action=undoStack[undoStack.length-1];
-    if(action.type==="delete")setTasks(prev=>[...prev,...action.tasks]);
+    if(action.type==="delete")setTasks(prev=>{const have=new Set(prev.map(t=>t.id));return [...prev,...action.tasks.filter(t=>!have.has(t.id))];});
     setUndoStack(prev=>prev.slice(0,-1));
     setRedoStack(prev=>[...prev,action]);
     setDeleteToast(null);
@@ -2375,7 +2434,7 @@ export default function HomeworkPlanner() {
   function renderPomodoroToast(){
     if(!pomodoroDone)return null;
     return (
-      <div role="status" style={{position:"fixed",left:"50%",bottom:20,transform:"translateX(-50%)",zIndex:1600,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
+      <div role="status" style={{position:"fixed",left:"50%",bottom:deleteToast!=null&&!focusMode?76:20,transform:"translateX(-50%)",zIndex:1600,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
         <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>Pomodoro done -- take a short break</span>
         <button onClick={()=>setPomodoroDone(false)} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>OK</button>
       </div>
@@ -2915,7 +2974,7 @@ export default function HomeworkPlanner() {
                       calendar:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="16" rx="2" stroke={dim} strokeWidth="1.5"/><line x1="2" y1="9" x2="20" y2="9" stroke={dim} strokeWidth="1.5"/><line x1="7" y1="2" x2="7" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><line x1="15" y1="2" x2="15" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><rect x="5" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="10" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="15" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.4"/></svg>,
                     };
                     return(
-                      <button key={key} onClick={()=>setLayout(key)}
+                      <button key={key} onClick={()=>{setLayout(key);if(key!=="list")exitSelectionMode();}}
                         style={{background:active?T.accent+"22":"none",border:`1.5px solid ${active?T.accent:T.border}`,borderRadius:11,padding:"10px 7px",cursor:"pointer",color:active?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all 0.14s"}}>
                         {icons[key]}
                         <span style={{fontWeight:500,fontSize:10}}>{l.name}</span>
@@ -3073,10 +3132,10 @@ export default function HomeworkPlanner() {
           allTags={allTags}
           onClose={()=>{setSelectedTask(null);}}
           onStartSession={startSession} onEndSession={endSession}
-          onToggleDone={()=>{toggleDone(selectedTask.id);setSelectedTask(null);}}
-          onDelete={()=>{deleteTask(selectedTask.id);setSelectedTask(null);}}
+          onToggleDone={()=>{if(sessionActive)endSession();toggleDone(selectedTask.id);setSelectedTask(null);}}
+          onDelete={()=>{if(sessionActive)endSession();deleteTask(selectedTask.id);setSelectedTask(null);}}
           onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
-          onArchive={()=>{archiveTask(selectedTask.id);setSelectedTask(null);}}
+          onArchive={()=>{if(sessionActive)endSession();archiveTask(selectedTask.id);setSelectedTask(null);}}
           onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
           onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
           onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}

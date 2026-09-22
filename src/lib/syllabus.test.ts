@@ -31,4 +31,9 @@ describe("parseSyllabus", () => {
     expect(item.title.length).toBeLessThanOrEqual(100);
     expect(item.title.endsWith("...")).toBe(true);
   });
+  it("ignores impossible dates instead of rolling them over", () => {
+    expect(parseSyllabus("Quiz 13/45")).toEqual([]);
+    expect(parseSyllabus("Essay due Feb 30, 2026")).toEqual([]);
+    expect(parseSyllabus("2026-02-30 Project")).toEqual([]);
+  });
 });

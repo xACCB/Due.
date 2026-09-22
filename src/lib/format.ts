@@ -32,7 +32,9 @@ export function formatTime(t:string):string {
 export function daysUntil(s:string):string|null {
   if (!s) return null;
   const now=new Date(); now.setHours(0,0,0,0);
-  const d=Math.ceil((new Date(s+"T00:00:00").getTime()-now.getTime())/86400000);
+  // round, not ceil: across a daylight-saving change the gap between two local
+  // midnights is 23h or 25h, and ceil turned 25h ("tomorrow") into 2 days.
+  const d=Math.round((new Date(s+"T00:00:00").getTime()-now.getTime())/86400000);
   if (d<0) return "Overdue!"; if (d===0) return "Due today!"; if (d===1) return "Due tomorrow"; return `${d} days left`;
 }
 // One duration format everywhere ("45m", "1h", "1h 30m"). Returns "" for a

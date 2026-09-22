@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getPriority, csvField, daysUntil, contrastColor, formatDuration, countdown, formatAgo, formatTime } from "./format";
+import { getPriority, csvField, daysUntil, contrastColor, formatDuration, countdown, formatAgo, formatTime, contrastRatio, readableOn } from "./format";
 
 describe("getPriority", () => {
   it("returns the manual override unconditionally", () => {
@@ -102,5 +102,31 @@ describe("formatTime", () => {
     expect(formatTime("15:05", true)).toBe("15:05");
     expect(formatTime("09:00", true)).toBe("09:00");
     expect(formatTime("", true)).toBe("");
+  });
+});
+
+describe("contrastRatio", () => {
+  it("matches the WCAG extremes", () => {
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21);
+    expect(contrastRatio("#777777", "#777777")).toBeCloseTo(1);
+  });
+});
+
+describe("readableOn", () => {
+  it("leaves colors that already pass alone", () => {
+    expect(readableOn("#111111", "#eeeeee")).toBe("#111111");
+    expect(readableOn("#ffa502", "#111111")).toBe("#ffa502");
+  });
+  it("darkens light colors on a light background just enough to pass", () => {
+    const out = readableOn("#ffa502", "#eeeeee");
+    expect(contrastRatio(out, "#eeeeee")).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(out, "#eeeeee")).toBeLessThan(6); // not crushed to black
+  });
+  it("lightens dark colors on a dark background", () => {
+    const out = readableOn("#3344aa", "#111111");
+    expect(contrastRatio(out, "#111111")).toBeGreaterThanOrEqual(4.5);
+  });
+  it("passes through non-hex colors", () => {
+    expect(readableOn("rgba(0,0,0,0.5)", "#eeeeee")).toBe("rgba(0,0,0,0.5)");
   });
 });

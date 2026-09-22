@@ -7,6 +7,35 @@ export function contrastColor(hex:string):string {
   const L=0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
   return L>0.5?"#1a1a1a":"#ffffff";
 }
+
+function luminance(hex:string):number {
+  const c=hex.replace("#","");
+  const lin=(i:number)=>{const v=parseInt(c.substring(i,i+2),16)/255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};
+  return 0.2126*lin(0)+0.7152*lin(2)+0.0722*lin(4);
+}
+
+// WCAG contrast ratio between two #rrggbb colors (1 to 21).
+export function contrastRatio(a:string,b:string):number {
+  const la=luminance(a), lb=luminance(b);
+  return (Math.max(la,lb)+0.05)/(Math.min(la,lb)+0.05);
+}
+
+// The same hue, darkened (on a light background) or lightened (on a dark one)
+// just enough to read as text against `bg` -- for colored text like subject
+// chips and urgency labels, which are picked for looks, not contrast. Colors
+// that already pass, and anything that isn't #rrggbb, come back unchanged.
+export function readableOn(fg:string,bg:string,ratio=4.5):string {
+  if(!/^#[0-9a-f]{6}$/i.test(fg)||!/^#[0-9a-f]{6}$/i.test(bg))return fg;
+  if(contrastRatio(fg,bg)>=ratio)return fg;
+  const target=luminance(bg)>0.5?0:255;
+  const ch=(i:number)=>parseInt(fg.substring(1+i,3+i),16);
+  let out=fg;
+  for(let t=0.05;t<=1;t+=0.05){
+    out="#"+[0,2,4].map(i=>Math.round(ch(i)+(target-ch(i))*t).toString(16).padStart(2,"0")).join("");
+    if(contrastRatio(out,bg)>=ratio)break;
+  }
+  return out;
+}
 export function getPriority(dueDate:string, estMins:number, override?:Priority):Priority {
   if (override) return override;
   if (!dueDate) return "low";

@@ -337,6 +337,27 @@ not `text-decoration`, so it can animate) draws across. Then `captureTaskRects()
 to its new one. Only `MiniCard` has `data-task-id`, so only the list layouts glide; the others
 get the check and strike but jump into place.
 
+**Accessibility conventions** (from the screen-reader/keyboard pass, checked with axe-core and the
+Chrome accessibility tree):
+- Task titles are `<button className="title-btn">` (looks like text, `all:unset`) with no handler of
+  their own: Enter/click bubbles to the card's existing onClick, so swipe guards still apply.
+  Per-task buttons carry the task's name (`Mark X done`, `Delete X`, `Reorder X`).
+- The drag handle is a button; ArrowUp/Down call `moveTaskBy`, which announces the new position
+  through the `srMessage` live region (`.sr-only`, next to the task modal).
+- `.app-inner` is `inert` while `TaskModal` is open. `TaskModal` records its opener in a layout
+  effect (inert blurs it before a normal effect runs) so focus returns there on close.
+- Landmarks: `<header>` (with a visually hidden `<h1>`), `<nav className="app-sidebar">`,
+  `<main className="app-main">`; Focus Mode's root is `<main>`. Selected-option buttons use
+  `aria-pressed`, disclosures `aria-expanded`. The title menu is a disclosure (`role="group"`), not
+  an ARIA menu.
+- Keyboard focus ring: a global `:focus-visible` rule with `!important` (beats inline
+  `outline:none`).
+- Colored text goes through `ink(color, T.light)` (module scope, wraps `readableOn()` in
+  `src/lib/format.ts`), which darkens or lightens it just enough for 4.5:1. Calling it (or other
+  helpers) inside a function declared *above* the `css` useMemo in `HomeworkPlanner` trips the
+  React Compiler's `preserve-manual-memoization` check, like the forward-reference note above; the
+  swipe-reveal label keeps plain hex for that reason.
+
 **Bulk edit / multi-select** (`selectionMode`/`selectedIds` state) is deliberately scoped to the
 default list layout only (`MiniCard`) — the other 6 layouts each render their own custom task row
 markup, so extending selection to all of them was judged not worth the scope. `MiniCard` accepts

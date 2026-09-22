@@ -1827,7 +1827,7 @@ export default function HomeworkPlanner() {
             </div>
             <div style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.title}</div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"auto"}}>
-              <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>⏱ {t.estMins}m</span>
+              <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{t.estMins}m</span>
               <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:17,height:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
                 {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
               </button>
@@ -1896,7 +1896,7 @@ export default function HomeworkPlanner() {
               </div>
               <div style={{display:"flex",gap:10,marginTop:4,flexWrap:"wrap"}}>
                 <span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>
-                <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>▦ {formatDate(t.dueDate)}</span>
+                <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}</span>
                 <span style={{fontFamily:F.body,fontSize:10,color:pr==="high"?"#FF4757":pr==="medium"?"#FFA502":"#2ED573"}}>{daysUntil(t.dueDate)}</span>
               </div>
             </div>
@@ -2011,7 +2011,7 @@ export default function HomeworkPlanner() {
                       </button>
                       <span style={{fontFamily:F.body,fontSize:12,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
                       <span style={{color:sc,fontFamily:F.body,fontSize:10}}>{t.subject}</span>
-                      <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>⏱{t.estMins}m</span>
+                      <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{t.estMins}m</span>
                       <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
                     </div>
                   );})}
@@ -2127,8 +2127,8 @@ export default function HomeworkPlanner() {
               </div>
               <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{topTask.title}</div>
               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>▦ {formatDate(topTask.dueDate)}{topTask.dueTime?` ${formatTime(topTask.dueTime)}`:""}</span>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>⏱ {topTask.estMins}m</span>
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(topTask.dueDate)}{topTask.dueTime?` ${formatTime(topTask.dueTime)}`:""}</span>
+                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{topTask.estMins}m</span>
               </div>
               <button onClick={()=>toggleDone(topTask.id)} style={{marginTop:14,background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>✓ Mark done</button>
             </div>
@@ -2344,7 +2344,7 @@ export default function HomeworkPlanner() {
                     <div style={{fontFamily:F.heading,fontSize:14,color:T.text}}>{newTask.title}</div>
                     <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
                       {newTask.subject&&<span style={{color:subjectColors[newTask.subject]||T.accent,fontFamily:F.body,fontSize:10}}>{newTask.subject}</span>}
-                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>▦ {formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime)}`:""}</span>}
+                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>{formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime)}`:""}</span>}
                       {newTask.recurrence&&newTask.recurrence!=="none"&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>↻ {newTask.recurrence}</span>}
                     </div>
                   </div>}
@@ -2551,7 +2551,7 @@ export default function HomeworkPlanner() {
                     <span style={{background:"#FF6B6B22",color:"#FF6B6B",borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>Math</span>
                   </div>
                   <div style={{display:"flex",gap:12,marginTop:5,paddingLeft:7}}>
-                    <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>▦ Due tomorrow</span>
+                    <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>Due tomorrow</span>
                     <span style={{fontFamily:F.body,fontSize:10,color:"#FFA502"}}>Due tomorrow</span>
                   </div>
                 </div>

@@ -196,6 +196,10 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
   light/dark-text picker (`contrastColor`) and CSV field quoting used by data export.
 - `id.ts`: `nextId()` — monotonic counter for task/subtask ids; avoids `Date.now()` collisions when
   two ids are minted in the same millisecond.
+- `timeLeft.ts`: `dueBucket` / `mostUrgent` -- behind the header's "Time left" dropdown (time
+  split by due date, time worked per subject, a "no estimate" link that sets the hidden
+  `filter==="noest"` view, and a Start button that opens Focus on the most urgent task in the
+  subject with the most time left).
 - `download.ts`: `downloadFile` — the `Blob` + object URL + synthetic `<a download>` click pattern
   used by data export.
 

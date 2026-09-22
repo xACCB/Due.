@@ -15,6 +15,7 @@ import { localDateStr, todayISO, advanceDate } from "./lib/dates";
 import { nextId } from "./lib/id";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown } from "./lib/format";
+import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
 import { downloadFile } from "./lib/download";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -207,6 +208,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"time-left-more", date:"2026-09-22", title:"New feature", description:"The \"Time left\" dropdown now splits time by due date, shows time worked per subject, flags tasks with no estimate, and can start Focus on the most urgent task in your biggest subject." },
   { id:"fewer-layouts", date:"2026-09-22", title:"UI change", description:"Trimmed the layouts to seven: Compact, Minimal, Sticky, Timeline and By Subject are gone. If you were using one, you're back on List." },
   { id:"recently-deleted", date:"2026-09-22", title:"New feature", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
   { id:"skip-occurrence", date:"2026-09-22", title:"New feature", description:"Repeating tasks have \"Skip this one\" in their detail view -- moves to the next occurrence without completing it. Undoable." },
@@ -1786,6 +1788,7 @@ export default function HomeworkPlanner() {
     if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
     if(filter==="done")return t.done;
     if(filter==="pending")return !t.done;
+    if(filter==="noest")return !t.done&&!t.estMins; // from the "Time left" dropdown; not a chip
     return showDone?true:!t.done;
   }).filter(matchesSearch);
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
@@ -1803,14 +1806,26 @@ export default function HomeworkPlanner() {
     document.addEventListener("visibilitychange",onVisible);
     return()=>{cancelled=true;document.removeEventListener("visibilitychange",onVisible);lock?.release().catch(()=>{});};
   },[focusMode]);
-  const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
+  const openTasks=visibleTasks.filter(t=>!t.done&&!t.archived);
+  const totalMins=openTasks.reduce((s,t)=>s+(t.estMins||0),0);
   // Per-subject split of totalMins for the header's "time left" popover, largest
   // first; tasks with no subject are pooled under "" (shown as "No subject").
+  // `spent` is real time logged by the task timer on those same open tasks.
   const timeBySubject=(()=>{
-    const m:Record<string,number>={};
-    visibleTasks.filter(t=>!t.done&&!t.archived).forEach(t=>{m[t.subject||""]=(m[t.subject||""]||0)+(t.estMins||0);});
-    return Object.entries(m).filter(([,mins])=>mins>0).sort((a,b)=>b[1]-a[1]).map(([name,mins])=>({name,mins,pct:totalMins?Math.round(mins/totalMins*100):0}));
+    const m:Record<string,{mins:number;spent:number}>={};
+    openTasks.forEach(t=>{const e=m[t.subject||""]||={mins:0,spent:0};e.mins+=t.estMins||0;e.spent+=(t.sessions||[]).reduce((a,x)=>a+x.mins,0);});
+    return Object.entries(m).filter(([,e])=>e.mins>0).sort((a,b)=>b[1].mins-a[1].mins).map(([name,e])=>({name,...e,pct:totalMins?Math.round(e.mins/totalMins*100):0}));
   })();
+  // Same open tasks split by when they're due (empty buckets dropped).
+  const timeByDue=(()=>{
+    const today=localDateStr(new Date(now));
+    return DUE_BUCKETS.map(b=>{const ts=openTasks.filter(t=>dueBucket(t.dueDate,today)===b.key);return {...b,count:ts.length,mins:ts.reduce((s,t)=>s+(t.estMins||0),0)};}).filter(b=>b.count>0);
+  })();
+  // Open tasks with no estimate count as 0 above, so the total reads low.
+  const noEstimateCount=openTasks.filter(t=>!t.estMins).length;
+  // Most urgent task in the subject with the most time left, for "Start".
+  const heaviestSubject=timeBySubject[0];
+  const heaviestNext=heaviestSubject?mostUrgent(openTasks.filter(t=>(t.subject||"")===heaviestSubject.name)):undefined;
   const fmtMins=(m:number)=>formatDuration(m)||"0m";
 
   // Inbox stats. Archived tasks still count here -- archiving is just a view
@@ -2818,10 +2833,22 @@ export default function HomeworkPlanner() {
             </button>
             {timeMenuOpen&&(
               <div role="dialog" aria-label="Time left by subject" style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,width:250,maxWidth:"calc(100vw - 28px)",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",padding:"12px 14px"}}>
-                <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Time left by subject</div>
-                {timeBySubject.length===0
+                <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By due date</div>
+                {timeByDue.length===0
                   ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Nothing left to do</div>
-                  :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  :<div style={{display:"flex",flexDirection:"column",gap:7}}>
+                    {timeByDue.map(b=>(
+                      <div key={b.key} style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontFamily:F.body,fontSize:12,color:b.key==="overdue"?"#FF4757":T.text,flex:1}}>{b.label}</span>
+                        <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{b.count} {b.count===1?"task":"tasks"}</span>
+                        <span style={{fontFamily:F.body,fontSize:12,color:T.text,width:52,textAlign:"right"}}>{fmtMins(b.mins)}</span>
+                      </div>
+                    ))}
+                  </div>}
+                {timeBySubject.length>0&&<>
+                  <div style={{height:1,background:T.borderFaint,margin:"12px 0"}}/>
+                  <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By subject</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
                     {timeBySubject.map(r=>{const c=r.name?(subjectColors[r.name]||T.accent):T.textMuted;return(
                       <div key={r.name}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2833,9 +2860,21 @@ export default function HomeworkPlanner() {
                         <div style={{height:3,borderRadius:99,background:T.cardAlt,marginTop:5,marginLeft:16,overflow:"hidden"}}>
                           <div style={{height:"100%",width:`${r.pct}%`,background:c,borderRadius:99}}/>
                         </div>
+                        {r.spent>0&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:4,marginLeft:16}}>{fmtMins(r.spent)} worked of {fmtMins(r.mins)} planned</div>}
                       </div>
                     );})}
-                  </div>}
+                  </div>
+                </>}
+                {noEstimateCount>0&&(
+                  <button onClick={()=>{setFilter("noest");setActiveTab("tasks");setTimeMenuOpen(false);}} style={{display:"block",width:"100%",marginTop:12,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",fontFamily:F.body,fontSize:11,color:T.textMuted}}>
+                    {noEstimateCount} {noEstimateCount===1?"task has":"tasks have"} no estimate, so the total is low. Show them ›
+                  </button>
+                )}
+                {heaviestNext&&(
+                  <button onClick={()=>{setFocusTaskId(heaviestNext.id);setTimeMenuOpen(false);setFocusModeAnimated(true);}} style={{display:"block",width:"100%",marginTop:12,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 10px",cursor:"pointer",fontFamily:F.body,fontSize:12,textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    ▶ Start {heaviestSubject.name||"No subject"}: {heaviestNext.title}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -2935,6 +2974,7 @@ export default function HomeworkPlanner() {
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
             {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f[0].toUpperCase()+f.slice(1)}</button>)}
+            {filter==="noest"&&<button onClick={()=>setFilter("all")} aria-label="Clear no-estimate filter" style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>No estimate ×</button>}
             {layout==="list"&&(selectionMode
               ? <button onClick={exitSelectionMode} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>
               : <button onClick={()=>setSelectionMode(true)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Select</button>
@@ -2943,7 +2983,7 @@ export default function HomeworkPlanner() {
           </div>
 
           {renderTasks(filteredTasks)}
-          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>{searchLower?`No tasks match "${searchQuery.trim()}"`:filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending -- nice work!":"Nothing here yet -- add some homework below"}</div>}
+          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>{searchLower?`No tasks match "${searchQuery.trim()}"`:filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending -- nice work!":filter==="noest"?"Every open task has an estimate":"Nothing here yet -- add some homework below"}</div>}
           <div style={{marginTop:14}}>
             {!adding?(
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,paddingTop:10}}>

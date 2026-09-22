@@ -2259,7 +2259,8 @@ export default function HomeworkPlanner() {
                 </div>}
               </div>
             ):(
-              <div style={{background:T.card,borderRadius:16,padding:"18px",border:`1px solid ${T.borderAccent}`}}>
+              <div style={{background:T.card,borderRadius:16,padding:"18px",border:`1px solid ${T.borderAccent}`,position:"relative"}}>
+                <button onClick={()=>setAdding(false)} aria-label="Cancel" title="Cancel" style={{position:"absolute",top:10,right:10,background:"none",border:"none",color:T.textFaint,fontSize:20,lineHeight:1,cursor:"pointer",padding:4}}>×</button>
                 <div style={{display:"flex",gap:5,marginBottom:14,justifyContent:"center"}}>
                   {[...Array(QUESTIONS.length+1)].map((_,i)=><div key={i} style={{width:i===step+1?20:6,height:6,borderRadius:999,background:i<=step+1?T.accent:T.border,transition:"all 0.3s"}}/>)}
                 </div>
@@ -2365,11 +2366,10 @@ export default function HomeworkPlanner() {
                     </div>
                   </div>}
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}>
-                  {step>-1&&<button onClick={goBackStep} aria-label="Go back" title="Go back" style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:13,cursor:"pointer",padding:0}}>‹</button>}
-                  <button onClick={()=>setAdding(false)} style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:11,cursor:"pointer",padding:0}}>cancel</button>
-                  {step>-1&&<button onClick={goForwardStep} aria-label="Skip" title="Skip" style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:13,cursor:"pointer",padding:0}}>›</button>}
-                </div>
+                {step>-1&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:16}}>
+                  <button onClick={goBackStep} aria-label="Go back" title="Go back" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.textMuted,fontSize:15,cursor:"pointer",padding:"7px 16px",borderRadius:10}}>‹ back</button>
+                  <button onClick={goForwardStep} aria-label="Skip" title="Skip" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.textMuted,fontSize:15,cursor:"pointer",padding:"7px 16px",borderRadius:10}}>skip ›</button>
+                </div>}
               </div>
             )}
           </div>

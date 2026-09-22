@@ -2449,7 +2449,7 @@ export default function HomeworkPlanner() {
         <div className="app-body">
         <div className="app-sidebar">
         {/* Tabs */}
-        <div className="tab-bar" onPointerDown={onTabBarPointerDown} onPointerMove={onTabBarPointerMove} onPointerUp={onTabBarPointerUp} onPointerCancel={onTabBarPointerCancel} style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"none"}}>
+        <div className="tab-bar" onPointerDown={onTabBarPointerDown} onPointerMove={onTabBarPointerMove} onPointerUp={onTabBarPointerUp} onPointerCancel={onTabBarPointerCancel} style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"none",userSelect:"none",WebkitUserSelect:"none"}}>
           {(["tasks","focus"] as const).map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
             const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};

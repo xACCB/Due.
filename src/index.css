@@ -9,25 +9,6 @@
   box-sizing: border-box;
 }
 
-/* Without this, a horizontal drag anywhere on the page (like the tab bar's
-   press-and-swipe gesture) can trigger iOS Safari's rubber-band overscroll
-   bounce, which pulls the whole page aside and reveals Safari's own
-   background -- not any element of ours, so no background-color fix alone
-   can cover it -- behind the left/right edge. Vertical overscroll
-   (pull-to-refresh feel) is untouched.
-   This does NOT fully fix it on iOS Safari -- a residual split-second flash
-   of the same artifact remains there. Two follow-up attempts (overflow-x:
-   hidden here; e.preventDefault() in the tab bar's pointer handlers in
-   App.tsx) were both tried and reverted after making it worse on a real
-   iPad, so don't retry either of those specifically without new evidence of
-   why they backfired -- neither could be verified locally (no iOS device/
-   simulator in this environment; Chromium doesn't reproduce Safari's
-   rubber-band bounce), which is almost certainly why both went in blind and
-   missed something about the actual behavior. */
-html, body {
-  overscroll-behavior-x: none;
-}
-
 body {
   margin: 0;
   /* Without this, text can render rough/jagged (reported as "pixelated") in

@@ -1401,45 +1401,6 @@ export default function HomeworkPlanner() {
   const [dragOffsetY,setDragOffsetY]=useState(0);
   const dragStartY=useRef(0);
   const dragOrderIds=useRef<number[]>([]);
-  // Tab bar: press-and-hold then drag across the pill to switch tabs without
-  // lifting, resolved via elementFromPoint (not per-button coordinates) so it
-  // stays correct regardless of layout/zoom -- same technique as the task
-  // reorder drag above. tabBarSwipeId doubles as the live highlight while
-  // pressed and the tab that actually gets committed on release.
-  const [tabBarSwipeId,setTabBarSwipeId]=useState<string|null>(null);
-  function onTabBarPointerDown(e:React.PointerEvent){
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    const el=(e.target as HTMLElement).closest("[data-tab-id]") as HTMLElement|null;
-    setTabBarSwipeId(el?.dataset.tabId||null);
-  }
-  function onTabBarPointerMove(e:React.PointerEvent){
-    if(tabBarSwipeId===null)return;
-    const el=document.elementFromPoint(e.clientX,e.clientY) as HTMLElement|null;
-    const id=el?.closest("[data-tab-id]")?.getAttribute("data-tab-id");
-    if(id&&id!==tabBarSwipeId)setTabBarSwipeId(id);
-  }
-  function onTabBarPointerUp(){
-    if(tabBarSwipeId==="focus")setFocusModeAnimated(true);
-    else if(tabBarSwipeId)setActiveTab(tabBarSwipeId);
-    setTabBarSwipeId(null);
-  }
-  function onTabBarPointerCancel(){setTabBarSwipeId(null);}
-  // Belt-and-suspenders against iOS Safari panning the *whole page* during
-  // this drag (touch-action:none on the bar itself wasn't enough on its
-  // own -- reported on a real iPad). Two earlier attempts at this backfired
-  // (overflow-x:hidden on html/body; e.preventDefault() inside the React
-  // pointer handlers) and were reverted; this is a different, more direct
-  // technique: a native (non-React) touchmove listener registered with
-  // {passive:false} explicitly, since browsers otherwise treat touch
-  // listeners as passive by default and silently ignore preventDefault
-  // inside them. Only attached while a drag is actually in progress, so it
-  // can't affect ordinary scrolling the rest of the time.
-  useEffect(()=>{
-    if(tabBarSwipeId===null)return;
-    function blockScroll(e:TouchEvent){e.preventDefault();}
-    document.addEventListener("touchmove",blockScroll,{passive:false});
-    return ()=>document.removeEventListener("touchmove",blockScroll);
-  },[tabBarSwipeId]);
   // Swipe gestures (List/Compact/Checklist layouts): left deletes, right toggles
   // done. Direction is locked on the first few px of movement so a mostly-vertical
   // drag (page scroll) is left alone instead of being hijacked as a swipe.
@@ -2482,18 +2443,14 @@ export default function HomeworkPlanner() {
         <div className="app-body">
         <div className="app-sidebar">
         {/* Tabs */}
-        <div className="tab-bar" onPointerDown={onTabBarPointerDown} onPointerMove={onTabBarPointerMove} onPointerUp={onTabBarPointerUp} onPointerCancel={onTabBarPointerCancel} style={{position:"relative",display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"none",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
-          {/* Single pill that slides between slots (rather than each button's
-              background instantly popping in/out) so the drag gesture above
-              reads as one continuous motion instead of a cross-fade. */}
-          <div style={{position:"absolute",top:4,bottom:4,left:(tabBarSwipeId==="focus"||(!tabBarSwipeId&&activeTab==="focus"))?"calc(4px + (100% - 8px - 3px) / 2 + 3px)":4,width:"calc((100% - 8px - 3px) / 2)",background:T.card,borderRadius:999,transition:"left 0.22s cubic-bezier(.34,1.4,.64,1)"}}/>
+        <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4}}>
           {(["tasks","focus"] as const).map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
             const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};
             const Icon=icons[id];
-            const active=tabBarSwipeId?id===tabBarSwipeId:activeTab===id;
-            return <button key={id} data-tab-id={id} onClick={()=>id==="focus"?setFocusModeAnimated(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
-              style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color 0.18s cubic-bezier(.34,1.4,.64,1)",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
+            const active=activeTab===id;
+            return <button key={id} onClick={()=>id==="focus"?setFocusModeAnimated(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
+              style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"all 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
               <Icon/>
             </button>;
           })}

@@ -919,7 +919,6 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
   },[notificationsEnabled,tasks,enabledOffsets]);
 
-  const [accentOverride,setAccentOverride]=useState<string|null>(()=>localStorage.getItem("hw-accent")||null);
   const [fontName,setFontName]=usePersistedState<FontName>("hw-font","dmSerif");
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
@@ -962,7 +961,11 @@ export default function HomeworkPlanner() {
   }
 
   useEffect(()=>{localStorage.setItem("hw-tasks",JSON.stringify(tasks));},[tasks]);
-  useEffect(()=>{if(accentOverride)localStorage.setItem("hw-accent",accentOverride);else localStorage.removeItem("hw-accent");},[accentOverride]);
+  // Clears any stale custom-accent override from before this feature was removed,
+  // so a leftover value can't silently hijack T.accent away from the active
+  // theme's own black/white accent (this is what caused text using color:T.accent
+  // to render invisible against a background it was never designed for).
+  useEffect(()=>{localStorage.removeItem("hw-accent");},[]);
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
@@ -1378,7 +1381,7 @@ export default function HomeworkPlanner() {
   function exitSelectionMode(){ setSelectionMode(false); setSelectedIds([]); }
 
   const base=THEMES[themeName];
-  const T:ThemeObj={...base,accentGlow:(accentOverride||base.accent)+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:(accentOverride||base.accent) as typeof base.accent};
+  const T:ThemeObj={...base,accentGlow:base.accent+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:base.accent as typeof base.accent};
   // Mirrors just the resolved background color (not the whole theme) to its own
   // key, read synchronously by a tiny inline script in index.html before React
   // hydrates -- prevents a flash of the browser's default white background for
@@ -2508,20 +2511,6 @@ export default function HomeworkPlanner() {
                   ))}
                 </div>
                 {themeMode==="auto"&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>Following your device -- currently {effectiveThemeMode}</div>}
-              </div>
-              {/* Accent */}
-              <div>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Custom Accent</div>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <input type="color" value={accentOverride||T.accent} onChange={e=>setAccentOverride(e.target.value)} style={{width:44,height:36,borderRadius:9,cursor:"pointer",border:`1px solid ${T.border}`}}/>
-                  <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{accentOverride||T.accent}</span>
-                  {accentOverride&&<button onClick={()=>setAccentOverride(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.textMuted,fontFamily:F.body,fontSize:10,padding:"3px 9px",cursor:"pointer"}}>reset</button>}
-                </div>
-                <div style={{marginTop:8,display:"flex",gap:7,flexWrap:"wrap"}}>
-                  {["#F0A500","#f472b6","#38bdf8","#4ade80","#fb923c","#f87171","#34d399","#a78bfa","#fbbf24","#60a5fa"].map(c=>(
-                    <button key={c} onClick={()=>setAccentOverride(c)} style={{width:26,height:26,borderRadius:"50%",background:c,border:`2px solid ${accentOverride===c?"#fff":"transparent"}`,cursor:"pointer"}}/>
-                  ))}
-                </div>
               </div>
               {/* Layouts */}
               <div>

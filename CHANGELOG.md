@@ -40,11 +40,22 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   `textFaint` against the large-text/UI-component bar, and both themes were nudged to actually pass.
 - Renamed the "Auto" appearance mode to "System" (label only, same behavior).
 
+### Fixed
+- The header wordmark, the selected Appearance button, and the Stats numbers could render in a
+  leftover custom accent color instead of the active theme's own black/white accent, making them
+  effectively invisible in Stealth Light if a custom accent had ever been set (from before the app
+  was down to just two themes). Root cause and fix below.
+
 ### Removed
 - Streak tracking, the 7-day activity dots, and streak-gated theme unlocks.
   The three previously-gated themes (matrix, dracula, rosepine) are now
   available to everyone.
 - The "BOW" theme (added, then removed again shortly after) from the light theme menu.
+- The "Custom Accent" color picker (Options tab). It let `T.accent` get permanently overridden by
+  an arbitrary color regardless of which theme was active, which is exactly what caused the
+  invisible-text bug above -- a stray override doesn't make sense anymore now that there are only
+  two themes and the accent is meant to always be exactly black or white. Any existing stale
+  override in a user's browser is cleared automatically on next load.
 
 ## [0.1.0] — 2026-09-21
 Baseline tag for the start of changelog tracking. Recent work before this

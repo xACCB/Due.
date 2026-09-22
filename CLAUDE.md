@@ -155,8 +155,15 @@ theme per light/dark category, `themeName` in `App.tsx` is a plain derived `cons
 preference), but which of the two themes that resolves to is fully determined by it, so there's
 nothing left to persist, sync, or correct; the old `themeByMode` "remember last picked theme per
 category" mechanism and its Firestore/localStorage sync are gone entirely, since there's nothing
-left to remember. The "Theme" picker grid is gone from Options for the same reason (nothing to pick
-between); "Custom Accent" is still there and independent of which of the two base themes is active.
+left to remember. The "Theme" picker grid and the "Custom Accent" color picker (`accentOverride`
+state, `hw-accent` localStorage key) are both gone from Options -- the latter because it let
+`T.accent` (`accentOverride||base.accent`) get permanently hijacked away from the active theme's
+own black/white accent by a stray custom color, which is exactly what caused several places that
+read `color:T.accent` directly (the header wordmark, the selected Appearance button, the Stats
+numbers) to render with a leftover light/invisible color in Stealth Light regardless of which
+theme was actually selected. `T.accent` is now simply `base.accent`, no override possible; a
+one-time `localStorage.removeItem("hw-accent")` on mount clears any stale value already saved by
+existing users' browsers rather than leaving a dead key around.
 One correctness fix from this worth knowing regardless of future palette changes: 21 call sites
 across the file style buttons/checkmarks as `background:T.accent, color:"#000"` (hardcoded,
 `border:"none"` on most), an assumption that only holds if `accent` is always bright enough for

@@ -1494,6 +1494,22 @@ export default function HomeworkPlanner() {
   const overviewCompleted=tasks.filter(t=>t.completedAt&&t.completedAt>=overviewStart);
   const overviewFinished=overviewCompleted.length;
   const overviewMins=overviewCompleted.reduce((s,t)=>s+(t.estMins||0),0);
+  // On-time vs late -- only counts completions that actually had a due date (a
+  // task with no due date has no deadline to be on time or late against); no
+  // due time on the task means the whole due date counts, so the deadline is
+  // that date's end of day.
+  const overviewDated=overviewCompleted.filter(t=>t.dueDate);
+  const overviewOnTime=overviewDated.filter(t=>{
+    const deadline=new Date(`${t.dueDate}T${t.dueTime||"23:59"}:00`).getTime();
+    return (t.completedAt as number)<=deadline;
+  }).length;
+  const onTimePct=overviewDated.length>0?Math.round(overviewOnTime/overviewDated.length*100):null;
+  const busiestSubject=(()=>{
+    const counts:Record<string,number>={};
+    overviewCompleted.forEach(t=>{if(t.subject)counts[t.subject]=(counts[t.subject]||0)+1;});
+    const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    return sorted.length?sorted[0][0]:null;
+  })();
 
   function startAdding(){
     setAdding(true);setStep(-1);
@@ -2246,7 +2262,8 @@ export default function HomeworkPlanner() {
                   </button>
                   {inboxMenuOpen&&(
                     <div style={{padding:"0 14px 12px"}}>
-                      {/* Overview */}
+                      {/* Personal */}
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Personal</div>
                       <div style={{display:"flex",gap:6,marginBottom:10}}>
                         {(["week","month","year"] as const).map(p=>(
                           <button key={p} onClick={()=>setOverviewPeriod(p)} style={{flex:1,background:overviewPeriod===p?T.accent:T.cardAlt,color:overviewPeriod===p?contrastColor(T.accent):T.textMuted,border:`1px solid ${overviewPeriod===p?T.accent:T.border}`,borderRadius:8,padding:"5px 0",fontFamily:F.body,fontSize:11,cursor:"pointer",textTransform:"capitalize"}}>{p}</button>
@@ -2261,9 +2278,17 @@ export default function HomeworkPlanner() {
                           <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{overviewMins>=60?`${Math.floor(overviewMins/60)}h ${overviewMins%60}m`:`${overviewMins}m`}</div>
                           <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Time spent</div>
                         </div>
+                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
+                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{onTimePct===null?"--":`${onTimePct}%`}</div>
+                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>On time</div>
+                        </div>
+                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
+                          <div style={{fontFamily:F.heading,fontSize:14,color:busiestSubject?subjectColors[busiestSubject]||T.accent:T.accent,marginTop:2}}>{busiestSubject||"--"}</div>
+                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Busiest subject</div>
+                        </div>
                       </div>
-                      {/* What's New */}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,paddingTop:10,borderTop:`1px solid ${T.border}`}}>What's New</div>
+                      {/* Updates */}
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,paddingTop:10,borderTop:`1px solid ${T.border}`}}>Updates</div>
                       <div style={{display:"flex",flexDirection:"column",gap:10,maxHeight:180,overflowY:"auto"}}>
                         {whatsNew.length===0
                           ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>

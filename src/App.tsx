@@ -172,6 +172,11 @@ function IconImport(){
     <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
   </svg>;
 }
+function IconChart(){
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/>
+  </svg>;
+}
 function IconBell(){
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/>
@@ -1332,6 +1337,7 @@ export default function HomeworkPlanner() {
   const [titleMenuOpen,setTitleMenuOpen]=useState(false);
   const [historyMenuOpen,setHistoryMenuOpen]=useState(false);
   const [inboxMenuOpen,setInboxMenuOpen]=useState(false);
+  const [statsMenuOpen,setStatsMenuOpen]=useState(false);
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!titleMenuOpen)return;
@@ -2269,6 +2275,25 @@ export default function HomeworkPlanner() {
                     </div>
                   )}
                 </div>
+                <div style={{borderBottom:`1px solid ${T.border}`}}>
+                  <button onClick={()=>setStatsMenuOpen(o=>!o)} aria-expanded={statsMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
+                    <IconChart/>
+                    <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Stats</span>
+                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:statsMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
+                  </button>
+                  {statsMenuOpen&&(
+                    <div style={{padding:"0 14px 12px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+                      <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
+                        <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisWeek}</div>
+                        <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Week</div>
+                      </div>
+                      <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
+                        <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisMonth}</div>
+                        <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Month</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button role="menuitem" onClick={()=>{setShowProfile(true);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke={T.text} strokeWidth="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.text} strokeWidth="2" strokeLinecap="round"/></svg>
                   <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Profile</span>
@@ -2492,21 +2517,6 @@ export default function HomeworkPlanner() {
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {/* Pomodoro */}
             {renderPomodoroCard()}
-
-            {/* Stats */}
-            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Stats</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-                <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
-                  <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisWeek}</div>
-                  <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Week</div>
-                </div>
-                <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
-                  <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisMonth}</div>
-                  <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Month</div>
-                </div>
-              </div>
-            </div>
 
             {/* Scratchpad */}
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>

@@ -1424,6 +1424,22 @@ export default function HomeworkPlanner() {
     setTabBarSwipeId(null);
   }
   function onTabBarPointerCancel(){setTabBarSwipeId(null);}
+  // Belt-and-suspenders against iOS Safari panning the *whole page* during
+  // this drag (touch-action:none on the bar itself wasn't enough on its
+  // own -- reported on a real iPad). Two earlier attempts at this backfired
+  // (overflow-x:hidden on html/body; e.preventDefault() inside the React
+  // pointer handlers) and were reverted; this is a different, more direct
+  // technique: a native (non-React) touchmove listener registered with
+  // {passive:false} explicitly, since browsers otherwise treat touch
+  // listeners as passive by default and silently ignore preventDefault
+  // inside them. Only attached while a drag is actually in progress, so it
+  // can't affect ordinary scrolling the rest of the time.
+  useEffect(()=>{
+    if(tabBarSwipeId===null)return;
+    function blockScroll(e:TouchEvent){e.preventDefault();}
+    document.addEventListener("touchmove",blockScroll,{passive:false});
+    return ()=>document.removeEventListener("touchmove",blockScroll);
+  },[tabBarSwipeId]);
   // Swipe gestures (List/Compact/Checklist layouts): left deletes, right toggles
   // done. Direction is locked on the first few px of movement so a mostly-vertical
   // drag (page scroll) is left alone instead of being hijacked as a swipe.

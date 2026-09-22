@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { flushSync } from "react-dom";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged, deleteUser } from "firebase/auth";
 import type { User } from "firebase/auth";
@@ -1305,6 +1306,22 @@ export default function HomeworkPlanner() {
 
   const [adding,setAdding]=useState(false);
   const [focusMode,setFocusMode]=useState(false); // transient by design -- no persistence needed
+  // Focus Mode swaps the *entire* app shell (see the early-return below), so
+  // without this the tab bar/header just vanish mid-frame -- especially ugly
+  // right after the tab bar's own sliding pill animation. startViewTransition
+  // needs the DOM to already reflect the new state by the time its callback
+  // returns, which setFocusMode alone can't guarantee (React batches state
+  // updates), hence flushSync forcing it through synchronously first. Falls
+  // straight back to a plain instant setFocusMode on browsers that don't
+  // have the API yet (anything pre Safari 18 -- Chrome/Edge have had it for
+  // years), so this never breaks anything, only sometimes fails to animate.
+  function setFocusModeAnimated(value:boolean){
+    if(typeof document.startViewTransition==="function"){
+      document.startViewTransition(()=>{flushSync(()=>setFocusMode(value));});
+    } else {
+      setFocusMode(value);
+    }
+  }
   const [step,setStep]=useState(0);
   const [newTask,setNewTask]=useState<Partial<Task>>({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
   const [pendingDueDate,setPendingDueDate]=useState<string|null>(null);
@@ -1402,7 +1419,7 @@ export default function HomeworkPlanner() {
     if(id&&id!==tabBarSwipeId)setTabBarSwipeId(id);
   }
   function onTabBarPointerUp(){
-    if(tabBarSwipeId==="focus")setFocusMode(true);
+    if(tabBarSwipeId==="focus")setFocusModeAnimated(true);
     else if(tabBarSwipeId)setActiveTab(tabBarSwipeId);
     setTabBarSwipeId(null);
   }
@@ -2220,7 +2237,7 @@ export default function HomeworkPlanner() {
         <style>{css}</style>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>Focus Mode</div>
-          <button onClick={()=>setFocusMode(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>✕ Exit</button>
+          <button onClick={()=>setFocusModeAnimated(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>✕ Exit</button>
         </div>
         <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
           {topTask?(
@@ -2459,7 +2476,7 @@ export default function HomeworkPlanner() {
             const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};
             const Icon=icons[id];
             const active=tabBarSwipeId?id===tabBarSwipeId:activeTab===id;
-            return <button key={id} data-tab-id={id} onClick={()=>id==="focus"?setFocusMode(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
+            return <button key={id} data-tab-id={id} onClick={()=>id==="focus"?setFocusModeAnimated(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
               style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color 0.18s cubic-bezier(.34,1.4,.64,1)",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
               <Icon/>
             </button>;

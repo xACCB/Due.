@@ -1337,6 +1337,7 @@ export default function HomeworkPlanner() {
   const [titleMenuOpen,setTitleMenuOpen]=useState(false);
   const [historyMenuOpen,setHistoryMenuOpen]=useState(false);
   const [inboxMenuOpen,setInboxMenuOpen]=useState(false);
+  const [overviewPeriod,setOverviewPeriod]=useState<"week"|"month"|"year">("week");
   const [statsMenuOpen,setStatsMenuOpen]=useState(false);
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
@@ -1479,12 +1480,20 @@ export default function HomeworkPlanner() {
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
 
-  // Stats (Tools tab). Archived tasks still count here -- archiving is just a
+  // Stats (title menu). Archived tasks still count here -- archiving is just a
   // view filter, it doesn't erase completion history.
   const startOfWeek=(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());d.setHours(0,0,0,0);return d.getTime();})();
   const startOfMonth=(()=>{const d=new Date();d.setDate(1);d.setHours(0,0,0,0);return d.getTime();})();
+  const startOfYear=(()=>{const d=new Date();d.setMonth(0,1);d.setHours(0,0,0,0);return d.getTime();})();
   const tasksThisWeek=tasks.filter(t=>t.completedAt&&t.completedAt>=startOfWeek).length;
   const tasksThisMonth=tasks.filter(t=>t.completedAt&&t.completedAt>=startOfMonth).length;
+  // Inbox overview -- Week/Month/Year toggle over the same completedAt data,
+  // "time spent" is a sum of estMins (no separate time-tracking ledger exists,
+  // this is the same proxy the header's "time left" uses for pending tasks).
+  const overviewStart=overviewPeriod==="week"?startOfWeek:overviewPeriod==="month"?startOfMonth:startOfYear;
+  const overviewCompleted=tasks.filter(t=>t.completedAt&&t.completedAt>=overviewStart);
+  const overviewFinished=overviewCompleted.length;
+  const overviewMins=overviewCompleted.reduce((s,t)=>s+(t.estMins||0),0);
 
   function startAdding(){
     setAdding(true);setStep(-1);
@@ -2236,21 +2245,41 @@ export default function HomeworkPlanner() {
                     <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:inboxMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
                   </button>
                   {inboxMenuOpen&&(
-                    <div style={{padding:"0 14px 12px",display:"flex",flexDirection:"column",gap:10,maxHeight:220,overflowY:"auto"}}>
-                      {whatsNew.length===0
-                        ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>
-                        : whatsNew.map(item=>(
-                        <div key={item.id} style={{display:"flex",gap:8}}>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
-                              <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.title}</span>
-                              <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
-                            </div>
-                            <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
-                          </div>
-                          <button onClick={()=>dismissWhatsNew(item.id)} aria-label="Dismiss" title="Dismiss" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
+                    <div style={{padding:"0 14px 12px"}}>
+                      {/* Overview */}
+                      <div style={{display:"flex",gap:6,marginBottom:10}}>
+                        {(["week","month","year"] as const).map(p=>(
+                          <button key={p} onClick={()=>setOverviewPeriod(p)} style={{flex:1,background:overviewPeriod===p?T.accent:T.cardAlt,color:overviewPeriod===p?contrastColor(T.accent):T.textMuted,border:`1px solid ${overviewPeriod===p?T.accent:T.border}`,borderRadius:8,padding:"5px 0",fontFamily:F.body,fontSize:11,cursor:"pointer",textTransform:"capitalize"}}>{p}</button>
+                        ))}
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
+                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{overviewFinished}</div>
+                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Finished</div>
                         </div>
-                      ))}
+                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
+                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{overviewMins>=60?`${Math.floor(overviewMins/60)}h ${overviewMins%60}m`:`${overviewMins}m`}</div>
+                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Time spent</div>
+                        </div>
+                      </div>
+                      {/* What's New */}
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,paddingTop:10,borderTop:`1px solid ${T.border}`}}>What's New</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:10,maxHeight:180,overflowY:"auto"}}>
+                        {whatsNew.length===0
+                          ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>
+                          : whatsNew.map(item=>(
+                          <div key={item.id} style={{display:"flex",gap:8}}>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                                <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.title}</span>
+                                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
+                              </div>
+                              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
+                            </div>
+                            <button onClick={()=>dismissWhatsNew(item.id)} aria-label="Dismiss" title="Dismiss" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

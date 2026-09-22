@@ -359,11 +359,17 @@ Chrome accessibility tree):
   React Compiler's `preserve-manual-memoization` check, like the forward-reference note above; the
   swipe-reveal label keeps plain hex for that reason.
 
-**Bulk edit / multi-select** (`selectionMode`/`selectedIds` state) is deliberately scoped to the
-default list layout only (`MiniCard`) — the other 6 layouts each render their own custom task row
-markup, so extending selection to all of them was judged not worth the scope. `MiniCard` accepts
-`selectionMode`/`isSelected`/`onToggleSelect` and repurposes the done-toggle button into a selection
-checkbox when active, gating swipe/drag handlers off at the same time to avoid gesture conflicts.
+**Bulk edit / multi-select** (`selectionMode`/`selectedIds` state, "Select" in the filter row, with
+"Select all" for the visible tasks) works in every layout. `MiniCard` takes
+`selectionMode`/`isSelected`/`onToggleSelect` and repurposes its done-toggle into a selection check
+(gating swipe/drag off); the other 6 layouts do the same through `openOrSelect(t)` (row tap selects
+instead of opening), `chk(t)` (the done-check shows selection, in the accent color) and
+`data-selected` (outline from the runtime css), with their delete buttons and swipe hidden while
+selecting. The bulk bar (two rows: Done/Archive/Delete, then Subject/Due date/Priority menus) calls
+`bulkMarkDone`/`bulkArchive`/`bulkDelete`/`bulkSetSubject`/`bulkSetDue`/`bulkSetPriority`, all
+through `changeTasks` so each is one undo step. Due date keeps each task's own time (clearing the
+date clears it); "Pick a date..." applies on Set, not on change. Priority "Automatic" clears
+`priorityOverride`.
 
 **Task templates** (`TaskTemplate`, `templates` state; shown as deletable chips under the add
 button) are local-only — `localStorage`, not synced

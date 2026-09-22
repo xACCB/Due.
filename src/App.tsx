@@ -23,6 +23,7 @@ import { diffTasks, applyTaskStates } from "./lib/history";
 import type { TaskStates } from "./lib/history";
 import type { SyncRecord, CloudRecord } from "./lib/sync";
 import { downloadFile } from "./lib/download";
+import { LIMITS, addSession, sanitizeTask } from "./lib/limits";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -394,7 +395,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   const [newSubtaskText,setNewSubtaskText]=useState("");
   function addSubtask(){
     const text=newSubtaskText.trim();
-    if(!text)return;
+    if(!text||subtasks.length>=LIMITS.subtasks)return; // firestore.rules caps the list
     onUpdateSubtasks([...subtasks,{id:String(nextId()),text,done:false}]);
     setNewSubtaskText("");
   }
@@ -418,7 +419,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   const [templateSaved,setTemplateSaved]=useState(false);
   function addTag(){
     const t=newTagText.trim();
-    if(!t||tags.includes(t))return;
+    if(!t||tags.includes(t)||tags.length>=LIMITS.tags)return; // firestore.rules caps the list
     onSetTags([...tags,t]);
     setNewTagText("");
   }
@@ -649,7 +650,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
               ))}
             </div>}
             <div style={{display:"flex",gap:6}}>
-              <input value={newSubtaskText} onChange={e=>setNewSubtaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSubtask()} placeholder="Add a subtask..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
+              <input value={newSubtaskText} onChange={e=>setNewSubtaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSubtask()} placeholder={subtasks.length>=LIMITS.subtasks?`Limit of ${LIMITS.subtasks} subtasks reached`:"Add a subtask..."} disabled={subtasks.length>=LIMITS.subtasks} maxLength={500} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
               <button onClick={addSubtask} aria-label="Add subtask" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:12,fontWeight:500}}>+</button>
             </div>
           </div>
@@ -666,10 +667,10 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
               ))}
             </div>}
             <div style={{display:"flex",gap:6}}>
-              <input value={newTagText} onChange={e=>setNewTagText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTag()} placeholder="Add a tag..." style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
+              <input value={newTagText} onChange={e=>setNewTagText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTag()} placeholder={tags.length>=LIMITS.tags?`Limit of ${LIMITS.tags} tags reached`:"Add a tag..."} disabled={tags.length>=LIMITS.tags} maxLength={100} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
               <button onClick={addTag} aria-label="Add tag" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:12,fontWeight:500}}>+</button>
             </div>
-            {allTags.filter(t=>!tags.includes(t)).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>
+            {tags.length<LIMITS.tags&&allTags.filter(t=>!tags.includes(t)).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>
               {allTags.filter(t=>!tags.includes(t)).slice(0,8).map(t=>(
                 <button key={t} onClick={()=>onSetTags([...tags,t])} style={{background:"none",border:`1px dashed ${T.border}`,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:10,color:T.textFaint,cursor:"pointer"}}>+{t}</button>
               ))}
@@ -1329,7 +1330,7 @@ export default function HomeworkPlanner() {
   }
   function addSubject(name:string){
     const trimmed=name.trim();
-    if(!trimmed||subjects.some(s=>s.toLowerCase()===trimmed.toLowerCase()))return;
+    if(!trimmed||subjects.length>=LIMITS.subjects||subjects.some(s=>s.toLowerCase()===trimmed.toLowerCase()))return;
     const used=new Set(Object.values(subjectColors));
     const color=SUBJECT_COLOR_PALETTE.find(c=>!used.has(c))||SUBJECT_COLOR_PALETTE[subjects.length%SUBJECT_COLOR_PALETTE.length];
     setSubjects(prev=>[...prev,trimmed]);
@@ -2008,7 +2009,7 @@ export default function HomeworkPlanner() {
     if(pomodoroPhase==="work"){
       // A finished focus session counts as a work session on the focus task.
       const logId=pomodoroTaskRef.current;
-      if(logId!=null)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:[...(t.sessions||[]),{mins:pomodoroWorkMins,at:Date.now()}]}:t));
+      if(logId!=null)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:addSession(t.sessions,{mins:pomodoroWorkMins,at:Date.now()})}:t));
       setLastWorkedTaskId(logId);setPomodoroPhase("break");setPomodoroSecs(pomodoroBreakMins*60);setPomodoroActive(autoStartBreaks);setPomodoroDone(true);setBreakEnded(false);
       try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:autoStartBreaks?`Nice work -- your ${pomodoroBreakMins}-minute break has started.`:`Nice work -- time for a ${pomodoroBreakMins}-minute break.`}); }catch{/* notifications unavailable */}
     }else{
@@ -2434,8 +2435,9 @@ export default function HomeworkPlanner() {
       const data=JSON.parse(await file.text());
       const raw:unknown[]=Array.isArray(data?.tasks)?data.tasks:[];
       const incoming:Task[]=raw.filter((t):t is Task=>!!t&&typeof (t as Task).id==="number"&&typeof (t as Task).title==="string")
-        .map(t=>({...t,subject:typeof t.subject==="string"?t.subject:"",dueDate:typeof t.dueDate==="string"?t.dueDate:"",
-          dueTime:typeof t.dueTime==="string"?t.dueTime:"",estMins:typeof t.estMins==="number"?t.estMins:0,done:!!t.done}));
+        // Brought inside the limits firestore.rules enforces, or a hand-edited
+        // backup could save locally but never sync.
+        .map(t=>sanitizeTask(t as unknown as Record<string,unknown>) as unknown as Task);
       if(incoming.length===0&&!Array.isArray(data?.subjects)){
         setImportBackupNote("That file doesn't look like a DuePlanner export.");
         return;
@@ -2446,11 +2448,12 @@ export default function HomeworkPlanner() {
       if(fresh.length)setTasks(prev=>[...prev,...fresh]);
       if(Array.isArray(data?.subjects)){
         const extra=(data.subjects as unknown[]).filter((s):s is string=>typeof s==="string"&&!subjects.some(x=>x.toLowerCase()===s.toLowerCase()));
-        if(extra.length)setSubjects(prev=>[...prev,...extra]);
+        if(extra.length)setSubjects(prev=>[...prev,...extra.map(x=>x.slice(0,LIMITS.subject))].slice(0,LIMITS.subjects));
       }
       if(data?.subjectColors&&typeof data.subjectColors==="object"){
         const cols=Object.fromEntries(Object.entries(data.subjectColors).filter(([,v])=>typeof v==="string")) as Record<string,string>;
-        setSubjectColors(prev=>({...cols,...prev}));
+        // Existing colors win; the map stays within the profile doc's cap.
+        setSubjectColors(prev=>Object.fromEntries(Object.entries({...prev,...Object.fromEntries(Object.entries(cols).filter(([k])=>!(k in prev)))}).slice(0,LIMITS.subjects)));
       }
       if(Array.isArray(data?.templates)){
         setTemplates(prev=>{
@@ -2774,7 +2777,7 @@ export default function HomeworkPlanner() {
     if(!selectedTask||sessionSecs<5){setSessionSecs(0);return;}
     const mins=Math.max(1,Math.round(sessionSecs/60));
     const id=selectedTask.id;
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,sessions:[...(t.sessions||[]),{mins,at:Date.now()}]}:t));
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,sessions:addSession(t.sessions,{mins,at:Date.now()})}:t));
     setSessionSecs(0);
   }
 
@@ -3791,7 +3794,7 @@ export default function HomeworkPlanner() {
                 })}
               </div>
               <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectText);setNewSubjectText("");}} style={{display:"flex",gap:8,marginTop:8}}>
-                <input value={newSubjectText} maxLength={200} onChange={e=>setNewSubjectText(e.target.value)} placeholder="Add a subject..." style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:12,outline:"none"}}/>
+                <input value={newSubjectText} maxLength={200} onChange={e=>setNewSubjectText(e.target.value)} placeholder={subjects.length>=LIMITS.subjects?`Limit of ${LIMITS.subjects} subjects reached`:"Add a subject..."} disabled={subjects.length>=LIMITS.subjects} style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:12,outline:"none"}}/>
                 <button type="submit" disabled={!newSubjectText.trim()} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:newSubjectText.trim()?"pointer":"default",opacity:newSubjectText.trim()?1:0.5,fontSize:12,fontWeight:500}}>Add</button>
               </form>
             </div>

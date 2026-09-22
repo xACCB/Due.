@@ -140,7 +140,14 @@ require rewriting a user's entire history:
   server) -- sign-out then clears local tasks/subjects from the device (they come back
   from the cloud on the next sign-in), since signed-out use is local-only.
 - `firestore.rules` validates the shape of profile/task writes (required fields present, correct
-  types, capped string lengths), not just who's making them -- a second layer beyond
+  types, enums, capped string lengths, capped list/map sizes and field counts), not just who's making
+  them. The size limits live in `src/lib/limits.ts` (`LIMITS`, unit-tested) and the app stays inside
+  them -- subtask/tag/subject inputs stop at the cap, `addSession()` drops the oldest session past
+  1000, and JSON import runs `sanitizeTask()` -- because a write over a rules cap saves locally but is
+  silently refused by the cloud. Change a limit in both places; `tests/firestore.rules.test.ts`
+  checks the rules side. Not enforced by rules: a max number of tasks per account or a write rate
+  limit (rules can't count documents or see other requests; that would need a counter doc updated
+  in every batch, or App Check enforcement) -- a second layer beyond
   auth-based ownership, since `firebaseConfig` being public means anyone could otherwise script
   requests directly against the project, bounded only by whatever the rules allow.
 - Firestore is initialized with `persistentLocalCache`/`persistentMultipleTabManager` for

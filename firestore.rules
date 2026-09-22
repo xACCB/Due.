@@ -14,25 +14,43 @@ service cloud.firestore {
     // field types, or unbounded strings run up your storage/bandwidth costs.
     // Optional fields are only type-checked when present, since profile
     // writes use merge:true and may only touch a subset of fields.
+    // Size caps: every string, list and map a client can grow is bounded, so
+    // a document can't be inflated toward Firestore's 1 MiB limit or run up
+    // storage costs. The app stays inside the same numbers (src/lib/limits.ts)
+    // so a normal edit never trips them -- change both together. Rules can't
+    // look inside list items, so item contents are bounded only by the list
+    // length and the 1 MiB document limit.
     function isValidProfile(data) {
-      return (!('layout' in data) || data.layout is string)
+      return data.keys().size() <= 40
+        && (!('layout' in data) || (data.layout is string && data.layout.size() <= 40))
         && (!('colorCodeUrgency' in data) || data.colorCodeUrgency is bool)
         && (!('subjects' in data) || (data.subjects is list && data.subjects.size() <= 200))
-        && (!('subjectColors' in data) || data.subjectColors is map)
+        && (!('subjectColors' in data) || (data.subjectColors is map && data.subjectColors.size() <= 200))
         && (!('timeFormat' in data) || data.timeFormat in ['12h','24h'])
         && (!('weekStart' in data) || data.weekStart in [0,1]);
     }
 
     function isValidTask(data) {
       return data.keys().hasAll(['id','title','subject','dueDate','dueTime','estMins','done','order'])
+        // Room for today's ~18 fields plus a few future/legacy ones, without
+        // allowing a doc to be padded out with arbitrary extra fields.
+        && data.keys().size() <= 24
         && data.id is number
         && data.title is string && data.title.size() <= 500
         && data.subject is string && data.subject.size() <= 200
-        && data.dueDate is string
-        && data.dueTime is string
-        && data.estMins is number
+        && data.dueDate is string && data.dueDate.size() <= 10
+        && data.dueTime is string && data.dueTime.size() <= 5
+        && data.estMins is number && data.estMins >= 0 && data.estMins <= 100000
         && data.done is bool
         && data.order is number
+        && (!('subtasks' in data) || (data.subtasks is list && data.subtasks.size() <= 100))
+        && (!('tags' in data) || (data.tags is list && data.tags.size() <= 30))
+        && (!('sessions' in data) || (data.sessions is list && data.sessions.size() <= 1000))
+        && (!('recurrence' in data) || data.recurrence == null || data.recurrence in ['none','daily','weekly','monthly'])
+        && (!('priorityOverride' in data) || data.priorityOverride == null || data.priorityOverride in ['high','medium','low'])
+        && (!('archived' in data) || data.archived is bool)
+        && (!('completedAt' in data) || data.completedAt == null || data.completedAt is number)
+        && (!('spawnedNextId' in data) || data.spawnedNextId == null || data.spawnedNextId is number)
         // Sync metadata (see src/lib/sync.ts): when the edit happened.
         && (!('updatedAt' in data) || data.updatedAt is number);
     }

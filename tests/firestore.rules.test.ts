@@ -127,3 +127,65 @@ describe("task sync metadata", () => {
     await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), { title: "Essay v2", updatedAt: 6 }, { merge: true }));
   });
 });
+
+// Mirrors src/lib/limits.ts -- the app stays inside these, the rules enforce them.
+describe("size caps", () => {
+  const full = { ...validTask, subtasks:[{ id:"a", text:"x", done:false }], recurrence:"weekly", archived:false,
+    completedAt:null, tags:["exam"], priorityOverride:"high", sessions:[{ mins:25, at:1 }], spawnedNextId:null, updatedAt:1 };
+  const list = (n:number, f:(i:number)=>unknown) => Array.from({ length:n }, (_, i) => f(i));
+  it("accepts a task using every optional field the app writes", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), full));
+  });
+  it("caps subtasks at 100, tags at 30 and sessions at 1000 per task", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/tasks/1");
+    await assertSucceeds(setDoc(ref, { ...validTask, subtasks:list(100, i => ({ id:String(i), text:"s", done:false })) }));
+    await assertFails(setDoc(ref, { ...validTask, subtasks:list(101, i => ({ id:String(i), text:"s", done:false })) }));
+    await assertSucceeds(setDoc(ref, { ...validTask, tags:list(30, i => `t${i}`) }));
+    await assertFails(setDoc(ref, { ...validTask, tags:list(31, i => `t${i}`) }));
+    await assertSucceeds(setDoc(ref, { ...validTask, sessions:list(1000, i => ({ mins:1, at:i })) }));
+    await assertFails(setDoc(ref, { ...validTask, sessions:list(1001, i => ({ mins:1, at:i })) }));
+  });
+  it("rejects over-long strings, bad dates/times lengths and out-of-range estimates", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/tasks/1");
+    await assertFails(setDoc(ref, { ...validTask, title:"x".repeat(501) }));
+    await assertFails(setDoc(ref, { ...validTask, subject:"x".repeat(201) }));
+    await assertFails(setDoc(ref, { ...validTask, dueDate:"2025-01-01T00:00:00Z" }));
+    await assertFails(setDoc(ref, { ...validTask, dueTime:"09:00:00" }));
+    await assertFails(setDoc(ref, { ...validTask, estMins:-1 }));
+    await assertFails(setDoc(ref, { ...validTask, estMins:100001 }));
+  });
+  it("only accepts known recurrence and priority values", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/tasks/1");
+    await assertFails(setDoc(ref, { ...validTask, recurrence:"hourly" }));
+    await assertFails(setDoc(ref, { ...validTask, priorityOverride:"urgent" }));
+    await assertFails(setDoc(ref, { ...validTask, tags:"a,b" }));
+    await assertFails(setDoc(ref, { ...validTask, archived:"yes" }));
+  });
+  it("rejects a task padded with lots of extra fields", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const padded = { ...validTask, ...Object.fromEntries(list(20, i => [`junk${i}`, i])) };
+    await assertFails(setDoc(doc(db, "users/alice/tasks/1"), padded));
+  });
+  it("applies the caps to a merge update too (the stored result is checked)", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/tasks/1");
+    await assertSucceeds(setDoc(ref, validTask));
+    await assertFails(setDoc(ref, { tags:list(31, i => `t${i}`) }, { merge:true }));
+  });
+  it("caps the trash the same way", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(db, "users/alice/trash/1"), { ...validTask, deletedAt:1, tags:list(31, i => `t${i}`) }));
+  });
+  it("caps the profile's subject colors, layout, and field count", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice");
+    await assertSucceeds(setDoc(ref, { subjectColors:Object.fromEntries(list(200, i => [`S${i}`, "#000000"])) }, { merge:true }));
+    await assertFails(setDoc(ref, { subjectColors:Object.fromEntries(list(201, i => [`X${i}`, "#000000"])) }));
+    await assertFails(setDoc(ref, { layout:"x".repeat(41) }, { merge:true }));
+    await assertFails(setDoc(doc(db, "users/alice"), Object.fromEntries(list(41, i => [`f${i}`, true]))));
+  });
+});

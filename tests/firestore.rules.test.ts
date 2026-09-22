@@ -89,3 +89,35 @@ describe("tasks subcollection (users/{uid}/tasks/{taskId})", () => {
     await assertFails(deleteDoc(doc(db, "users/bob/tasks/1")));
   });
 });
+
+describe("trash subcollection (users/{uid}/trash/{taskId})", () => {
+  const trashed = { ...validTask, deletedAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000 };
+  it("lets an owner move a task to the trash", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(setDoc(doc(db, "users/alice/trash/1"), trashed));
+    await assertSucceeds(deleteDoc(doc(db, "users/alice/trash/1")));
+  });
+  it("rejects a trashed task without deletedAt, or with a malformed task", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(db, "users/alice/trash/1"), { ...validTask, updatedAt: 1 }));
+    await assertFails(setDoc(doc(db, "users/alice/trash/1"), { ...trashed, done: "no" }));
+  });
+  it("rejects another user's trash", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(db, "users/bob/trash/1"), trashed));
+    await assertFails(getDoc(doc(db, "users/bob/trash/1")));
+  });
+});
+
+describe("task sync metadata", () => {
+  it("accepts a numeric updatedAt and rejects any other type", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), { ...validTask, updatedAt: 5 }));
+    await assertFails(setDoc(doc(db, "users/alice/tasks/2"), { ...validTask, id: 2, updatedAt: "now" }));
+  });
+  it("allows a partial (merge) update of an existing task", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), validTask));
+    await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), { title: "Essay v2", updatedAt: 6 }, { merge: true }));
+  });
+});

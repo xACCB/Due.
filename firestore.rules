@@ -30,7 +30,14 @@ service cloud.firestore {
         && data.dueTime is string
         && data.estMins is number
         && data.done is bool
-        && data.order is number;
+        && data.order is number
+        // Sync metadata (see src/lib/sync.ts): when the edit happened.
+        && (!('updatedAt' in data) || data.updatedAt is number);
+    }
+
+    // A task in Recently deleted: the whole task, plus when it was deleted.
+    function isValidTrashedTask(data) {
+      return isValidTask(data) && data.deletedAt is number;
     }
 
     match /users/{userId} {
@@ -40,6 +47,11 @@ service cloud.firestore {
       match /tasks/{taskId} {
         allow read, delete: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidTask(request.resource.data);
+      }
+
+      match /trash/{taskId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidTrashedTask(request.resource.data);
       }
     }
 

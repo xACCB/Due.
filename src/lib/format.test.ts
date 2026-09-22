@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getPriority, csvField, daysUntil, contrastColor, formatDuration, countdown } from "./format";
+import { getPriority, csvField, daysUntil, contrastColor, formatDuration, countdown, formatAgo } from "./format";
 
 describe("getPriority", () => {
   it("returns the manual override unconditionally", () => {
@@ -83,5 +83,15 @@ describe("countdown", () => {
   it("returns null without a time or for another day", () => {
     expect(countdown("2026-09-22", "", at(15, 0))).toBeNull();
     expect(countdown("2026-09-23", "09:00", at(15, 0))).toBeNull();
+  });
+});
+
+describe("formatAgo", () => {
+  it("rounds down to the largest unit", () => {
+    const now = 1_000_000_000_000;
+    expect(formatAgo(now - 30_000, now)).toBe("just now");
+    expect(formatAgo(now - 5 * 60_000, now)).toBe("5m ago");
+    expect(formatAgo(now - 125 * 60_000, now)).toBe("2h ago");
+    expect(formatAgo(now - 3 * 86_400_000, now)).toBe("3d ago");
   });
 });

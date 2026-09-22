@@ -59,3 +59,12 @@ export function countdown(dueDate:string, dueTime:string, now:number):string|nul
   if (mins===0) return "Due in <1m";
   return `Overdue by ${formatDuration(-mins)}`;
 }
+// "just now", "5m ago", "2h ago", "3d ago" -- for "Synced 5m ago".
+export function formatAgo(at:number, now:number):string {
+  const mins=Math.floor((now-at)/60000);
+  if (mins<1) return "just now";
+  if (mins<60) return `${mins}m ago`;
+  const h=Math.floor(mins/60);
+  if (h<24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}

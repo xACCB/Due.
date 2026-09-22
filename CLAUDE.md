@@ -102,10 +102,26 @@ require rewriting a user's entire history:
   after sign-in can't race ahead of the first read. `themeName` isn't a field here (or in
   `firestore.rules`'s `isValidProfile`) -- see Design-system constants below: it's a derived value
   now, not independent state, so there's nothing to sync.
-- `users/{uid}/tasks/{taskId}` — one document per task (`taskId` is `String(task.id)`). Synced with
-  a diff against `lastSyncedTasksRef` (a `Map<id, Task>` of what's last known to be in the
-  subcollection), so only tasks that actually changed get written, via a `writeBatch`, instead of
-  the whole list on every toggle.
+- `users/{uid}/tasks/{taskId}` — one document per live task (`taskId` is `String(task.id)`), plus
+  an `updatedAt` (when the edit happened). `users/{uid}/trash/{taskId}` — Recently deleted: the
+  whole task plus `deletedAt`. Trash is a separate collection, not a flag on `tasks/` docs, so an
+  older app version still open on another device sees a plain delete rather than the task
+  reappearing. Emptying the trash / the 30-day cleanup deletes the doc for real.
+- **Conflict handling** (`src/lib/sync.ts`, unit-tested): `baseRef` holds what we last knew the cloud
+  held per task, `dirtyAtRef` when this device last changed a task it hasn't written yet. Incoming
+  snapshots (both collections; merging waits until each has arrived once) are merged, not applied
+  wholesale: an untouched task takes the cloud version; one changed on both sides is merged field
+  by field (a field only one side changed takes that side; a field both changed takes the newer
+  edit; delete vs. edit is newest-wins). This fixes the old bug where another device's change
+  arriving within the 400ms write delay overwrote an unsaved edit. Writes are one small
+  `writeBatch` per changed task (so one rejected write can't sink the rest), and an edit to an
+  existing task is a merge write of only its changed fields (removed fields -> `deleteField()`).
+  `baseRef` is updated optimistically at write time -- Firestore applies the write to its cache
+  immediately and retries it. `syncUidRef` resets this state when the account changes.
+- Sync status: both listeners use `includeMetadataChanges` so `lastSyncedAt`/`hasPendingWrites`
+  track when writes reach the server; with `online` (browser online/offline events) they drive
+  `syncStatus` ("Synced 2m ago" / "Saving..." / "Offline ...") under Profile in the title menu, plus
+  an "offline" note under the wordmark when signed in.
 - An earlier version of this app stored the whole task array as one field on `users/{uid}`, which
   had every edit rewrite every task ever created and could eventually hit Firestore's 1MB
   per-document limit for a long-time user. A one-time migration effect (gated by `readyForUid`,
@@ -120,7 +136,8 @@ require rewriting a user's entire history:
   without this, a single reorder drag would fire one Firestore write per intermediate step instead
   of one at the end. Local state and `localStorage` stay instant regardless; only the cloud write
   is delayed. The pending write is kept in `pendingTasksWrite` so `signOutFirebase` can flush it
-  before signing out -- sign-out then clears local tasks/subjects from the device (they come back
+  before signing out (capped at 3s, since offline a write only resolves once it reaches the
+  server) -- sign-out then clears local tasks/subjects from the device (they come back
   from the cloud on the next sign-in), since signed-out use is local-only.
 - `firestore.rules` validates the shape of profile/task writes (required fields present, correct
   types, capped string lengths), not just who's making them -- a second layer beyond
@@ -132,7 +149,7 @@ require rewriting a user's entire history:
   this runs at module load time before React renders -- an uncaught throw here would blank-page the
   whole app in an exotic environment instead of just missing offline support.
 - Account deletion (Options tab, "Danger Zone", gated on being signed in) batch-deletes every doc
-  in the tasks subcollection plus the profile doc, then calls Firebase Auth's `deleteUser`, then
+  in the tasks and trash subcollections plus the profile doc, then calls Firebase Auth's `deleteUser`, then
   clears every `hw-*` localStorage key and reloads -- "delete my data" means all of it, not just
   the cloud copy. Gated behind a type-`DELETE`-to-confirm panel rather than a plain `window.confirm`,
   given it's irreversible. Not chunked past Firestore's 500-op batch limit, matching the existing
@@ -249,8 +266,8 @@ React Compiler's purity lint rejects `Date.now()` inside component functions; `s
 in the undo history as an `"edit"` `HistoryAction` with the before/after due date and time, so it
 shares the undo toast and History menu with deletes), duplicate it
 (`duplicateTask`: fresh id, unchecked subtasks, no sessions, detached from any repeat chain) and
-restore it from the archive. **Recently deleted** (`trash`, `hw-trash`, local-only, not synced):
-every delete also lands here for 30 days (pruned on load, capped at 200), restorable from the
+restore it from the archive. **Recently deleted** (`trash`, `hw-trash`; synced via `users/{uid}/trash`
+when signed in, see the Firestore data model above): every delete also lands here for 30 days (pruned on load, capped at 200), restorable from the
 History menu; undo/redo of a delete keeps it in step. **Focus Mode** targets `focusTask` (`focusTaskId`, falling back to
 the first pending task); a finished Pomodoro logs a 25-minute session to it (read through
 `pomodoroTaskRef`, since the finish effect is declared before `focusTask` is computed), and a

@@ -2165,8 +2165,10 @@ export default function HomeworkPlanner() {
         {/* Header */}
         <div style={{position:"relative",display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
           <div>
-            <div style={{fontFamily:F.heading,fontSize:28,lineHeight:1,color:T.accent}}>Due<span style={{color:T.text}}>Planner</span></div>
-            <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2}}>by due. studios</div>
+            <div aria-label="DuePlanner" title="DuePlanner" style={{width:40,height:40,borderRadius:10,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontFamily:F.heading,fontSize:19,lineHeight:1,color:contrastColor(T.accent)}}>dp</span>
+            </div>
+            <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:4}}>by due. studios</div>
           </div>
           {/* Profile button - always visible, absolutely centered in the header regardless of the side content's widths */}
           {!fbLoading&&(

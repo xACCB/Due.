@@ -146,6 +146,41 @@ const LAYOUTS = {
 } as const;
 type LayoutName = keyof typeof LAYOUTS;
 
+// ─── TAB BAR ICONS ─────────────────────────────────────────────────────────────
+// Small stroke-based SVGs (not Unicode glyphs) for the icon-only main tab bar --
+// built from plain primitives (line/circle/polyline) rather than hand-drawn path
+// data, so they render identically and crisply everywhere instead of depending on
+// whichever symbols a given OS/browser's font happens to ship. `stroke="currentColor"`
+// picks up the parent button's `color`, so active/inactive state needs no extra prop.
+function IconTasks(){
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="4" cy="6" r="1.3"/><line x1="8.5" y1="6" x2="20" y2="6"/>
+    <circle cx="4" cy="12" r="1.3"/><line x1="8.5" y1="12" x2="20" y2="12"/>
+    <circle cx="4" cy="18" r="1.3"/><line x1="8.5" y1="18" x2="20" y2="18"/>
+  </svg>;
+}
+function IconTools(){
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="6" y1="4" x2="6" y2="20"/><circle cx="6" cy="14" r="2.1"/>
+    <line x1="12" y1="4" x2="12" y2="20"/><circle cx="12" cy="8" r="2.1"/>
+    <line x1="18" y1="4" x2="18" y2="20"/><circle cx="18" cy="16" r="2.1"/>
+  </svg>;
+}
+function IconImport(){
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="3" x2="12" y2="14"/><polyline points="7.5,10 12,14.5 16.5,10"/>
+    <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+  </svg>;
+}
+function IconSettings(){
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.1"/>
+    {[0,45,90,135,180,225,270,315].map(deg=>(
+      <line key={deg} x1="12" y1="4.2" x2="12" y2="1.8" transform={`rotate(${deg} 12 12)`}/>
+    ))}
+  </svg>;
+}
+
 // ─── FONT ─────────────────────────────────────────────────────────────────────
 // Down to exactly one -- the original DM Serif Display/DM Mono pairing -- with
 // every other option removed, so there's no per-user Font picker/state
@@ -1717,8 +1752,8 @@ export default function HomeworkPlanner() {
       .dl-sidebar .app-body{display:flex;align-items:flex-start;gap:24px;}
       .dl-sidebar .app-sidebar{width:168px;flex-shrink:0;position:sticky;top:24px;}
       .dl-sidebar .app-main{flex:1;min-width:0;}
-      .dl-sidebar .app-sidebar .tab-bar{flex-direction:column;background:none!important;padding:0!important;gap:6px!important;}
-      .dl-sidebar .app-sidebar .tab-bar button{flex:none!important;justify-content:flex-start!important;text-align:left;padding:10px 12px!important;}
+      .dl-sidebar .app-sidebar .tab-bar{flex-direction:column;background:none!important;border:none!important;padding:0!important;gap:6px!important;}
+      .dl-sidebar .app-sidebar .tab-bar button{flex:none!important;justify-content:center!important;padding:12px!important;}
     }
     @media (max-width:600px){
       input,textarea{font-size:16px!important;}
@@ -2167,11 +2202,15 @@ export default function HomeworkPlanner() {
         <div className="app-body">
         <div className="app-sidebar">
         {/* Tabs */}
-        <div className="tab-bar" style={{display:"flex",gap:4,marginBottom:16,background:T.surface,borderRadius:11,padding:3}}>
+        <div className="tab-bar" style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4}}>
           {(["tasks","tools","import","options"] as const).map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",tools:"Tools",import:"Import",options:"Settings"};
-            return <button key={id} onClick={()=>setActiveTab(id)} style={{flex:1,background:activeTab===id?T.card:"transparent",color:activeTab===id?T.text:T.textMuted,fontFamily:F.body,fontSize:10,border:"none",borderRadius:9,padding:"7px 4px",cursor:"pointer",transition:"all 0.15s",fontWeight:activeTab===id?"500":"normal",position:"relative",whiteSpace:"nowrap"}}>
-              {labels[id]}
+            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,tools:IconTools,import:IconImport,options:IconSettings};
+            const Icon=icons[id];
+            const active=activeTab===id;
+            return <button key={id} onClick={()=>setActiveTab(id)} aria-label={labels[id]} aria-pressed={active} title={labels[id]}
+              style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"all 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
+              <Icon/>
             </button>;
           })}
         </div>

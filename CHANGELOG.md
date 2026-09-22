@@ -39,6 +39,13 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   (low contrast reads as moody on a dark background, broken on a light one). The script now checks
   `textFaint` against the large-text/UI-component bar, and both themes were nudged to actually pass.
 - Renamed the "Auto" appearance mode to "System" (label only, same behavior).
+- Main tab bar (Tasks/Tools/Import/Settings) redesigned as an icon-only "liquid glass" pill: a
+  translucent, blurred (`backdrop-filter: blur`) rounded container with individual buttons that no
+  longer show text labels, just a small stroke SVG icon each (`aria-label`/`title` cover
+  accessibility and hover tooltips), with the active tab getting its own raised glass-pill highlight
+  in the theme's accent color. The four icons (list, sliders, inbox-tray, gear) are hand-built from
+  SVG primitives rather than Unicode glyphs, so they render identically everywhere instead of
+  depending on font/OS glyph support.
 - Removed every colored/pictographic emoji from the UI (button labels, tab labels, layout and
   group-by icons, appearance mode icons, toasts, empty states). Functional icon slots that had no
   plain-text fallback (layout picker, group-by picker, Light/Dark/System toggle, the AI-suggestion

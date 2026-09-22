@@ -198,7 +198,13 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
 
 **UI shape.** `HomeworkPlanner` renders a tab bar (`tasks` / `tools` / `import` / `options`, via
 `activeTab` state) plus a separate full-screen Focus Mode (`focusMode` state) with its own
-Pomodoro-style timer. `TaskModal` (task detail, subtasks, session timer) is defined at module
+Pomodoro-style timer. The tab bar itself is an icon-only "liquid glass" pill (translucent
+`backdrop-filter: blur` container, active tab gets its own raised glass-pill highlight) -- the four
+icons (`IconTasks`/`IconTools`/`IconImport`/`IconSettings`, module scope, just above `FONT`) are
+small hand-built SVGs from plain primitives (line/circle/polyline) rather than Unicode glyphs or an
+icon library dependency, styled with `stroke="currentColor"` so they pick up the button's active/
+inactive `color` automatically; `aria-label`/`title` on each button carry the accessible name now
+that there's no visible text. `TaskModal` (task detail, subtasks, session timer) is defined at module
 scope, outside `HomeworkPlanner`, specifically so the session timer's once-a-second tick doesn't
 redefine it as a "new" component and force React to remount the modal every second. It hand-rolls a
 focus trap (Tab/Shift+Tab cycle within the panel, focus-return to whatever opened it on close,

@@ -2221,7 +2221,7 @@ export default function HomeworkPlanner() {
             <div className="pop" style={{background:T.gradientCard,borderRadius:16,padding:"20px",border:`1px solid ${T.accent}44`}}>
               <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                 <span className="rb" style={{background:T.accent+"33",color:T.accent}}>most urgent</span>
-                <span style={{background:(subjectColors[topTask.subject]||T.accent)+"22",color:subjectColors[topTask.subject]||T.accent,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{topTask.subject}</span>
+                {topTask.subject&&<span style={{background:(subjectColors[topTask.subject]||T.accent)+"22",color:subjectColors[topTask.subject]||T.accent,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{topTask.subject}</span>}
               </div>
               <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{topTask.title}</div>
               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>

@@ -39,6 +39,12 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   (low contrast reads as moody on a dark background, broken on a light one). The script now checks
   `textFaint` against the large-text/UI-component bar, and both themes were nudged to actually pass.
 - Renamed the "Auto" appearance mode to "System" (label only, same behavior).
+- Removed every colored/pictographic emoji from the UI (button labels, tab labels, layout and
+  group-by icons, appearance mode icons, toasts, empty states). Functional icon slots that had no
+  plain-text fallback (layout picker, group-by picker, Light/Dark/System toggle, the AI-suggestion
+  sparkle) were swapped for monochrome Unicode glyphs consistent with the icon set already in use
+  elsewhere in the app (☰ ⊟ ⊞ ▓ △); purely decorative emoji (🎉 💪 🎒 etc.) were just removed.
+  `THEMES`' own unused `emoji` field (🕶️, never actually rendered) was deleted along with it.
 
 ### Fixed
 - The header wordmark, the selected Appearance button, and the Stats numbers could render in a

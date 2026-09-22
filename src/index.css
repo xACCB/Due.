@@ -11,6 +11,15 @@
 
 body {
   margin: 0;
+  /* Without this, text can render rough/jagged (reported as "pixelated") in
+     WebKit/Blink browsers on macOS in particular -- these two properties
+     switch to the OS's grayscale anti-aliasing instead of subpixel
+     rendering, which most browsers otherwise apply by default for
+     light-on-dark or thin/small text regardless of which typeface is
+     loaded. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 #root {

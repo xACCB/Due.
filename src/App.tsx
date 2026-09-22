@@ -146,26 +146,11 @@ const LAYOUTS = {
 } as const;
 type LayoutName = keyof typeof LAYOUTS;
 
-// ─── FONTS ────────────────────────────────────────────────────────────────────
-const FONTS = {
-  dmSerif:      { name:"DM Serif",        preview:"Homework.",  heading:"'DM Serif Display', serif",   body:"'DM Mono', monospace",        google:"DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500" },
-  inter:        { name:"Inter",           preview:"Homework.",  heading:"'Inter', sans-serif",          body:"'Inter', sans-serif",          google:"Inter:wght@400;500;600;700" },
-  jakarta:      { name:"Plus Jakarta",    preview:"Homework.",  heading:"'Plus Jakarta Sans', sans-serif", body:"'Plus Jakarta Sans', sans-serif", google:"Plus+Jakarta+Sans:wght@400;500;600;700" },
-  playfair:     { name:"Playfair",        preview:"Homework.",  heading:"'Playfair Display', serif",    body:"'Inter', sans-serif",          google:"Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500" },
-  cormorant:    { name:"Cormorant",       preview:"Homework.",  heading:"'Cormorant Garamond', serif",  body:"'Inter', sans-serif",          google:"Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500" },
-  nunito:       { name:"Nunito",          preview:"Homework.",  heading:"'Nunito', sans-serif",         body:"'Nunito', sans-serif",          google:"Nunito:wght@400;500;600;700;800" },
-  poppins:      { name:"Poppins",         preview:"Homework.",  heading:"'Poppins', sans-serif",        body:"'Poppins', sans-serif",         google:"Poppins:wght@400;500;600;700" },
-  jetbrains:    { name:"JetBrains Mono",  preview:"Homework.",  heading:"'JetBrains Mono', monospace",  body:"'JetBrains Mono', monospace",   google:"JetBrains+Mono:wght@400;500;700" },
-  firacode:     { name:"Fira Code",       preview:"Homework.",  heading:"'Fira Code', monospace",       body:"'Fira Code', monospace",        google:"Fira+Code:wght@400;500;700" },
-  sourceserif:  { name:"Source Serif",    preview:"Homework.",  heading:"'Source Serif 4', serif",      body:"'Source Serif 4', serif",       google:"Source+Serif+4:ital,wght@0,400;0,600;1,400" },
-  lora:         { name:"Lora",            preview:"Homework.",  heading:"'Lora', serif",                body:"'Inter', sans-serif",           google:"Lora:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500" },
-  spacegrotesk: { name:"Space Grotesk",   preview:"Homework.",  heading:"'Space Grotesk', sans-serif",  body:"'Space Grotesk', sans-serif",   google:"Space+Grotesk:wght@400;500;600;700" },
-  ibmplex:      { name:"IBM Plex Serif",  preview:"Homework.",  heading:"'IBM Plex Serif', serif",      body:"'IBM Plex Sans', sans-serif",   google:"IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500" },
-  syne:         { name:"Syne",            preview:"Homework.",  heading:"'Syne', sans-serif",           body:"'Inter', sans-serif",           google:"Syne:wght@400;500;600;700;800" },
-  outfit:       { name:"Outfit",          preview:"Homework.",  heading:"'Outfit', sans-serif",         body:"'Outfit', sans-serif",          google:"Outfit:wght@300;400;500;600;700" },
-  pixel:        { name:"Pixel",           preview:"HW.",        heading:"'Press Start 2P', monospace",  body:"'Press Start 2P', monospace",   google:"Press+Start+2P" },
-} as const;
-type FontName = keyof typeof FONTS;
+// ─── FONT ─────────────────────────────────────────────────────────────────────
+// Down to exactly one -- the original DM Serif Display/DM Mono pairing -- with
+// every other option removed, so there's no per-user Font picker/state
+// anymore (same treatment THEMES got when it went down to two).
+const FONT = { name:"DM Serif", heading:"'DM Serif Display', serif", body:"'DM Mono', monospace", google:"DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500" } as const;
 
 const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:"▥"}, priority:{name:"Priority",emoji:"‼"}, dueDate:{name:"Due Date",emoji:"▦"} };
 const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE"];
@@ -234,7 +219,7 @@ async function fetchAISuggestion(tasks:Task[]):Promise<string> {
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
 function TaskModal({task,T,F,subjectColors,sessionActive,sessionSecs,sessionHistory,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
-  task:Task; T:ThemeObj; F:typeof FONTS[FontName]; subjectColors:Record<string,string>;
+  task:Task; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>;
   sessionActive:boolean; sessionSecs:number; sessionHistory:{mins:number;date:string}[];
   allTags:string[];
   onClose:()=>void; onStartSession:()=>void; onEndSession:()=>void; onToggleDone:()=>void; onDelete:()=>void;
@@ -482,7 +467,7 @@ function Toggle({on,onChange,T}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeOb
 // consequential case of this pattern in the file.
 function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect}:{
   task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
-  T:ThemeObj; F:typeof FONTS[FontName]; subjectColors:Record<string,string>;
+  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>;
   dragTaskId:number|null; dragOffsetY:number;
   onOpen:(task:Task)=>void;
   onToggleDone:(id:number)=>void;
@@ -569,12 +554,12 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,dragTaskId,
 // wipe out the text. newSubjectText/setNewSubjectText are lifted to the
 // parent specifically so they survive that; being hoisted now means this
 // component itself is no longer being recreated in the first place either.
-function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,subjects,subjectColors,themeName,fontName,newSubjectText,setNewSubjectText,profileTab,setProfileTab,setShowProfile,signInWithFirebase,signOutFirebase,addSubject,removeSubject}:{
-  T:ThemeObj; F:typeof FONTS[FontName];
+function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,subjects,subjectColors,themeName,newSubjectText,setNewSubjectText,profileTab,setProfileTab,setShowProfile,signInWithFirebase,signOutFirebase,addSubject,removeSubject}:{
+  T:ThemeObj; F:typeof FONT;
   fbUser:User|null; signInError:string|null; syncError:string|null;
   visibleTasks:Task[]; totalMins:number;
   subjects:string[]; subjectColors:Record<string,string>;
-  themeName:ThemeName; fontName:FontName;
+  themeName:ThemeName;
   newSubjectText:string; setNewSubjectText:(v:string)=>void;
   profileTab:"profile"|"personalize"; setProfileTab:(v:"profile"|"personalize")=>void;
   setShowProfile:(v:boolean)=>void;
@@ -753,7 +738,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
             </div>
             <div style={{flex:1,background:T.surface,borderRadius:10,padding:"10px 12px"}}>
               <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:3}}>Font</div>
-              <span style={{fontFamily:F.heading,fontSize:12,color:T.text}}>{FONTS[fontName].name}</span>
+              <span style={{fontFamily:F.heading,fontSize:12,color:T.text}}>{FONT.name}</span>
             </div>
           </div>
         </div>
@@ -919,7 +904,6 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
   },[notificationsEnabled,tasks,enabledOffsets]);
 
-  const [fontName,setFontName]=usePersistedState<FontName>("hw-font","dmSerif");
   // Desktop layout: "narrow" (default, current single-column look), "wide" (roomier
   // center column), "sidebar" (tabs move into a persistent left nav column). All of
   // these only kick in above a min-width via CSS media queries, so phones/tablets
@@ -966,6 +950,9 @@ export default function HomeworkPlanner() {
   // theme's own black/white accent (this is what caused text using color:T.accent
   // to render invisible against a background it was never designed for).
   useEffect(()=>{localStorage.removeItem("hw-accent");},[]);
+  // Clears any stale per-user font choice from before the Font picker was
+  // removed (down to exactly one font now, same treatment as hw-accent above).
+  useEffect(()=>{localStorage.removeItem("hw-font");},[]);
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
@@ -1563,7 +1550,7 @@ export default function HomeworkPlanner() {
     const data={
       exportedAt:new Date().toISOString(),
       tasks,subjects,subjectColors,templates,
-      themeName,layout,fontName,groupBy,
+      themeName,layout,groupBy,
       scratchpad,
     };
     downloadFile(`dueplanner-export-${todayISO()}.json`,JSON.stringify(data,null,2),"application/json");
@@ -1690,7 +1677,7 @@ export default function HomeworkPlanner() {
   }
   const currentQ=step>=0?QUESTIONS[step]:null;
 
-  const F = FONTS[fontName];
+  const F = FONT;
 
   // Memoized on the actual primitives used below (not on T/F themselves --
   // those are fresh object literals every render) so this multi-hundred-line
@@ -2545,19 +2532,6 @@ export default function HomeworkPlanner() {
                   })}
                 </div>
               </div>
-              {/* Fonts */}
-              <div>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Font ({Object.keys(FONTS).length})</div>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {(Object.entries(FONTS) as [FontName, typeof FONTS[FontName]][]).map(([key,f])=>(
-                    <button key={key} onClick={()=>setFontName(key)}
-                      style={{background:fontName===key?T.accent+"22":"none",border:`1.5px solid ${fontName===key?T.accent:T.border}`,borderRadius:11,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"all 0.14s"}}>
-                      <span style={{fontFamily:f.heading,fontSize:18,color:fontName===key?T.accent:T.text}}>{f.preview}</span>
-                      <span style={{fontFamily:F.body,fontSize:10,color:fontName===key?T.accent:T.textFaint}}>{f.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
               {/* Preview */}
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Preview</div>
@@ -2724,7 +2698,7 @@ export default function HomeworkPlanner() {
         fbUser={fbUser} signInError={signInError} syncError={syncError}
         visibleTasks={visibleTasks} totalMins={totalMins}
         subjects={subjects} subjectColors={subjectColors}
-        themeName={themeName} fontName={fontName}
+        themeName={themeName}
         newSubjectText={newSubjectText} setNewSubjectText={setNewSubjectText}
         profileTab={profileTab} setProfileTab={setProfileTab}
         setShowProfile={setShowProfile}

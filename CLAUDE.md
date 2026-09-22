@@ -175,8 +175,12 @@ the `Toggle` switch thumb) instead of a hardcoded color, so they stay correct un
 a future theme might use. A few needed a conditional version since they only sometimes render on a
 solid `T.accent` fill (e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`,
 in most layouts -- only the branches that actually use `T.accent` as the fill needed the fix).
-`LAYOUTS` (12 task-list display modes, still in `App.tsx`) and `FONTS` (16 heading/body pairings
-loaded from Google Fonts, still in `App.tsx`) are unchanged.
+`LAYOUTS` (12 task-list display modes, still in `App.tsx`) is unchanged. `FONTS` went the same way
+as `THEMES` -- down from 16 selectable heading/body pairings to exactly one (`FONT`, still in
+`App.tsx`: the original DM Serif Display/DM Mono pairing), with the Font picker grid and its
+`fontName`/`setFontName` state gone entirely. `F` is now just `FONT` directly rather than a keyed
+lookup. A one-time `localStorage.removeItem("hw-font")` on mount clears any stale per-user font
+choice already saved by existing users' browsers, mirroring the `hw-accent` cleanup above.
 
 **Domain logic as plain functions** (not hooks), all in `src/lib/` and unit-tested via `npm test`:
 - `dates.ts`: `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due

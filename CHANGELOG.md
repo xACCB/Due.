@@ -45,6 +45,10 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   sparkle) were swapped for monochrome Unicode glyphs consistent with the icon set already in use
   elsewhere in the app (☰ ⊟ ⊞ ▓ △); purely decorative emoji (🎉 💪 🎒 etc.) were just removed.
   `THEMES`' own unused `emoji` field (🕶️, never actually rendered) was deleted along with it.
+- Down to just one font: the original DM Serif Display/DM Mono pairing, removing the other 15. Same
+  treatment as the theme reduction above -- the Font picker grid and its per-user `fontName` state
+  are gone; `F` is now the fixed `FONT` constant instead of a keyed lookup. Any existing stale font
+  choice in a user's browser is cleared automatically on next load.
 
 ### Fixed
 - The header wordmark, the selected Appearance button, and the Stats numbers could render in a

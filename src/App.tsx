@@ -2449,14 +2449,14 @@ export default function HomeworkPlanner() {
         <div className="app-body">
         <div className="app-sidebar">
         {/* Tabs */}
-        <div className="tab-bar" onPointerDown={onTabBarPointerDown} onPointerMove={onTabBarPointerMove} onPointerUp={onTabBarPointerUp} onPointerCancel={onTabBarPointerCancel} style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"none",userSelect:"none",WebkitUserSelect:"none"}}>
+        <div className="tab-bar" onPointerDown={onTabBarPointerDown} onPointerMove={onTabBarPointerMove} onPointerUp={onTabBarPointerUp} onPointerCancel={onTabBarPointerCancel} style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"none",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
           {(["tasks","focus"] as const).map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
             const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};
             const Icon=icons[id];
             const active=tabBarSwipeId?id===tabBarSwipeId:activeTab===id;
             return <button key={id} data-tab-id={id} onClick={()=>id==="focus"?setFocusMode(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
-              style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"all 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
+              style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"all 0.18s cubic-bezier(.34,1.4,.64,1)",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
               <Icon/>
             </button>;
           })}

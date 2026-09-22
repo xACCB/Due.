@@ -9,7 +9,8 @@
   h1 { font-size: 28px; margin-bottom: 4px; }
   .updated { color: #666; font-size: 13px; margin-bottom: 32px; }
   h2 { font-size: 18px; margin-top: 32px; }
-  a { color: #863bff; }
+  a { color: #111; }
+  @media (prefers-color-scheme: dark) { body { background: #0a0a0a; color: #cccccc; } .updated { color: #7c7c7c; } a { color: #ffffff; } }
   ul { padding-left: 20px; }
 </style>
 </head>
@@ -25,7 +26,7 @@
 <p>If you choose to sign in with Google, we collect:</p>
 <ul>
   <li>Your name, email address, and profile photo, provided by Google as part of sign-in.</li>
-  <li>The content you create in the app: tasks, due dates, subjects, notes, subtasks, your scratchpad text, and your display/theme preferences.</li>
+  <li>The content you create in the app: tasks (titles, due dates, subjects, tags, subtasks, and logged work sessions), your subjects and their colors, and a few display preferences (task layout and urgency color coding).</li>
 </ul>
 <p>Signing in is optional and only used to sync your data across your own devices.</p>
 
@@ -38,13 +39,14 @@
   <li><strong>Google Firebase</strong> (Authentication &amp; Firestore database) — stores your account data and app content when you're signed in. See <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase's privacy policy</a>.</li>
   <li><strong>Google Sign-In</strong> — used to authenticate you. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a>.</li>
   <li><strong>Google reCAPTCHA Enterprise</strong> (via Firebase App Check) — helps verify that requests to our systems come from the real app rather than automated abuse. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a>.</li>
-  <li><strong>Firebase Analytics</strong> (Google Analytics) — collects basic, aggregated usage data such as page views and how long the app is used, to help us understand which features are actually used. This does not include the content of your tasks or notes. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a>.</li>
+  <li><strong>Firebase Analytics</strong> (Google Analytics) — collects basic, aggregated usage data such as page views and how long the app is used, to help us understand which features are actually used. This does not include the content of your tasks. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a>.</li>
+  <li><strong>Firebase Performance Monitoring</strong> — measures page load time and network request speed so we can find and fix slowness. It collects technical data (like device type and timings), not the content of your tasks. See <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase's privacy policy</a>.</li>
   <li><strong>Vercel</strong> — hosts the app itself. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's privacy policy</a>.</li>
 </ul>
 <p>We do not use any advertising networks, and we do not sell or share your data for marketing purposes.</p>
 
 <h2>Data retention and deletion</h2>
-<p>If you sign in, your data is retained until you delete it or request deletion. You can request deletion of your account and all associated data at any time by contacting us at the email below.</p>
+<p>If you sign in, your data is retained until you delete it. You can delete your account and all associated data yourself at any time from the app: open <strong>Settings</strong>, then <strong>Danger Zone</strong>, then <strong>Delete my account &amp; all data</strong>. This removes your cloud data and the data stored on that device. You can also request deletion by contacting us at the email below.</p>
 
 <h2>Children's privacy</h2>
 <p>This app is not directed at children under 13, and we do not knowingly collect personal information from children under 13. If you believe a child has provided us with personal information, please contact us and we will delete it.</p>

@@ -21,7 +21,7 @@ export default defineConfig({
       manifest: {
         name: 'DuePlanner',
         short_name: 'DuePlanner',
-        description: 'A fast, highly personalizable homework and task planner -- due dates, subjects, recurring tasks, and a full theming system, all in one place.',
+        description: 'A fast, highly personalizable homework and task planner -- due dates, subjects, recurring tasks, reminders, and focus tools, all in one place.',
         start_url: '/',
         display: 'standalone',
         background_color: '#0a0a0a',

@@ -141,7 +141,7 @@ const LAYOUTS = {
   kanban:    { name:"Kanban",     emoji:"𝄘",  desc:"By status" },
   timeline:  { name:"Timeline",   emoji:"↓",  desc:"Time ordered" },
   subject:   { name:"By Subject", emoji:"▥", desc:"Subject tabs" },
-  progress:  { name:"Progress",   emoji:"▓",  desc:"Progress bars" },
+  progress:  { name:"Progress",   emoji:"▓",  desc:"Subtask progress" },
   pyramid:   { name:"Pyramid",    emoji:"△",  desc:"By priority" },
   calendar:  { name:"Calendar",   emoji:"▦", desc:"Week view" },
 } as const;
@@ -164,11 +164,6 @@ function IconImport(){
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="3" x2="12" y2="14"/><polyline points="7.5,10 12,14.5 16.5,10"/>
     <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
-  </svg>;
-}
-function IconChart(){
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/>
   </svg>;
 }
 function IconFocus(){
@@ -384,11 +379,11 @@ function TaskModal({task,T,F,subjectColors,colorCodeUrgency,sessionActive,sessio
             <div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` at ${formatTime(task.dueTime)}`:""}</span>
             </div>
-            <div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",gap:6}}>
+            {task.estMins>0&&<div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontFamily:F.body,fontSize:12,color:T.accent,fontWeight:500}}>
-                {task.estMins>=60?`${Math.floor(task.estMins/60)}h ${task.estMins%60?`${task.estMins%60}m`:""}`:` ${task.estMins}m`} estimated
+                {formatDuration(task.estMins)} estimated
               </span>
-            </div>
+            </div>}
             {totalSessionMins>0&&<div style={{background:"#2ED57322",borderRadius:10,padding:"8px 14px",border:"1px solid #2ED57344",display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontSize:14}}>✓</span>
               <span style={{fontFamily:F.body,fontSize:12,color:"#2ED573"}}>{totalSessionMins}m spent today</span>
@@ -604,7 +599,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
           </div>
           <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
             <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime)}`:""}</span>
-            <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{task.estMins>=60?`${Math.floor(task.estMins/60)}h${task.estMins%60?` ${task.estMins%60}m`:""}`:` ${task.estMins}m`}</span>
+            {task.estMins>0&&<span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDuration(task.estMins)}</span>}
             {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:priColor(pr,colorCodeUrgency),fontWeight:500}}>{dm}</span>}
           </div>
           {!!task.subtasks?.length&&(
@@ -620,6 +615,18 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
       </div>
     </div>
   );
+}
+
+// Captured at module load so the "Add to Home Screen" button can trigger the
+// browser's own install prompt later (Chrome/Edge/Android fire this event;
+// Safari never does, so it gets written instructions instead).
+interface InstallPromptEvent extends Event { prompt:()=>Promise<void>; }
+let deferredInstallPrompt:InstallPromptEvent|null=null;
+if(typeof window!=="undefined"){
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e as InstallPromptEvent;});
+}
+function isStandalone(){
+  return window.matchMedia?.("(display-mode: standalone)").matches||(navigator as unknown as {standalone?:boolean}).standalone===true;
 }
 
 // ─── PROFILE MODAL ────────────────────────────────────────────────────────────
@@ -644,6 +651,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
   const totalTasks=visibleTasks.length;
   const highPri=visibleTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high").length;
   const pct=totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
+  const [installHint,setInstallHint]=useState<string|null>(null);
   const subjectCounts=subjects.map(s=>({name:s,count:visibleTasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
 
   if (!fbUser) return (
@@ -665,17 +673,22 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
         </button>
         {signInError&&<div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:"#FF4757",marginBottom:12,lineHeight:1.5}}>{signInError}</div>}
         <div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textFaint,lineHeight:1.6}}>
-          By signing in you agree to have your homework data synced across your devices. No data is shared with third parties.
+          Signing in syncs your homework across your devices. We never sell your data or use it for ads -- see the <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{color:T.textMuted}}>privacy policy</a> for the services that help run the app.
         </div>
       </div>
-      {/* Bookmark button */}
-      <button onClick={()=>{
-        if(navigator.share){navigator.share({title:"DuePlanner",url:window.location.href}).catch(()=>{});}
-        else{navigator.clipboard?.writeText(window.location.href);alert("Link copied! Open Safari and paste, then Share → Add to Home Screen.");}
+      {/* Add to Home Screen -- the browser's own install prompt where it offers
+          one (Chrome/Edge/Android), otherwise platform-specific instructions;
+          hidden entirely once the app is already running installed. */}
+      {!isStandalone()&&<button onClick={async()=>{
+        if(deferredInstallPrompt){ await deferredInstallPrompt.prompt(); deferredInstallPrompt=null; setInstallHint(null); return; }
+        setInstallHint(/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)
+          ?"In Safari, tap the Share button, then \"Add to Home Screen\"."
+          :"Open your browser's menu and choose \"Install app\" or \"Add to Home screen\".");
       }} style={{width:"100%",maxWidth:340,background:"none",border:`1px solid ${T.border}`,borderRadius:12,padding:"12px",fontFamily:F.body,fontSize:12,color:T.textMuted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:12}}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
         Add to Home Screen
-      </button>
+      </button>}
+      {installHint&&<div style={{maxWidth:340,textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:8,lineHeight:1.5}}>{installHint}</div>}
       {/* Decorative divider */}
       <div style={{position:"absolute",bottom:40,display:"flex",alignItems:"center",gap:12}}>
         <div style={{height:1,width:60,background:T.border}}/>
@@ -742,11 +755,11 @@ function ProfileModal({T,F,fbUser,signInError,syncError,visibleTasks,totalMins,s
         {/* Time stats */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
           <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
-            <div style={{fontFamily:F.heading,fontSize:26,color:T.accent}}>{(totalMins/60).toFixed(1)}h</div>
+            <div style={{fontFamily:F.heading,fontSize:26,color:T.accent}}>{formatDuration(totalMins)||"0m"}</div>
             <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:2}}>estimated left</div>
           </div>
           <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
-            <div style={{fontFamily:F.heading,fontSize:26,color:"#4ECDC4"}}>{visibleTasks.filter(t=>t.done).reduce((a,b)=>a+(b.estMins||0),0)}m</div>
+            <div style={{fontFamily:F.heading,fontSize:26,color:T.accent}}>{formatDuration(visibleTasks.filter(t=>t.done).reduce((a,b)=>a+(b.estMins||0),0))||"0m"}</div>
             <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginTop:2}}>completed work</div>
           </div>
         </div>
@@ -1385,7 +1398,6 @@ export default function HomeworkPlanner() {
   const [historyMenuOpen,setHistoryMenuOpen]=useState(false);
   const [inboxMenuOpen,setInboxMenuOpen]=useState(false);
   const [overviewPeriod,setOverviewPeriod]=useState<"week"|"month"|"year">("week");
-  const [statsMenuOpen,setStatsMenuOpen]=useState(false);
   const [importExportMenuOpen,setImportExportMenuOpen]=useState(false);
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
@@ -1426,7 +1438,7 @@ export default function HomeworkPlanner() {
   }
   function commitImport(){
     if(!importPreview)return;
-    const subject=importSubject||subjects[0]||"Other";
+    const subject=importSubject||subjects[0]||"";
     const toAdd=importPreview.filter(it=>it.checked);
     if(toAdd.length===0)return;
     setTasks(prev=>[
@@ -1441,7 +1453,6 @@ export default function HomeworkPlanner() {
   const [pomodoroSecs,setPomodoroSecs]=useState(25*60);
   const [timeHours,setTimeHours]=useState(0);
   const [timeMins,setTimeMins]=useState(30);
-  const [timeSecs,setTimeSecs]=useState(0);
   const [showProfile,setShowProfile]=useState(false);
   const [sessionActive,setSessionActive]=useState(false);
   const [sessionSecs,setSessionSecs]=useState(0);
@@ -1559,22 +1570,20 @@ export default function HomeworkPlanner() {
     visibleTasks.filter(t=>!t.done&&!t.archived).forEach(t=>{m[t.subject||""]=(m[t.subject||""]||0)+(t.estMins||0);});
     return Object.entries(m).filter(([,mins])=>mins>0).sort((a,b)=>b[1]-a[1]).map(([name,mins])=>({name,mins,pct:totalMins?Math.round(mins/totalMins*100):0}));
   })();
-  const fmtMins=(m:number)=>m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
+  const fmtMins=(m:number)=>formatDuration(m)||"0m";
 
-  // Stats (title menu). Archived tasks still count here -- archiving is just a
-  // view filter, it doesn't erase completion history.
+  // Inbox stats. Archived tasks still count here -- archiving is just a view
+  // filter, it doesn't erase completion history.
   const startOfWeek=(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());d.setHours(0,0,0,0);return d.getTime();})();
   const startOfMonth=(()=>{const d=new Date();d.setDate(1);d.setHours(0,0,0,0);return d.getTime();})();
   const startOfYear=(()=>{const d=new Date();d.setMonth(0,1);d.setHours(0,0,0,0);return d.getTime();})();
-  const tasksThisWeek=tasks.filter(t=>t.completedAt&&t.completedAt>=startOfWeek).length;
-  const tasksThisMonth=tasks.filter(t=>t.completedAt&&t.completedAt>=startOfMonth).length;
-  // Inbox overview -- Week/Month/Year toggle over the same completedAt data,
-  // "time spent" is a sum of estMins (no separate time-tracking ledger exists,
-  // this is the same proxy the header's "time left" uses for pending tasks).
+  // Inbox overview -- Week/Month/Year toggle over the same completedAt data.
   const overviewStart=overviewPeriod==="week"?startOfWeek:overviewPeriod==="month"?startOfMonth:startOfYear;
   const overviewCompleted=tasks.filter(t=>t.completedAt&&t.completedAt>=overviewStart);
   const overviewFinished=overviewCompleted.length;
-  const overviewMins=overviewCompleted.reduce((s,t)=>s+(t.estMins||0),0);
+  // Real time from the task timer's logged sessions (not estimates), across
+  // every task -- sessions count whenever they happened, finished task or not.
+  const overviewMins=tasks.reduce((s,t)=>s+(t.sessions||[]).filter(x=>x.at>=overviewStart).reduce((a,x)=>a+x.mins,0),0);
   // On-time vs late -- only counts completions that actually had a due date (a
   // task with no due date has no deadline to be on time or late against); no
   // due time on the task means the whole due date counts, so the deadline is
@@ -1596,7 +1605,7 @@ export default function HomeworkPlanner() {
     setAdding(true);setStep(-1);
     setNewTask({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
     setPendingDueDate(null);
-    setTimeHours(0);setTimeMins(30);setTimeSecs(0);
+    setTimeHours(0);setTimeMins(30);
     setUsingTemplate(false);setTemplateSubtasks(null);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
@@ -1636,7 +1645,11 @@ export default function HomeworkPlanner() {
   }
   function goForwardStep(){
     if(QUESTIONS[step]?.type==="date"&&pendingDueDate!==null){confirmDueTime("");return;}
-    if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(newTask as Task);
+    // Skipping leaves that answer blank -- for the estimate that means 0 (shown
+    // as no estimate), not the wizard's hidden 30-minute starting value.
+    const updated=QUESTIONS[step]?.type==="time"?{...newTask,estMins:0}:newTask;
+    if(updated!==newTask)setNewTask(updated);
+    if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);
   }
   function handleDateInput(val:string){
     setPendingDueDate(val);
@@ -1970,7 +1983,7 @@ export default function HomeworkPlanner() {
             <div style={{width:6,height:6,borderRadius:"50%",background:priColor(pr,colorCodeUrgency),flexShrink:0}}/>
             <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
             {t.subject&&<span style={{color:sc,fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
-            <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{daysUntil(t.dueDate)}</span>
+            {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{daysUntil(t.dueDate)}</span>}
             <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 3px"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
           </div>
         );})}
@@ -1988,7 +2001,7 @@ export default function HomeworkPlanner() {
                 {t.done&&<span style={{color:contrastColor(T.accent),fontSize:11,fontWeight:"bold"}}>✓</span>}
               </button>
               <span style={{fontFamily:F.body,fontSize:13,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
-              <span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>
+              {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>}
               <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
             </div>
           </div>
@@ -2023,11 +2036,12 @@ export default function HomeworkPlanner() {
             <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:priColor(pr,colorCodeUrgency),borderRadius:"12px 12px 0 0"}}/>
             <div style={{display:"flex",justifyContent:"space-between"}}>
               {t.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
-              <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
+              <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:"auto"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
             </div>
             <div style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.title}</div>
+            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}{!t.done&&t.dueDate?<span style={{color:priColor(pr,colorCodeUrgency)}}> · {daysUntil(t.dueDate)}</span>:null}</div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"auto"}}>
-              <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{t.estMins}m</span>
+              {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
               <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:17,height:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
                 {t.done&&<span style={{color:"#111",fontSize:8,fontWeight:"bold"}}>✓</span>}
               </button>
@@ -2086,7 +2100,7 @@ export default function HomeworkPlanner() {
     if (layout==="timeline") return (
       <div style={{position:"relative",paddingLeft:24}}>
         <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:`linear-gradient(${T.accent},${T.border})`}}/>
-        {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
+        {[...tasks].sort((a,b)=>(a.dueDate||"9999")===(b.dueDate||"9999")?(a.dueTime||"99").localeCompare(b.dueTime||"99"):(a.dueDate||"9999").localeCompare(b.dueDate||"9999")).map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
           <div key={t.id} className="tc" style={{position:"relative",marginBottom:14}}>
             <div style={{position:"absolute",left:-19,top:14,width:12,height:12,borderRadius:"50%",background:t.done?"#2ED573":priColor(pr,colorCodeUrgency),border:`2px solid ${T.bg}`,cursor:"pointer"}} onClick={()=>toggleDone(t.id)}/>
             <div onClick={()=>{setSelectedTask(t);}} style={{background:T.card,borderRadius:11,padding:"11px 13px",border:`1px solid ${T.border}`,marginLeft:6,cursor:"pointer"}}>
@@ -2097,7 +2111,7 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",gap:10,marginTop:4,flexWrap:"wrap"}}>
                 {t.subject&&<span style={{background:sc+"22",color:sc,borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
                 <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}</span>
-                <span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>
+                {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency)}}>{daysUntil(t.dueDate)}</span>}
               </div>
             </div>
           </div>
@@ -2130,7 +2144,9 @@ export default function HomeworkPlanner() {
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {tasks.map(t=>{
           const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;
-          const maxMins=120; const pct=Math.min(100,Math.round(t.estMins/maxMins*100));
+          // Real progress: share of subtasks checked off (a done task is 100%).
+          const subs=t.subtasks||[]; const doneSubs=subs.filter(s=>s.done).length;
+          const pct=t.done?100:subs.length?Math.round(doneSubs/subs.length*100):0;
           return(
             <div key={t.id} className="tc" onClick={()=>{setSelectedTask(t);}} style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,cursor:"pointer"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -2147,10 +2163,11 @@ export default function HomeworkPlanner() {
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{flex:1,height:7,background:T.border,borderRadius:999}}>
-                  <div style={{width:t.done?"100%":`${pct}%`,height:"100%",background:t.done?"#2ED573":priColor(pr,colorCodeUrgency),borderRadius:999,transition:"width 0.5s"}}/>
+                  <div style={{width:`${pct}%`,height:"100%",background:t.done?"#2ED573":priColor(pr,colorCodeUrgency),borderRadius:999,transition:"width 0.5s"}}/>
                 </div>
-                <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.estMins}m</span>
-                <span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency),flexShrink:0}}>{daysUntil(t.dueDate)}</span>
+                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{t.done?"done":subs.length?`${doneSubs}/${subs.length}`:"no subtasks"}</span>
+                {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
+                {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:priColor(pr,colorCodeUrgency),flexShrink:0}}>{daysUntil(t.dueDate)}</span>}
               </div>
             </div>
           );
@@ -2233,7 +2250,7 @@ export default function HomeworkPlanner() {
                       </button>
                       <span style={{fontFamily:F.body,fontSize:12,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?T.textFaint:T.text}}>{t.title}</span>
                       {t.subject&&<span style={{color:sc,fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
-                      <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{t.estMins}m</span>
+                      {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
                       <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
                     </div>
                   );})}
@@ -2254,7 +2271,7 @@ export default function HomeworkPlanner() {
       const groups=new Map<string,Task[]>();
       const order:string[]=[];
       const keyFor=(t:Task)=>{
-        if (groupBy==="subject") return t.subject||"Other";
+        if (groupBy==="subject") return t.subject||"No subject";
         if (groupBy==="priority") return getPriority(t.dueDate,t.estMins,t.priorityOverride);
         return t.dueDate||"No date"; // dueDate
       };
@@ -2325,8 +2342,8 @@ export default function HomeworkPlanner() {
     return()=>{ document.body.style.background=""; };
   },[T.bg]);
 
-  // Focus Mode: a stripped, full-screen view -- just the single most urgent
-  // pending task and the (reused, not forked) Pomodoro timer. No tab bar, no
+  // Focus Mode: a stripped, full-screen view -- just the first pending task
+  // in the user's own order (same one the list badges "do first") and the (reused, not forked) Pomodoro timer. No tab bar, no
   // other tasks, no settings. Plain useState above, nothing to persist.
   if(focusMode){
     return (
@@ -2340,13 +2357,13 @@ export default function HomeworkPlanner() {
           {topTask?(
             <div className="pop" style={{background:T.gradientCard,borderRadius:16,padding:"20px",border:`1px solid ${T.accent}44`}}>
               <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-                <span className="rb" style={{background:T.accent+"33",color:T.accent}}>most urgent</span>
+                <span className="rb" style={{background:T.accent+"33",color:T.accent}}>up next</span>
                 {topTask.subject&&<span style={{background:(subjectColors[topTask.subject]||T.accent)+"22",color:subjectColors[topTask.subject]||T.accent,borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{topTask.subject}</span>}
               </div>
               <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{topTask.title}</div>
               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
                 <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(topTask.dueDate)}{topTask.dueTime?` ${formatTime(topTask.dueTime)}`:""}</span>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{topTask.estMins}m</span>
+                {topTask.estMins>0&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDuration(topTask.estMins)}</span>}
               </div>
               <button onClick={()=>toggleDone(topTask.id)} style={{marginTop:14,background:"#2ED57322",color:"#2ED573",border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>✓ Mark done</button>
             </div>
@@ -2395,7 +2412,7 @@ export default function HomeworkPlanner() {
                           <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Finished</div>
                         </div>
                         <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{overviewMins>=60?`${Math.floor(overviewMins/60)}h ${overviewMins%60}m`:`${overviewMins}m`}</div>
+                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{formatDuration(overviewMins)||"0m"}</div>
                           <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Time spent</div>
                         </div>
                         <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
@@ -2445,25 +2462,6 @@ export default function HomeworkPlanner() {
                           Redo
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
                         </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div style={{borderBottom:`1px solid ${T.border}`}}>
-                  <button onClick={()=>setStatsMenuOpen(o=>!o)} aria-expanded={statsMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
-                    <IconChart/>
-                    <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Stats</span>
-                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:statsMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
-                  </button>
-                  {statsMenuOpen&&(
-                    <div style={{padding:"0 14px 12px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-                      <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
-                        <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisWeek}</div>
-                        <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Week</div>
-                      </div>
-                      <div style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
-                        <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{tasksThisMonth}</div>
-                        <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>This Month</div>
                       </div>
                     </div>
                   )}
@@ -2683,7 +2681,7 @@ export default function HomeworkPlanner() {
           </div>
 
           {renderTasks(filteredTasks)}
-          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>nothing here yet</div>}
+          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>{searchLower?`No tasks match "${searchQuery.trim()}"`:filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending -- nice work!":"Nothing here yet -- add some homework below"}</div>}
           <div style={{marginTop:14}}>
             {!adding?(
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,paddingTop:10}}>
@@ -2766,23 +2764,14 @@ export default function HomeworkPlanner() {
                                 <button onClick={()=>setTimeMins(m=>m<=0?55:m-5)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:14}}>▼</button>
                                 <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>min</div>
                               </div>
-                              <div style={{fontFamily:F.heading,fontSize:28,color:T.textMuted,marginBottom:16}}>:</div>
-                              {/* Seconds */}
-                              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                                <button onClick={()=>setTimeSecs(s=>s>=55?0:s+5)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:14}}>▲</button>
-                                <div style={{fontFamily:F.heading,fontSize:28,color:T.text,minWidth:44,textAlign:"center",lineHeight:1}}>{String(timeSecs).padStart(2,"0")}</div>
-                                <button onClick={()=>setTimeSecs(s=>s<=0?55:s-5)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:14}}>▼</button>
-                                <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>sec</div>
-                              </div>
                             </div>
                             {/* Preview + confirm */}
                             <div style={{marginTop:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                               <div style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>
-                                {timeHours>0?`${timeHours}h `:""}{timeMins>0?`${timeMins}m `:""}{timeSecs>0?`${timeSecs}s`:""}{timeHours===0&&timeMins===0&&timeSecs===0?"0 min":""}
-                                {" "}= {Math.round(timeHours*60+timeMins+timeSecs/60)} min total
+                                {formatDuration(timeHours*60+timeMins)||"Pick a duration"}
                               </div>
-                              <button onClick={()=>handleAnswer(String(Math.max(1,Math.round(timeHours*60+timeMins+timeSecs/60))))}
-                                style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer",fontWeight:500}}>
+                              <button onClick={()=>handleAnswer(String(timeHours*60+timeMins))} disabled={timeHours*60+timeMins===0}
+                                style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:timeHours*60+timeMins===0?"default":"pointer",opacity:timeHours*60+timeMins===0?0.4:1,fontWeight:500}}>
                                 Set time →
                               </button>
                             </div>
@@ -2886,22 +2875,6 @@ export default function HomeworkPlanner() {
                       </button>
                     );
                   })}
-                </div>
-              </div>
-              {/* Preview */}
-              <div>
-                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Preview</div>
-                <div style={{background:T.surface,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.accent}44`,position:"relative",overflow:"hidden"}}>
-                  <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:T.accent,borderRadius:"12px 0 0 12px"}}/>
-                  <div style={{paddingLeft:7,display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                    <span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>
-                    <span style={{fontFamily:F.heading,fontSize:15,color:T.text}}>Sample Assignment</span>
-                    <span style={{background:"#FF6B6B22",color:"#FF6B6B",borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>Math</span>
-                  </div>
-                  <div style={{display:"flex",gap:12,marginTop:5,paddingLeft:7}}>
-                    <span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>Due tomorrow</span>
-                    <span style={{fontFamily:F.body,fontSize:10,color:"#FFA502"}}>Due tomorrow</span>
-                  </div>
                 </div>
               </div>
               {/* Desktop layout */}
@@ -3009,18 +2982,6 @@ export default function HomeworkPlanner() {
                 Done tasks move to Archived after this long. You can still archive any task manually from its detail view.
               </div>
             </div>
-            {/* Stats */}
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted}}>Stats</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:9}}>
-                {[{label:"Total",val:visibleTasks.length},{label:"Done",val:visibleTasks.filter(t=>t.done).length},{label:"Hours",val:`${(totalMins/60).toFixed(1)}h`}].map(({label,val})=>(
-                  <div key={label} style={{background:T.surface,borderRadius:9,padding:"11px 8px",textAlign:"center"}}>
-                    <div style={{fontFamily:F.heading,fontSize:20,color:T.accent}}>{val}</div>
-                    <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>{label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
             <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>
             <button onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived -- you can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:"#FF4757",fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Clear completed tasks</button>
             {fbUser&&(
@@ -3043,7 +3004,7 @@ export default function HomeworkPlanner() {
                 )}
               </div>
             )}
-            <div style={{textAlign:"center",fontFamily:F.body,fontSize:9,color:T.textFaint,paddingTop:4}}>DuePlanner v{__APP_VERSION__}</div>
+            <div style={{textAlign:"center",fontFamily:F.body,fontSize:9,color:T.textFaint,paddingTop:4}}>DuePlanner v{__APP_VERSION__} · <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{color:T.textFaint}}>Privacy policy</a></div>
           </div>
         )}
         </div>

@@ -29,6 +29,13 @@ for(const [key,t] of Object.entries(THEMES)){
     {label:"text on card",   fg:t.text,      bg:t.card, min:NORMAL_TEXT_MIN},
     {label:"textMuted on bg",fg:t.textMuted, bg:t.bg,   min:NORMAL_TEXT_MIN},
     {label:"textMuted/card", fg:t.textMuted, bg:t.card, min:NORMAL_TEXT_MIN},
+    // textFaint is the deliberately lowest-emphasis tier (decorative/caption-ish,
+    // not primary reading text), so it's held to the looser large-text/UI-component
+    // bar rather than normal-text AA -- this row was originally missing entirely,
+    // which let stealthLight's #cccccc-on-#f5f5f5 (1.47:1, genuinely close to
+    // invisible) ship without the audit ever flagging it.
+    {label:"textFaint on bg", fg:t.textFaint, bg:t.bg,   min:LARGE_TEXT_MIN},
+    {label:"textFaint/card",  fg:t.textFaint, bg:t.card, min:LARGE_TEXT_MIN},
     {label:"accent on bg",   fg:t.accent,    bg:t.bg,   min:LARGE_TEXT_MIN},
   ];
   for(const row of rows){

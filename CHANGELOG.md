@@ -33,6 +33,11 @@ tracking as of `0.1.0` — earlier history is in `git log`, not backfilled here.
   buttons/checkmarks that hardcoded black text on a `T.accent` fill (safe when accent was always a
   bright color; broken by Stealth Light's pure-black accent) to use the existing `contrastColor()`
   helper instead.
+- Fixed `textFaint` contrast in both Stealth and Stealth Light -- `scripts/check-theme-contrast.ts`
+  never actually checked this field, so Stealth's own original value (1.57:1, close to invisible)
+  had shipped unnoticed, and its mirror in Stealth Light (1.47:1) was the same problem made obvious
+  (low contrast reads as moody on a dark background, broken on a light one). The script now checks
+  `textFaint` against the large-text/UI-component bar, and both themes were nudged to actually pass.
 - Renamed the "Auto" appearance mode to "System" (label only, same behavior).
 
 ### Removed

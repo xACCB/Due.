@@ -140,7 +140,15 @@ require rewriting a user's entire history:
 `stealthLight`, a literal per-channel RGB inversion of `stealth`'s achromatic grays (near-white bg
 instead of near-black, pure black accent instead of pure white; `textMuted` needed a small manual
 nudge afterward, since a naive hex inversion doesn't perfectly preserve WCAG contrast ratios -- sRGB
-gamma correction means relative luminance isn't linear in raw channel space). With exactly one
+gamma correction means relative luminance isn't linear in raw channel space). `textFaint` needed the
+same kind of manual correction on *both* themes, for a different reason: `scripts/check-theme-
+contrast.ts` originally didn't check `textFaint` at all, so `stealth`'s own original value
+(`#333333` on `#0a0a0a`, 1.57:1) had shipped with a contrast ratio close to invisible, and its
+mechanical inversion (`#cccccc` on `#f5f5f5`, 1.47:1) inherited the same problem -- except low
+contrast on a *dark* background reads as moody/intentional, while the same trick on a *light*
+background just looks broken, which is what surfaced it. The script now checks `textFaint` too
+(against the large-text/UI-component 3:1 bar, not full-text 4.5:1, since it's deliberately the
+lowest-emphasis tier) and both themes' `textFaint` were nudged to actually clear that. With exactly one
 theme per light/dark category, `themeName` in `App.tsx` is a plain derived `const`
 (`effectiveThemeMode==="light"?"stealthLight":"stealth"`), not state -- light/dark/auto
 (`themeMode`, labeled "System" in the UI) is still a real user choice (incl. following system

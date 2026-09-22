@@ -2424,7 +2424,8 @@ export default function HomeworkPlanner() {
               </div>
             )}
           </div>
-          <div style={{textAlign:"right"}}>
+          {/* Absolutely centered in the header regardless of the title's width */}
+          <div style={{position:"absolute",left:"50%",bottom:0,transform:"translateX(-50%)",textAlign:"center",whiteSpace:"nowrap",pointerEvents:"none"}}>
             <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>time left</div>
             <div style={{fontFamily:F.heading,fontSize:20,color:effectiveThemeMode==="dark"?"#fff":"#000"}}>{totalMins>=60?`${Math.floor(totalMins/60)}h ${totalMins%60}m`:`${totalMins}m`}</div>
           </div>

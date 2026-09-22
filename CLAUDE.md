@@ -245,7 +245,9 @@ React Compiler's purity lint rejects `Date.now()` inside component functions; `s
 in the undo history as an `"edit"` `HistoryAction` with the before/after due date and time, so it
 shares the undo toast and History menu with deletes), duplicate it
 (`duplicateTask`: fresh id, unchecked subtasks, no sessions, detached from any repeat chain) and
-restore it from the archive. **Focus Mode** targets `focusTask` (`focusTaskId`, falling back to
+restore it from the archive. **Recently deleted** (`trash`, `hw-trash`, local-only, not synced):
+every delete also lands here for 30 days (pruned on load, capped at 200), restorable from the
+History menu; undo/redo of a delete keeps it in step. **Focus Mode** targets `focusTask` (`focusTaskId`, falling back to
 the first pending task); a finished Pomodoro logs a 25-minute session to it (read through
 `pomodoroTaskRef`, since the finish effect is declared before `focusTask` is computed), and a
 Screen Wake Lock is held while Focus Mode is open. **JSON import** (`importBackupJSON`) merges an

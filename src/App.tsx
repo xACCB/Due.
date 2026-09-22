@@ -212,6 +212,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"recently-deleted", date:"2026-09-22", title:"New feature", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
   { id:"skip-occurrence", date:"2026-09-22", title:"New feature", description:"Repeating tasks have \"Skip this one\" in their detail view -- moves to the next occurrence without completing it. Undoable." },
   { id:"countdown", date:"2026-09-22", title:"New feature", description:"Tasks due today at a set time show a live countdown, like \"Due in 2h 15m\"." },
   { id:"profile-in-menu", date:"2026-09-22", title:"UI change", description:"Profile now lives only in the title menu, which also shows when there's a sync issue." },
@@ -307,6 +308,16 @@ function buildSuggestion(tasks:Task[]):string {
 type HistoryAction =
   | {type:"delete"; tasks:Task[]}
   | {type:"edit"; taskId:number; before:Partial<Task>; after:Partial<Task>; label:string};
+
+// Recently deleted entries. Built at module scope because the React
+// Compiler's purity lint rejects Date.now() inside component functions.
+type TrashEntry={task:Task;deletedAt:number};
+const TRASH_DAYS=30;
+function trashEntries(list:Task[]):TrashEntry[]{ const at=Date.now(); return list.map(task=>({task,deletedAt:at})); }
+function pruneTrash(prev:TrashEntry[]):TrashEntry[]{
+  const cutoff=Date.now()-TRASH_DAYS*86400000;
+  return prev.some(e=>e.deletedAt<cutoff)?prev.filter(e=>e.deletedAt>=cutoff):prev;
+}
 
 // Snooze moves a task's due date (and, for "later today", its time) forward.
 type SnoozeKind="later"|"tomorrow"|"week";
@@ -1515,6 +1526,7 @@ export default function HomeworkPlanner() {
     setTasks([]);
     setSubjects(DEFAULT_SUBJECTS);
     setSubjectColors(DEFAULT_SUBJECT_COLORS);
+    setTrash([]);
   }
   const [showDeleteAccountConfirm,setShowDeleteAccountConfirm]=useState(false);
   const [deleteConfirmText,setDeleteConfirmText]=useState("");
@@ -1679,6 +1691,25 @@ export default function HomeworkPlanner() {
   const [undoStack,setUndoStack]=useState<HistoryAction[]>([]);
   const [redoStack,setRedoStack]=useState<HistoryAction[]>([]);
   const [undoToast,setUndoToast]=useState<string|null>(null);
+  // Recently deleted: every deleted task is kept here for 30 days so it can be
+  // restored after the undo toast is gone. Local to this device (not synced).
+  const [trash,setTrash]=usePersistedState<TrashEntry[]>("hw-trash",[]);
+  useEffect(()=>{ setTrash(pruneTrash); },[setTrash]);
+  function addToTrash(list:Task[]){
+    const ids=new Set(list.map(t=>t.id));
+    const added=trashEntries(list);
+    setTrash(prev=>[...added,...prev.filter(e=>!ids.has(e.task.id))].slice(0,200));
+  }
+  function removeFromTrash(ids:number[]){
+    const s=new Set(ids);
+    setTrash(prev=>prev.filter(e=>!s.has(e.task.id)));
+  }
+  function restoreFromTrash(id:number){
+    const entry=trash.find(e=>e.task.id===id);
+    if(!entry)return;
+    setTasks(prev=>prev.some(t=>t.id===id)?prev:[...prev,{...entry.task,order:nextOrder(prev)}]);
+    removeFromTrash([id]);
+  }
   const undoToastTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   // Bulk edit / multi-select. Scoped to the default list layout (MiniCard) --
   // the other 11 layouts each render their own custom task row markup, so
@@ -1907,6 +1938,7 @@ export default function HomeworkPlanner() {
     const removed=tasks.filter(t=>ids.includes(t.id));
     if(removed.length===0)return;
     setTasks(prev=>prev.filter(t=>!ids.includes(t.id)));
+    addToTrash(removed);
     pushUndoable({type:"delete",tasks:removed},removed.length===1?`"${removed[0].title}" deleted`:`${removed.length} tasks deleted`);
   }
   function deleteTask(id:number){ deleteTasks([id]); }
@@ -1941,7 +1973,10 @@ export default function HomeworkPlanner() {
   function undo(){
     if(undoStack.length===0)return;
     const action=undoStack[undoStack.length-1];
-    if(action.type==="delete")setTasks(prev=>{const have=new Set(prev.map(t=>t.id));return [...prev,...action.tasks.filter(t=>!have.has(t.id))];});
+    if(action.type==="delete"){
+      setTasks(prev=>{const have=new Set(prev.map(t=>t.id));return [...prev,...action.tasks.filter(t=>!have.has(t.id))];});
+      removeFromTrash(action.tasks.map(t=>t.id));
+    }
     if(action.type==="edit")updateTask(action.taskId,action.before);
     setUndoStack(prev=>prev.slice(0,-1));
     setRedoStack(prev=>[...prev,action]);
@@ -1950,7 +1985,7 @@ export default function HomeworkPlanner() {
   function redo(){
     if(redoStack.length===0)return;
     const action=redoStack[redoStack.length-1];
-    if(action.type==="delete"){const ids=new Set(action.tasks.map(t=>t.id));setTasks(prev=>prev.filter(t=>!ids.has(t.id)));}
+    if(action.type==="delete"){const ids=new Set(action.tasks.map(t=>t.id));setTasks(prev=>prev.filter(t=>!ids.has(t.id)));addToTrash(action.tasks);}
     if(action.type==="edit")updateTask(action.taskId,action.after);
     setRedoStack(prev=>prev.slice(0,-1));
     setUndoStack(prev=>[...prev,action]);
@@ -2788,6 +2823,23 @@ export default function HomeworkPlanner() {
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
                         </button>
                       </div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:12,marginBottom:6}}>
+                        <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recently deleted{trash.length?` (${trash.length})`:""}</span>
+                        {trash.length>0&&<button onClick={()=>setTrash([])} style={{background:"none",border:"none",color:T.textFaint,fontSize:11,cursor:"pointer",padding:0}}>Empty</button>}
+                      </div>
+                      {trash.length===0
+                        ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here. Deleted tasks stay for 30 days.</div>
+                        : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
+                          {trash.map(e=>(
+                            <div key={e.task.id} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,borderRadius:8,padding:"6px 8px"}}>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.task.title}</div>
+                                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>Deleted {formatDate(localDateStr(new Date(e.deletedAt)))}</div>
+                              </div>
+                              <button onClick={()=>restoreFromTrash(e.task.id)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontSize:11,cursor:"pointer",padding:"4px 10px",flexShrink:0}}>Restore</button>
+                            </div>
+                          ))}
+                        </div>}
                     </div>
                   )}
                 </div>

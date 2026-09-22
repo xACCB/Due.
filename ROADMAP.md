@@ -30,7 +30,7 @@ tier, and a rough size.
 | Server-side reminders: Cloud Functions plus web push | ⬜ | XL | Reminders arrive even with the app closed. Many notification items below need this |
 | Turn on App Check enforcement | 🟡 | S | Code is in place; set the site key, watch traffic, then enforce |
 | Rate limits and size caps in `firestore.rules` (max tasks, subtasks, tags, string lengths) | 🟡 | M | String lengths are already capped |
-| Run the Firestore rules tests in CI (emulator in GitHub Actions) | ⬜ | S | Currently local-only |
+| Run the Firestore rules tests in CI (emulator in GitHub Actions) | ✅ | S | Runs on every push; tests updated to the current rules |
 | Scheduled Firestore backups (exports to Cloud Storage) | ⬜ | S | |
 | Crash and error monitoring (e.g. Sentry) | ⬜ | S | Include sync errors, not just crashes |
 | Split `App.tsx` (about 3,100 lines) into layout, page and wizard components | ⬜ | L | Makes every item below safer to build |
@@ -54,7 +54,7 @@ tier, and a rough size.
 | Item | Status | Tier | Size | Notes |
 |---|---|---|---|---|
 | Bulk edit (multi-select, change fields at once) | 🟡 | F | M | Exists for the List layout (Done, Archive, Subject, Delete). Missing: other layouts, and editing the due date and priority |
-| Snooze / "later today" quick action | ⬜ | F | S | Swipe action or modal button: later today / tomorrow / next week |
+| Snooze / "later today" quick action | ✅ | F | S | In the task detail: later today / tomorrow / next week. A swipe action could come with #128 |
 | Task dependencies / prerequisites | ⬜ | P | L | "Blocked by"; blocked tasks greyed out until the prerequisite is done |
 | Multi-day / duration tasks (a date range, not one date) | ⬜ | F | M | Affects Calendar, the heatmap, and conflict detection |
 | Conflict detection (two heavy tasks on the same day) | ⬜ | F | M | Best built after the workload heatmap |
@@ -96,7 +96,7 @@ tier, and a rough size.
 ## 4. Reminders & notifications
 | Item | Status | Tier | Size | Notes |
 |---|---|---|---|---|
-| Multi-offset reminders | 🟡 | F | S | 1 day / 3 hours / 1 hour / at due time exist. Add "1 week before" |
+| Multi-offset reminders | ✅ | F | S | 1 week / 1 day / 3 hours / 1 hour / at due time |
 | Reminders with the app closed (push) | ⬜ | F | XL | See 0.2; needs server-side reminders |
 | Smart rescheduling nudge when a task goes overdue | ⬜ | F | M | "Move to tomorrow?" with one tap |
 | Inactivity nudge ("haven't opened the app in 3 days") | ⬜ | F | S | Needs push |
@@ -122,7 +122,7 @@ tier, and a rough size.
 | Command palette (Cmd/Ctrl+K: add, search, jump to anywhere) | ⬜ | F | M | |
 | Global quick-capture hotkey | ⬜ | F | S | In-app shortcut; a system-wide hotkey needs the browser extension or desktop app |
 | Bulk CSV / spreadsheet import | ⬜ | F | M | Export exists |
-| JSON import (restore an export) | ⬜ | F | S | Export exists, but there's no way back in |
+| JSON import (restore an export) | ✅ | F | S | Menu → Backup & export → Import backup (JSON); merges, skipping tasks already present |
 | Voice-to-task | ⬜ | P | M | Web Speech API; parse the result with natural-language quick add |
 | Camera syllabus scan (OCR) | ⬜ | P | L | Server OCR costs money, so Pro |
 | Browser / email-to-task | ⬜ | P | L | Email-in address needs a backend; the browser side is covered in section 13 |
@@ -195,7 +195,7 @@ tier, and a rough size.
 |---|---|---|---|---|
 | CSV / JSON export | ✅ | F | — | JSON now includes settings |
 | "Download all my data" | ✅ | F | — | JSON export covers it; could be labelled as such in the Danger Zone |
-| JSON import | ⬜ | F | S | Same item as in section 6 |
+| JSON import | ✅ | F | S | Same item as in section 6 |
 | Print-friendly weekly agenda / PDF | ⬜ | F | M | A print stylesheet gets most of the way |
 | Public API / webhooks out | ⬜ | P | XL | Needs API keys, per-user limits and docs |
 | Remappable keyboard shortcuts | ⬜ | P | M | Needs a shortcuts system first (command palette) |
@@ -219,10 +219,10 @@ Things most people expect from an app like this that are missing today.
 | Item | Status | Tier | Size | Notes |
 |---|---|---|---|---|
 | First-run onboarding (a short tour, or 3 questions: school level, subjects, reminders) | ⬜ | F | M | New users currently land on sample tasks with no explanation |
-| Edit every task field in the detail view (title, subject, due date/time, estimate, recurrence) | ⬜ | F | M | Today most fields can only be set while adding a task |
+| Edit every task field in the detail view (title, subject, due date/time, estimate, recurrence) | ✅ | F | M | Today most fields can only be set while adding a task |
 | Rename subjects and change their colors (not just add/delete) | ⬜ | F | S | |
 | Undo for more than deletes (completing, editing, archiving) | 🟡 | F | M | History is delete-only |
-| "Restore" button in the Archived view | 🟡 | F | S | Archived tasks can be viewed, but there's no explicit restore |
+| "Restore" button in the Archived view | ✅ | F | S | Restore button in an archived task's detail view |
 | Keyboard shortcuts (n = new task, / = search, j/k to move, x = complete) | ⬜ | F | S | Pairs with the command palette |
 | Full accessibility pass (screen reader, keyboard-only use, contrast, focus rings) | 🟡 | F | M | Button labels were added in the audit; needs a real screen-reader pass |
 | Other languages (start with Spanish) | ⬜ | F | L | Move all text into one strings file first |
@@ -254,7 +254,7 @@ feature is free for now, so these have no tier.
 | 14 | Progress slider (% done) for tasks without subtasks | Yes | S | Would also give the Progress layout something to show for tasks without subtasks |
 | 16 | Custom repeat patterns (Mon/Wed/Fri, every 2 weeks, last day of the month) | Yes | M | |
 | 17 | Repeat end date or count | With tweaks | S | Pairs with #16 |
-| 18 | Duplicate task | Yes | S | |
+| 18 | Duplicate task | Yes | S | ✅ Done: in the task detail view |
 | 19 | Task history (created, edited, completed) | Maybe | M | |
 | 20 | "Waiting on" status (e.g. waiting for teacher feedback) | With tweaks | S | |
 | 21 | Submission checklist ("Submitted on Canvas ✓", optional screenshot) | With tweaks | M | A screenshot needs file storage (see Attachments, section 5) |
@@ -277,9 +277,9 @@ feature is free for now, so these have no tier.
 | 40 | Daily focus goal (e.g. 90 minutes) with a streak | With tweaks | S | Work sessions are already logged |
 | 43 | Quiet hours for notifications | Maybe | S | |
 | 47 | Session goal ("finish the intro"), checked at the end | Yes | S | Pairs with the post-session reflection log (section 8) |
-| 132 | Pick which task Focus Mode is about, not only the first one | Yes | S | |
-| 133 | Pomodoro time counts as a work session on that task | Yes | S | Work sessions are already stored on tasks; pairs with #132 |
-| 135 | Keep the screen awake during Focus Mode | Yes | S | Screen Wake Lock API; not every browser supports it |
+| 132 | Pick which task Focus Mode is about, not only the first one | Yes | S | ✅ Done: "Change task" in Focus Mode |
+| 133 | Pomodoro time counts as a work session on that task | Yes | S | ✅ Done: a finished Pomodoro logs 25 minutes to the focus task |
+| 135 | Keep the screen awake during Focus Mode | Yes | S | ✅ Done (Screen Wake Lock API; not every browser supports it) |
 | 136 | Next-task suggestion when a break ends | Yes | S | The Pomodoro has no break phase yet; build with configurable Pomodoro (section 8) |
 | 137 | End-of-day shutdown: review what you finished, roll leftovers to tomorrow | Yes | M | Close to Evening review (section 2); design them together |
 | 138 | Flow mode: hide clocks and counts while focusing | Yes | S | |

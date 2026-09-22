@@ -172,6 +172,12 @@ function IconImport(){
     <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
   </svg>;
 }
+function IconBell(){
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/>
+    <path d="M10 19a2 2 0 0 0 4 0"/>
+  </svg>;
+}
 function IconHistory(){
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="13" r="8"/><polyline points="12,9 12,13 15,15"/><polyline points="8.5,2.5 12,5.5 15.5,2.5"/>
@@ -202,6 +208,19 @@ const PRIORITY_COLORS: Record<Priority,string> = { high:"#FF4757",medium:"#FFA50
 // urgency still reads through position/text ("Overdue!" etc.) without color.
 const NEUTRAL_PRIORITY_COLOR = "#8a8a8a";
 function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORITY_COLORS[pr]:NEUTRAL_PRIORITY_COLOR; }
+// What's New feed shown in the title menu's Inbox section -- hand-maintained,
+// newest first; add an entry here whenever a user-facing change ships.
+const WHATS_NEW: {date:string; title:string; description:string}[] = [
+  { date:"2026-09-22", title:"Bug fix", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
+  { date:"2026-09-22", title:"UI change", description:"History is now a collapsible section in the title menu instead of always expanded." },
+  { date:"2026-09-22", title:"New feature", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
+  { date:"2026-09-22", title:"Navigation", description:"Settings moved out of the tab bar -- open it from the title menu instead." },
+  { date:"2026-09-22", title:"UI change", description:"The DuePlanner title is now a menu with quick access to Inbox, History, Profile, and Settings." },
+  { date:"2026-09-22", title:"UI change", description:"Cancel moved out from between the add-task wizard's back/skip buttons to avoid accidental taps." },
+  { date:"2026-09-22", title:"New feature", description:"Added back and skip buttons to the add-task wizard, so you can revisit or skip a question." },
+  { date:"2026-09-22", title:"Bug fix", description:"Subject colors for English and Science no longer look nearly identical." },
+  { date:"2026-09-22", title:"UI change", description:"The time-left number in the header now follows the theme instead of always being teal." },
+];
 const REMINDER_OFFSETS = [
   { key:"1d", label:"1 day before", mins:1440 },
   { key:"3h", label:"3 hours before", mins:180 },
@@ -1307,6 +1326,7 @@ export default function HomeworkPlanner() {
   const [activeTab,setActiveTab]=useState("tasks");
   const [titleMenuOpen,setTitleMenuOpen]=useState(false);
   const [historyMenuOpen,setHistoryMenuOpen]=useState(false);
+  const [inboxMenuOpen,setInboxMenuOpen]=useState(false);
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!titleMenuOpen)return;
@@ -1441,14 +1461,10 @@ export default function HomeworkPlanner() {
   const filteredTasks=allSorted.filter(t=>{
     if(filter==="archived")return !!t.archived;
     if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
-    if(filter==="inbox")return !t.done&&(!t.dueDate||!t.subject);
     if(filter==="done")return t.done;
     if(filter==="pending")return !t.done;
     return showDone?true:!t.done;
   }).filter(matchesSearch);
-  // Untriaged -- tasks whose due date and/or subject were skipped rather than answered
-  // (see the add-wizard's skip arrow), surfaced via the title menu's Inbox entry.
-  const inboxCount=visibleTasks.filter(t=>!t.done&&!t.archived&&(!t.dueDate||!t.subject)).length;
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const totalMins=visibleTasks.filter(t=>!t.done&&!t.archived).reduce((s,t)=>s+(t.estMins||0),0);
 
@@ -2202,11 +2218,26 @@ export default function HomeworkPlanner() {
             </button>
             {titleMenuOpen&&(
               <div role="menu" style={{position:"absolute",top:"calc(100% + 8px)",left:0,zIndex:200,width:280,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",overflow:"hidden"}}>
-                <button role="menuitem" onClick={()=>{setFilter("inbox");setActiveTab("tasks");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
-                  <IconTasks/>
-                  <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Inbox</span>
-                  {inboxCount>0&&<span style={{background:T.accent,color:contrastColor(T.accent),borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{inboxCount}</span>}
-                </button>
+                <div style={{borderBottom:`1px solid ${T.border}`}}>
+                  <button onClick={()=>setInboxMenuOpen(o=>!o)} aria-expanded={inboxMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
+                    <IconBell/>
+                    <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Inbox</span>
+                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:inboxMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
+                  </button>
+                  {inboxMenuOpen&&(
+                    <div style={{padding:"0 14px 12px",display:"flex",flexDirection:"column",gap:10,maxHeight:220,overflowY:"auto"}}>
+                      {WHATS_NEW.map((item,i)=>(
+                        <div key={i}>
+                          <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                            <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.title}</span>
+                            <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
+                          </div>
+                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div style={{borderBottom:`1px solid ${T.border}`}}>
                   <button onClick={()=>setHistoryMenuOpen(o=>!o)} aria-expanded={historyMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
                     <IconHistory/>
@@ -2308,7 +2339,7 @@ export default function HomeworkPlanner() {
 
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
-            {["all","pending","done","archived","inbox"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
+            {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f}</button>)}
             {topTask&&<button onClick={()=>setFocusMode(true)} style={{background:"none",border:`1px solid ${T.accent}55`,color:T.accent,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>Focus</button>}
             {layout==="list"&&(selectionMode
               ? <button onClick={exitSelectionMode} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>

@@ -172,6 +172,11 @@ function IconImport(){
     <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
   </svg>;
 }
+function IconHistory(){
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="13" r="8"/><polyline points="12,9 12,13 15,15"/><polyline points="8.5,2.5 12,5.5 15.5,2.5"/>
+  </svg>;
+}
 function IconSettings(){
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.1"/>
@@ -1301,6 +1306,7 @@ export default function HomeworkPlanner() {
   const [suggestionLoading,setSuggestionLoading]=useState(false);
   const [activeTab,setActiveTab]=useState("tasks");
   const [titleMenuOpen,setTitleMenuOpen]=useState(false);
+  const [historyMenuOpen,setHistoryMenuOpen]=useState(false);
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!titleMenuOpen)return;
@@ -2196,29 +2202,37 @@ export default function HomeworkPlanner() {
             </button>
             {titleMenuOpen&&(
               <div role="menu" style={{position:"absolute",top:"calc(100% + 8px)",left:0,zIndex:200,width:280,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",overflow:"hidden"}}>
-                <button role="menuitem" onClick={()=>{setFilter("inbox");setActiveTab("tasks");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`}}>
+                <button role="menuitem" onClick={()=>{setFilter("inbox");setActiveTab("tasks");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <IconTasks/>
                   <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Inbox</span>
                   {inboxCount>0&&<span style={{background:T.accent,color:contrastColor(T.accent),borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{inboxCount}</span>}
                 </button>
-                <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontFamily:F.body,fontSize:13,color:T.text,marginBottom:8}}>History</div>
-                  <div style={{display:"flex",gap:8}}>
-                    <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: delete "${undoStack[undoStack.length-1].task.title}"`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
-                      Undo
-                    </button>
-                    <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: delete "${redoStack[redoStack.length-1].task.title}"`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
-                      Redo
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
-                    </button>
-                  </div>
+                <div style={{borderBottom:`1px solid ${T.border}`}}>
+                  <button onClick={()=>setHistoryMenuOpen(o=>!o)} aria-expanded={historyMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
+                    <IconHistory/>
+                    <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>History</span>
+                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:historyMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
+                  </button>
+                  {historyMenuOpen&&(
+                    <div style={{padding:"0 14px 12px"}}>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: delete "${undoStack[undoStack.length-1].task.title}"`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
+                          Undo
+                        </button>
+                        <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: delete "${redoStack[redoStack.length-1].task.title}"`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                          Redo
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <button role="menuitem" onClick={()=>{setShowProfile(true);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`}}>
+                <button role="menuitem" onClick={()=>{setShowProfile(true);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke={T.text} strokeWidth="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.text} strokeWidth="2" strokeLinecap="round"/></svg>
                   <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Profile</span>
                 </button>
-                <button role="menuitem" onClick={()=>{setActiveTab("options");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left"}}>
+                <button role="menuitem" onClick={()=>{setActiveTab("options");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
                   <IconSettings/>
                   <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Settings</span>
                 </button>

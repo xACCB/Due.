@@ -212,3 +212,26 @@ tier, and a rough size.
 4. **Server-side reminders and email (weeks 9–12):** push notifications with the app closed, the inactivity nudge, and the email digest. These make the app feel "real" and support Pro.
 5. **Integrations (ongoing):** the .ics feeds first (both directions), then Google Calendar, then Google Classroom and Canvas.
 6. **Social and collaboration (later):** after a privacy and safety review. Start with read-only share links.
+
+---
+
+## Phase details
+
+### Phase 1: Groundwork
+
+Under-the-hood work with no new user-facing features. It goes first because
+almost everything later touches `App.tsx`, and Pro features will depend on
+sync and the security rules being solid.
+
+| # | Item | What it involves | Why | Risk / cost |
+|---|---|---|---|---|
+| 1 | Safer sync | An `updatedAt` on each task so the newer edit wins when two devices conflict; write only the changed fields instead of the whole task | Fixes the known issue where another device's change arriving within the 400ms write delay can overwrite a local edit | Low risk, high value: protects user data |
+| 2 | Rules tests in CI | Run `npm run test:rules` (Firestore emulator) in GitHub Actions on every push | A rules change that would break sync gets caught before it's deployed, not after | Needs Java in the CI image; otherwise low risk |
+| 3 | Error monitoring | Add Sentry (the free tier is enough) for crashes and sync errors | You see real users' problems, not only the ones you hit yourself | Needs a Sentry account; add Sentry to `privacy.html` |
+| 4 | Split `App.tsx` | Move the layouts, Settings, the add-task wizard and the task detail into their own files | Smaller, safer changes; fewer unrelated breakages | Big refactor with no visible payoff; small risk of visual regressions, so move carefully and check screenshots as you go |
+| 5 | Shared components | A few reusable pieces (Card, Chip, IconButton, SectionLabel) replacing repeated inline styles | Visual changes (themes, Liquid Glass) happen in one place instead of dozens | Same as #4 |
+
+**Suggested order within the phase:** 1 → 2 → 3 → 4 → 5. Items 1–2 are the
+most valuable and can ship on their own. If visible progress is wanted sooner,
+4–5 can be deferred, at the cost of slower and riskier feature work until
+they're done.

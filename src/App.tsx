@@ -2449,14 +2449,18 @@ export default function HomeworkPlanner() {
         <div className="app-body">
         <div className="app-sidebar">
         {/* Tabs */}
-        <div className="tab-bar" onPointerDown={onTabBarPointerDown} onPointerMove={onTabBarPointerMove} onPointerUp={onTabBarPointerUp} onPointerCancel={onTabBarPointerCancel} style={{display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"none",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
+        <div className="tab-bar" onPointerDown={onTabBarPointerDown} onPointerMove={onTabBarPointerMove} onPointerUp={onTabBarPointerUp} onPointerCancel={onTabBarPointerCancel} style={{position:"relative",display:"flex",gap:3,marginBottom:16,background:T.surface+"cc",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${T.border}`,borderRadius:999,padding:4,touchAction:"none",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
+          {/* Single pill that slides between slots (rather than each button's
+              background instantly popping in/out) so the drag gesture above
+              reads as one continuous motion instead of a cross-fade. */}
+          <div style={{position:"absolute",top:4,bottom:4,left:(tabBarSwipeId==="focus"||(!tabBarSwipeId&&activeTab==="focus"))?"calc(4px + (100% - 8px - 3px) / 2 + 3px)":4,width:"calc((100% - 8px - 3px) / 2)",background:T.card,borderRadius:999,transition:"left 0.22s cubic-bezier(.34,1.4,.64,1)"}}/>
           {(["tasks","focus"] as const).map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
             const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};
             const Icon=icons[id];
             const active=tabBarSwipeId?id===tabBarSwipeId:activeTab===id;
             return <button key={id} data-tab-id={id} onClick={()=>id==="focus"?setFocusMode(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
-              style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"all 0.18s cubic-bezier(.34,1.4,.64,1)",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
+              style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color 0.18s cubic-bezier(.34,1.4,.64,1)",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
               <Icon/>
             </button>;
           })}

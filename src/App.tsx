@@ -1945,7 +1945,7 @@ export default function HomeworkPlanner() {
           return(
             <div key={t.id} className="sticky-note" onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{background:bg,borderRadius:3,padding:"14px 12px",transform:`rotate(${rot}deg)`,boxShadow:"2px 3px 10px #00000033",minHeight:120,display:"flex",flexDirection:"column",gap:6,opacity:t.done?0.5:1,cursor:"pointer"}}>
               <div style={{fontFamily:F.heading,fontSize:14,color:"#1a1a1a",textDecoration:t.done?"line-through":"none",lineHeight:1.3,flex:1}}>{t.title}</div>
-              <div style={{fontFamily:F.body,fontSize:10,color:"#555"}}>{t.subject&&<><span style={{color:sc,fontWeight:600}}>{t.subject}</span> · </>}{daysUntil(t.dueDate)||"no date"}</div>
+              <div style={{fontFamily:F.body,fontSize:10,color:"#555"}}>{t.subject&&<><span style={{color:sc,fontWeight:600}}>{t.subject}</span> · </>}{daysUntil(t.dueDate)||"No date"}</div>
               <div style={{display:"flex",justifyContent:"space-between"}}>
                 <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#22c55e":"#ffffff88",border:"1.5px solid #33333333",borderRadius:4,padding:"2px 7px",cursor:"pointer",fontFamily:F.body,fontSize:10,color:"#333"}}>{t.done?"✓ done":"mark done"}</button>
                 <button style={{background:"none",border:"none",color:"#666",cursor:"pointer",fontSize:14}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
@@ -2090,8 +2090,30 @@ export default function HomeworkPlanner() {
       const week:string[]=[];
       for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()+i);week.push(localDateStr(d));}
       const noDate=tasks.filter(t=>!t.dueDate);
+      const overdue=tasks.filter(t=>t.dueDate&&t.dueDate<week[0]);
+      const later=tasks.filter(t=>t.dueDate&&t.dueDate>week[6]);
+      // Overdue / later / undated tasks fall outside the 7-day window above,
+      // so they get their own simpler sections instead of silently vanishing.
+      const extraSection=(label:string,list:Task[],labelColor?:string)=>list.length>0&&(
+            <div key={label} style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`}}>
+              <div style={{fontFamily:F.body,fontSize:11,color:labelColor||T.textMuted,marginBottom:8}}>{label}</div>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                {list.map(t=>(
+                  <div key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+                    <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {t.done&&<span style={{color:"#111",fontSize:9}}>✓</span>}
+                    </button>
+                    <span style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
+                    {t.dueDate&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDate(t.dueDate)}</span>}
+                    <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+      );
       return(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {extraSection("Overdue",overdue,priColor("high",colorCodeUrgency))}
           {week.map(day=>{
             const dayTasks=tasks.filter(t=>t.dueDate===day);
             if(dayTasks.length===0)return null;
@@ -2117,22 +2139,8 @@ export default function HomeworkPlanner() {
               </div>
             );
           })}
-          {noDate.length>0&&(
-            <div style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8}}>No date</div>
-              <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                {noDate.map(t=>(
-                  <div key={t.id} onClick={()=>{setSelectedTask(t);setSessionHistory([]);}} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
-                    <button onClick={e=>{e.stopPropagation();toggleDone(t.id);}} style={{background:t.done?"#2ED573":"none",border:`1.5px solid ${t.done?"#2ED573":T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {t.done&&<span style={{color:"#111",fontSize:9}}>✓</span>}
-                    </button>
-                    <span style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
-                    <button style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {extraSection("Later",later)}
+          {extraSection("No date",noDate)}
         </div>
       );
     }

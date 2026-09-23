@@ -91,3 +91,19 @@ export function changedFields<T extends object>(prev: T, next: T, removed: unkno
   }
   return out;
 }
+
+// ---- Task counter (users/{uid}/meta/counts, see firestore.rules) ----
+// Which collection a task's doc lives in: tasks/, trash/, or neither.
+export type TaskHome = "tasks" | "trash" | null;
+export function homeOf(r: { deletedAt?: number } | undefined): TaskHome {
+  return !r ? null : r.deletedAt !== undefined ? "trash" : "tasks";
+}
+// How the counts doc's n (tasks) and t (trash) must change when one task's
+// doc moves from `before` to `after`. firestore.rules checks exactly this
+// against which docs really exist before and after the batch.
+export function countDelta(before: TaskHome, after: TaskHome): { n: number; t: number } {
+  return {
+    n: (after === "tasks" ? 1 : 0) - (before === "tasks" ? 1 : 0),
+    t: (after === "trash" ? 1 : 0) - (before === "trash" ? 1 : 0),
+  };
+}

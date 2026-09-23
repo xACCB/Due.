@@ -55,6 +55,56 @@ service cloud.firestore {
         && (!('updatedAt' in data) || data.updatedAt is number);
     }
 
+    // ---- Task counter: a cap on how many tasks (and trash entries) one
+    // account can hold. Rules can't count a collection, so users/{uid}/meta/
+    // counts keeps the numbers: n = docs in tasks/, t = docs in trash/, last =
+    // the task id the latest change was about. Every batch that creates,
+    // deletes or moves a task also increments/decrements it, and the rules
+    // below check the change matches which docs really exist before and after
+    // that batch -- so the count can't be edited to anything but the truth.
+    // (Client side: countDelta() in src/lib/sync.ts.)
+    //
+    // Deleting is never blocked (so nobody can get locked out of cleaning
+    // up); only creating a task/trash doc requires the count. The counts doc
+    // can't be deleted, or deleting and recreating it at zero would reset the
+    // cap -- after an account is deleted it stays behind holding only numbers.
+    //
+    // Rollout: enforceTaskCap() is false while app versions that don't write
+    // the counter may still be open somewhere (old tabs, a cached installed
+    // app). Flip it to true (a one-line change + deploy) once they've aged out.
+    function enforceTaskCap() { return false; }
+
+    function countsPath(userId) {
+      return /databases/$(database)/documents/users/$(userId)/meta/counts;
+    }
+    function inColl(userId, coll, id, after) {
+      return after
+        ? existsAfter(/databases/$(database)/documents/users/$(userId)/$(coll)/$(id))
+        : exists(/databases/$(database)/documents/users/$(userId)/$(coll)/$(id));
+    }
+    function isValidCountChange(userId) {
+      let b = resource.data;
+      let a = request.resource.data;
+      let dn = a.n - b.n;
+      let dt = a.t - b.t;
+      return a.keys().hasOnly(['n','t','last'])
+        && a.n is int && a.t is int
+        && a.last is string && a.last.size() > 0 && a.last.size() <= 30
+        && (dn != 0 || dt != 0)
+        && dn == (inColl(userId, 'tasks', a.last, true) ? 1 : 0) - (inColl(userId, 'tasks', a.last, false) ? 1 : 0)
+        && dt == (inColl(userId, 'trash', a.last, true) ? 1 : 0) - (inColl(userId, 'trash', a.last, false) ? 1 : 0)
+        // The caps: 5000 tasks, 500 in the trash (the app keeps 200 at most).
+        // Only checked when a number goes up, so being over never blocks a delete.
+        && (dn <= 0 || a.n <= 5000)
+        && (dt <= 0 || a.t <= 500);
+    }
+    // Creating a task/trash doc must bump the matching count in the same batch.
+    function isCountedCreate(userId, taskId, field) {
+      let c = countsPath(userId);
+      return !enforceTaskCap()
+        || (getAfter(c).data.last == taskId && getAfter(c).data[field] == get(c).data[field] + 1);
+    }
+
     // A task in Recently deleted: the whole task, plus when it was deleted.
     function isValidTrashedTask(data) {
       return isValidTask(data) && data.deletedAt is number;
@@ -66,12 +116,26 @@ service cloud.firestore {
 
       match /tasks/{taskId} {
         allow read, delete: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidTask(request.resource.data);
+        allow update: if isOwner(userId) && isValidTask(request.resource.data);
+        allow create: if isOwner(userId) && isValidTask(request.resource.data) && isCountedCreate(userId, taskId, 'n');
       }
 
       match /trash/{taskId} {
         allow read, delete: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidTrashedTask(request.resource.data);
+        allow update: if isOwner(userId) && isValidTrashedTask(request.resource.data);
+        allow create: if isOwner(userId) && isValidTrashedTask(request.resource.data) && isCountedCreate(userId, taskId, 't');
+      }
+
+      match /meta/counts {
+        allow read: if isOwner(userId);
+        // Starts at zero; tasks that already existed before the counter was
+        // added just aren't counted (the cap is effectively that much higher).
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['n','t','last'])
+          && request.resource.data.n == 0 && request.resource.data.t == 0
+          && request.resource.data.last is string;
+        allow update: if isOwner(userId) && isValidCountChange(userId);
+        allow delete: if false;
       }
     }
 

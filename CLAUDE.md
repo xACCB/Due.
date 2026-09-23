@@ -13,6 +13,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run test:rules` — Firestore emulator + `@firebase/rules-unit-testing`, verifying
   `firestore.rules` actually rejects malformed writes and cross-user access. Needs Java (a JRE) for
   the emulator; CI installs one and runs it. Run it locally before changing `firestore.rules`.
+- Emulator mode: `npx firebase-tools emulators:start --only auth,firestore` (needs Java), then
+  `VITE_FIREBASE_EMULATORS=1 npm run dev` -- the app talks to the local Auth/Firestore emulators
+  (fake Google sign-in, throwaway data) instead of production. Dev server only; never in a build.
 - `npm run audit:contrast` — diagnostic script (`scripts/check-theme-contrast.ts`, run via `node
   --experimental-strip-types`) that checks every theme in `src/themes.ts` against WCAG AA contrast
   ratios and prints failures. Reports only; doesn't fix anything, since adjusting a theme's hex
@@ -149,9 +152,27 @@ require rewriting a user's entire history:
   them -- subtask/tag/subject inputs stop at the cap, `addSession()` drops the oldest session past
   1000, and JSON import runs `sanitizeTask()` -- because a write over a rules cap saves locally but is
   silently refused by the cloud. Change a limit in both places; `tests/firestore.rules.test.ts`
-  checks the rules side. Not enforced by rules: a max number of tasks per account or a write rate
-  limit (rules can't count documents or see other requests; that would need a counter doc updated
-  in every batch, or App Check enforcement) -- a second layer beyond
+  checks the rules side.
+- **Task counter / per-account cap.** Rules can't count a collection, so `users/{uid}/meta/counts`
+  (`n` = docs in tasks/, `t` = docs in trash/, `last` = the task id the latest change was about)
+  does. Every batch that creates, deletes or moves a task bumps it (`countDelta()` in
+  `src/lib/sync.ts`; batches are built by `addTaskWrite()` in `src/lib/taskWrites.ts`, shared with
+  `tests/firestore.counter.test.ts` so the rules are tested against the app's real writes). The
+  rules check each change against which docs actually exist before/after the batch, cap creates at
+  5000 tasks / 500 trash entries, never block deletes, start the doc at zero (pre-existing tasks
+  just aren't counted) and forbid deleting it (else delete+recreate would reset the cap, so it
+  outlives account deletion, holding only numbers). The prepare effect creates it at sign-in
+  (`countsReadyUid`); until then writes go out uncounted. A write rejected because this device's
+  view was stale is retried once from what really exists (`addTaskWriteFromActual`). Rollout:
+  `enforceTaskCap()` in `firestore.rules` is `false` (phase A: counter validated, not required)
+  so app versions without it still sync; flipping it to `true` (phase B) is a one-line deploy once
+  old versions have aged out. Write rate limiting is left to App Check (see below), not rules.
+- **In-flight writes vs. the two listeners.** One batch can touch tasks/ and trash/ (moving a task
+  to Recently deleted), but the two `onSnapshot` listeners hear about it separately, so for a
+  moment the task looks gone from both -- which the merge used to read as a remote delete, wiping
+  the trash entry locally and then in the cloud. `inFlightRef` counts un-acked writes per task id;
+  while one is pending the merge uses what we wrote instead of the cloud's in-between state, and
+  `applyRef` re-merges when it lands. -- a second layer beyond
   auth-based ownership, since `firebaseConfig` being public means anyone could otherwise script
   requests directly against the project, bounded only by whatever the rules allow.
 - Firestore is initialized with `persistentLocalCache`/`persistentMultipleTabManager` for

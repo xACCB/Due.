@@ -1,9 +1,9 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged, deleteUser } from "firebase/auth";
+import { getAuth, connectAuthEmulator, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged, deleteUser } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { initializeFirestore, connectFirestoreEmulator, doc, getDoc, getDocFromServer, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
@@ -18,7 +18,8 @@ import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, readableOn, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
 import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "./lib/spring";
-import { reconcile, changedFields, same } from "./lib/sync";
+import { reconcile, same } from "./lib/sync";
+import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
 import { diffTasks, applyTaskStates } from "./lib/history";
 import type { TaskStates } from "./lib/history";
 import type { SyncRecord, CloudRecord } from "./lib/sync";
@@ -70,6 +71,14 @@ try {
 } catch (e) {
   console.error("Firestore persistent cache unavailable, falling back to in-memory cache:", e);
   db = initializeFirestore(fbApp, { ignoreUndefinedProperties: true });
+}
+// Local development against the Firebase emulators (`npx firebase-tools
+// emulators:start --only auth,firestore`), to try sync changes without touching
+// real accounts or data. Only in `npm run dev` with VITE_FIREBASE_EMULATORS=1 --
+// import.meta.env.DEV is false in every production build.
+if (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULATORS === "1") {
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 }
 const googleProvider = new GoogleAuthProvider();
 // App Check proves requests are coming from this real app (not a script
@@ -229,6 +238,7 @@ const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = 
   { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
   { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
+  { id:"trash-sync-fix", date:"2026-09-22", title:"Fix", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
   { id:"bulk-everywhere", date:"2026-09-22", title:"New feature", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
   { id:"a11y-pass", date:"2026-09-22", title:"Improvement", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
   { id:"complete-anim", date:"2026-09-22", title:"Improvement", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
@@ -1415,6 +1425,20 @@ export default function HomeworkPlanner() {
   const cloudTasksRef=useRef<Map<number,CloudRecord<Task>>|null>(null);
   const cloudTrashRef=useRef<Map<number,CloudRecord<Task>>|null>(null);
   const syncUidRef=useRef<string|null>(null);
+  // The uid whose users/{uid}/meta/counts doc (the task counter, see
+  // firestore.rules) is known to exist. Task writes only bump the counter once
+  // it does; until then they go out uncounted, which the rules still accept
+  // while the cap isn't enforced.
+  const countsReadyUid=useRef<string|null>(null);
+  // Task ids with a write of ours still on its way to the server (count per
+  // id). One write can touch both tasks/ and trash/ (e.g. moving a task to
+  // Recently deleted), but the two listeners below hear about it separately --
+  // for a moment the task looks gone from both, which the merge would read as
+  // "deleted on another device" and wipe. So while a write is in flight, the
+  // merge uses what we wrote instead of the cloud's in-between state, and
+  // re-merges (applyRef) once it lands.
+  const inFlightRef=useRef<Map<number,number>>(new Map());
+  const applyRef=useRef<(()=>void)|null>(null);
   // Set only for an explicit sign-in (not a restored session): the first
   // cloud snapshot after it keeps any tasks created while signed out instead
   // of replacing them. Limited to explicit sign-ins because on a normal page
@@ -1486,6 +1510,16 @@ export default function HomeworkPlanner() {
     (async()=>{
       try{
         const profileRef=doc(db,"users",fbUser.uid);
+        const countsRef=doc(db,"users",fbUser.uid,"meta","counts");
+        // Make sure the task counter exists (it starts at zero; tasks from
+        // before it existed just aren't counted). If it can't be checked --
+        // offline on a first sign-in -- writes go out uncounted for now and
+        // the next load tries again.
+        try{
+          const c=await getDoc(countsRef);
+          if(!c.exists())await setDoc(countsRef,{n:0,t:0,last:""});
+          countsReadyUid.current=fbUser.uid;
+        }catch(err){ console.error(err); }
         const snap=await getDoc(profileRef);
         const isNew=!snap.exists();
         const data=snap.exists()?snap.data():null;
@@ -1493,13 +1527,16 @@ export default function HomeworkPlanner() {
           const tasksCol=collection(db,"users",fbUser.uid,"tasks");
           const existing=await getDocs(tasksCol);
           if(existing.empty&&data.tasks.length>0){
-            const batch=writeBatch(db);
-            for(const t of data.tasks as Task[]) batch.set(doc(tasksCol,String(t.id)),t);
-            // Only commit the new docs, then clear the legacy field, after
-            // confirming the subcollection is actually empty -- if anything
-            // here throws, the legacy field is left in place so the next
-            // load just retries the whole check from scratch.
-            await batch.commit();
+            // One batch per task, each bumping the task counter (the rules
+            // check one task per counter change). Only after they've all been
+            // written is the legacy field cleared -- if anything here throws,
+            // it's left in place so the next load retries from scratch.
+            const counted=countsReadyUid.current===fbUser.uid;
+            await Promise.all((data.tasks as Task[]).map(t=>{
+              const batch=writeBatch(db);
+              addTaskWrite(batch,{task:doc(tasksCol,String(t.id)),trash:doc(db,"users",fbUser.uid,"trash",String(t.id)),counts:countsRef},t.id,{task:t},undefined,Date.now(),counted);
+              return batch.commit();
+            }));
           }
           await updateDoc(profileRef,{tasks:deleteField()});
         }
@@ -1563,12 +1600,16 @@ export default function HomeworkPlanner() {
     if(!fbUser||readyForUid!==fbUser.uid)return;
     const uid=fbUser.uid;
     // A different account than the one baseRef/dirtyAtRef describe: start clean.
-    if(syncUidRef.current!==uid){ baseRef.current=new Map(); dirtyAtRef.current=new Map(); prevLocalRef.current=new Map(); syncUidRef.current=uid; }
+    if(syncUidRef.current!==uid){ baseRef.current=new Map(); dirtyAtRef.current=new Map(); prevLocalRef.current=new Map(); inFlightRef.current=new Map(); syncUidRef.current=uid; }
     cloudTasksRef.current=null; cloudTrashRef.current=null;
     const apply=()=>{
       const cloudTasks=cloudTasksRef.current, cloudTrash=cloudTrashRef.current;
       if(!cloudTasks||!cloudTrash)return;
       const cloud=new Map([...cloudTrash,...cloudTasks]);
+      for(const id of inFlightRef.current.keys()){
+        const mine=baseRef.current.get(id);
+        if(mine) cloud.set(id,{...mine,updatedAt:cloud.get(id)?.updatedAt??0}); else cloud.delete(id);
+      }
       // An empty cloud is ambiguous on its own: a brand-new account with
       // nothing synced yet vs. a returning account that legitimately has zero
       // tasks. isNewAccountForUid (set by the migration effect above, from
@@ -1598,6 +1639,7 @@ export default function HomeworkPlanner() {
       if(!same(deleted,trashRef.current)) setTrash(deleted);
       setTasksSyncedForUid(uid);
     };
+    applyRef.current=apply;
     let tasksMeta={pending:false,fromCache:true}, trashMeta={pending:false,fromCache:true};
     const status=()=>{
       const pending=tasksMeta.pending||trashMeta.pending;
@@ -1630,7 +1672,7 @@ export default function HomeworkPlanner() {
       trashMeta={pending:false,fromCache:false};
       if(!cloudTrashRef.current){ cloudTrashRef.current=new Map(); apply(); }
     });
-    return()=>{unsubTasks();unsubTrash();};
+    return()=>{unsubTasks();unsubTrash();applyRef.current=null;};
   },[fbUser,readyForUid,isNewAccountForUid,setTrash]);
 
   // Save tasks TO the cloud whenever they change -- only the tasks that differ
@@ -1670,14 +1712,31 @@ export default function HomeworkPlanner() {
         const L=local.get(id), B=base.get(id);
         if(same(L,B))continue;
         const updatedAt=dirtyAtRef.current.get(id)??Date.now();
-        const taskDoc=doc(db,"users",uid,"tasks",String(id)), trashDoc=doc(db,"users",uid,"trash",String(id));
+        const refs={task:doc(db,"users",uid,"tasks",String(id)),trash:doc(db,"users",uid,"trash",String(id)),counts:doc(db,"users",uid,"meta","counts")};
+        const counted=countsReadyUid.current===uid;
         // One batch per task, so one rejected write can't take others down with it.
         const batch=writeBatch(db);
-        if(!L){ batch.delete(taskDoc); batch.delete(trashDoc); }
-        else if(L.deletedAt!==undefined){ batch.set(trashDoc,{...L.task,deletedAt:L.deletedAt,updatedAt}); if(B?.deletedAt===undefined) batch.delete(taskDoc); }
-        else if(!B||B.deletedAt!==undefined){ batch.set(taskDoc,{...L.task,updatedAt}); if(B) batch.delete(trashDoc); }
-        else batch.set(taskDoc,{...changedFields(B.task,L.task,deleteField()),updatedAt},{merge:true});
-        commits.push(batch.commit());
+        addTaskWrite(batch,refs,id,L,B,updatedAt,counted);
+        const inFlight=inFlightRef.current;
+        inFlight.set(id,(inFlight.get(id)??0)+1);
+        commits.push(batch.commit().catch(async err=>{
+          // Rejected -- most often because B was stale (another device moved
+          // or deleted this task first, so the counter change didn't match).
+          // Retry once from what actually exists in the cloud right now.
+          if((err as {code?:string})?.code!=="permission-denied")throw err;
+          const [tk,tr]=await Promise.all([getDocFromServer(refs.task),getDocFromServer(refs.trash)]);
+          const retry=writeBatch(db);
+          addTaskWriteFromActual(retry,refs,id,L,{tasks:tk.exists(),trash:tr.exists()},updatedAt,counted);
+          await retry.commit().catch(err2=>{
+            // Still refused while adding: most likely the per-account cap.
+            if(L&&!tk.exists()&&!tr.exists())setSyncError(`You've reached the limit of ${LIMITS.tasks.toLocaleString()} tasks (including archived and recently deleted ones) -- new tasks are saved on this device, but won't sync until you delete some.`);
+            throw err2;
+          });
+        }).finally(()=>{
+          const left=(inFlight.get(id)??1)-1;
+          if(left>0)inFlight.set(id,left); else inFlight.delete(id);
+          applyRef.current?.();
+        }));
         // Optimistic: Firestore applies the write to its local cache right
         // away and retries it until the server accepts or rejects it.
         if(L) base.set(id,L); else base.delete(id);
@@ -1688,7 +1747,7 @@ export default function HomeworkPlanner() {
         .then(()=>setSyncError(null))
         .catch(err=>{
           console.error(err);
-          setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
+          setSyncError(prev=>prev?.startsWith("You've reached the limit")?prev:"Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
         });
     };
     pendingTasksWrite.current=run;
@@ -3538,7 +3597,7 @@ export default function HomeworkPlanner() {
                     <div>
                       <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>What's the assignment?</div>
                       <form onSubmit={handleTitleSubmit} style={{display:"flex",gap:8}}>
-                        <input ref={inputRef} aria-label={currentQ?.label} defaultValue={newTask.title||""} maxLength={500} placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,flex:1,outline:"none"}}/>
+                        <input ref={inputRef} aria-label="What's the assignment?" defaultValue={newTask.title||""} maxLength={500} placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,flex:1,outline:"none"}}/>
                         <button type="submit" aria-label="Next" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer"}}>→</button>
                       </form>
                     </div>

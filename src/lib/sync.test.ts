@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { same, mergeFields, mergeRecord, reconcile, changedFields } from "./sync";
+import { same, mergeFields, mergeRecord, reconcile, changedFields, homeOf, countDelta } from "./sync";
 import type { SyncRecord, CloudRecord } from "./sync";
 
 type T = { id: number; title: string; done: boolean; dueDate?: string };
@@ -67,5 +67,22 @@ describe("changedFields", () => {
   it("lists changed and removed fields", () => {
     const DEL = Symbol("del");
     expect(changedFields(t({ dueDate: "x" }), t({ title: "New" }), DEL)).toEqual({ title: "New", dueDate: DEL });
+  });
+});
+
+describe("task counter deltas", () => {
+  it("knows where a record lives", () => {
+    expect(homeOf(undefined)).toBe(null);
+    expect(homeOf({})).toBe("tasks");
+    expect(homeOf({ deletedAt: 1 })).toBe("trash");
+  });
+  it("counts creates, moves and removals", () => {
+    expect(countDelta(null, "tasks")).toEqual({ n: 1, t: 0 });       // new task
+    expect(countDelta("tasks", "tasks")).toEqual({ n: 0, t: 0 });    // edit
+    expect(countDelta("tasks", "trash")).toEqual({ n: -1, t: 1 });   // delete -> Recently deleted
+    expect(countDelta("trash", "tasks")).toEqual({ n: 1, t: -1 });   // restore
+    expect(countDelta("trash", null)).toEqual({ n: 0, t: -1 });      // empty trash
+    expect(countDelta("tasks", null)).toEqual({ n: -1, t: 0 });      // hard delete
+    expect(countDelta(null, "trash")).toEqual({ n: 0, t: 1 });       // deleted before it ever synced
   });
 });

@@ -11,6 +11,8 @@ export const LIMITS = {
   tags: 30,           // per task
   sessions: 1000,     // logged work sessions per task; oldest drop off
   estMins: 100000,
+  tasks: 5000,        // per account, via the counter doc in firestore.rules
+  trash: 500,         // Recently deleted entries per account (the app keeps 200)
 } as const;
 
 const RECURRENCES = ["none", "daily", "weekly", "monthly"];

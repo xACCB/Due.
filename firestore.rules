@@ -69,10 +69,11 @@ service cloud.firestore {
     // can't be deleted, or deleting and recreating it at zero would reset the
     // cap -- after an account is deleted it stays behind holding only numbers.
     //
-    // Rollout: enforceTaskCap() is false while app versions that don't write
-    // the counter may still be open somewhere (old tabs, a cached installed
-    // app). Flip it to true (a one-line change + deploy) once they've aged out.
-    function enforceTaskCap() { return false; }
+    // Rollout: enforceTaskCap() was false (phase A) while app versions that
+    // didn't write the counter could still be open; it's true since 2026-09-22
+    // (phase B). Setting it back to false is the escape hatch if creates ever
+    // start failing for a reason the counter gets wrong.
+    function enforceTaskCap() { return true; }
 
     function countsPath(userId) {
       return /databases/$(database)/documents/users/$(userId)/meta/counts;

@@ -8,16 +8,19 @@ import { addTaskWrite, addTaskWriteFromActual } from "../src/lib/taskWrites";
 import type { SyncRecord } from "../src/lib/sync";
 
 // The task counter (users/{uid}/meta/counts) against the real rules, using the
-// same batch builder the app uses. Runs once with the cap off (phase A, what's
-// deployed while old app versions may still be open) and once with it on.
+// same batch builder the app uses. Runs once with the counter requirement off
+// (phase A) and once with it on (phase B, deployed since 2026-09-22).
 type Task = { id:number; title:string; subject:string; dueDate:string; dueTime:string; estMins:number; done:boolean; order:number };
 const task = (id:number):Task => ({ id, title:`Task ${id}`, subject:"", dueDate:"", dueTime:"", estMins:0, done:false, order:id });
 const live = (id:number):SyncRecord<Task> => ({ task:task(id) });
 const trashed = (id:number):SyncRecord<Task> => ({ task:task(id), deletedAt:1 });
 
-const baseRules = readFileSync("firestore.rules", "utf8");
-const enforcedRules = baseRules.replace("function enforceTaskCap() { return false; }", "function enforceTaskCap() { return true; }");
-if (enforcedRules === baseRules) throw new Error("enforceTaskCap() toggle not found in firestore.rules");
+// Both phases, whichever one firestore.rules is currently set to.
+const rulesFile = readFileSync("firestore.rules", "utf8");
+const OFF = "function enforceTaskCap() { return false; }", ON = "function enforceTaskCap() { return true; }";
+if (!rulesFile.includes(OFF) && !rulesFile.includes(ON)) throw new Error("enforceTaskCap() toggle not found in firestore.rules");
+const baseRules = rulesFile.replace(ON, OFF);
+const enforcedRules = rulesFile.replace(OFF, ON);
 
 for (const [phase, rules] of [["cap off (phase A)", baseRules], ["cap on (phase B)", enforcedRules]] as const) {
   const enforced = rules === enforcedRules;

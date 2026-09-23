@@ -163,10 +163,14 @@ require rewriting a user's entire history:
   just aren't counted) and forbid deleting it (else delete+recreate would reset the cap, so it
   outlives account deletion, holding only numbers). The prepare effect creates it at sign-in
   (`countsReadyUid`); until then writes go out uncounted. A write rejected because this device's
-  view was stale is retried once from what really exists (`addTaskWriteFromActual`). Rollout:
-  `enforceTaskCap()` in `firestore.rules` is `false` (phase A: counter validated, not required)
-  so app versions without it still sync; flipping it to `true` (phase B) is a one-line deploy once
-  old versions have aged out. Write rate limiting is left to App Check (see below), not rules.
+  view was stale is retried once from what really exists (`addTaskWriteFromActual`). `enforceTaskCap()`
+  in `firestore.rules` is `true` (phase B, since 2026-09-22): a create without the counter is
+  refused. It was `false` (phase A) for the rollout; setting it back is the escape hatch if creates
+  ever fail for a reason the counter gets wrong. An app version from before the counter can still
+  edit/complete/delete, but a task it *creates* is refused and then dropped by its own merge -- so
+  after changing anything here, reload every open copy before adding tasks. The shape tests in
+  `tests/firestore.rules.test.ts` load the rules with it off; `tests/firestore.counter.test.ts`
+  covers both settings. Write rate limiting is left to App Check (see below), not rules.
 - **In-flight writes vs. the two listeners.** One batch can touch tasks/ and trash/ (moving a task
   to Recently deleted), but the two `onSnapshot` listeners hear about it separately, so for a
   moment the task looks gone from both -- which the merge used to read as a remote delete, wiping

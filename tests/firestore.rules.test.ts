@@ -15,7 +15,10 @@ const validTask = { id:1, title:"Essay", subject:"English", dueDate:"2025-01-01"
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: "dueplanner-rules-test",
-    firestore: { rules: readFileSync("firestore.rules", "utf8") },
+    // With the task cap's counter requirement off: these tests are about the
+    // shape and size of documents, written as plain single-doc writes. The
+    // counter (and the rules with it on) is covered in firestore.counter.test.ts.
+    firestore: { rules: readFileSync("firestore.rules", "utf8").replace("function enforceTaskCap() { return true; }", "function enforceTaskCap() { return false; }") },
   });
 });
 

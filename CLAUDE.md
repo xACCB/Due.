@@ -82,11 +82,18 @@ auto-falls-back from a blocked popup to `signInWithRedirect`; popup doesn't depe
 Redirect is now only attempted automatically for `auth/operation-not-supported-in-this-environment`
 (genuinely no popup support, e.g. some embedded webviews).
 
-**App Check.** Wired up but inert until `VITE_RECAPTCHA_SITE_KEY` is set (a reCAPTCHA Enterprise site key
-from Firebase Console → Project Settings → App Check — not a secret, safe as a plain env var).
-Generating tokens client-side does nothing by itself; enforcement (Firestore actually rejecting
-requests without one) is a separate, off-by-default switch in the console that should only be
-flipped on after confirming real traffic is producing valid tokens.
+**App Check.** Live and **enforced** for Cloud Firestore and Authentication (since 2026-09-23):
+requests without a valid App Check token are rejected, so scripts using the public `firebaseConfig`
+can't reach the data -- this is the write-rate/abuse protection that `firestore.rules` can't
+provide. The token comes from reCAPTCHA Enterprise (score-based, invisible) via the site key in
+Vercel's `VITE_RECAPTCHA_SITE_KEY` env var (not a secret); the key allows `dueplanner.vercel.app`
+only, so **a new domain (e.g. the custom one) must be added to the reCAPTCHA key before switching**,
+or every request from it is rejected. Automated/headless browsers get a low score and are refused
+(403 from the token exchange) -- expected, not a bug. Local `npm run dev` against production has
+no key, so it's rejected too: register a debug token (App Check -> Apps -> Manage debug tokens) and
+set `self.FIREBASE_APPCHECK_DEBUG_TOKEN` before init, or use emulator mode (below), which App Check
+doesn't apply to. If sign-in or sync ever breaks for real users, "Unenforce" on the App Check -> APIs
+page undoes it instantly.
 
 **Performance Monitoring.** `getPerformance(fbApp)` is initialized unconditionally (no key/setup
 needed, included on the free plan) — tracks real-world page load time and network request latency,

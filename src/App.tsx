@@ -422,7 +422,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   function saveEdit(){
     if(!draft)return;
     onUpdateTask({title:draft.title.trim()||task.title,subject:draft.subject,dueDate:draft.dueDate,
-      dueTime:draft.dueDate?draft.dueTime:"",estMins:Math.max(0,draft.estH*60+draft.estM),recurrence:draft.recurrence});
+      dueTime:draft.dueDate?draft.dueTime:"",estMins:Math.min(LIMITS.estMins,Math.max(0,draft.estH*60+draft.estM)),recurrence:draft.recurrence});
     setDraft(null);
   }
   // Inline "name this template" field (replaces a browser prompt() dialog).
@@ -581,7 +581,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
               </div>
               <div style={{display:"flex",gap:8}}>
                 <label style={{flex:1}}><span style={label}>Estimate (hours)</span>
-                  <input type="number" min={0} max={23} value={draft.estH} onChange={e=>setDraft({...draft,estH:Math.min(23,Math.max(0,Number(e.target.value)||0))})} style={field}/></label>
+                  <input type="number" min={0} max={Math.floor(LIMITS.estMins/60)} value={draft.estH} onChange={e=>setDraft({...draft,estH:Math.min(Math.floor(LIMITS.estMins/60),Math.max(0,Math.floor(Number(e.target.value))||0))})} style={field}/></label>
                 <label style={{flex:1}}><span style={label}>Minutes</span>
                   <input type="number" min={0} max={59} step={5} value={draft.estM} onChange={e=>setDraft({...draft,estM:Math.min(59,Math.max(0,Number(e.target.value)||0))})} style={field}/></label>
               </div>
@@ -1004,7 +1004,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,syncStatus,visibleTasks,
           <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:8}}>{fbUser.email}</div>
           <div style={{display:"flex",alignItems:"center",gap:6,background:syncError?"#FF475722":"#2ED57322",borderRadius:999,padding:"4px 12px",border:`1px solid ${syncError?"#FF475744":"#2ED57344"}`}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:syncError?"#FF4757":"#2ED573"}}/>
-            <span style={{fontFamily:F.body,fontSize:11,color:syncError?"#FF4757":"#2ED573"}}>{syncError?"Sync issue":syncStatus||"Synced across devices"}</span>
+            <span style={{fontFamily:F.body,fontSize:11,color:ink(syncError?"#FF4757":"#2ED573",T.light)}}>{syncError?"Sync issue":syncStatus||"Synced across devices"}</span>
           </div>
           {syncError&&<div style={{fontFamily:F.body,fontSize:11,color:ink("#FF4757",T.light),marginTop:8,textAlign:"center",maxWidth:280,lineHeight:1.5}}>{syncError}</div>}
         </div>
@@ -2855,6 +2855,16 @@ export default function HomeworkPlanner() {
     setTasks(prev=>prev.map(t=>t.id===id?{...t,sessions:addSession(t.sessions,{mins,at:Date.now()})}:t));
     setSessionSecs(0);
   }
+
+  // If the open task disappears from under the detail panel -- deleted on
+  // another device, or signed out -- close it (and stop any session on it,
+  // which would have nowhere to be logged) rather than showing a stale copy
+  // whose edits go nowhere, with the page behind still made inert.
+  useEffect(()=>{
+    if(!selectedTask||tasks.some(t=>t.id===selectedTask.id))return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedTask(null);setSessionActive(false);setSessionSecs(0);
+  },[tasks,selectedTask]);
 
   // ─── LAYOUT RENDERERS ─────────────────────────────────────────────────────────
   function renderTasks(tasks:Task[]) {

@@ -224,6 +224,14 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"fixes-sep23", date:"2026-09-23", title:"Bug fix", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
+  { id:"trash-sync-fix", date:"2026-09-22", title:"Fix", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
+  { id:"bulk-everywhere", date:"2026-09-22", title:"New feature", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
+  { id:"a11y-pass", date:"2026-09-22", title:"Improvement", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
+  { id:"complete-anim", date:"2026-09-22", title:"Improvement", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
+  { id:"sheet-spring", date:"2026-09-22", title:"Improvement", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
+  { id:"glass-cursor", date:"2026-09-22", title:"Improvement", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
+  { id:"pomodoro-breaks", date:"2026-09-22", title:"New feature", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
   { id:"fixes-sep22", date:"2026-09-22", title:"Bug fix", description:"Un-completing an archived task no longer makes it disappear; long titles and subject names are capped instead of failing to sync; swiping a finished task now says \"Mark not done\"; Empty in Recently deleted asks to confirm; 24-hour time now applies everywhere; and a few labels say what they actually do (\"In 3 hours\", \"Next 7 days\")." },
   { id:"settings-batch", date:"2026-09-22", title:"New feature", description:"Rename subjects and change their colors (✎ in Settings -> Subjects); a \"Done today\" list in the Inbox; 24-hour time and a Monday week start in Settings -> Date & time; and completing, editing, archiving and bulk changes can now be undone." },
   { id:"safer-sync", date:"2026-09-22", title:"Improvement", description:"Syncing between devices is safer: edits made at the same time on two devices are merged field by field instead of one overwriting the other, Recently deleted now syncs too, and the title menu shows when you last synced (or that you're offline)." },
@@ -238,13 +246,6 @@ const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = 
   { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
   { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
-  { id:"trash-sync-fix", date:"2026-09-22", title:"Fix", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
-  { id:"bulk-everywhere", date:"2026-09-22", title:"New feature", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
-  { id:"a11y-pass", date:"2026-09-22", title:"Improvement", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
-  { id:"complete-anim", date:"2026-09-22", title:"Improvement", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
-  { id:"sheet-spring", date:"2026-09-22", title:"Improvement", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
-  { id:"glass-cursor", date:"2026-09-22", title:"Improvement", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
-  { id:"pomodoro-breaks", date:"2026-09-22", title:"New feature", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
   { id:"focus-picker", date:"2026-09-22", title:"New feature", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
   { id:"liquid-glass", date:"2026-09-22", title:"New feature", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
   { id:"time-left-breakdown", date:"2026-09-22", title:"New feature", description:"Tap \"Time left\" in the header to see how much time each subject needs." },
@@ -774,9 +775,6 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   );
 }
 
-// Defined at module scope for the same reason as TaskModal above: it's
-// rendered from several places (toggles in the Settings tab) and stability
-// matters so it isn't torn down and recreated on every unrelated re-render.
 // Colored text (subject names, urgency labels) adjusted to stay readable on the
 // theme -- those colors are picked for looks, and several fall well under
 // WCAG AA as text on the light theme's near-white cards.
@@ -800,6 +798,9 @@ function CheckMark({size=10,color="#111",animate=false}:{size?:number;color?:str
   );
 }
 
+// Defined at module scope for the same reason as TaskModal above: it's
+// rendered from several places (toggles in the Settings tab) and stability
+// matters so it isn't torn down and recreated on every unrelated re-render.
 function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeObj;label:string}){
   const trackColor=on?T.accent:T.solidBorder;
   return <button className="tog" role="switch" aria-checked={on} aria-label={label} onClick={()=>onChange(!on)} style={{background:trackColor}}>
@@ -1425,11 +1426,6 @@ export default function HomeworkPlanner() {
   const cloudTasksRef=useRef<Map<number,CloudRecord<Task>>|null>(null);
   const cloudTrashRef=useRef<Map<number,CloudRecord<Task>>|null>(null);
   const syncUidRef=useRef<string|null>(null);
-  // The uid whose users/{uid}/meta/counts doc (the task counter, see
-  // firestore.rules) is known to exist. Task writes only bump the counter once
-  // it does; until then they go out uncounted, which the rules still accept
-  // while the cap isn't enforced.
-  const countsReadyUid=useRef<string|null>(null);
   // Task ids with a write of ours still on its way to the server (count per
   // id). One write can touch both tasks/ and trash/ (e.g. moving a task to
   // Recently deleted), but the two listeners below hear about it separately --
@@ -1512,14 +1508,18 @@ export default function HomeworkPlanner() {
         const profileRef=doc(db,"users",fbUser.uid);
         const countsRef=doc(db,"users",fbUser.uid,"meta","counts");
         // Make sure the task counter exists (it starts at zero; tasks from
-        // before it existed just aren't counted). If it can't be checked --
-        // offline on a first sign-in -- writes go out uncounted for now and
-        // the next load tries again.
+        // before it existed just aren't counted). Every task write bumps it,
+        // and the rules refuse a new task without that -- so if it can't be
+        // checked (offline, nothing cached), queue its creation anyway: it
+        // lands before the task writes queued after it, and if the doc already
+        // exists the rules just refuse this reset, harmlessly.
         try{
           const c=await getDoc(countsRef);
           if(!c.exists())await setDoc(countsRef,{n:0,t:0,last:""});
-          countsReadyUid.current=fbUser.uid;
-        }catch(err){ console.error(err); }
+        }catch(err){
+          console.error(err);
+          setDoc(countsRef,{n:0,t:0,last:""}).catch(()=>{});
+        }
         const snap=await getDoc(profileRef);
         const isNew=!snap.exists();
         const data=snap.exists()?snap.data():null;
@@ -1531,10 +1531,9 @@ export default function HomeworkPlanner() {
             // check one task per counter change). Only after they've all been
             // written is the legacy field cleared -- if anything here throws,
             // it's left in place so the next load retries from scratch.
-            const counted=countsReadyUid.current===fbUser.uid;
             await Promise.all((data.tasks as Task[]).map(t=>{
               const batch=writeBatch(db);
-              addTaskWrite(batch,{task:doc(tasksCol,String(t.id)),trash:doc(db,"users",fbUser.uid,"trash",String(t.id)),counts:countsRef},t.id,{task:t},undefined,Date.now(),counted);
+              addTaskWrite(batch,{task:doc(tasksCol,String(t.id)),trash:doc(db,"users",fbUser.uid,"trash",String(t.id)),counts:countsRef},t.id,{task:t},undefined,Date.now(),true);
               return batch.commit();
             }));
           }
@@ -1713,7 +1712,7 @@ export default function HomeworkPlanner() {
         if(same(L,B))continue;
         const updatedAt=dirtyAtRef.current.get(id)??Date.now();
         const refs={task:doc(db,"users",uid,"tasks",String(id)),trash:doc(db,"users",uid,"trash",String(id)),counts:doc(db,"users",uid,"meta","counts")};
-        const counted=countsReadyUid.current===uid;
+        const counted=true; // the rules require the task counter on every create (firestore.rules)
         // One batch per task, so one rejected write can't take others down with it.
         const batch=writeBatch(db);
         addTaskWrite(batch,refs,id,L,B,updatedAt,counted);
@@ -1823,19 +1822,24 @@ export default function HomeworkPlanner() {
   const [deleteAccountError,setDeleteAccountError]=useState<string|null>(null);
   // Deletes the Firestore profile doc + every doc in the tasks and trash subcollections,
   // then the Auth account itself, then wipes local data too -- "delete my
-  // data" should mean all of it, not just the cloud copy. Not chunked into
-  // multiple batches past Firestore's 500-op limit, matching the existing
-  // tasks-sync effect's writeBatch usage elsewhere in this file.
+  // data" should mean all of it, not just the cloud copy. In chunks, since a
+  // batch holds at most 500 writes and an account can have up to 5,500 docs;
+  // the profile doc goes last, so an interrupted run can simply be retried.
+  // (The task counter, users/{uid}/meta/counts, can't be deleted by design --
+  // see firestore.rules -- and holds only two numbers.)
   async function deleteAccountForever(){
     if(!fbUser)return;
     setDeleteAccountBusy(true);
     setDeleteAccountError(null);
     try{
       const [snap,trashSnap]=await Promise.all([getDocs(collection(db,"users",fbUser.uid,"tasks")),getDocs(collection(db,"users",fbUser.uid,"trash"))]);
-      const batch=writeBatch(db);
-      [...snap.docs,...trashSnap.docs].forEach(d=>batch.delete(d.ref));
-      batch.delete(doc(db,"users",fbUser.uid));
-      await batch.commit();
+      const refs=[...snap.docs,...trashSnap.docs].map(d=>d.ref);
+      for(let i=0;i<refs.length;i+=450){
+        const batch=writeBatch(db);
+        refs.slice(i,i+450).forEach(r=>batch.delete(r));
+        await batch.commit();
+      }
+      await writeBatch(db).delete(doc(db,"users",fbUser.uid)).commit();
       await deleteUser(fbUser);
       Object.keys(localStorage).filter(k=>k.startsWith("hw-")).forEach(k=>localStorage.removeItem(k));
       window.location.reload();
@@ -1950,12 +1954,8 @@ export default function HomeworkPlanner() {
   const [sessionSecs,setSessionSecs]=useState(0);
   const sessionInterval=useRef<ReturnType<typeof setInterval>|undefined>(undefined);
   const inputRef=useRef<HTMLInputElement>(null);
-  // Controlled (not ref+uncontrolled) specifically because ProfileModal is a
-  // component defined inside this render body, so it gets torn down and
-  // recreated -- along with any of its own uncontrolled DOM inputs -- on every
-  // unrelated re-render of HomeworkPlanner while it's open (a Firestore sync
-  // landing, etc). State that lives up here in the parent
-  // survives that; an uncontrolled input's typed text would silently vanish.
+  // Settings' "Add a subject" field. Controlled and kept up here so a
+  // re-render (a Firestore sync landing, etc.) can never wipe typed text.
   const [newSubjectText,setNewSubjectText]=useState("");
   const [pendingSubjectDelete,setPendingSubjectDelete]=useState<string|null>(null);
   // The subject being renamed/recolored in Settings, and its draft values.
@@ -1999,10 +1999,8 @@ export default function HomeworkPlanner() {
     removeFromTrash([id]);
   }
   const undoToastTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  // Bulk edit / multi-select. Scoped to the default list layout (MiniCard) --
-  // the other 6 layouts each render their own custom task row markup, so
-  // extending selection to all of them is a much bigger job than the value
-  // justifies right now.
+  // Bulk edit / multi-select, in every layout: MiniCard handles it itself, the
+  // other layouts' rows go through openOrSelect/chk in renderTasks.
   const [selectionMode,setSelectionMode]=useState(false);
   const [selectedIds,setSelectedIds]=useState<number[]>([]);
   function toggleSelected(id:number){
@@ -2041,7 +2039,21 @@ export default function HomeworkPlanner() {
   // handled in its own effect (not inside the countdown's state updater, where
   // side effects don't belong): it plays a short chime, sends a notification
   // if they're allowed, and moves to the other phase.
-  useEffect(()=>{if(!pomodoroActive)return;const t=setInterval(()=>setPomodoroSecs(s=>Math.max(0,s-1)),1000);return()=>clearInterval(t);},[pomodoroActive]);
+  //
+  // Counts down from a fixed end time, not by subtracting a second per tick:
+  // browsers slow timers in background tabs to about once a minute (and pause
+  // them with the screen locked), which used to stretch a 25-minute session
+  // far past 25 minutes. Re-anchored whenever it starts or changes phase.
+  const pomodoroSecsRef=useRef(pomodoroSecs);
+  useEffect(()=>{pomodoroSecsRef.current=pomodoroSecs;});
+  useEffect(()=>{
+    if(!pomodoroActive)return;
+    const endAt=Date.now()+pomodoroSecsRef.current*1000;
+    const tick=()=>setPomodoroSecs(Math.max(0,Math.ceil((endAt-Date.now())/1000)));
+    const t=setInterval(tick,500);
+    document.addEventListener("visibilitychange",tick);
+    return()=>{clearInterval(t);document.removeEventListener("visibilitychange",tick);};
+  },[pomodoroActive,pomodoroPhase]);
   const [pomodoroDone,setPomodoroDone]=useState(false);
   // Set when a break runs out; shows the "next up" suggestion until it's
   // started or dismissed.
@@ -2257,6 +2269,8 @@ export default function HomeworkPlanner() {
     // as no estimate), not the wizard's hidden 30-minute starting value.
     const updated=QUESTIONS[step]?.type==="time"?{...newTask,estMins:0}:newTask;
     if(updated!==newTask)setNewTask(updated);
+    // A template already answered everything after the date (see confirmDueTime).
+    if(usingTemplate&&QUESTIONS[step]?.type==="date"){finishTask(updated as Task);return;}
     if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);
   }
   function handleDateInput(val:string){
@@ -2817,17 +2831,19 @@ export default function HomeworkPlanner() {
     };
   },[liquidGlass,glassCardSel]);
 
-  // Session timer
+  // Session timer -- elapsed time from a fixed start, not a per-second
+  // counter, so time worked while the tab is in the background or the screen
+  // is locked (when browsers slow or pause timers) still counts.
+  const sessionStartRef=useRef(0);
   useEffect(()=>{
-    if(sessionActive){
-      sessionInterval.current=setInterval(()=>setSessionSecs(s=>s+1),1000);
-    } else {
-      clearInterval(sessionInterval.current);
-    }
-    return()=>clearInterval(sessionInterval.current);
+    if(!sessionActive)return;
+    const tick=()=>setSessionSecs(Math.floor((Date.now()-sessionStartRef.current)/1000));
+    sessionInterval.current=setInterval(tick,1000);
+    document.addEventListener("visibilitychange",tick);
+    return()=>{clearInterval(sessionInterval.current);document.removeEventListener("visibilitychange",tick);};
   },[sessionActive]);
 
-  function startSession(){setSessionSecs(0);setSessionActive(true);}
+  function startSession(){sessionStartRef.current=Date.now();setSessionSecs(0);setSessionActive(true);}
   // Logged onto the task itself (and so synced like any other task field),
   // not kept in throwaway modal state -- "sessions today" used to reset every
   // time the modal was closed and reopened.
@@ -3074,7 +3090,7 @@ export default function HomeworkPlanner() {
         {order.map(k=>(
           <div key={k}>
             <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{labelFor(k)} ({groups.get(k)!.length})</div>
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div role="list" aria-label={labelFor(k)} style={{display:"flex",flexDirection:"column",gap:10}}>
               {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} swipeable {...mc(t)}/>)}
             </div>
           </div>
@@ -3965,7 +3981,7 @@ export default function HomeworkPlanner() {
           onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
           onArchive={()=>{if(sessionActive)endSession();archiveTask(selectedTask.id);setSelectedTask(null);}}
           onRestore={()=>unarchiveTask(selectedTask.id)}
-          onDuplicate={()=>{const copy=duplicateTask(selectedTask.id);if(copy)setSelectedTask(copy);}}
+          onDuplicate={()=>{if(sessionActive)endSession();const copy=duplicateTask(selectedTask.id);if(copy)setSelectedTask(copy);}}
           onUpdateTask={patch=>editTask(selectedTask.id,patch)}
           onSnooze={kind=>snoozeTask(selectedTask.id,kind)}
           onSkipOccurrence={()=>skipOccurrence(selectedTask.id)}

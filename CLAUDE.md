@@ -168,8 +168,9 @@ require rewriting a user's entire history:
   rules check each change against which docs actually exist before/after the batch, cap creates at
   5000 tasks / 500 trash entries, never block deletes, start the doc at zero (pre-existing tasks
   just aren't counted) and forbid deleting it (else delete+recreate would reset the cap, so it
-  outlives account deletion, holding only numbers). The prepare effect creates it at sign-in
-  (`countsReadyUid`); until then writes go out uncounted. A write rejected because this device's
+  outlives account deletion, holding only numbers). The prepare effect creates it at sign-in; if
+  that check fails (offline, nothing cached) it queues the creation anyway, since every write is
+  counted and the rules refuse an uncounted create. A write rejected because this device's
   view was stale is retried once from what really exists (`addTaskWriteFromActual`). `enforceTaskCap()`
   in `firestore.rules` is `true` (phase B, since 2026-09-22): a create without the counter is
   refused. It was `false` (phase A) for the rollout; setting it back is the escape hatch if creates
@@ -194,9 +195,10 @@ require rewriting a user's entire history:
 - Account deletion (Options tab, "Danger Zone", gated on being signed in) batch-deletes every doc
   in the tasks and trash subcollections plus the profile doc, then calls Firebase Auth's `deleteUser`, then
   clears every `hw-*` localStorage key and reloads -- "delete my data" means all of it, not just
-  the cloud copy. Gated behind a type-`DELETE`-to-confirm panel rather than a plain `window.confirm`,
-  given it's irreversible. Not chunked past Firestore's 500-op batch limit, matching the existing
-  tasks-sync effect's `writeBatch` usage elsewhere.
+  the cloud copy (except the task counter doc, which rules keep undeletable). Gated behind a
+  type-`DELETE`-to-confirm panel rather than a plain `window.confirm`, given it's irreversible.
+  Deletes in chunks of 450 (Firestore's batch limit is 500; an account can hold ~5,500 docs), with
+  the profile doc last so an interrupted run can be retried.
 
 **Design-system constants** drive both the inline styles and the runtime stylesheet. `THEMES`
 (`src/themes.ts`) went from 26 color themes down to exactly two -- `stealth` (dark) and
@@ -264,7 +266,9 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
   used by data export.
 
 **UI shape.** `HomeworkPlanner` renders a two-button tab bar -- Tasks, and Focus, which opens the
-separate full-screen Focus Mode (`focusMode` state) with its Pomodoro timer (the running time shows
+separate full-screen Focus Mode (`focusMode` state) with its Pomodoro timer (clock-based: it counts
+down to a fixed end time, as the task session timer counts up from a fixed start, because browsers
+slow or pause intervals in background tabs and on locked screens; the running time shows
 on the Focus button; finishing chimes via `playChime()`, notifies, and toasts). Settings
 (`activeTab==="options"`) is opened from the title menu, not the tab bar, so it has its own header
 with a back button. The title menu (the DuePlanner wordmark) holds Inbox (stats + What's New),

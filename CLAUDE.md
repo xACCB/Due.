@@ -346,7 +346,13 @@ export: tasks with ids already present are skipped, subjects/templates added if 
 subject colors win, settings untouched.
 
 **What's New** (`WHATS_NEW`, the Inbox's Updates list) is hand-maintained, newest first -- add an
-entry whenever a user-facing change ships. Only dismissed ids are persisted
+entry whenever a user-facing change ships. Each entry has a `kind` (category: "New feature", "Bug
+fix"...) and a `headline` (its short title) plus the `description`. Tapping a row opens
+`UpdateDetail` (module scope): the card grows from the row's box to a centered card over a blurred
+backdrop (pinned `position:fixed` while its left/top/width/height animate, then released back to
+`relative`) and shrinks back into the row on close, or fades if the row is gone. Newer/Older step
+through the list; Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
+the title menu's outside-click/Escape handlers ignore, so the menu stays open behind it. Only dismissed ids are persisted
 (`hw-whatsnew-dismissed`), so new entries reach returning users; `LEGACY_WHATSNEW_IDS` is a frozen
 list used once to migrate the old whole-feed `hw-whatsnew` key, and must not be extended.
 

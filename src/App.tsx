@@ -228,54 +228,58 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // What's New feed shown in the title menu's Inbox section -- hand-maintained,
 // newest first; add an entry here whenever a user-facing change ships. Each
 // entry needs a stable id: dismissing one stores just its id (see
-// dismissedWhatsNew below), never a copy of this list.
-const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
-  { id:"new-task-questions", date:"2026-09-26", title:"New feature", description:"Choose which questions you get when adding a task, and in what order: Settings -> New task questions. Turn off the ones you don't need -- you can still fill them in later with Edit." },
-  { id:"edit-estimate-fix", date:"2026-09-26", title:"Bug fix", description:"Editing a task's estimate works properly: you can clear the hours and minutes and type new ones, any number of minutes saves (90 minutes becomes 1h 30m), and phones no longer zoom in when you tap a field." },
-  { id:"floating-search", date:"2026-09-26", title:"New feature", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
-  { id:"cards-glide", date:"2026-09-26", title:"Improvement", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once -- new ones fade in and removed ones fade out." },
-  { id:"fixes-sep23", date:"2026-09-23", title:"Bug fix", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
-  { id:"trash-sync-fix", date:"2026-09-22", title:"Fix", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
-  { id:"bulk-everywhere", date:"2026-09-22", title:"New feature", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
-  { id:"a11y-pass", date:"2026-09-22", title:"Improvement", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
-  { id:"complete-anim", date:"2026-09-22", title:"Improvement", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
-  { id:"sheet-spring", date:"2026-09-22", title:"Improvement", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
-  { id:"glass-cursor", date:"2026-09-22", title:"Improvement", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
-  { id:"pomodoro-breaks", date:"2026-09-22", title:"New feature", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
-  { id:"fixes-sep22", date:"2026-09-22", title:"Bug fix", description:"Un-completing an archived task no longer makes it disappear; long titles and subject names are capped instead of failing to sync; swiping a finished task now says \"Mark not done\"; Empty in Recently deleted asks to confirm; 24-hour time now applies everywhere; and a few labels say what they actually do (\"In 3 hours\", \"Next 7 days\")." },
-  { id:"settings-batch", date:"2026-09-22", title:"New feature", description:"Rename subjects and change their colors (✎ in Settings -> Subjects); a \"Done today\" list in the Inbox; 24-hour time and a Monday week start in Settings -> Date & time; and completing, editing, archiving and bulk changes can now be undone." },
-  { id:"safer-sync", date:"2026-09-22", title:"Improvement", description:"Syncing between devices is safer: edits made at the same time on two devices are merged field by field instead of one overwriting the other, Recently deleted now syncs too, and the title menu shows when you last synced (or that you're offline)." },
-  { id:"time-left-more", date:"2026-09-22", title:"New feature", description:"The \"Time left\" dropdown now splits time by due date, shows time worked per subject, flags tasks with no estimate, and can start Focus on the most urgent task in your biggest subject." },
-  { id:"fewer-layouts", date:"2026-09-22", title:"UI change", description:"Trimmed the layouts to seven: Compact, Minimal, Sticky, Timeline and By Subject are gone. If you were using one, you're back on List." },
-  { id:"recently-deleted", date:"2026-09-22", title:"New feature", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
-  { id:"skip-occurrence", date:"2026-09-22", title:"New feature", description:"Repeating tasks have \"Skip this one\" in their detail view -- moves to the next occurrence without completing it. Undoable." },
-  { id:"countdown", date:"2026-09-22", title:"New feature", description:"Tasks due today at a set time show a live countdown, like \"Due in 2h 15m\"." },
-  { id:"profile-in-menu", date:"2026-09-22", title:"UI change", description:"Profile now lives only in the title menu, which also shows when there's a sync issue." },
-  { id:"edit-tasks", date:"2026-09-22", title:"New feature", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view -- tap Edit." },
-  { id:"snooze", date:"2026-09-22", title:"New feature", description:"Snooze a task to later today, tomorrow, or next week from its detail view -- and undo it if you change your mind." },
-  { id:"duplicate-restore", date:"2026-09-22", title:"New feature", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
-  { id:"json-import", date:"2026-09-22", title:"New feature", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
-  { id:"week-reminder", date:"2026-09-22", title:"New feature", description:"New \"1 week before\" reminder option in Settings." },
-  { id:"focus-picker", date:"2026-09-22", title:"New feature", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
-  { id:"liquid-glass", date:"2026-09-22", title:"New feature", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
-  { id:"time-left-breakdown", date:"2026-09-22", title:"New feature", description:"Tap \"Time left\" in the header to see how much time each subject needs." },
-  { id:"sync-more", date:"2026-09-22", title:"New feature", description:"Subjects, subject colors, and Urgency Color Coding now sync across your devices." },
-  { id:"subjects-in-settings", date:"2026-09-22", title:"Navigation", description:"Subjects are now managed in Settings, and work without signing in." },
-  { id:"sessions-saved", date:"2026-09-22", title:"New feature", description:"Work sessions are now saved on the task, and your Inbox shows real time spent." },
-  { id:"pomodoro-chime", date:"2026-09-22", title:"New feature", description:"The Pomodoro timer now chimes when it's done, and shows its time on the Focus tab while running." },
-  { id:"undo-more", date:"2026-09-22", title:"New feature", description:"Bulk delete and Clear completed can now be undone." },
-  { id:"calendar-sections", date:"2026-09-22", title:"UI change", description:"The Calendar layout now shows Overdue and Later sections, so no task disappears from it." },
-  { id:"reminder-fixes", date:"2026-09-22", title:"Bug fix", description:"\"At due time\" reminders now fire, and you no longer get several reminders for one task at once." },
-  { id:"recurring-fix", date:"2026-09-22", title:"Bug fix", description:"Un-completing a repeating task no longer leaves a duplicate behind." },
-  { id:"icon-color-fix", date:"2026-09-22", title:"Bug fix", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
-  { id:"history-collapsible", date:"2026-09-22", title:"UI change", description:"History is now a collapsible section in the title menu instead of always expanded." },
-  { id:"undo-redo", date:"2026-09-22", title:"New feature", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
-  { id:"settings-in-menu", date:"2026-09-22", title:"Navigation", description:"Settings moved out of the tab bar -- open it from the title menu instead." },
-  { id:"title-menu", date:"2026-09-22", title:"UI change", description:"The DuePlanner title is now a menu with quick access to Inbox, History, Profile, and Settings." },
-  { id:"wizard-cancel-moved", date:"2026-09-22", title:"UI change", description:"Cancel moved out from between the add-task wizard's back/skip buttons to avoid accidental taps." },
-  { id:"wizard-back-skip", date:"2026-09-22", title:"New feature", description:"Added back and skip buttons to the add-task wizard, so you can revisit or skip a question." },
-  { id:"subject-colors-fix", date:"2026-09-22", title:"Bug fix", description:"Subject colors for English and Science no longer look nearly identical." },
-  { id:"time-left-color", date:"2026-09-22", title:"UI change", description:"The time-left number in the header now follows the theme instead of always being teal." },
+// dismissedWhatsNew below), never a copy of this list. `kind` is the category
+// ("New feature", "Bug fix"...), `headline` the short name shown as its title;
+// tapping an entry opens it in a floating panel (UpdateDetail).
+type WhatsNewItem={id:string; date:string; kind:string; headline:string; description:string};
+const WHATS_NEW: WhatsNewItem[] = [
+  { id:"update-details", date:"2026-09-26", kind:"New feature", headline:"Open an update", description:"Tap any update in your Inbox and it grows into a card in the middle of the screen, with its full details. Flip through the others with Newer and Older, or dismiss it from there." },
+  { id:"new-task-questions", date:"2026-09-26", kind:"New feature", headline:"Choose your new task questions", description:"Choose which questions you get when adding a task, and in what order: Settings -> New task questions. Turn off the ones you don't need -- you can still fill them in later with Edit." },
+  { id:"edit-estimate-fix", date:"2026-09-26", kind:"Bug fix", headline:"Estimate editing fixed", description:"Editing a task's estimate works properly: you can clear the hours and minutes and type new ones, any number of minutes saves (90 minutes becomes 1h 30m), and phones no longer zoom in when you tap a field." },
+  { id:"floating-search", date:"2026-09-26", kind:"New feature", headline:"Floating search", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
+  { id:"cards-glide", date:"2026-09-26", kind:"Improvement", headline:"Tasks glide into place", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once -- new ones fade in and removed ones fade out." },
+  { id:"fixes-sep23", date:"2026-09-23", kind:"Bug fix", headline:"Timer and account fixes", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
+  { id:"trash-sync-fix", date:"2026-09-22", kind:"Fix", headline:"Recently deleted stays put", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
+  { id:"bulk-everywhere", date:"2026-09-22", kind:"New feature", headline:"Select in every layout", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
+  { id:"a11y-pass", date:"2026-09-22", kind:"Improvement", headline:"Keyboard and screen reader support", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
+  { id:"complete-anim", date:"2026-09-22", kind:"Improvement", headline:"A more satisfying check-off", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
+  { id:"sheet-spring", date:"2026-09-22", kind:"Improvement", headline:"Springy task details", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
+  { id:"glass-cursor", date:"2026-09-22", kind:"Improvement", headline:"Liquid Glass catches the light", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
+  { id:"pomodoro-breaks", date:"2026-09-22", kind:"New feature", headline:"Pomodoro breaks", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
+  { id:"fixes-sep22", date:"2026-09-22", kind:"Bug fix", headline:"A batch of fixes", description:"Un-completing an archived task no longer makes it disappear; long titles and subject names are capped instead of failing to sync; swiping a finished task now says \"Mark not done\"; Empty in Recently deleted asks to confirm; 24-hour time now applies everywhere; and a few labels say what they actually do (\"In 3 hours\", \"Next 7 days\")." },
+  { id:"settings-batch", date:"2026-09-22", kind:"New feature", headline:"Subject colors, Done today and more undo", description:"Rename subjects and change their colors (✎ in Settings -> Subjects); a \"Done today\" list in the Inbox; 24-hour time and a Monday week start in Settings -> Date & time; and completing, editing, archiving and bulk changes can now be undone." },
+  { id:"safer-sync", date:"2026-09-22", kind:"Improvement", headline:"Safer syncing", description:"Syncing between devices is safer: edits made at the same time on two devices are merged field by field instead of one overwriting the other, Recently deleted now syncs too, and the title menu shows when you last synced (or that you're offline)." },
+  { id:"time-left-more", date:"2026-09-22", kind:"New feature", headline:"A smarter Time left", description:"The \"Time left\" dropdown now splits time by due date, shows time worked per subject, flags tasks with no estimate, and can start Focus on the most urgent task in your biggest subject." },
+  { id:"fewer-layouts", date:"2026-09-22", kind:"UI change", headline:"Seven layouts", description:"Trimmed the layouts to seven: Compact, Minimal, Sticky, Timeline and By Subject are gone. If you were using one, you're back on List." },
+  { id:"recently-deleted", date:"2026-09-22", kind:"New feature", headline:"Recently deleted", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
+  { id:"skip-occurrence", date:"2026-09-22", kind:"New feature", headline:"Skip a repeat", description:"Repeating tasks have \"Skip this one\" in their detail view -- moves to the next occurrence without completing it. Undoable." },
+  { id:"countdown", date:"2026-09-22", kind:"New feature", headline:"Live countdowns", description:"Tasks due today at a set time show a live countdown, like \"Due in 2h 15m\"." },
+  { id:"profile-in-menu", date:"2026-09-22", kind:"UI change", headline:"Profile moved to the menu", description:"Profile now lives only in the title menu, which also shows when there's a sync issue." },
+  { id:"edit-tasks", date:"2026-09-22", kind:"New feature", headline:"Edit tasks", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view -- tap Edit." },
+  { id:"snooze", date:"2026-09-22", kind:"New feature", headline:"Snooze", description:"Snooze a task to later today, tomorrow, or next week from its detail view -- and undo it if you change your mind." },
+  { id:"duplicate-restore", date:"2026-09-22", kind:"New feature", headline:"Duplicate and restore", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
+  { id:"json-import", date:"2026-09-22", kind:"New feature", headline:"Import a backup", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
+  { id:"week-reminder", date:"2026-09-22", kind:"New feature", headline:"1-week reminders", description:"New \"1 week before\" reminder option in Settings." },
+  { id:"focus-picker", date:"2026-09-22", kind:"New feature", headline:"Pick your focus task", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
+  { id:"liquid-glass", date:"2026-09-22", kind:"New feature", headline:"Liquid Glass", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
+  { id:"time-left-breakdown", date:"2026-09-22", kind:"New feature", headline:"Time left by subject", description:"Tap \"Time left\" in the header to see how much time each subject needs." },
+  { id:"sync-more", date:"2026-09-22", kind:"New feature", headline:"More things sync", description:"Subjects, subject colors, and Urgency Color Coding now sync across your devices." },
+  { id:"subjects-in-settings", date:"2026-09-22", kind:"Navigation", headline:"Subjects in Settings", description:"Subjects are now managed in Settings, and work without signing in." },
+  { id:"sessions-saved", date:"2026-09-22", kind:"New feature", headline:"Work sessions saved", description:"Work sessions are now saved on the task, and your Inbox shows real time spent." },
+  { id:"pomodoro-chime", date:"2026-09-22", kind:"New feature", headline:"Pomodoro chime", description:"The Pomodoro timer now chimes when it's done, and shows its time on the Focus tab while running." },
+  { id:"undo-more", date:"2026-09-22", kind:"New feature", headline:"Undo more", description:"Bulk delete and Clear completed can now be undone." },
+  { id:"calendar-sections", date:"2026-09-22", kind:"UI change", headline:"Calendar sections", description:"The Calendar layout now shows Overdue and Later sections, so no task disappears from it." },
+  { id:"reminder-fixes", date:"2026-09-22", kind:"Bug fix", headline:"Reminder fixes", description:"\"At due time\" reminders now fire, and you no longer get several reminders for one task at once." },
+  { id:"recurring-fix", date:"2026-09-22", kind:"Bug fix", headline:"No more duplicate repeats", description:"Un-completing a repeating task no longer leaves a duplicate behind." },
+  { id:"icon-color-fix", date:"2026-09-22", kind:"Bug fix", headline:"Icon colors fixed", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
+  { id:"history-collapsible", date:"2026-09-22", kind:"UI change", headline:"Collapsible History", description:"History is now a collapsible section in the title menu instead of always expanded." },
+  { id:"undo-redo", date:"2026-09-22", kind:"New feature", headline:"Undo and redo", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
+  { id:"settings-in-menu", date:"2026-09-22", kind:"Navigation", headline:"Settings moved", description:"Settings moved out of the tab bar -- open it from the title menu instead." },
+  { id:"title-menu", date:"2026-09-22", kind:"UI change", headline:"The title menu", description:"The DuePlanner title is now a menu with quick access to Inbox, History, Profile, and Settings." },
+  { id:"wizard-cancel-moved", date:"2026-09-22", kind:"UI change", headline:"Cancel moved", description:"Cancel moved out from between the add-task wizard's back/skip buttons to avoid accidental taps." },
+  { id:"wizard-back-skip", date:"2026-09-22", kind:"New feature", headline:"Back and skip", description:"Added back and skip buttons to the add-task wizard, so you can revisit or skip a question." },
+  { id:"subject-colors-fix", date:"2026-09-22", kind:"Bug fix", headline:"Clearer subject colors", description:"Subject colors for English and Science no longer look nearly identical." },
+  { id:"time-left-color", date:"2026-09-22", kind:"UI change", headline:"Theme-colored time left", description:"The time-left number in the header now follows the theme instead of always being teal." },
 ];
 // Every WHATS_NEW id that existed while the feed was still persisted as a
 // whole array under "hw-whatsnew" (see the dismissed-ids migration below) --
@@ -954,6 +958,97 @@ function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTa
   );
 }
 
+// A long date for an update's detail panel, e.g. "Saturday, September 26, 2026".
+function longDate(iso:string):string{
+  const d=new Date(iso+"T00:00");
+  return isNaN(d.getTime())?iso:d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+}
+
+// A box as keyframe/style values, and pinning an element to one: UpdateDetail's
+// card is normally centered by its flex container, so while its box animates
+// it's pinned to fixed screen coordinates (else each width step would re-center
+// it) and released after.
+const box=(r:DOMRect)=>({left:`${r.left}px`,top:`${r.top}px`,width:`${r.width}px`,height:`${r.height}px`});
+function pin(el:HTMLElement,r:DOMRect){Object.assign(el.style,{position:"fixed",margin:"0",...box(r)});}
+// Back to its declared position:relative (clearing it would drop the card
+// under the absolutely positioned backdrop).
+function unpin(el:HTMLElement){Object.assign(el.style,{position:"relative",margin:"",left:"",top:"",width:"",height:""});}
+
+// An Inbox update, opened: the row grows out of the menu into a card floating
+// in the middle of a blurred screen (its box animates from the row's box to
+// the card's, so nothing stretches), and shrinks back into the row on close.
+// Newer/Older step through the other updates in place. `origin` is the row
+// element it grew from; module scope like SearchOverlay.
+function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClose}:{
+  items:WhatsNewItem[]; index:number; T:ThemeObj; F:typeof FONT;
+  origin:HTMLElement|null;
+  onIndex:(i:number)=>void; onDismiss:(id:string)=>void; onClose:()=>void;
+}){
+  const item=items[index];
+  const backdropRef=useRef<HTMLDivElement>(null), cardRef=useRef<HTMLDivElement>(null), bodyRef=useRef<HTMLDivElement>(null);
+  const closeRef=useRef<HTMLButtonElement>(null);
+  const closing=useRef(false);
+  const reduced=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  useLayoutEffect(()=>{
+    closeRef.current?.focus({preventScroll:true});
+    const card=cardRef.current, from=origin?.getBoundingClientRect();
+    if(!card||!from||reduced())return;
+    const to=card.getBoundingClientRect();
+    pin(card,to);
+    backdropRef.current?.animate([{opacity:0},{opacity:1}],{duration:280,easing:"ease-out"});
+    const anim=card.animate([{...box(from),borderRadius:"8px"},{...box(to),borderRadius:"16px"}],{duration:420,easing:"cubic-bezier(.2,.9,.25,1)"});
+    const release=()=>{if(!closing.current)unpin(card);};
+    anim.finished.then(release,release);
+    bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.45},{opacity:1}],{duration:420,easing:"ease-out"});
+  },[origin]);
+  // Back into the row -- or, when the row is gone (dismissed) or off screen, a fade.
+  function close(dismissed=false){
+    if(closing.current)return;
+    closing.current=true;
+    const card=cardRef.current, to=dismissed?null:origin?.getBoundingClientRect();
+    // A dismissed update leaves the list only once the card is gone, or the
+    // panel would unmount before its exit animation plays.
+    const done=()=>{if(dismissed)onDismiss(item.id);onClose();};
+    if(!card||reduced()){done();return;}
+    const from=card.getBoundingClientRect();
+    card.getAnimations().forEach(a=>a.cancel());
+    pin(card,from);
+    backdropRef.current?.animate([{opacity:1},{opacity:0}],{duration:280,easing:"ease-in",fill:"forwards"});
+    const anim=to&&to.width>0&&to.bottom>0&&to.top<window.innerHeight
+      ?(bodyRef.current?.animate([{opacity:1},{opacity:0}],{duration:120,fill:"forwards"}),
+        card.animate([{...box(from),borderRadius:"16px"},{...box(to),borderRadius:"8px"}],{duration:320,easing:"cubic-bezier(.4,0,.2,1)",fill:"forwards"}))
+      :card.animate([{opacity:1,transform:"none"},{opacity:0,transform:"scale(.96)"}],{duration:200,easing:"ease-in",fill:"forwards"});
+    anim.finished.then(done,done);
+  }
+  if(!item)return null;
+  const btn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12};
+  return(
+    <div role="dialog" aria-modal="true" aria-labelledby="update-detail-title" data-keeps-menu onKeyDown={e=>{if(e.key==="Escape"){e.stopPropagation();close();}}}
+      style={{position:"fixed",inset:0,zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div ref={backdropRef} onClick={()=>close()} style={{position:"absolute",inset:0,background:T.light?"rgba(245,245,245,0.55)":"rgba(0,0,0,0.5)",backdropFilter:"blur(14px)",WebkitBackdropFilter:"blur(14px)"}}/>
+      <div ref={cardRef} style={{position:"relative",width:"min(460px,100%)",maxHeight:"100%",overflow:"hidden",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,boxShadow:T.light?"0 16px 48px rgba(0,0,0,0.16)":"0 16px 48px rgba(0,0,0,0.6)",display:"flex",flexDirection:"column"}}>
+        <div ref={bodyRef} style={{padding:"20px 20px 16px",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+            <span style={{background:T.cardAlt,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>{item.kind}</span>
+            <button ref={closeRef} onClick={()=>close()} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:20,lineHeight:1,padding:"2px 4px"}}>×</button>
+          </div>
+          <div>
+            <h2 id="update-detail-title" style={{margin:0,fontFamily:F.heading,fontWeight:400,fontSize:26,lineHeight:1.15,color:T.text}}>{item.headline}</h2>
+            <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:6}}>{longDate(item.date)}</div>
+          </div>
+          <p style={{margin:0,fontFamily:F.body,fontSize:13,lineHeight:1.6,color:T.text}}>{item.description}</p>
+          <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:4}}>
+            <button onClick={()=>onIndex(index-1)} disabled={index===0} aria-label="Newer update" style={{...btn,opacity:index===0?0.4:1,cursor:index===0?"default":"pointer"}}>‹ Newer</button>
+            <button onClick={()=>onIndex(index+1)} disabled={index===items.length-1} aria-label="Older update" style={{...btn,opacity:index===items.length-1?0.4:1,cursor:index===items.length-1?"default":"pointer"}}>Older ›</button>
+            <span style={{flex:1,textAlign:"center",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{index+1} of {items.length}</span>
+            <button onClick={()=>close(true)} style={{...btn,background:T.accent,border:"none",color:contrastColor(T.accent)}}>Dismiss</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,now,h24,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect,justDone,onMoveBy}:{
   task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
   T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number; h24:boolean;
@@ -1479,6 +1574,9 @@ export default function HomeworkPlanner() {
   },[dismissedWhatsNew]);
   const whatsNew=WHATS_NEW.filter(w=>!dismissedWhatsNew.includes(w.id));
   function dismissWhatsNew(id:string){setDismissedWhatsNew(prev=>[...prev,id]);}
+  // The Inbox update open in the floating panel (UpdateDetail), by id, and the
+  // row it grew out of (to grow back into on close).
+  const [openUpdate,setOpenUpdate]=useState<{id:string;origin:HTMLElement|null}|null>(null);
   const [subjectColors,setSubjectColors]=useState<Record<string,string>>(()=>{try{const s=localStorage.getItem("hw-subjectcolors");return {...DEFAULT_SUBJECT_COLORS,...(s?JSON.parse(s):{})};}catch{return DEFAULT_SUBJECT_COLORS;}});
   useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
   const [templates,setTemplates]=usePersistedState<TaskTemplate[]>("hw-templates",[]);
@@ -2045,8 +2143,11 @@ export default function HomeworkPlanner() {
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!titleMenuOpen)return;
-    function onPointerDown(e:PointerEvent){if(titleMenuRef.current&&!titleMenuRef.current.contains(e.target as Node))setTitleMenuOpen(false);}
-    function onKeyDown(e:KeyboardEvent){if(e.key==="Escape")setTitleMenuOpen(false);}
+    // Panels opened from the menu (data-keeps-menu, e.g. an Inbox update) sit
+    // outside it but shouldn't close it.
+    const keeps=(t:EventTarget|null)=>t instanceof Element&&!!t.closest("[data-keeps-menu]");
+    function onPointerDown(e:PointerEvent){if(titleMenuRef.current&&!titleMenuRef.current.contains(e.target as Node)&&!keeps(e.target))setTitleMenuOpen(false);}
+    function onKeyDown(e:KeyboardEvent){if(e.key==="Escape"&&!keeps(e.target))setTitleMenuOpen(false);}
     document.addEventListener("pointerdown",onPointerDown);
     document.addEventListener("keydown",onKeyDown);
     return ()=>{document.removeEventListener("pointerdown",onPointerDown);document.removeEventListener("keydown",onKeyDown);};
@@ -2930,6 +3031,7 @@ export default function HomeworkPlanner() {
     .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
     .search-pop{animation:pop .3s cubic-bezier(.2,.8,.3,1) backwards;}
+    .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
     /* iOS zooms the page into any focused field under 16px. */
     @media (pointer:coarse){.edit-field{font-size:16px!important;}}
     .sli{animation:sli 0.22s ease forwards;}
@@ -3465,7 +3567,7 @@ export default function HomeworkPlanner() {
       <style>{css}</style>
       {/* inert while the task sheet is open, so screen readers and Tab stay in
           the dialog instead of wandering through the list behind it. */}
-      <div className="app-inner" inert={selectedTask!=null||searchOpen||undefined}>
+      <div className="app-inner" inert={selectedTask!=null||searchOpen||openUpdate!=null||undefined}>
         {/* Header */}
         <header style={{position:"relative",display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
           <h1 className="sr-only">DuePlanner</h1>
@@ -3528,15 +3630,19 @@ export default function HomeworkPlanner() {
                         {whatsNew.length===0
                           ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>
                           : whatsNew.map(item=>(
-                          <div key={item.id} style={{display:"flex",gap:8}}>
-                            <div style={{flex:1,minWidth:0}}>
+                          <div key={item.id} style={{display:"flex",gap:4,alignItems:"flex-start"}}>
+                            {/* Opens the update in a floating panel (UpdateDetail); hidden
+                                while open, so the panel looks like it grew out of here. */}
+                            <button data-update-id={item.id} onClick={e=>setOpenUpdate({id:item.id,origin:e.currentTarget})} aria-haspopup="dialog"
+                              style={{flex:1,minWidth:0,background:"none",border:"none",borderRadius:8,padding:"4px 6px",margin:"-4px -6px",cursor:"pointer",textAlign:"left",color:"inherit",visibility:openUpdate?.id===item.id?"hidden":undefined}}>
                               <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
-                                <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.title}</span>
+                                <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.headline}</span>
                                 <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
                               </div>
-                              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
-                            </div>
-                            <button onClick={()=>dismissWhatsNew(item.id)} aria-label="Dismiss" title="Dismiss" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
+                              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{item.kind}</div>
+                              <div className="clamp2" style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
+                            </button>
+                            <button onClick={()=>dismissWhatsNew(item.id)} aria-label={`Dismiss ${item.headline}`} title="Dismiss" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
                           </div>
                         ))}
                       </div>
@@ -4222,6 +4328,13 @@ export default function HomeworkPlanner() {
         </div>
       </div>
       <div className="sr-only" aria-live="polite">{srMessage}</div>
+      {openUpdate&&(()=>{
+        const index=whatsNew.findIndex(w=>w.id===openUpdate.id);
+        return index<0?null:<UpdateDetail items={whatsNew} index={index} T={T} F={F} origin={openUpdate.origin}
+          onIndex={i=>{const id=whatsNew[i].id;setOpenUpdate({id,origin:document.querySelector<HTMLElement>(`[data-update-id="${id}"]`)});}}
+          onDismiss={dismissWhatsNew}
+          onClose={()=>{const o=openUpdate.origin;setOpenUpdate(null);requestAnimationFrame(()=>o?.isConnected&&o.focus());}}/>;
+      })()}
       {searchOpen&&<SearchOverlay tasks={tasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         origin={searchTriggerRef}
         onOpenTask={t=>{setSearchOpen(false);setSelectedTask(t);}}

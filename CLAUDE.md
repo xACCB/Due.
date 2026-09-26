@@ -383,8 +383,19 @@ not `text-decoration`, so it can animate) draws across. Then `captureTaskRects()
 `[data-task-id]` card's position and a `useLayoutEffect` FLIP-animates each card from its old spot
 to its new one: the farthest-moving card (the completed one) lifts slightly (scale 1.025, raised
 z-index) and slides the whole way down over ~1.5-2s at an even pace, while the others make room in
-~1s; keyboard reordering passes `quick` for a plain 320ms version. Only `MiniCard` has `data-task-id`, so only the list layouts glide; the others
-get the check and strike but jump into place.
+~1s. The same FLIP engine animates other list changes: `captureTaskRects(mode)` is called right
+before the state change -- `"settle"` (completion, above), `"shift"` (filter chips, search,
+add/duplicate, `deleteTasks`, `changeTasks` so every bulk/archive/snooze/edit, undo/redo; ~0.35-0.5s)
+or `"quick"` (keyboard reorder, 320ms). Moves are 2D (grid/column layouts move sideways). Cards
+with no "before" position fade/rise in; cards that left are faded out by a stand-in: capture clones
+each on-screen card, and the effect pins the clone `position:fixed` over the old spot (no
+`data-task-id`, `aria-hidden`, `inert`) and removes it after. Every layout's card root carries
+`data-task-id` (checklist: the outer swipe wrapper). A capture older than 1s is dropped, so a
+no-op state change can't make a later unrelated render animate from stale positions. Reduced
+motion skips capture entirely. Not animated on purpose: pointer drag-to-reorder (the dragged card
+already follows the finger, and moving the others would shift what `elementFromPoint` hits,
+flip-flopping the swap), layout switches, and changes arriving from sync (cards shouldn't move
+under your finger). `glideClock()` (module scope) exists for the React Compiler purity lint.
 
 **Accessibility conventions** (from the screen-reader/keyboard pass, checked with axe-core and the
 Chrome accessibility tree):

@@ -224,6 +224,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"cards-glide", date:"2026-09-26", title:"Improvement", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once -- new ones fade in and removed ones fade out." },
   { id:"fixes-sep23", date:"2026-09-23", title:"Bug fix", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
   { id:"trash-sync-fix", date:"2026-09-22", title:"Fix", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
   { id:"bulk-everywhere", date:"2026-09-22", title:"New feature", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
@@ -366,6 +367,10 @@ function cloudRecord(d:QueryDocumentSnapshot,deleted:boolean):CloudRecord<Task>|
 // A local YYYY-MM-DD `days` from today (bulk "set due date" shortcuts). Module
 // scope for the same React Compiler purity reason as snoozeTarget below.
 function dateInDays(days:number):string{ const d=new Date(); d.setDate(d.getDate()+days); return localDateStr(d); }
+
+// A timestamp for the card glide's capture (see captureTaskRects). Module scope
+// for the same React Compiler purity reason as dateInDays above.
+function glideClock():number{ return performance.now(); }
 
 // Snooze moves a task's due date (and, for "in 3 hours", its time) forward.
 type SnoozeKind="later"|"tomorrow"|"week";
@@ -2292,71 +2297,135 @@ export default function HomeworkPlanner() {
   }
   function finishTask(task:Task){
     const subtasks=templateSubtasks?templateSubtasks.map(s=>({id:String(nextId()),text:s.text,done:false})):undefined;
+    captureTaskRects();
     setTasks(prev=>[...prev,{...task,id:nextId(),done:false,order:nextOrder(prev),...(subtasks?{subtasks}:{})}]);
     setAdding(false);setStep(0);
     setUsingTemplate(false);setTemplateSubtasks(null);
   }
-  // Where each list card is, for animating it from there to its new place after
-  // the list re-sorts (FLIP: the layout effect below plays the difference).
-  // `quick` is for keyboard reordering, where a long glide would lag behind the
-  // arrow keys.
-  const taskRectsBefore=useRef<{tops:Map<string,number>;quick:boolean}|null>(null);
-  function captureTaskRects(quick=false){
-    const tops=new Map<string,number>();
-    document.querySelectorAll<HTMLElement>("[data-task-id]").forEach(el=>tops.set(el.dataset.taskId!,el.getBoundingClientRect().top));
-    taskRectsBefore.current={tops,quick};
+  // Where each task card is (every layout marks its cards with data-task-id),
+  // for animating the list from its old arrangement to the new one (FLIP: the
+  // layout effect below plays the difference). Call it right before the state
+  // change. The motion depends on what happened:
+  // - "settle": a task just completed glides to the done tasks (toggleDone).
+  // - "shift": filter, search, add, delete, undo, bulk actions -- a brisk move.
+  // - "quick": keyboard reordering, where a long glide would lag the arrow keys.
+  // Cards on screen are also cloned, so one that leaves can fade out as a
+  // stand-in after React has removed the real one.
+  type GlideMode="settle"|"shift"|"quick";
+  const taskRectsBefore=useRef<{rects:Map<string,{x:number;y:number;w:number;h:number;clone:HTMLElement|null}>;mode:GlideMode;at:number}|null>(null);
+  // Stand-ins still fading out, by task id, so a task that comes straight back
+  // (e.g. search typed then erased) doesn't show twice.
+  const taskGhosts=useRef(new Map<string,HTMLElement>());
+  function captureTaskRects(mode:GlideMode="shift"){
+    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+    const rects=new Map<string,{x:number;y:number;w:number;h:number;clone:HTMLElement|null}>();
+    const vh=window.innerHeight;
+    document.querySelectorAll<HTMLElement>("[data-task-id]").forEach(el=>{
+      const r=el.getBoundingClientRect();
+      const onScreen=r.bottom>0&&r.top<vh&&r.width>0;
+      rects.set(el.dataset.taskId!,{x:r.left,y:r.top,w:r.width,h:r.height,clone:onScreen?el.cloneNode(true) as HTMLElement:null});
+    });
+    taskRectsBefore.current={rects,mode,at:glideClock()};
   }
   function toggleDone(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
+    changeTasks(prev=>setDone(prev,[id],!task.done),`${task.done?"uncheck":"complete"} "${task.title}"`,
+      task.done?`"${task.title}" marked not done`:`"${task.title}" completed`);
     // Completing: the card holds its place while the check draws in and the
     // title strikes through, then glides down to the done tasks. Unchecking
-    // glides it straight back up. Reduced motion skips all of it.
+    // glides it straight back up. Reduced motion skips all of it. (After
+    // changeTasks, so this capture replaces its "shift" one.)
     if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
       if(!task.done){
         setJustDone(prev=>[...prev,id]);
-        setTimeout(()=>{captureTaskRects();setJustDone(prev=>prev.filter(x=>x!==id));},750);
+        setTimeout(()=>{captureTaskRects("settle");setJustDone(prev=>prev.filter(x=>x!==id));},750);
       }else{
         setJustDone(prev=>prev.filter(x=>x!==id));
-        captureTaskRects();
+        captureTaskRects("settle");
       }
     }
-    changeTasks(prev=>setDone(prev,[id],!task.done),`${task.done?"uncheck":"complete"} "${task.title}"`,
-      task.done?`"${task.title}" marked not done`:`"${task.title}" completed`);
   }
   useLayoutEffect(()=>{
     const before=taskRectsBefore.current;
     if(!before)return;
     taskRectsBefore.current=null;
+    // A capture whose change never rendered (e.g. picking the filter already
+    // selected) mustn't animate some later, unrelated render from stale spots.
+    if(glideClock()-before.at>1000)return;
+    const {mode}=before;
+    const vh=window.innerHeight;
     const cards=[...document.querySelectorAll<HTMLElement>("[data-task-id]")];
     // Stop any glide still running first, or its offset would skew the new
     // measurement (the "before" positions already include it, so nothing jumps).
     cards.forEach(el=>el.getAnimations().forEach(a=>{if(a instanceof CSSAnimation||a instanceof CSSTransition)return;a.cancel();}));
-    const moves=cards.map(el=>{const top=before.tops.get(el.dataset.taskId!);return {el,dy:top==null?0:top-el.getBoundingClientRect().top};}).filter(m=>Math.abs(m.dy)>=1);
-    const farthest=Math.max(0,...moves.map(m=>Math.abs(m.dy)));
-    for(const {el,dy} of moves){
-      if(before.quick){
-        el.animate([{transform:`translateY(${dy}px)`},{transform:"translateY(0)"}],{duration:320,easing:"cubic-bezier(.2,.8,.3,1)"});
+    const present=new Set<string>();
+    const moves:{el:HTMLElement;dx:number;dy:number}[]=[];
+    const enters:HTMLElement[]=[];
+    for(const el of cards){
+      const id=el.dataset.taskId!;
+      present.add(id);
+      taskGhosts.current.get(id)?.remove();
+      const r=el.getBoundingClientRect();
+      const was=before.rects.get(id);
+      const onScreenNow=r.bottom>0&&r.top<vh;
+      if(!was){if(onScreenNow)enters.push(el);continue;}
+      const dx=was.x-r.left, dy=was.y-r.top;
+      // Off screen both before and after: nothing anyone would see.
+      if(!onScreenNow&&!(was.y+was.h>0&&was.y<vh))continue;
+      if(Math.abs(dx)>=1||Math.abs(dy)>=1)moves.push({el,dx,dy});
+    }
+    // Cards that left: a stand-in copy fades out where the card was.
+    for(const [id,was] of before.rects){
+      if(present.has(id)||!was.clone)continue;
+      const g=was.clone;
+      g.removeAttribute("data-task-id");
+      g.setAttribute("aria-hidden","true");
+      g.inert=true;
+      Object.assign(g.style,{position:"fixed",left:`${was.x}px`,top:`${was.y}px`,width:`${was.w}px`,height:`${was.h}px`,margin:"0",pointerEvents:"none",zIndex:"2",transition:"none"});
+      document.body.appendChild(g);
+      taskGhosts.current.get(id)?.remove();
+      taskGhosts.current.set(id,g);
+      const anim=g.animate([{opacity:1,transform:"scale(1)"},{opacity:0,transform:"scale(.96)"}],{duration:mode==="settle"?320:200,easing:"ease-in",fill:"forwards"});
+      const done=()=>{g.remove();if(taskGhosts.current.get(id)===g)taskGhosts.current.delete(id);};
+      anim.finished.then(done,done);
+    }
+    // New arrivals fade and rise in, a beat after the others start making room,
+    // in a quick cascade down the list.
+    enters.forEach((el,i)=>{
+      el.animate([{opacity:0,transform:"translateY(8px) scale(.98)"},{opacity:1,transform:"none"}],
+        {duration:280,delay:80+Math.min(i,8)*30,easing:"cubic-bezier(.2,.8,.3,1)",fill:"backwards"});
+    });
+    const farthest=Math.max(0,...moves.map(m=>Math.hypot(m.dx,m.dy)));
+    for(const {el,dx,dy} of moves){
+      const from=`translate(${dx}px,${dy}px)`;
+      if(mode==="quick"){
+        el.animate([{transform:from},{transform:"none"}],{duration:320,easing:"cubic-bezier(.2,.8,.3,1)"});
         continue;
       }
-      // The card that travels farthest (the one just completed) is the star:
-      // it lifts slightly, slides the whole way down at an even pace over about
-      // 1.5-2s, and sets down softly, riding above the cards it passes. The
-      // others just make room, quicker and without the lift.
-      const lead=Math.abs(dy)===farthest&&moves.length>1;
+      const dist=Math.hypot(dx,dy);
+      if(mode==="shift"){
+        el.animate([{transform:from},{transform:"none"}],{duration:Math.min(520,340+dist*0.25),easing:"cubic-bezier(.25,.8,.3,1)"});
+        continue;
+      }
+      // "settle": the card that travels farthest (the one just completed) is
+      // the star: it lifts slightly, slides the whole way down at an even pace
+      // over about 1.5-2s, and sets down softly, riding above the cards it
+      // passes. The others just make room, quicker and without the lift.
+      const lead=dist===farthest&&moves.length>1;
       if(lead){
-        const duration=Math.min(2100,1300+Math.abs(dy)*1.1);
+        const duration=Math.min(2100,1300+dist*1.1);
         el.style.zIndex="3";
         const anim=el.animate([
-          {transform:`translateY(${dy}px) scale(1)`,easing:"cubic-bezier(.3,0,.2,1)"},
-          {transform:`translateY(${dy*0.92}px) scale(1.025)`,offset:0.1,easing:"cubic-bezier(.45,0,.25,1)"},
-          {transform:"translateY(0) scale(1.025)",offset:0.9,easing:"cubic-bezier(.3,0,.2,1)"},
-          {transform:"translateY(0) scale(1)"},
+          {transform:`${from} scale(1)`,easing:"cubic-bezier(.3,0,.2,1)"},
+          {transform:`translate(${dx*0.92}px,${dy*0.92}px) scale(1.025)`,offset:0.1,easing:"cubic-bezier(.45,0,.25,1)"},
+          {transform:"translate(0,0) scale(1.025)",offset:0.9,easing:"cubic-bezier(.3,0,.2,1)"},
+          {transform:"translate(0,0) scale(1)"},
         ],{duration});
         const done=()=>{el.style.zIndex="";};
         anim.finished.then(done,done);
       }else{
-        el.animate([{transform:`translateY(${dy}px)`},{transform:"translateY(0)"}],{duration:Math.min(1200,700+Math.abs(dy)*0.8),easing:"cubic-bezier(.45,0,.2,1)"});
+        el.animate([{transform:from},{transform:"none"}],{duration:Math.min(1200,700+dist*0.8),easing:"cubic-bezier(.45,0,.2,1)"});
       }
     }
   });
@@ -2365,6 +2434,7 @@ export default function HomeworkPlanner() {
   function deleteTasks(ids:number[]){
     const removed=tasks.filter(t=>ids.includes(t.id));
     if(removed.length===0)return;
+    captureTaskRects();
     setTasks(prev=>prev.filter(t=>!ids.includes(t.id)));
     addToTrash(removed);
     pushUndoable({type:"delete",tasks:removed},removed.length===1?`"${removed[0].title}" deleted`:`${removed.length} tasks deleted`);
@@ -2383,6 +2453,7 @@ export default function HomeworkPlanner() {
     const next=fn(tasks);
     const {before,after}=diffTasks(tasks,next);
     if(before.length===0)return;
+    captureTaskRects();
     setTasks(next);
     pushUndoable({type:"change",before,after,label},toast);
   }
@@ -2408,6 +2479,7 @@ export default function HomeworkPlanner() {
   function undo(){
     if(undoStack.length===0)return;
     const action=undoStack[undoStack.length-1];
+    captureTaskRects();
     if(action.type==="delete"){
       setTasks(prev=>{const have=new Set(prev.map(t=>t.id));return [...prev,...action.tasks.filter(t=>!have.has(t.id))];});
       removeFromTrash(action.tasks.map(t=>t.id));
@@ -2420,6 +2492,7 @@ export default function HomeworkPlanner() {
   function redo(){
     if(redoStack.length===0)return;
     const action=redoStack[redoStack.length-1];
+    captureTaskRects();
     if(action.type==="delete"){const ids=new Set(action.tasks.map(t=>t.id));setTasks(prev=>prev.filter(t=>!ids.has(t.id)));addToTrash(action.tasks);}
     if(action.type==="change")setTasks(prev=>applyTaskStates(prev,action.after));
     setRedoStack(prev=>prev.slice(0,-1));
@@ -2443,6 +2516,7 @@ export default function HomeworkPlanner() {
     if(!src)return null;
     const copy:Task={...src,id:nextId(),done:false,completedAt:null,archived:false,spawnedNextId:null,sessions:[],
       order:nextOrder(tasks),...(src.subtasks?{subtasks:src.subtasks.map(s=>({...s,id:String(nextId()),done:false}))}:{})};
+    captureTaskRects();
     setTasks(prev=>[...prev,copy]);
     return copy;
   }
@@ -2591,7 +2665,7 @@ export default function HomeworkPlanner() {
     if(from===-1||to<0||to>=ids.length)return;
     ids.splice(from,1); ids.splice(to,0,id);
     const orderMap=new Map(ids.map((tid,idx)=>[tid,idx]));
-    if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches)captureTaskRects(true);
+    captureTaskRects("quick");
     setTasks(prev=>prev.map(t=>orderMap.has(t.id)?{...t,order:orderMap.get(t.id)!}:t));
     setSrMessage(`Moved to position ${to+1} of ${ids.length}`);
     requestAnimationFrame(()=>document.querySelector<HTMLElement>(`[data-task-id="${id}"] [data-reorder]`)?.focus());
@@ -2886,7 +2960,7 @@ export default function HomeworkPlanner() {
     if (layout==="checklist") return (
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
         {tasks.map((t,i)=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);return(
-          <div key={t.id} style={{position:"relative",overflow:"hidden",borderRadius:10}}>
+          <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:10}}>
             {renderSwipeReveal(t.id)}
             <div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.card,borderRadius:10,border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
               <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,minWidth:18}}>{String(i+1).padStart(2,"0")}</span>
@@ -2905,7 +2979,7 @@ export default function HomeworkPlanner() {
     if (layout==="board") return (
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))",gap:10}}>
         {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
-          <div key={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7,cursor:"pointer"}}>
+          <div key={t.id} data-task-id={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7,cursor:"pointer"}}>
             <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:priColor(pr,colorCodeUrgency),borderRadius:"12px 12px 0 0"}}/>
             <div style={{display:"flex",justifyContent:"space-between"}}>
               {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
@@ -2933,7 +3007,7 @@ export default function HomeworkPlanner() {
               <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10,fontWeight:500}}>{col.label} ({col.tasks.length})</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {col.tasks.map(t=>(
-                  <div key={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:8,padding:"9px 10px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7,cursor:"pointer"}}>
+                  <div key={t.id} data-task-id={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:8,padding:"9px 10px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7,cursor:"pointer"}}>
                     <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:14,height:14,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                     </button>
@@ -2957,7 +3031,7 @@ export default function HomeworkPlanner() {
           const subs=t.subtasks||[]; const doneSubs=subs.filter(s=>s.done).length;
           const pct=t.done?100:subs.length?Math.round(doneSubs/subs.length*100):0;
           return(
-            <div key={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,cursor:"pointer"}}>
+            <div key={t.id} data-task-id={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,cursor:"pointer"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:18,height:18,cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -2997,7 +3071,7 @@ export default function HomeworkPlanner() {
                 <div style={{fontFamily:F.body,fontSize:10,color:tier.color,marginBottom:5,textAlign:"center"}}>{tier.label}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {tier.tasks.map(t=>(
-                    <div key={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:9,padding:"9px 12px",border:`1px solid ${tier.color}44`,display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+                    <div key={t.id} data-task-id={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:9,padding:"9px 12px",border:`1px solid ${tier.color}44`,display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
                       <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                       </button>
@@ -3027,7 +3101,7 @@ export default function HomeworkPlanner() {
               <div style={{fontFamily:F.body,fontSize:11,color:labelColor||T.textMuted,marginBottom:8}}>{label}</div>
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
                 {list.map(t=>(
-                  <div key={t.id} onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+                  <div key={t.id} data-task-id={t.id} onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
                     <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                     </button>
@@ -3053,7 +3127,7 @@ export default function HomeworkPlanner() {
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;return(
-                    <div key={t.id} onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.borderFaint}`,cursor:"pointer"}}>
+                    <div key={t.id} data-task-id={t.id} onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.borderFaint}`,cursor:"pointer"}}>
                       <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                       </button>
@@ -3574,17 +3648,17 @@ export default function HomeworkPlanner() {
           <div style={{position:"relative",marginBottom:10}}>
             <input
               value={searchQuery}
-              onChange={e=>setSearchQuery(e.target.value)}
+              onChange={e=>{captureTaskRects();setSearchQuery(e.target.value);}}
               placeholder="Search tasks..."
               style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"9px 32px 9px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}
             />
-            {searchQuery&&<button onClick={()=>setSearchQuery("")} aria-label="Clear search" style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,lineHeight:1,padding:6}}>×</button>}
+            {searchQuery&&<button onClick={()=>{captureTaskRects();setSearchQuery("");}} aria-label="Clear search" style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,lineHeight:1,padding:6}}>×</button>}
           </div>
 
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
-            {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>setFilter(f)} aria-pressed={filter===f} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f[0].toUpperCase()+f.slice(1)}</button>)}
-            {filter==="noest"&&<button onClick={()=>setFilter("all")} aria-label="Clear no-estimate filter" style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>No estimate ×</button>}
+            {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>{if(f!==filter)captureTaskRects();setFilter(f);}} aria-pressed={filter===f} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f[0].toUpperCase()+f.slice(1)}</button>)}
+            {filter==="noest"&&<button onClick={()=>{captureTaskRects();setFilter("all");}} aria-label="Clear no-estimate filter" style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>No estimate ×</button>}
             {selectionMode&&(()=>{
               const ids=filteredTasks.map(t=>t.id), all=ids.length>0&&ids.every(id=>selectedIds.includes(id));
               return <button onClick={()=>setSelectedIds(all?[]:ids)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{all?"Select none":`Select all (${ids.length})`}</button>;

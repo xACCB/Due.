@@ -384,7 +384,7 @@ not `text-decoration`, so it can animate) draws across. Then `captureTaskRects()
 to its new one: the farthest-moving card (the completed one) lifts slightly (scale 1.025, raised
 z-index) and slides the whole way down over ~1.5-2s at an even pace, while the others make room in
 ~1s. The same FLIP engine animates other list changes: `captureTaskRects(mode)` is called right
-before the state change -- `"settle"` (completion, above), `"shift"` (filter chips, search,
+before the state change -- `"settle"` (completion, above), `"shift"` (filter chips,
 add/duplicate, `deleteTasks`, `changeTasks` so every bulk/archive/snooze/edit, undo/redo; ~0.35-0.5s)
 or `"quick"` (keyboard reorder, 320ms). Moves are 2D (grid/column layouts move sideways). Cards
 with no "before" position fade/rise in; cards that left are faded out by a stand-in: capture clones
@@ -396,6 +396,17 @@ motion skips capture entirely. Not animated on purpose: pointer drag-to-reorder 
 already follows the finger, and moving the others would shift what `elementFromPoint` hits,
 flip-flopping the swap), layout switches, and changes arriving from sync (cards shouldn't move
 under your finger). `glideClock()` (module scope) exists for the React Compiler purity lint.
+
+**Search** is a floating panel, not an inline filter: the Tasks tab's "Search tasks..." field is
+a button (`searchTriggerRef`, hidden while open) that opens `SearchOverlay` (module scope, like
+`TaskModal`, so the `now` tick doesn't remount it and lose the query). The bar flies out of the
+field (WAAPI translate + height) into the upper middle of the *visible* viewport
+(`visualViewport`, so it stays above a phone keyboard) over a blurred backdrop, and flies back on
+close (Cancel, Escape, backdrop tap). Results (title/subject/tag match, archived excluded,
+pending first, max 50) are keyed by id with a `.search-pop` CSS animation, so each newly matching
+task pops in while ones that still match stay put. Enter opens the first result, arrows walk the
+list; `.app-inner` is `inert` while it's open, and focus returns to the field on close. The task
+list itself is no longer filtered by search.
 
 **Accessibility conventions** (from the screen-reader/keyboard pass, checked with axe-core and the
 Chrome accessibility tree):

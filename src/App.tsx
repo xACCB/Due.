@@ -194,6 +194,11 @@ function IconHistory(){
     <circle cx="12" cy="13" r="8"/><polyline points="12,9 12,13 15,15"/><polyline points="8.5,2.5 12,5.5 15.5,2.5"/>
   </svg>;
 }
+function IconSearch(){
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.5" y1="15.5" x2="21" y2="21"/>
+  </svg>;
+}
 function IconSettings(){
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.1"/>
@@ -224,6 +229,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"floating-search", date:"2026-09-26", title:"New feature", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
   { id:"cards-glide", date:"2026-09-26", title:"Improvement", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once -- new ones fade in and removed ones fade out." },
   { id:"fixes-sep23", date:"2026-09-23", title:"Bug fix", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
   { id:"trash-sync-fix", date:"2026-09-22", title:"Fix", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
@@ -818,6 +824,114 @@ function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:T
 // for every visible task across every layout, so being redefined (and every
 // instance's DOM torn down/recreated) on each unrelated render was the most
 // consequential case of this pattern in the file.
+// Search as a floating panel: the search field lifts off the Tasks tab and
+// floats up the middle of a blurred screen, and matching tasks (title, subject
+// or tag) pop in under it as you type. Module scope, like TaskModal, so the
+// once-a-second `now` tick doesn't remount it (and lose what's typed). `origin`
+// is the field it flies out of and back into.
+function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTask,onClose}:{
+  tasks:Task[]; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
+  origin:React.RefObject<HTMLButtonElement|null>;
+  onOpenTask:(task:Task)=>void; onClose:()=>void;
+}){
+  const [query,setQuery]=useState("");
+  const backdropRef=useRef<HTMLDivElement>(null), barRef=useRef<HTMLDivElement>(null);
+  const resultsRef=useRef<HTMLDivElement>(null), inputRef=useRef<HTMLInputElement>(null);
+  const closing=useRef(false);
+  // The part of the screen actually visible -- on phones the keyboard covers
+  // the bottom, and the bar should float in the middle of what's left.
+  const [view,setView]=useState(()=>({h:window.visualViewport?.height??window.innerHeight,top:window.visualViewport?.offsetTop??0}));
+  useEffect(()=>{
+    const vv=window.visualViewport;
+    if(!vv)return;
+    const update=()=>setView({h:vv.height,top:vv.offsetTop});
+    vv.addEventListener("resize",update);vv.addEventListener("scroll",update);
+    return()=>{vv.removeEventListener("resize",update);vv.removeEventListener("scroll",update);};
+  },[]);
+  const q=query.trim().toLowerCase();
+  const results=!q?[]:tasks
+    .filter(t=>!t.archived&&(t.title.toLowerCase().includes(q)||t.subject.toLowerCase().includes(q)||(t.tags||[]).some(g=>g.toLowerCase().includes(q))))
+    .sort((a,b)=>a.done!==b.done?(a.done?1:-1):a.order-b.order)
+    .slice(0,50);
+  // Fly in from the field. A layout effect, so the first frame already shows
+  // the bar at the field's spot, and focus lands inside the tap that opened
+  // it (iOS only raises the keyboard for focus during a user gesture).
+  useLayoutEffect(()=>{
+    inputRef.current?.focus({preventScroll:true});
+    const bar=barRef.current, from=origin.current?.getBoundingClientRect();
+    if(!bar||!from||window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+    const to=bar.getBoundingClientRect();
+    backdropRef.current?.animate([{opacity:0},{opacity:1}],{duration:260,easing:"ease-out"});
+    bar.animate([
+      {transform:`translate(${from.left-to.left}px,${from.top-to.top}px)`,height:`${from.height}px`,boxShadow:"0 0 0 rgba(0,0,0,0)"},
+      {transform:"none",height:`${to.height}px`},
+    ],{duration:440,easing:"cubic-bezier(.2,.9,.25,1.05)"});
+  },[origin]);
+  // Fly back into the field, then unmount.
+  function close(){
+    if(closing.current)return;
+    closing.current=true;
+    const bar=barRef.current, to=origin.current?.getBoundingClientRect();
+    if(!bar||!to||window.matchMedia("(prefers-reduced-motion: reduce)").matches){onClose();return;}
+    const from=bar.getBoundingClientRect();
+    resultsRef.current?.animate([{opacity:1},{opacity:0}],{duration:140,fill:"forwards"});
+    backdropRef.current?.animate([{opacity:1},{opacity:0}],{duration:280,easing:"ease-in",fill:"forwards"});
+    const anim=bar.animate([
+      {transform:"none",height:`${from.height}px`},
+      {transform:`translate(${to.left-from.left}px,${to.top-from.top}px)`,height:`${to.height}px`,boxShadow:"0 0 0 rgba(0,0,0,0)"},
+    ],{duration:300,easing:"cubic-bezier(.4,0,.2,1)",fill:"forwards"});
+    anim.finished.then(onClose,onClose);
+  }
+  function onKeyDown(e:React.KeyboardEvent){
+    if(e.key==="Escape"){e.preventDefault();close();return;}
+    if(e.key!=="ArrowDown"&&e.key!=="ArrowUp")return;
+    // Arrow keys walk from the field through the results and back.
+    const items=[inputRef.current,...(resultsRef.current?.querySelectorAll<HTMLElement>("[data-result]")??[])].filter(Boolean) as HTMLElement[];
+    const i=items.indexOf(document.activeElement as HTMLElement);
+    const next=items[Math.max(0,Math.min(items.length-1,i+(e.key==="ArrowDown"?1:-1)))];
+    if(next){e.preventDefault();next.focus();}
+  }
+  // The typed text, marked where it matches the title.
+  const highlight=(title:string)=>{
+    const at=q?title.toLowerCase().indexOf(q):-1;
+    if(at<0)return title;
+    return <>{title.slice(0,at)}<mark style={{background:T.light?"rgba(0,0,0,0.1)":"rgba(255,255,255,0.18)",color:"inherit",borderRadius:3,padding:"0 1px"}}>{title.slice(at,at+q.length)}</mark>{title.slice(at+q.length)}</>;
+  };
+  return(
+    <div role="dialog" aria-modal="true" aria-label="Search tasks" onKeyDown={onKeyDown}
+      style={{position:"fixed",left:0,right:0,top:view.top,height:view.h,zIndex:900,display:"flex",justifyContent:"center",padding:`${Math.max(24,Math.round(view.h*0.34-28))}px 16px 16px`,transition:"padding-top .25s ease"}}>
+      <div ref={backdropRef} onClick={close} style={{position:"absolute",inset:0,background:T.light?"rgba(245,245,245,0.55)":"rgba(0,0,0,0.5)",backdropFilter:"blur(14px)",WebkitBackdropFilter:"blur(14px)"}}/>
+      <div style={{position:"relative",width:"min(548px,100%)",display:"flex",flexDirection:"column",gap:10,maxHeight:"100%"}}>
+        <div ref={barRef} className="search-bar" style={{display:"flex",alignItems:"center",gap:9,height:54,flexShrink:0,overflow:"hidden",background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"0 8px 0 15px",color:T.textMuted,boxShadow:T.light?"0 12px 40px rgba(0,0,0,0.14)":"0 12px 40px rgba(0,0,0,0.55)"}}>
+          <IconSearch/>
+          <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tasks..." aria-label="Search tasks" enterKeyHint="search"
+            onKeyDown={e=>{if(e.key==="Enter"&&results[0]){e.preventDefault();onOpenTask(results[0]);}}}
+            style={{flex:1,minWidth:0,background:"none",border:"none",color:T.text,padding:"9px 0",fontFamily:F.body,fontSize:16,outline:"none"}}/>
+          <button onClick={close} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",fontFamily:F.body,fontSize:11,padding:"6px 7px"}}>Cancel</button>
+        </div>
+        <div ref={resultsRef} style={{display:"flex",flexDirection:"column",gap:6,overflowY:"auto",overscrollBehavior:"contain",minHeight:0,paddingBottom:8}}>
+          {results.map((t,i)=>{
+            const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);
+            const sc=subjectColors[t.subject]||T.accent;
+            return(
+              <button key={t.id} data-result onClick={()=>onOpenTask(t)} className="search-pop"
+                style={{animationDelay:`${Math.min(i,8)*35}ms`,display:"flex",alignItems:"center",gap:10,width:"100%",textAlign:"left",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 13px",cursor:"pointer",color:T.text}}>
+                <span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:t.done?T.textFaint:priColor(pr,colorCodeUrgency),flexShrink:0}}/>
+                <span style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none"}}>{highlight(t.title)}</span>
+                {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
+                {!t.done&&t.dueDate&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{daysUntil(t.dueDate)}</span>}
+              </button>
+            );
+          })}
+          <div aria-live="polite" style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textMuted,padding:"6px 0"}}>
+            {!q?"Type a title, subject or tag":results.length===0?`No tasks match "${query.trim()}"`:<span className="sr-only">{results.length} {results.length===1?"task":"tasks"} found</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUrgency,now,h24,dragTaskId,dragOffsetY,onOpen,onToggleDone,onDelete,swipeClickGuard,swipeHandlers,swipeContentStyle,renderSwipeReveal,startDrag,onDragMove,endDrag,selectionMode,isSelected,onToggleSelect,justDone,onMoveBy}:{
   task:Task; rank:number; reorderable?:boolean; swipeable?:boolean;
   T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number; h24:boolean;
@@ -1892,7 +2006,9 @@ export default function HomeworkPlanner() {
   const [templateSubtasks,setTemplateSubtasks]=useState<{text:string}[]|null>(null);
   const inputValRef=useRef("");
   const [filter,setFilter]=useState("all");
-  const [searchQuery,setSearchQuery]=useState("");
+  // The floating search panel (SearchOverlay), and the field it flies out of.
+  const [searchOpen,setSearchOpen]=useState(false);
+  const searchTriggerRef=useRef<HTMLButtonElement>(null);
   const [activeTab,setActiveTab]=useState("tasks");
   const [titleMenuOpen,setTitleMenuOpen]=useState(false);
   const [historyMenuOpen,setHistoryMenuOpen]=useState(false);
@@ -2120,8 +2236,6 @@ export default function HomeworkPlanner() {
     if(ad!==bd)return ad?1:-1;
     return a.order-b.order;
   });
-  const searchLower=searchQuery.trim().toLowerCase();
-  const matchesSearch=(t:Task)=>!searchLower||t.title.toLowerCase().includes(searchLower)||t.subject.toLowerCase().includes(searchLower)||(t.tags||[]).some(g=>g.toLowerCase().includes(searchLower));
   const filteredTasks=allSorted.filter(t=>{
     if(filter==="archived")return !!t.archived;
     if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
@@ -2129,7 +2243,7 @@ export default function HomeworkPlanner() {
     if(filter==="pending")return !t.done||justDone.includes(t.id);
     if(filter==="noest")return !t.done&&!t.estMins; // from the "Time left" dropdown; not a chip
     return showDone||!t.done||justDone.includes(t.id);
-  }).filter(matchesSearch);
+  });
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   const focusTask=tasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
   useEffect(()=>{pomodoroTaskRef.current=focusTask?.id??null;});
@@ -2779,6 +2893,7 @@ export default function HomeworkPlanner() {
     }
     .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+    .search-pop{animation:pop .3s cubic-bezier(.2,.8,.3,1) backwards;}
     .sli{animation:sli 0.22s ease forwards;}
     @keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
     .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}
@@ -2788,6 +2903,8 @@ export default function HomeworkPlanner() {
        outline:none on inputs -- :focus-visible only matches keyboard focus
        (and text fields), so mouse and touch users don't see it on click. */
     :focus-visible{outline:2px solid ${T.accent}!important;outline-offset:2px;}
+    .search-bar input:focus-visible{outline:none!important;}
+    .search-bar:has(input:focus-visible){outline:2px solid ${T.accent};outline-offset:2px;}
     [data-selected]{outline:2px solid ${T.accent};outline-offset:-1px;}
     .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
     /* Task titles are role="button" spans (so they can be reached and opened
@@ -2805,7 +2922,7 @@ export default function HomeworkPlanner() {
     .strike{text-decoration:none!important;background-image:linear-gradient(currentColor,currentColor);background-repeat:no-repeat;background-position:0 55%;background-size:100% 1.5px;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
     .strike-anim{animation:strikeDraw .5s .22s cubic-bezier(.65,0,.35,1) both;}
     @keyframes strikeDraw{from{background-size:0% 1.5px}}
-    @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim{animation:none;}}
+    @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim,.search-pop{animation:none;}}
     .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}
     .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background 0.2s;position:relative;flex-shrink:0;}
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;}
@@ -3310,7 +3427,7 @@ export default function HomeworkPlanner() {
       <style>{css}</style>
       {/* inert while the task sheet is open, so screen readers and Tab stay in
           the dialog instead of wandering through the list behind it. */}
-      <div className="app-inner" inert={selectedTask!=null||undefined}>
+      <div className="app-inner" inert={selectedTask!=null||searchOpen||undefined}>
         {/* Header */}
         <header style={{position:"relative",display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
           <h1 className="sr-only">DuePlanner</h1>
@@ -3645,15 +3762,12 @@ export default function HomeworkPlanner() {
           ):null)}
 
           {/* Search */}
-          <div style={{position:"relative",marginBottom:10}}>
-            <input
-              value={searchQuery}
-              onChange={e=>{captureTaskRects();setSearchQuery(e.target.value);}}
-              placeholder="Search tasks..."
-              style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"9px 32px 9px 13px",fontFamily:F.body,fontSize:13,outline:"none"}}
-            />
-            {searchQuery&&<button onClick={()=>{captureTaskRects();setSearchQuery("");}} aria-label="Clear search" style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,lineHeight:1,padding:6}}>×</button>}
-          </div>
+          {/* Opens the floating search panel (SearchOverlay); hidden while it's
+              open, so the bar looks like it lifted off from here. */}
+          <button ref={searchTriggerRef} onClick={()=>setSearchOpen(true)} aria-haspopup="dialog" aria-expanded={searchOpen}
+            style={{display:"flex",alignItems:"center",gap:9,width:"100%",marginBottom:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.textFaint,padding:"0 13px",height:42,fontFamily:F.body,fontSize:13,cursor:"text",textAlign:"left",visibility:searchOpen?"hidden":undefined}}>
+            <IconSearch/>Search tasks...
+          </button>
 
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
@@ -3671,7 +3785,7 @@ export default function HomeworkPlanner() {
           </div>
 
           {renderTasks(filteredTasks)}
-          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>{searchLower?`No tasks match "${searchQuery.trim()}"`:filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending -- nice work!":filter==="noest"?"Every open task has an estimate":"Nothing here yet -- add some homework below"}</div>}
+          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>{filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending -- nice work!":filter==="noest"?"Every open task has an estimate":"Nothing here yet -- add some homework below"}</div>}
           <div style={{marginTop:14}}>
             {!adding?(
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,paddingTop:10}}>
@@ -4043,6 +4157,10 @@ export default function HomeworkPlanner() {
         </div>
       </div>
       <div className="sr-only" aria-live="polite">{srMessage}</div>
+      {searchOpen&&<SearchOverlay tasks={tasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
+        origin={searchTriggerRef}
+        onOpenTask={t=>{setSearchOpen(false);setSelectedTask(t);}}
+        onClose={()=>{setSearchOpen(false);requestAnimationFrame(()=>searchTriggerRef.current?.focus());}}/>}
       {selectedTask&&<ErrorBoundary fallback={()=>(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
           <div style={{background:T.card,borderRadius:12,padding:24,maxWidth:320,textAlign:"center",display:"flex",flexDirection:"column",gap:12,border:`1px solid ${T.border}`}}>

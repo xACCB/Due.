@@ -229,6 +229,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"edit-estimate-fix", date:"2026-09-26", title:"Bug fix", description:"Editing a task's estimate works properly: you can clear the hours and minutes and type new ones, any number of minutes saves (90 minutes becomes 1h 30m), and phones no longer zoom in when you tap a field." },
   { id:"floating-search", date:"2026-09-26", title:"New feature", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
   { id:"cards-glide", date:"2026-09-26", title:"Improvement", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once -- new ones fade in and removed ones fade out." },
   { id:"fixes-sep23", date:"2026-09-23", title:"Bug fix", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
@@ -425,15 +426,18 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   const [newTagText,setNewTagText]=useState("");
   // Editing the task's own fields (title, subject, due date/time, estimate,
   // repeat) -- previously these could only be set while adding a task.
-  const [draft,setDraft]=useState<{title:string;subject:string;dueDate:string;dueTime:string;estH:number;estM:number;recurrence:Recurrence}|null>(null);
+  // The estimate is kept as the typed text (digits only, may be empty mid-edit)
+  // and only turned into minutes on save; minutes past 59 roll into hours.
+  const [draft,setDraft]=useState<{title:string;subject:string;dueDate:string;dueTime:string;estH:string;estM:string;recurrence:Recurrence}|null>(null);
+  const draftEstMins=draft?Math.min(LIMITS.estMins,(parseInt(draft.estH,10)||0)*60+(parseInt(draft.estM,10)||0)):0;
   function startEdit(){
     setDraft({title:task.title,subject:task.subject,dueDate:task.dueDate,dueTime:task.dueTime,
-      estH:Math.floor((task.estMins||0)/60),estM:(task.estMins||0)%60,recurrence:task.recurrence||"none"});
+      estH:task.estMins>=60?String(Math.floor(task.estMins/60)):"",estM:task.estMins%60?String(task.estMins%60):"",recurrence:task.recurrence||"none"});
   }
   function saveEdit(){
     if(!draft)return;
     onUpdateTask({title:draft.title.trim()||task.title,subject:draft.subject,dueDate:draft.dueDate,
-      dueTime:draft.dueDate?draft.dueTime:"",estMins:Math.min(LIMITS.estMins,Math.max(0,draft.estH*60+draft.estM)),recurrence:draft.recurrence});
+      dueTime:draft.dueDate?draft.dueTime:"",estMins:draftEstMins,recurrence:draft.recurrence});
     setDraft(null);
   }
   // Inline "name this template" field (replaces a browser prompt() dialog).
@@ -578,26 +582,30 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
             return (
             <form onSubmit={e=>{e.preventDefault();saveEdit();}} style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.accent}44`,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
               <label><span style={label}>Title</span>
-                <input autoFocus value={draft.title} maxLength={500} onChange={e=>setDraft({...draft,title:e.target.value})} style={field}/></label>
+                <input className="edit-field" autoFocus value={draft.title} maxLength={500} onChange={e=>setDraft({...draft,title:e.target.value})} style={field}/></label>
               <label><span style={label}>Subject</span>
-                <select value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})} style={field}>
+                <select className="edit-field" value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})} style={field}>
                   <option value="">No subject</option>
                   {subjectOptions.map(s=><option key={s} value={s}>{s}</option>)}
                 </select></label>
               <div style={{display:"flex",gap:8}}>
                 <label style={{flex:1}}><span style={label}>Due date</span>
-                  <input type="date" value={draft.dueDate} onChange={e=>setDraft({...draft,dueDate:e.target.value})} style={field}/></label>
+                  <input className="edit-field" type="date" value={draft.dueDate} onChange={e=>setDraft({...draft,dueDate:e.target.value})} style={field}/></label>
                 <label style={{flex:1}}><span style={label}>Time</span>
-                  <input type="time" value={draft.dueTime} disabled={!draft.dueDate} onChange={e=>setDraft({...draft,dueTime:e.target.value})} style={{...field,opacity:draft.dueDate?1:0.5}}/></label>
+                  <input className="edit-field" type="time" value={draft.dueTime} disabled={!draft.dueDate} onChange={e=>setDraft({...draft,dueTime:e.target.value})} style={{...field,opacity:draft.dueDate?1:0.5}}/></label>
               </div>
               <div style={{display:"flex",gap:8}}>
+                {/* Plain text fields with the number keypad, not type="number":
+                    those snapped an emptied field back to 0 (typing then gave
+                    "030"), and step/max validation silently blocked Save. */}
                 <label style={{flex:1}}><span style={label}>Estimate (hours)</span>
-                  <input type="number" min={0} max={Math.floor(LIMITS.estMins/60)} value={draft.estH} onChange={e=>setDraft({...draft,estH:Math.min(Math.floor(LIMITS.estMins/60),Math.max(0,Math.floor(Number(e.target.value))||0))})} style={field}/></label>
+                  <input className="edit-field" inputMode="numeric" placeholder="0" value={draft.estH} onFocus={e=>e.currentTarget.select()} onChange={e=>setDraft({...draft,estH:e.target.value.replace(/\D/g,"").slice(0,4)})} style={field}/></label>
                 <label style={{flex:1}}><span style={label}>Minutes</span>
-                  <input type="number" min={0} max={59} step={5} value={draft.estM} onChange={e=>setDraft({...draft,estM:Math.min(59,Math.max(0,Number(e.target.value)||0))})} style={field}/></label>
+                  <input className="edit-field" inputMode="numeric" placeholder="0" value={draft.estM} onFocus={e=>e.currentTarget.select()} onChange={e=>setDraft({...draft,estM:e.target.value.replace(/\D/g,"").slice(0,4)})} style={field}/></label>
               </div>
+              {(parseInt(draft.estM,10)||0)>=60&&<div style={{fontSize:10,color:T.textMuted,marginTop:-4}}>Saves as {formatDuration(draftEstMins)}</div>}
               <label><span style={label}>Repeats</span>
-                <select value={draft.recurrence} onChange={e=>setDraft({...draft,recurrence:e.target.value as Recurrence})} style={field}>
+                <select className="edit-field" value={draft.recurrence} onChange={e=>setDraft({...draft,recurrence:e.target.value as Recurrence})} style={field}>
                   <option value="none">Doesn't repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
                 </select></label>
               <div style={{display:"flex",gap:8}}>
@@ -2894,6 +2902,8 @@ export default function HomeworkPlanner() {
     .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
     .search-pop{animation:pop .3s cubic-bezier(.2,.8,.3,1) backwards;}
+    /* iOS zooms the page into any focused field under 16px. */
+    @media (pointer:coarse){.edit-field{font-size:16px!important;}}
     .sli{animation:sli 0.22s ease forwards;}
     @keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
     .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}

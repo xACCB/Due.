@@ -325,7 +325,9 @@ tasks, trash and templates). Date & time: `timeFormat` (`formatTime(t, h24)`, pa
 the Inbox's week stats). The Inbox starts with a "Done today" list (`doneToday`).
 
 **Task detail actions.** `TaskModal` can edit a task's own fields (an Edit panel, via
-`onUpdateTask(patch)` -> `updateTask`), snooze it (`snoozeTarget()`, module scope, since the
+`onUpdateTask(patch)` -> `updateTask`; its estimate hours/minutes are digit-only text fields kept as
+strings, not `type="number"`, and minutes past 59 roll into hours on save; `.edit-field` gets 16px
+text on touch screens so iOS doesn't zoom in on focus), snooze it (`snoozeTarget()`, module scope, since the
 React Compiler's purity lint rejects `Date.now()` inside component functions; `snoozeTask` records it
 in the undo history as an `"edit"` `HistoryAction` with the before/after due date and time, so it
 shares the undo toast and History menu with deletes), duplicate it

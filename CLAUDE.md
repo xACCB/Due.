@@ -445,11 +445,23 @@ through `changeTasks` so each is one undo step. Due date keeps each task's own t
 date clears it); "Pick a date..." applies on Set, not on change. Priority "Automatic" clears
 `priorityOverride`.
 
+**New task questions** (Settings; `hw-add-questions`, local-only like the Focus timer settings): which
+of the add-task questions after the title (`QUESTIONS`: subject, due date, estimate, repeat) are asked,
+and in what order. Stored as `{key,on}[]`, cleaned by `normalizeQuestionPrefs()` (`src/lib/addQuestions.ts`,
+unit-tested: unknown/duplicate keys dropped, missing ones appended on). The wizard indexes
+`askQuestions` (the enabled ones, in order), never `QUESTIONS`, so `step` means "position in the
+user's list". `askQuestions` is `useMemo`'d over the module-scope `askedQuestions()` -- computed
+plainly in the component body, the React Compiler treated it as possibly mutated and bailed out on
+the whole component (reported, confusingly, on the `css` memo's `F.google`/`F.body` deps). With the
+estimate question off a new task gets `estMins:0` (not the picker's 30-minute start); with every
+question off, submitting the title adds the task.
+
 **Task templates** (`TaskTemplate`, `templates` state; shown as deletable chips under the add
 button) are local-only — `localStorage`, not synced
 to Firestore. Deliberate scope call: a personal convenience, not core data, not worth a second
 synced subcollection right now. Starting a task from a template (`startFromTemplate`) skips the
-normal step-by-step add-task wizard straight to the due-date question via `usingTemplate`/
+normal step-by-step add-task wizard straight to the due-date question (wherever the user put it; if
+it's turned off, the task is added immediately) via `usingTemplate`/
 `templateSubtasks` state, since the template already answered the other questions.
 
 **Reminders** (`REMINDER_OFFSETS`, `enabledOffsets` state) support multiple independently-toggleable

@@ -26,6 +26,7 @@ import type { SyncRecord, CloudRecord } from "./lib/sync";
 import { downloadFile } from "./lib/download";
 import { LIMITS, addSession, sanitizeTask } from "./lib/limits";
 import { usePersistedState } from "./hooks/usePersistedState";
+import { normalizeQuestionPrefs, moveQuestion } from "./lib/addQuestions";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
@@ -229,6 +230,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // entry needs a stable id: dismissing one stores just its id (see
 // dismissedWhatsNew below), never a copy of this list.
 const WHATS_NEW: {id:string; date:string; title:string; description:string}[] = [
+  { id:"new-task-questions", date:"2026-09-26", title:"New feature", description:"Choose which questions you get when adding a task, and in what order: Settings -> New task questions. Turn off the ones you don't need -- you can still fill them in later with Edit." },
   { id:"edit-estimate-fix", date:"2026-09-26", title:"Bug fix", description:"Editing a task's estimate works properly: you can clear the hours and minutes and type new ones, any number of minutes saves (90 minutes becomes 1h 30m), and phones no longer zoom in when you tap a field." },
   { id:"floating-search", date:"2026-09-26", title:"New feature", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
   { id:"cards-glide", date:"2026-09-26", title:"Improvement", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once -- new ones fade in and removed ones fade out." },
@@ -286,12 +288,24 @@ const REMINDER_OFFSETS = [
   { key:"1h", label:"1 hour before", mins:60 },
   { key:"0",  label:"At due time",   mins:0 },
 ] as const;
+// The add-task questions asked after the title. Which are asked, and in what
+// order, is the "New task questions" setting (`askQuestions`); `name` is how
+// Settings lists each one.
 const QUESTIONS = [
-  { key:"subject", label:"What subject?", type:"select" },
-  { key:"dueDate", label:"When is it due?", type:"date" },
-  { key:"estMins", label:"How long will it take?", type:"time" },
-  { key:"recurrence", label:"Does this repeat?", type:"recurrence" },
+  { key:"subject", label:"What subject?", type:"select", name:"Subject" },
+  { key:"dueDate", label:"When is it due?", type:"date", name:"Due date" },
+  { key:"estMins", label:"How long will it take?", type:"time", name:"How long it takes" },
+  { key:"recurrence", label:"Does this repeat?", type:"recurrence", name:"Repeats" },
 ];
+const QUESTION_KEYS=QUESTIONS.map(q=>q.key);
+// The questions to ask, in order, from the saved "New task questions" setting.
+// HomeworkPlanner wraps this in useMemo: computed plainly in the component body,
+// the React Compiler treated the list (read by the wizard's JSX) as possibly
+// mutated and bailed out on the whole component (preserve-manual-memoization,
+// reported on the css memo's F.google/F.body deps).
+function askedQuestions(saved:unknown){
+  return normalizeQuestionPrefs(saved,QUESTION_KEYS).filter(p=>p.on).map(p=>QUESTIONS.find(q=>q.key===p.key)!);
+}
 
 interface Subtask { id:string; text:string; done:boolean; }
 interface Task {
@@ -1439,6 +1453,11 @@ export default function HomeworkPlanner() {
   const [pomodoroWorkMins,setPomodoroWorkMins]=usePersistedState("hw-pomodoro-work",25);
   const [pomodoroBreakMins,setPomodoroBreakMins]=usePersistedState("hw-pomodoro-break",5);
   const [autoStartBreaks,setAutoStartBreaks]=usePersistedState("hw-pomodoro-autobreak",true);
+  // "New task questions": which add-task questions are asked, in what order.
+  // Local-only, like the Focus timer settings.
+  const [savedAddQuestions,setSavedAddQuestions]=usePersistedState<unknown>("hw-add-questions",null);
+  const addQuestionPrefs=normalizeQuestionPrefs(savedAddQuestions,QUESTION_KEYS);
+  const askQuestions=useMemo(()=>askedQuestions(savedAddQuestions),[savedAddQuestions]);
   const [subjects,setSubjects]=usePersistedState<string[]>("hw-subjects",DEFAULT_SUBJECTS);
   // Only the ids the user dismissed are stored, and the feed itself always
   // comes from WHATS_NEW -- storing the whole feed (the old approach) meant a
@@ -2341,32 +2360,41 @@ export default function HomeworkPlanner() {
 
   function startAdding(){
     setAdding(true);setStep(-1);
-    setNewTask({title:"",subject:"",dueDate:"",dueTime:"",estMins:30});
+    // 30 minutes is only the estimate picker's starting point; with that
+    // question turned off, the task gets no estimate.
+    setNewTask({title:"",subject:"",dueDate:"",dueTime:"",estMins:askQuestions.some(q=>q.type==="time")?30:0});
     setPendingDueDate(null);
     setTimeHours(0);setTimeMins(30);
     setUsingTemplate(false);setTemplateSubtasks(null);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
   }
-  // Skips straight to the due-date question, since everything else a template
-  // covers (subject/estimate/recurrence/subtasks) is already decided --
-  // confirmDueTime and finishTask below check usingTemplate/templateSubtasks
-  // to finish immediately after the date instead of asking the remaining
-  // normally-sequential questions.
+  // Skips straight to the due-date question (wherever it is in the user's
+  // order), since everything else a template covers (subject/estimate/
+  // recurrence/subtasks) is already decided -- confirmDueTime and finishTask
+  // below check usingTemplate/templateSubtasks to finish immediately after the
+  // date instead of asking the remaining questions. With the due-date question
+  // turned off, the task is added straight away.
   function startFromTemplate(tpl:TaskTemplate){
+    const task={title:tpl.name,subject:tpl.subject,dueDate:"",dueTime:"",estMins:tpl.estMins,recurrence:tpl.recurrence};
+    const dateStep=askQuestions.findIndex(q=>q.type==="date");
+    if(dateStep<0){finishTask(task as Task,tpl.subtasks||null);return;}
     setAdding(true);
-    setNewTask({title:tpl.name,subject:tpl.subject,dueDate:"",dueTime:"",estMins:tpl.estMins,recurrence:tpl.recurrence});
+    setNewTask(task);
     setPendingDueDate(null);
     setUsingTemplate(true);setTemplateSubtasks(tpl.subtasks||null);
-    setStep(1);
+    setStep(dateStep);
   }
   function handleTitleSubmit(e:React.FormEvent){
     e.preventDefault();
     const val=inputRef.current?.value||"";
     if(!val.trim())return;
-    setNewTask(t=>({...t,title:val.trim()}));
+    const updated={...newTask,title:val.trim()};
+    setNewTask(updated);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
+    // Every question turned off in Settings: the title is all there is to ask.
+    if(askQuestions.length===0){finishTask(updated as Task);return;}
     setStep(0);
   }
   // A wizard answer advances after a 100ms beat; this ignores a second tap in
@@ -2378,27 +2406,27 @@ export default function HomeworkPlanner() {
   }
   function handleAnswer(val:string){
     if(wizardAdvancing.current)return;
-    const q=QUESTIONS[step];
+    const q=askQuestions[step];
     const value = q.type==="time" ? parseInt(val) : val;
     const updated={...newTask,[q.key]:value};setNewTask(updated);
     inputValRef.current="";
     if(inputRef.current) inputRef.current.value="";
-    afterBeat(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);});
+    afterBeat(()=>{if(step<askQuestions.length-1){setStep(s=>s+1);}else finishTask(updated as Task);});
   }
   function goBackStep(){
-    if(QUESTIONS[step]?.type==="date"&&pendingDueDate!==null){setPendingDueDate(null);return;}
+    if(askQuestions[step]?.type==="date"&&pendingDueDate!==null){setPendingDueDate(null);return;}
     if(step>-1)setStep(s=>s-1);
   }
   function goForwardStep(){
     if(wizardAdvancing.current)return;
-    if(QUESTIONS[step]?.type==="date"&&pendingDueDate!==null){confirmDueTime("");return;}
+    if(askQuestions[step]?.type==="date"&&pendingDueDate!==null){confirmDueTime("");return;}
     // Skipping leaves that answer blank -- for the estimate that means 0 (shown
     // as no estimate), not the wizard's hidden 30-minute starting value.
-    const updated=QUESTIONS[step]?.type==="time"?{...newTask,estMins:0}:newTask;
+    const updated=askQuestions[step]?.type==="time"?{...newTask,estMins:0}:newTask;
     if(updated!==newTask)setNewTask(updated);
     // A template already answered everything after the date (see confirmDueTime).
-    if(usingTemplate&&QUESTIONS[step]?.type==="date"){finishTask(updated as Task);return;}
-    if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);
+    if(usingTemplate&&askQuestions[step]?.type==="date"){finishTask(updated as Task);return;}
+    if(step<askQuestions.length-1){setStep(s=>s+1);}else finishTask(updated as Task);
   }
   function handleDateInput(val:string){
     setPendingDueDate(val);
@@ -2414,11 +2442,11 @@ export default function HomeworkPlanner() {
     if(usingTemplate){
       afterBeat(()=>finishTask(updated as Task));
     } else {
-      afterBeat(()=>{if(step<QUESTIONS.length-1){setStep(s=>s+1);}else finishTask(updated as Task);});
+      afterBeat(()=>{if(step<askQuestions.length-1){setStep(s=>s+1);}else finishTask(updated as Task);});
     }
   }
-  function finishTask(task:Task){
-    const subtasks=templateSubtasks?templateSubtasks.map(s=>({id:String(nextId()),text:s.text,done:false})):undefined;
+  function finishTask(task:Task,tplSubtasks:{text:string}[]|null=templateSubtasks){
+    const subtasks=tplSubtasks?tplSubtasks.map(s=>({id:String(nextId()),text:s.text,done:false})):undefined;
     captureTaskRects();
     setTasks(prev=>[...prev,{...task,id:nextId(),done:false,order:nextOrder(prev),...(subtasks?{subtasks}:{})}]);
     setAdding(false);setStep(0);
@@ -2871,7 +2899,7 @@ export default function HomeworkPlanner() {
       <span style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:isRight?"#2ED573":"#FF4757"}}>{isRight?(done?"↩ Mark not done":"✓ Mark done"):"Delete"}</span>
     </div>;
   }
-  const currentQ=step>=0?QUESTIONS[step]:null;
+  const currentQ=step>=0?askQuestions[step]:null;
 
   const F = FONT;
 
@@ -3814,7 +3842,7 @@ export default function HomeworkPlanner() {
               <div style={{background:T.card,borderRadius:16,padding:"18px",border:`1px solid ${T.borderAccent}`,position:"relative"}}>
                 <button onClick={()=>setAdding(false)} aria-label="Cancel" title="Cancel" style={{position:"absolute",top:10,right:10,background:"none",border:"none",color:T.textFaint,fontSize:20,lineHeight:1,cursor:"pointer",padding:4}}>×</button>
                 <div style={{display:"flex",gap:5,marginBottom:14,justifyContent:"center"}}>
-                  {[...Array(QUESTIONS.length+1)].map((_,i)=><div key={i} style={{width:i===step+1?20:6,height:6,borderRadius:999,background:i<=step+1?T.accent:T.border,transition:"all 0.3s"}}/>)}
+                  {[...Array(askQuestions.length+1)].map((_,i)=><div key={i} style={{width:i===step+1?20:6,height:6,borderRadius:999,background:i<=step+1?T.accent:T.border,transition:"all 0.3s"}}/>)}
                 </div>
                 <div>
                   {step===-1?(
@@ -4038,6 +4066,33 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
                 <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Start breaks automatically</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>When a focus session ends. After a break, you get a suggestion for what to work on next.</div></div>
                 <Toggle on={autoStartBreaks} onChange={setAutoStartBreaks} T={T} label="Start breaks automatically"/>
+              </div>
+            </div>
+            {/* New task questions: which add-task questions are asked, in what order */}
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>New task questions</div>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4,marginBottom:10}}>Asked in this order after the title. Anything you turn off can still be filled in later with Edit.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:T.surface,borderRadius:9,border:`1px solid ${T.border}`}}>
+                  <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,minWidth:14}}>1</span>
+                  <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted,flex:1}}>Title</span>
+                  <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>Always asked</span>
+                </div>
+                {addQuestionPrefs.map((p,i)=>{
+                  const q=QUESTIONS.find(x=>x.key===p.key)!;
+                  const pos=p.on?addQuestionPrefs.slice(0,i).filter(x=>x.on).length+2:null;
+                  const first=i===0, last=i===addQuestionPrefs.length-1;
+                  const arrow={background:"none",border:`1px solid ${T.border}`,borderRadius:7,width:28,height:28,color:T.textMuted,fontSize:12,padding:0,display:"flex",alignItems:"center",justifyContent:"center"};
+                  return(
+                    <div key={p.key} data-question={p.key} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 8px 6px 10px",background:T.surface,borderRadius:9,border:`1px solid ${T.border}`,opacity:p.on?1:0.6}}>
+                      <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,minWidth:14}}>{pos??"–"}</span>
+                      <span style={{fontFamily:F.body,fontSize:12,color:p.on?T.text:T.textMuted,flex:1}}>{q.name}</span>
+                      <button onClick={()=>setSavedAddQuestions(moveQuestion(addQuestionPrefs,i,-1))} disabled={first} aria-label={`Move ${q.name} earlier`} style={{...arrow,opacity:first?0.35:1,cursor:first?"default":"pointer"}}>↑</button>
+                      <button onClick={()=>setSavedAddQuestions(moveQuestion(addQuestionPrefs,i,1))} disabled={last} aria-label={`Move ${q.name} later`} style={{...arrow,opacity:last?0.35:1,cursor:last?"default":"pointer"}}>↓</button>
+                      <Toggle on={p.on} onChange={on=>setSavedAddQuestions(addQuestionPrefs.map(x=>x.key===p.key?{...x,on}:x))} T={T} label={`Ask ${q.name}`}/>
+                    </div>
+                  );
+                })}
               </div>
             </div>
             {/* Subjects -- lives here (not in Profile) so it works signed out too */}

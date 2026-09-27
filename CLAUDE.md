@@ -271,8 +271,8 @@ down to a fixed end time, as the task session timer counts up from a fixed start
 slow or pause intervals in background tabs and on locked screens; the running time shows
 on the Focus button; finishing chimes via `playChime()`, notifies, and toasts). Settings
 (`activeTab==="options"`) is opened from the title menu, not the tab bar, so it has its own header
-with a back button. The title menu (the DuePlanner wordmark) holds Inbox (stats + What's New),
-History (undo/redo), Import/Export, Profile, and Settings; tapping "Time left" in the header opens a
+with a back button. The title menu (the DuePlanner wordmark) holds, top to bottom, Profile, Inbox (stats +
+What's New), History (undo/redo), Import/Export, and Settings; tapping "Time left" in the header opens a
 per-subject time breakdown. The tab bar icons and menu icons (`IconTasks`/`IconFocus`/
 `IconImport`/`IconSettings` etc., module scope, just above `FONT`) are
 small hand-built SVGs from plain primitives (line/circle/polyline) rather than Unicode glyphs or an
@@ -318,6 +318,15 @@ can't roll back unrelated edits made since (e.g. synced from another device). An
 should be undoable goes through `changeTasks(fn, label, toast)` -- completing (incl. the spawned
 repeat copy), the Edit panel (`editTask`), archive/restore, snooze, skip, and bulk actions.
 Subtask ticks, tags and priority overrides are deliberately not undoable (too noisy).
+
+**Empty fields aren't labeled.** A task with no due date or no subtasks shows nothing there -- no
+"No date"/"No subtasks" text (`formatDate("")` still returns "No date" for other callers, so guard
+display sites with `task.dueDate&&`). Where undated tasks are grouped (Calendar layout, group by due
+date, Time left buckets) the heading is "Anytime".
+
+**Smart suggestion** (the ✦ card above the list): its × hides only the current suggestion
+(`hiddenSuggestionFor`, `hw-suggestion-hidden`, the top task's id); it returns when a different task
+becomes most urgent. `showSuggestion` (Settings → Task list) turns it off entirely.
 
 **Settings layout.** Every Settings section is a `SettingsSection` dropdown (module scope): Looks,
 Date & time, Focus timer, New task questions, Subjects, Task list (group by, smart suggestion, show

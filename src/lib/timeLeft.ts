@@ -8,7 +8,7 @@ export const DUE_BUCKETS: { key: DueBucket; label: string }[] = [
   { key: "tomorrow", label: "Tomorrow" },
   { key: "week", label: "Next 7 days" },
   { key: "later", label: "Later" },
-  { key: "none", label: "No date" },
+  { key: "none", label: "Anytime" },
 ];
 
 // Which bucket a due date falls in, relative to `today` (a local YYYY-MM-DD).

@@ -238,6 +238,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"menu-screens", date:"2026-09-27", kind:"UI change", headline:"Inbox, History and Import/Export get their own screens", where:"Menu (tap DuePlanner) → Inbox, History or Import/Export", go:"menu", description:"Inbox, History and Import/Export now open as full screens, like Settings, instead of dropdowns squeezed into the menu -- more room for your stats, updates, recently deleted tasks and syllabus imports. Tap ‹ Tasks to go back." },
   { id:"no-empty-labels", date:"2026-09-27", kind:"UI change", headline:"Cleaner task cards", where:"Your task list, and a task's details", go:"tasks", description:"Tasks without a due date or subtasks no longer say \"No date\" or \"No subtasks\" -- those spots are simply left out. Where undated tasks are grouped together (the Calendar layout, grouping by due date, Time left), the heading now says \"Anytime\"." },
   { id:"profile-top", date:"2026-09-27", kind:"UI change", headline:"Profile at the top", where:"Menu (tap DuePlanner) → Profile", go:"menu", description:"Profile is now the first thing in the title menu, above Inbox." },
   { id:"suggestion-hide-fix", date:"2026-09-27", kind:"Bug fix", headline:"Hiding a suggestion", where:"Tasks tab → the ✦ suggestion above your list", go:"tasks", description:"The × on the smart suggestion now just hides that suggestion -- a new one appears when a different task becomes the most urgent. It used to turn suggestions off completely (that's still in Settings → Task list)." },
@@ -251,7 +252,7 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"floating-search", date:"2026-09-26", kind:"New feature", headline:"Floating search", where:"Tasks tab → Search tasks, above your list", go:"tasks:search", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
   { id:"cards-glide", date:"2026-09-26", kind:"Improvement", headline:"Tasks glide into place", where:"Your task list, in any layout", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once -- new ones fade in and removed ones fade out." },
   { id:"fixes-sep23", date:"2026-09-23", kind:"Bug fix", headline:"Timer and account fixes", where:"Focus tab (the Pomodoro), and the timer in a task's details", go:"tasks:tab-focus", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
-  { id:"trash-sync-fix", date:"2026-09-22", kind:"Fix", headline:"Recently deleted stays put", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"menu:trash", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
+  { id:"trash-sync-fix", date:"2026-09-22", kind:"Fix", headline:"Recently deleted stays put", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"history:trash", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
   { id:"bulk-everywhere", date:"2026-09-22", kind:"New feature", headline:"Select in every layout", where:"Tasks tab → Select, next to the filters", go:"tasks:select", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
   { id:"a11y-pass", date:"2026-09-22", kind:"Improvement", headline:"Keyboard and screen reader support", where:"Everywhere -- try Tab, Enter and the arrow keys", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
   { id:"complete-anim", date:"2026-09-22", kind:"Improvement", headline:"A more satisfying check-off", where:"Tap the circle next to any task", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
@@ -263,14 +264,14 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"safer-sync", date:"2026-09-22", kind:"Improvement", headline:"Safer syncing", where:"Menu (tap DuePlanner) → Profile shows when you last synced", go:"profile", description:"Syncing between devices is safer: edits made at the same time on two devices are merged field by field instead of one overwriting the other, Recently deleted now syncs too, and the title menu shows when you last synced (or that you're offline)." },
   { id:"time-left-more", date:"2026-09-22", kind:"New feature", headline:"A smarter Time left", where:"Tap Time left, top right", go:"tasks:time-left", description:"The \"Time left\" dropdown now splits time by due date, shows time worked per subject, flags tasks with no estimate, and can start Focus on the most urgent task in your biggest subject." },
   { id:"fewer-layouts", date:"2026-09-22", kind:"UI change", headline:"Seven layouts", where:"Menu (tap DuePlanner) → Settings → Looks → Layout", go:"settings:layout", description:"Trimmed the layouts to seven: Compact, Minimal, Sticky, Timeline and By Subject are gone. If you were using one, you're back on List." },
-  { id:"recently-deleted", date:"2026-09-22", kind:"New feature", headline:"Recently deleted", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"menu:trash", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
+  { id:"recently-deleted", date:"2026-09-22", kind:"New feature", headline:"Recently deleted", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"history:trash", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
   { id:"skip-occurrence", date:"2026-09-22", kind:"New feature", headline:"Skip a repeat", where:"Tap a repeating task → Skip this one", go:"task:task-skip", description:"Repeating tasks have \"Skip this one\" in their detail view -- moves to the next occurrence without completing it. Undoable." },
   { id:"countdown", date:"2026-09-22", kind:"New feature", headline:"Live countdowns", where:"Your task list, on tasks due today at a set time", description:"Tasks due today at a set time show a live countdown, like \"Due in 2h 15m\"." },
   { id:"profile-in-menu", date:"2026-09-22", kind:"UI change", headline:"Profile moved to the menu", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Profile now lives only in the title menu, which also shows when there's a sync issue." },
   { id:"edit-tasks", date:"2026-09-22", kind:"New feature", headline:"Edit tasks", where:"Tap a task → Edit", go:"task:task-edit", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view -- tap Edit." },
   { id:"snooze", date:"2026-09-22", kind:"New feature", headline:"Snooze", where:"Tap a task → Snooze", go:"task:task-snooze", description:"Snooze a task to later today, tomorrow, or next week from its detail view -- and undo it if you change your mind." },
   { id:"duplicate-restore", date:"2026-09-22", kind:"New feature", headline:"Duplicate and restore", where:"Tap a task → Duplicate, or Restore on an archived task", go:"task:task-duplicate", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
-  { id:"json-import", date:"2026-09-22", kind:"New feature", headline:"Import a backup", where:"Menu (tap DuePlanner) → Import/Export → Import backup (JSON)", go:"menu:import-backup", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
+  { id:"json-import", date:"2026-09-22", kind:"New feature", headline:"Import a backup", where:"Menu (tap DuePlanner) → Import/Export → Import backup (JSON)", go:"import:import-backup", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", kind:"New feature", headline:"1-week reminders", where:"Menu (tap DuePlanner) → Settings → Reminders → Remind me", go:"settings:reminders", description:"New \"1 week before\" reminder option in Settings." },
   { id:"focus-picker", date:"2026-09-22", kind:"New feature", headline:"Pick your focus task", where:"Focus tab → Change task", go:"focus:change-task", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
   { id:"liquid-glass", date:"2026-09-22", kind:"New feature", headline:"Liquid Glass", where:"Menu (tap DuePlanner) → Settings → Looks → Liquid Glass", go:"settings:liquid-glass", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
@@ -279,13 +280,13 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"subjects-in-settings", date:"2026-09-22", kind:"Navigation", headline:"Subjects in Settings", where:"Menu (tap DuePlanner) → Settings → Subjects", go:"settings:subjects", description:"Subjects are now managed in Settings, and work without signing in." },
   { id:"sessions-saved", date:"2026-09-22", kind:"New feature", headline:"Work sessions saved", where:"Tap a task to start a work session; your totals are in Menu (tap DuePlanner) → Inbox", go:"task", description:"Work sessions are now saved on the task, and your Inbox shows real time spent." },
   { id:"pomodoro-chime", date:"2026-09-22", kind:"New feature", headline:"Pomodoro chime", where:"Focus tab", go:"tasks:tab-focus", description:"The Pomodoro timer now chimes when it's done, and shows its time on the Focus tab while running." },
-  { id:"undo-more", date:"2026-09-22", kind:"New feature", headline:"Undo more", where:"Menu (tap DuePlanner) → History → Undo", go:"menu:history", description:"Bulk delete and Clear completed can now be undone." },
+  { id:"undo-more", date:"2026-09-22", kind:"New feature", headline:"Undo more", where:"Menu (tap DuePlanner) → History → Undo", go:"history:undo-redo", description:"Bulk delete and Clear completed can now be undone." },
   { id:"calendar-sections", date:"2026-09-22", kind:"UI change", headline:"Calendar sections", where:"Menu (tap DuePlanner) → Settings → Looks → Layout → Calendar", go:"settings:layout", description:"The Calendar layout now shows Overdue and Later sections, so no task disappears from it." },
   { id:"reminder-fixes", date:"2026-09-22", kind:"Bug fix", headline:"Reminder fixes", where:"Menu (tap DuePlanner) → Settings → Reminders", go:"settings:reminders", description:"\"At due time\" reminders now fire, and you no longer get several reminders for one task at once." },
   { id:"recurring-fix", date:"2026-09-22", kind:"Bug fix", headline:"No more duplicate repeats", where:"Tap the circle on a repeating task", description:"Un-completing a repeating task no longer leaves a duplicate behind." },
   { id:"icon-color-fix", date:"2026-09-22", kind:"Bug fix", headline:"Icon colors fixed", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
-  { id:"history-collapsible", date:"2026-09-22", kind:"UI change", headline:"Collapsible History", where:"Menu (tap DuePlanner) → History", go:"menu:history", description:"History is now a collapsible section in the title menu instead of always expanded." },
-  { id:"undo-redo", date:"2026-09-22", kind:"New feature", headline:"Undo and redo", where:"Menu (tap DuePlanner) → History", go:"menu:history", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
+  { id:"history-collapsible", date:"2026-09-22", kind:"UI change", headline:"Collapsible History", where:"Menu (tap DuePlanner) → History", go:"history:undo-redo", description:"History is now a collapsible section in the title menu instead of always expanded." },
+  { id:"undo-redo", date:"2026-09-22", kind:"New feature", headline:"Undo and redo", where:"Menu (tap DuePlanner) → History", go:"history:undo-redo", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
   { id:"settings-in-menu", date:"2026-09-22", kind:"Navigation", headline:"Settings moved", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"Settings moved out of the tab bar -- open it from the title menu instead." },
   { id:"title-menu", date:"2026-09-22", kind:"UI change", headline:"The title menu", where:"Tap DuePlanner, top left", description:"The DuePlanner title is now a menu with quick access to Inbox, History, Profile, and Settings." },
   { id:"wizard-cancel-moved", date:"2026-09-22", kind:"UI change", headline:"Cancel moved", where:"Tasks tab → + Add homework", go:"tasks:add", description:"Cancel moved out from between the add-task wizard's back/skip buttons to avoid accidental taps." },
@@ -854,6 +855,18 @@ function CheckMark({size=10,color="#111",animate=false}:{size?:number;color?:str
 // the body is only rendered while open. Which sections are open is
 // remembered per device (openSettings, "hw-settings-open"). `tour` is the
 // data-tour anchor "Take me there" highlights (see goTo).
+// The header of a screen opened from the title menu (Inbox, History,
+// Import/Export, Settings): a way back to Tasks and the screen's name, since
+// the tab bar has nothing highlighted there.
+function ScreenHeader({title,onBack,T,F}:{title:string;onBack:()=>void;T:ThemeObj;F:typeof FONT}){
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+      <button onClick={onBack} aria-label="Back to tasks" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.text,fontSize:12,cursor:"pointer",padding:"6px 12px",borderRadius:9}}>‹ Tasks</button>
+      <h2 style={{fontFamily:F.heading,fontSize:20,color:T.text,margin:0,fontWeight:400}}>{title}</h2>
+    </div>
+  );
+}
+
 function SettingsSection({id,title,open,onToggle,T,F,tour,danger,gap=0,children}:{
   id:string; title:string; open:boolean; onToggle:(id:string)=>void; T:ThemeObj; F:typeof FONT;
   tour?:string; danger?:boolean; gap?:number; children:React.ReactNode;
@@ -2232,10 +2245,7 @@ export default function HomeworkPlanner() {
   const searchTriggerRef=useRef<HTMLButtonElement>(null);
   const [activeTab,setActiveTab]=useState("tasks");
   const [titleMenuOpen,setTitleMenuOpen]=useState(false);
-  const [historyMenuOpen,setHistoryMenuOpen]=useState(false);
-  const [inboxMenuOpen,setInboxMenuOpen]=useState(false);
   const [overviewPeriod,setOverviewPeriod]=useState<"week"|"month"|"year">("week");
-  const [importExportMenuOpen,setImportExportMenuOpen]=useState(false);
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!titleMenuOpen)return;
@@ -3299,18 +3309,15 @@ export default function HomeworkPlanner() {
   },[tasks,selectedTask]);
 
   // "Take me there" on an Inbox update (WhatsNewItem.go): opens the place
-  // ("settings", "tasks", "task", "menu", "profile", "focus") and then
+  // ("settings", "tasks", "task", "history", "import", "menu", "profile", "focus") and then
   // highlights the data-tour anchor, if any. Shows where things are rather than
   // doing them -- e.g. it points at Select instead of starting a selection.
   function goTo(dest:string){
     const [place,anchor]=dest.split(":");
     setOpenUpdate(null);
-    if(place==="menu"){
-      // Stays in the title menu: collapse the Inbox and open the section.
-      setInboxMenuOpen(false);
-      if(anchor==="history"||anchor==="trash")setHistoryMenuOpen(true);
-      if(anchor==="import-backup")setImportExportMenuOpen(true);
-    }else setTitleMenuOpen(false);
+    // "menu" opens the title menu itself; everything else closes it.
+    setTitleMenuOpen(place==="menu");
+    if(place==="history"||place==="import")setActiveTab(place);
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
@@ -3722,184 +3729,18 @@ export default function HomeworkPlanner() {
                   </span>
                   {syncError&&<span title="Sync issue -- open Profile for details" style={{fontFamily:F.body,fontSize:11,color:ink("#FF4757",T.light)}}>⚠ Sync issue</span>}
                 </button>
-                <div style={{borderBottom:`1px solid ${T.border}`}}>
-                  <button onClick={()=>setInboxMenuOpen(o=>!o)} aria-expanded={inboxMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
-                    <IconBell/>
-                    <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Inbox</span>
-                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:inboxMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
-                  </button>
-                  {inboxMenuOpen&&(
-                    <div style={{padding:"0 14px 12px"}}>
-                      {/* Done today */}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Done today{doneToday.length?` (${doneToday.length})`:""}</div>
-                      {doneToday.length===0
-                        ?<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:12}}>Nothing finished yet today.</div>
-                        :<div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,maxHeight:180,overflowY:"auto"}}>
-                          {doneToday.map(t=>(
-                            <button key={t.id} onClick={()=>{setSelectedTask(t);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer",textAlign:"left"}}>
-                              <span style={{color:ink("#2ED573",T.light),fontSize:11,flexShrink:0}}>✓</span>
-                              <span style={{fontFamily:F.body,fontSize:12,color:T.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-                              <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{clockTime(t.completedAt!)}</span>
-                            </button>
-                          ))}
-                        </div>}
-                      {/* Personal */}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Personal</div>
-                      <div style={{display:"flex",gap:6,marginBottom:10}}>
-                        {(["week","month","year"] as const).map(p=>(
-                          <button key={p} onClick={()=>setOverviewPeriod(p)} style={{flex:1,background:overviewPeriod===p?T.accent:T.cardAlt,color:overviewPeriod===p?contrastColor(T.accent):T.textMuted,border:`1px solid ${overviewPeriod===p?T.accent:T.border}`,borderRadius:8,padding:"5px 0",fontFamily:F.body,fontSize:11,cursor:"pointer",textTransform:"capitalize"}}>{p}</button>
-                        ))}
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{overviewFinished}</div>
-                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Finished</div>
-                        </div>
-                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{formatDuration(overviewMins)||"0m"}</div>
-                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Time spent</div>
-                        </div>
-                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{onTimePct===null?"--":`${onTimePct}%`}</div>
-                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>On time</div>
-                        </div>
-                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:14,color:busiestSubject?subjectColors[busiestSubject]||T.accent:T.accent,marginTop:2}}>{busiestSubject||"--"}</div>
-                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Busiest subject</div>
-                        </div>
-                      </div>
-                      {/* Updates */}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,paddingTop:10,borderTop:`1px solid ${T.border}`}}>Updates</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:10,maxHeight:180,overflowY:"auto"}}>
-                        {whatsNew.length===0
-                          ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>
-                          : whatsNew.map(item=>(
-                          <div key={item.id} style={{display:"flex",gap:4,alignItems:"flex-start"}}>
-                            {/* Opens the update in a floating panel (UpdateDetail); hidden
-                                while open, so the panel looks like it grew out of here. */}
-                            <button data-update-id={item.id} onClick={e=>setOpenUpdate({id:item.id,origin:e.currentTarget})} aria-haspopup="dialog"
-                              style={{flex:1,minWidth:0,background:"none",border:"none",borderRadius:8,padding:"4px 6px",margin:"-4px -6px",cursor:"pointer",textAlign:"left",color:"inherit",visibility:openUpdate?.id===item.id?"hidden":undefined}}>
-                              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
-                                <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.headline}</span>
-                                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
-                              </div>
-                              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{item.kind}</div>
-                              <div className="clamp2" style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
-                            </button>
-                            <button onClick={()=>dismissWhatsNew(item.id)} aria-label={`Dismiss ${item.headline}`} title="Dismiss" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div style={{borderBottom:`1px solid ${T.border}`}}>
-                  <button data-tour="history" onClick={()=>setHistoryMenuOpen(o=>!o)} aria-expanded={historyMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
-                    <IconHistory/>
-                    <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>History</span>
-                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:historyMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
-                  </button>
-                  {historyMenuOpen&&(
-                    <div style={{padding:"0 14px 12px"}}>
-                      <div style={{display:"flex",gap:8}}>
-                        <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: ${describeAction(undoStack[undoStack.length-1])}`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
-                          Undo
-                        </button>
-                        <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: ${describeAction(redoStack[redoStack.length-1])}`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
-                          Redo
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
-                        </button>
-                      </div>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:12,marginBottom:6}}>
-                        <span data-tour="trash" style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recently deleted{trash.length?` (${trash.length})`:""}</span>
-                        {trash.length>0&&<button onClick={()=>{if(confirmEmptyTrash){setTrash([]);setConfirmEmptyTrash(false);}else setConfirmEmptyTrash(true);}} onBlur={()=>setConfirmEmptyTrash(false)} title={confirmEmptyTrash?"Tap again to delete these for good":"Delete everything here for good"} style={{background:confirmEmptyTrash?"#FF475722":"none",border:"none",borderRadius:6,color:confirmEmptyTrash?"#FF4757":T.textFaint,fontSize:11,cursor:"pointer",padding:confirmEmptyTrash?"2px 8px":0}}>{confirmEmptyTrash?"Delete for good?":"Empty"}</button>}
-                      </div>
-                      {trash.length===0
-                        ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here. Deleted tasks stay for 30 days.</div>
-                        : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
-                          {trash.map(e=>(
-                            <div key={e.task.id} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,borderRadius:8,padding:"6px 8px"}}>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.task.title}</div>
-                                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>Deleted {formatDate(localDateStr(new Date(e.deletedAt)))}</div>
-                              </div>
-                              <button onClick={()=>restoreFromTrash(e.task.id)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontSize:11,cursor:"pointer",padding:"4px 10px",flexShrink:0}}>Restore</button>
-                            </div>
-                          ))}
-                        </div>}
-                    </div>
-                  )}
-                </div>
-                <div style={{borderBottom:`1px solid ${T.border}`}}>
-                  <button onClick={()=>setImportExportMenuOpen(o=>!o)} aria-expanded={importExportMenuOpen} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
-                    <IconImport/>
-                    <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Import/Export</span>
-                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,transform:importExportMenuOpen?"rotate(180deg)":"none",transition:"transform 0.15s"}}>⌄</span>
-                  </button>
-                  {importExportMenuOpen&&(
-                    <div style={{padding:"0 14px 12px",maxHeight:400,overflowY:"auto"}}>
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Import from Syllabus</div>
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:10,lineHeight:1.5}}>
-                        Paste your syllabus below. Lines with a date (e.g. "Sept 20", "9/20", "2026-09-20") are picked up as assignments -- review and uncheck anything that isn't one before adding.
-                      </div>
-                      <textarea
-                        value={importText}
-                        onChange={e=>{setImportText(e.target.value);setImportPreview(null);setImportedCount(null);}}
-                        placeholder="Paste your syllabus text here..."
-                        style={{width:"100%",minHeight:100,maxHeight:200,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto",marginBottom:10}}
-                      />
-                      <div style={{marginBottom:10}}>
-                        <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Add as subject</div>
-                        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-                          {subjects.map(s=>{
-                            const active=importSubjectEff===s;
-                            return <button key={s} className="chip" onClick={()=>setImportSubject(s)} style={{background:active?(subjectColors[s]||T.accent)+"33":"none",color:active?(subjectColors[s]||T.accent):T.textMuted,border:`1.5px solid ${active?(subjectColors[s]||T.accent):T.border}`}}>{s}</button>;
-                          })}
-                        </div>
-                      </div>
-                      <button onClick={scanSyllabus} disabled={!importText.trim()} style={{width:"100%",background:importText.trim()?T.accent:T.surface,color:importText.trim()?contrastColor(T.accent):T.textFaint,border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:importText.trim()?"pointer":"default"}}>
-                        Scan for assignments
-                      </button>
-                      {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:12,color:ink("#2ED573",T.light),marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
-                      {importPreview&&(
-                        <div style={{marginTop:12}}>
-                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8}}>
-                            Found {importPreview.length} assignment{importPreview.length===1?"":"s"}
-                          </div>
-                          {importPreview.length===0?(
-                            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"16px 0"}}>No dated lines found -- try a different format.</div>
-                          ):(<>
-                            <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,maxHeight:200,overflowY:"auto"}}>
-                              {importPreview.map((it,i)=>(
-                                <div key={i} role="checkbox" aria-checked={it.checked} tabIndex={0} onClick={()=>toggleImportItem(i)} onKeyDown={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();toggleImportItem(i);}}} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:T.surface,borderRadius:9,cursor:"pointer",opacity:it.checked?1:0.45}}>
-                                  <div style={{width:18,height:18,border:`2px solid ${it.checked?T.accent:T.textFaint}`,borderRadius:5,background:it.checked?T.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                                    {it.checked&&<span style={{color:contrastColor(T.accent),fontSize:11,fontWeight:"bold"}}>✓</span>}
-                                  </div>
-                                  <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.title}</div>
-                                    {it.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{formatDate(it.dueDate)}</div>}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            <button onClick={commitImport} disabled={!importPreview.some(it=>it.checked)} style={{width:"100%",background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:"pointer"}}>
-                              + Add {importPreview.filter(it=>it.checked).length} task{importPreview.filter(it=>it.checked).length===1?"":"s"}
-                            </button>
-                          </>)}
-                        </div>
-                      )}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,marginTop:14,paddingTop:12,borderTop:`1px solid ${T.border}`}}>Backup &amp; export</div>
-                      <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-                        <button data-tour="import-backup" onClick={()=>importFileRef.current?.click()} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Import backup (JSON)</button>
-                        <input ref={importFileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)importBackupJSON(f);e.target.value="";}}/>
-                        <button onClick={exportAllDataJSON} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export all (JSON)</button>
-                        <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export tasks (CSV)</button>
-                      </div>
-                      {importBackupNote&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:8}}>{importBackupNote}</div>}
-                    </div>
-                  )}
-                </div>
+                <button onClick={()=>{setActiveTab("inbox");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
+                  <IconBell/>
+                  <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Inbox</span>
+                </button>
+                <button onClick={()=>{setActiveTab("history");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
+                  <IconHistory/>
+                  <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>History</span>
+                </button>
+                <button onClick={()=>{setActiveTab("import");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
+                  <IconImport/>
+                  <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Import/Export</span>
+                </button>
                 <button onClick={()=>{setActiveTab("options");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",color:T.text}}>
                   <IconSettings/>
                   <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Settings</span>
@@ -4190,15 +4031,188 @@ export default function HomeworkPlanner() {
         </>}
 
         {/* OPTIONS TAB */}
+        {/* Inbox, History and Import/Export: full screens opened from the title
+            menu, like Settings (they used to be dropdowns inside the menu). */}
+        {activeTab==="inbox"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <ScreenHeader title="Inbox" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                      {/* Done today */}
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Done today{doneToday.length?` (${doneToday.length})`:""}</div>
+                      {doneToday.length===0
+                        ?<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,}}>Nothing finished yet today.</div>
+                        :<div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {doneToday.map(t=>(
+                            <button key={t.id} onClick={()=>{setSelectedTask(t);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer",textAlign:"left"}}>
+                              <span style={{color:ink("#2ED573",T.light),fontSize:11,flexShrink:0}}>✓</span>
+                              <span style={{fontFamily:F.body,fontSize:12,color:T.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                              <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{clockTime(t.completedAt!)}</span>
+                            </button>
+                          ))}
+                        </div>}
+            </div>
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                      {/* Personal */}
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Personal</div>
+                      <div style={{display:"flex",gap:6,marginBottom:10}}>
+                        {(["week","month","year"] as const).map(p=>(
+                          <button key={p} onClick={()=>setOverviewPeriod(p)} style={{flex:1,background:overviewPeriod===p?T.accent:T.cardAlt,color:overviewPeriod===p?contrastColor(T.accent):T.textMuted,border:`1px solid ${overviewPeriod===p?T.accent:T.border}`,borderRadius:8,padding:"5px 0",fontFamily:F.body,fontSize:11,cursor:"pointer",textTransform:"capitalize"}}>{p}</button>
+                        ))}
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
+                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{overviewFinished}</div>
+                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Finished</div>
+                        </div>
+                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
+                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{formatDuration(overviewMins)||"0m"}</div>
+                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Time spent</div>
+                        </div>
+                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
+                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{onTimePct===null?"--":`${onTimePct}%`}</div>
+                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>On time</div>
+                        </div>
+                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
+                          <div style={{fontFamily:F.heading,fontSize:14,color:busiestSubject?subjectColors[busiestSubject]||T.accent:T.accent,marginTop:2}}>{busiestSubject||"--"}</div>
+                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Busiest subject</div>
+                        </div>
+                      </div>
+            </div>
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                      {/* Updates */}
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Updates</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                        {whatsNew.length===0
+                          ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>
+                          : whatsNew.map(item=>(
+                          <div key={item.id} style={{display:"flex",gap:4,alignItems:"flex-start"}}>
+                            {/* Opens the update in a floating panel (UpdateDetail); hidden
+                                while open, so the panel looks like it grew out of here. */}
+                            <button data-update-id={item.id} onClick={e=>setOpenUpdate({id:item.id,origin:e.currentTarget})} aria-haspopup="dialog"
+                              style={{flex:1,minWidth:0,background:"none",border:"none",borderRadius:8,padding:"4px 6px",margin:"-4px -6px",cursor:"pointer",textAlign:"left",color:"inherit",visibility:openUpdate?.id===item.id?"hidden":undefined}}>
+                              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                                <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.headline}</span>
+                                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
+                              </div>
+                              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{item.kind}</div>
+                              <div className="clamp2" style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
+                            </button>
+                            <button onClick={()=>dismissWhatsNew(item.id)} aria-label={`Dismiss ${item.headline}`} title="Dismiss" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
+                          </div>
+                        ))}
+                      </div>
+            </div>
+          </div>
+        )}
+        {activeTab==="history"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <ScreenHeader title="History" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
+            <div data-tour="undo-redo" style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: ${describeAction(undoStack[undoStack.length-1])}`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
+                          Undo
+                        </button>
+                        <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: ${describeAction(redoStack[redoStack.length-1])}`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                          Redo
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
+                        </button>
+                      </div>
+            </div>
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                        <span data-tour="trash" style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recently deleted{trash.length?` (${trash.length})`:""}</span>
+                        {trash.length>0&&<button onClick={()=>{if(confirmEmptyTrash){setTrash([]);setConfirmEmptyTrash(false);}else setConfirmEmptyTrash(true);}} onBlur={()=>setConfirmEmptyTrash(false)} title={confirmEmptyTrash?"Tap again to delete these for good":"Delete everything here for good"} style={{background:confirmEmptyTrash?"#FF475722":"none",border:"none",borderRadius:6,color:confirmEmptyTrash?"#FF4757":T.textFaint,fontSize:11,cursor:"pointer",padding:confirmEmptyTrash?"2px 8px":0}}>{confirmEmptyTrash?"Delete for good?":"Empty"}</button>}
+                      </div>
+                      {trash.length===0
+                        ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here. Deleted tasks stay for 30 days.</div>
+                        : <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {trash.map(e=>(
+                            <div key={e.task.id} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,borderRadius:8,padding:"6px 8px"}}>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.task.title}</div>
+                                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>Deleted {formatDate(localDateStr(new Date(e.deletedAt)))}</div>
+                              </div>
+                              <button onClick={()=>restoreFromTrash(e.task.id)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontSize:11,cursor:"pointer",padding:"4px 10px",flexShrink:0}}>Restore</button>
+                            </div>
+                          ))}
+                        </div>}
+            </div>
+          </div>
+        )}
+        {activeTab==="import"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <ScreenHeader title="Import/Export" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Import from Syllabus</div>
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:10,lineHeight:1.5}}>
+                        Paste your syllabus below. Lines with a date (e.g. "Sept 20", "9/20", "2026-09-20") are picked up as assignments -- review and uncheck anything that isn't one before adding.
+                      </div>
+                      <textarea
+                        value={importText}
+                        onChange={e=>{setImportText(e.target.value);setImportPreview(null);setImportedCount(null);}}
+                        placeholder="Paste your syllabus text here..."
+                        style={{width:"100%",minHeight:100,maxHeight:200,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto",marginBottom:10}}
+                      />
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Add as subject</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                          {subjects.map(s=>{
+                            const active=importSubjectEff===s;
+                            return <button key={s} className="chip" onClick={()=>setImportSubject(s)} style={{background:active?(subjectColors[s]||T.accent)+"33":"none",color:active?(subjectColors[s]||T.accent):T.textMuted,border:`1.5px solid ${active?(subjectColors[s]||T.accent):T.border}`}}>{s}</button>;
+                          })}
+                        </div>
+                      </div>
+                      <button onClick={scanSyllabus} disabled={!importText.trim()} style={{width:"100%",background:importText.trim()?T.accent:T.surface,color:importText.trim()?contrastColor(T.accent):T.textFaint,border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:importText.trim()?"pointer":"default"}}>
+                        Scan for assignments
+                      </button>
+                      {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:12,color:ink("#2ED573",T.light),marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
+                      {importPreview&&(
+                        <div style={{marginTop:12}}>
+                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8}}>
+                            Found {importPreview.length} assignment{importPreview.length===1?"":"s"}
+                          </div>
+                          {importPreview.length===0?(
+                            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"16px 0"}}>No dated lines found -- try a different format.</div>
+                          ):(<>
+                            <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,maxHeight:200,overflowY:"auto"}}>
+                              {importPreview.map((it,i)=>(
+                                <div key={i} role="checkbox" aria-checked={it.checked} tabIndex={0} onClick={()=>toggleImportItem(i)} onKeyDown={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();toggleImportItem(i);}}} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:T.surface,borderRadius:9,cursor:"pointer",opacity:it.checked?1:0.45}}>
+                                  <div style={{width:18,height:18,border:`2px solid ${it.checked?T.accent:T.textFaint}`,borderRadius:5,background:it.checked?T.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                    {it.checked&&<span style={{color:contrastColor(T.accent),fontSize:11,fontWeight:"bold"}}>✓</span>}
+                                  </div>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.title}</div>
+                                    {it.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{formatDate(it.dueDate)}</div>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <button onClick={commitImport} disabled={!importPreview.some(it=>it.checked)} style={{width:"100%",background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:"pointer"}}>
+                              + Add {importPreview.filter(it=>it.checked).length} task{importPreview.filter(it=>it.checked).length===1?"":"s"}
+                            </button>
+                          </>)}
+                        </div>
+                      )}
+            </div>
+            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
+                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Backup &amp; export</div>
+                      <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                        <button data-tour="import-backup" onClick={()=>importFileRef.current?.click()} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Import backup (JSON)</button>
+                        <input ref={importFileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)importBackupJSON(f);e.target.value="";}}/>
+                        <button onClick={exportAllDataJSON} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export all (JSON)</button>
+                        <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export tasks (CSV)</button>
+                      </div>
+                      {importBackupNote&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:8}}>{importBackupNote}</div>}
+            </div>
+          </div>
+        )}
         {activeTab==="options"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {/* Settings is opened from the title menu, not the tab bar, so it
                 names itself and offers a way back instead of leaving the tab
                 bar with nothing highlighted and no hint where you are. */}
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-              <button onClick={()=>setActiveTab("tasks")} aria-label="Back to tasks" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.text,fontSize:12,cursor:"pointer",padding:"6px 12px",borderRadius:9}}>‹ Tasks</button>
-              <h2 style={{fontFamily:F.heading,fontSize:20,color:T.text,margin:0,fontWeight:400}}>Settings</h2>
-            </div>
+            <ScreenHeader title="Settings" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
 
             {/* Looks */}
             <SettingsSection title="Looks" gap={20} {...sec("looks")}>

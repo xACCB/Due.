@@ -271,8 +271,10 @@ down to a fixed end time, as the task session timer counts up from a fixed start
 slow or pause intervals in background tabs and on locked screens; the running time shows
 on the Focus button; finishing chimes via `playChime()`, notifies, and toasts). Settings
 (`activeTab==="options"`) is opened from the title menu, not the tab bar, so it has its own header
-with a back button. The title menu (the DuePlanner wordmark) holds, top to bottom, Profile, Inbox (stats +
-What's New), History (undo/redo), Import/Export, and Settings; tapping "Time left" in the header opens a
+with a back button. The title menu (the DuePlanner wordmark) is a plain list -- Profile (a modal), then Inbox (Done
+today, stats, What's New), History (undo/redo, Recently deleted), Import/Export (syllabus import,
+backups) and Settings, each a full screen (`activeTab` "inbox"/"history"/"import"/"options") with
+the shared `ScreenHeader` (‹ Tasks + title), not a dropdown inside the menu; tapping "Time left" in the header opens a
 per-subject time breakdown. The tab bar icons and menu icons (`IconTasks`/`IconFocus`/
 `IconImport`/`IconSettings` etc., module scope, just above `FONT`) are
 small hand-built SVGs from plain primitives (line/circle/polyline) rather than Unicode glyphs or an
@@ -368,8 +370,7 @@ using the on-screen labels ("Menu (tap DuePlanner) → Settings → ..."), shown
 in the update's card. Give every entry a `where` unless there's genuinely nowhere to point. Also give it a
 `go` when there's a screen to open: `"place"` or `"place:anchor"`, handled by `goTo()` in
 `HomeworkPlanner` (places: `settings`, `tasks`, `task` -- opens a real task, a repeating one for
-`task-skip` -- `menu`, which expands a title-menu section and keeps the menu open, `profile`,
-`focus`). The anchor is a `data-tour="..."` attribute on the thing to highlight; `flashTarget()`
+`task-skip` -- `history`, `import`, `menu` -- opens the title menu itself -- `profile`, `focus`). The anchor is a `data-tour="..."` attribute on the thing to highlight; `flashTarget()`
 (module scope) waits for it to render, scrolls it into view, focuses it if it's a control and rings
 it with an inset shadow (not clipped by `overflow:hidden` parents). A new feature's control usually
 needs a new `data-tour` for its entry. The card's "Take me there" button fades the card, then calls
@@ -379,7 +380,8 @@ backdrop (pinned `position:fixed` while its left/top/width/height animate, then 
 `relative`) and shrinks back into the row on close, or fades if the row is gone. Newer/Older step
 through the list in place (content slides, card eases to the new height; the grow-from-row
 animation runs once on open, from `openedFrom`, even though `origin` follows the shown update); Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
-the title menu's outside-click/Escape handlers ignore, so the menu stays open behind it. Only dismissed ids are persisted
+the title menu's outside-click/Escape handlers ignore (a leftover from when the Inbox lived in the
+menu; harmless now that it's a screen). Only dismissed ids are persisted
 (`hw-whatsnew-dismissed`), so new entries reach returning users; `LEGACY_WHATSNEW_IDS` is a frozen
 list used once to migrate the old whole-feed `hw-whatsnew` key, and must not be extended.
 

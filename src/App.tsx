@@ -989,9 +989,13 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClose}:{
   const closeRef=useRef<HTMLButtonElement>(null);
   const closing=useRef(false);
   const reduced=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Grow out of the row once, on open. `origin` changes with Newer/Older (so
+  // close shrinks into the row of the update being shown), but that mustn't
+  // replay this -- it made every Newer/Older look like the panel reloading.
+  const openedFrom=useRef(origin);
   useLayoutEffect(()=>{
     closeRef.current?.focus({preventScroll:true});
-    const card=cardRef.current, from=origin?.getBoundingClientRect();
+    const card=cardRef.current, from=openedFrom.current?.getBoundingClientRect();
     if(!card||!from||reduced())return;
     const to=card.getBoundingClientRect();
     pin(card,to);
@@ -1000,7 +1004,26 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClose}:{
     const release=()=>{if(!closing.current)unpin(card);};
     anim.finished.then(release,release);
     bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.45},{opacity:1}],{duration:420,easing:"ease-out"});
-  },[origin]);
+  },[]);
+  // Newer/Older swap the content in place: it slides in from the side you're
+  // heading, and the card eases to the new height from the one measured just
+  // before the switch (see go()).
+  const shown=useRef(index);
+  const heightBefore=useRef<number|null>(null);
+  function go(i:number){
+    heightBefore.current=cardRef.current?.getBoundingClientRect().height??null;
+    onIndex(i);
+  }
+  useLayoutEffect(()=>{
+    const dir=Math.sign(index-shown.current);
+    shown.current=index;
+    const card=cardRef.current, from=heightBefore.current;
+    heightBefore.current=null;
+    if(!dir||!card||closing.current||window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+    const to=card.getBoundingClientRect().height;
+    if(from!=null&&Math.abs(from-to)>=1)card.animate([{height:`${from}px`},{height:`${to}px`}],{duration:280,easing:"cubic-bezier(.2,.8,.3,1)"});
+    bodyRef.current?.animate([{opacity:0,transform:`translateX(${dir*16}px)`},{opacity:1,transform:"none"}],{duration:260,easing:"cubic-bezier(.2,.8,.3,1)"});
+  },[index]);
   // Back into the row -- or, when the row is gone (dismissed) or off screen, a fade.
   function close(dismissed=false){
     if(closing.current)return;
@@ -1038,8 +1061,8 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClose}:{
           </div>
           <p style={{margin:0,fontFamily:F.body,fontSize:13,lineHeight:1.6,color:T.text}}>{item.description}</p>
           <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:4}}>
-            <button onClick={()=>onIndex(index-1)} disabled={index===0} aria-label="Newer update" style={{...btn,opacity:index===0?0.4:1,cursor:index===0?"default":"pointer"}}>‹ Newer</button>
-            <button onClick={()=>onIndex(index+1)} disabled={index===items.length-1} aria-label="Older update" style={{...btn,opacity:index===items.length-1?0.4:1,cursor:index===items.length-1?"default":"pointer"}}>Older ›</button>
+            <button onClick={()=>go(index-1)} disabled={index===0} aria-label="Newer update" style={{...btn,opacity:index===0?0.4:1,cursor:index===0?"default":"pointer"}}>‹ Newer</button>
+            <button onClick={()=>go(index+1)} disabled={index===items.length-1} aria-label="Older update" style={{...btn,opacity:index===items.length-1?0.4:1,cursor:index===items.length-1?"default":"pointer"}}>Older ›</button>
             <span style={{flex:1,textAlign:"center",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{index+1} of {items.length}</span>
             <button onClick={()=>close(true)} style={{...btn,background:T.accent,border:"none",color:contrastColor(T.accent)}}>Dismiss</button>
           </div>

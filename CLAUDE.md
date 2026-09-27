@@ -351,7 +351,8 @@ fix"...) and a `headline` (its short title) plus the `description`. Tapping a ro
 `UpdateDetail` (module scope): the card grows from the row's box to a centered card over a blurred
 backdrop (pinned `position:fixed` while its left/top/width/height animate, then released back to
 `relative`) and shrinks back into the row on close, or fades if the row is gone. Newer/Older step
-through the list; Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
+through the list in place (content slides, card eases to the new height; the grow-from-row
+animation runs once on open, from `openedFrom`, even though `origin` follows the shown update); Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
 the title menu's outside-click/Escape handlers ignore, so the menu stays open behind it. Only dismissed ids are persisted
 (`hw-whatsnew-dismissed`), so new entries reach returning users; `LEGACY_WHATSNEW_IDS` is a frozen
 list used once to migrate the old whole-feed `hw-whatsnew` key, and must not be extended.

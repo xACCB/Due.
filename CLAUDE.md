@@ -261,10 +261,12 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
 - `timeLeft.ts`: `dueBucket` / `mostUrgent` -- behind the header's "Time left" dropdown (time
   split by due date, time worked per subject, a "no estimate" link that sets the hidden
   `filter==="noest"` view).
+- `calendar.ts`: `monthGrid` (6 fixed rows of 7 local dates, honoring `weekStart`) / `shiftMonth` /
+  `weekdayLabels` / `heatLevel` (0-4 from open minutes due) / `byDueDate` -- behind the Calendar tab.
 - `download.ts`: `downloadFile` — the `Blob` + object URL + synthetic `<a download>` click pattern
   used by data export.
 
-**UI shape.** `HomeworkPlanner` renders a two-button tab bar -- Tasks, and Focus, which opens the
+**UI shape.** `HomeworkPlanner` renders a three-button tab bar -- Tasks, Calendar (below), and Focus, which opens the
 separate full-screen Focus Mode (`focusMode` state) with its Pomodoro timer (clock-based: it counts
 down to a fixed end time, as the task session timer counts up from a fixed start, because browsers
 slow or pause intervals in background tabs and on locked screens; the running time shows
@@ -443,6 +445,15 @@ pending first, max 50) are keyed by id with a `.search-pop` CSS animation, so ea
 task pops in while ones that still match stay put. Enter opens the first result, arrows walk the
 list; `.app-inner` is `inert` while it's open, and focus returns to the field on close. The task
 list itself is no longer filtered by search.
+
+**Calendar tab** (`CalendarView`, module scope so the `now` tick doesn't reset the month): a month
+grid where each day is shaded by open work due (the workload heatmap, `T.accent` at up to 25% so day
+numbers keep their contrast) with up to 3 subject-colored dots, and the selected day's tasks below
+(check off, tap to open). Undated tasks aren't shown. Arrow keys move the selection (and focus) across
+months; swiping the grid or ‹ › change month, Today jumps back. "+ Add homework due <day>" calls
+`addHomeworkOn()`: switches to Tasks and starts the usual add flow with the date pre-picked
+(`pendingDueDate`, so the date question opens on "what time?"; if that question is off the date is
+set directly). The Calendar *layout* (a week list) still exists alongside it.
 
 **Accessibility conventions** (from the screen-reader/keyboard pass, checked with axe-core and the
 Chrome accessibility tree):

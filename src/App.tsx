@@ -17,6 +17,7 @@ import { nextId } from "./lib/id";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, readableOn, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
+import { monthGrid, shiftMonth, weekdayLabels, heatLevel, byDueDate } from "./lib/calendar";
 import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "./lib/spring";
 import { reconcile, same } from "./lib/sync";
 import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
@@ -179,6 +180,11 @@ function IconImport(){
     <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
   </svg>;
 }
+function IconCalendar(){
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><line x1="3.5" y1="10" x2="20.5" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/>
+  </svg>;
+}
 function IconFocus(){
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none"/>
@@ -238,6 +244,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"calendar-tab", date:"2026-09-27", kind:"New feature", headline:"Calendar", where:"The Calendar tab -- the middle one in the tab bar", go:"calendar", description:"A new Calendar tab: see the whole month, with busier days shaded darker and a dot for each thing due. Tap a day to see its homework, check it off, or add something due that day. Swipe or use the arrows to change month." },
   { id:"time-left-no-start", date:"2026-09-27", kind:"UI change", headline:"Simpler Time left", where:"Tasks tab → Time left, top right", go:"tasks:time-left", description:"The Start button is gone from the Time left breakdown -- it's just your time by due date and subject now. Start a focus session from the Focus tab." },
   { id:"menu-screens", date:"2026-09-27", kind:"UI change", headline:"Inbox, History and Import/Export get their own screens", where:"Menu (tap DuePlanner) → Inbox, History or Import/Export", go:"menu", description:"Inbox, History and Import/Export now open as full screens, like Settings, instead of dropdowns squeezed into the menu -- more room for your stats, updates, recently deleted tasks and syllabus imports. Tap ‹ Tasks to go back." },
   { id:"no-empty-labels", date:"2026-09-27", kind:"UI change", headline:"Cleaner task cards", where:"Your task list, and a task's details", go:"tasks", description:"Tasks without a due date or subtasks no longer say \"No date\" or \"No subtasks\" -- those spots are simply left out. Where undated tasks are grouped together (the Calendar layout, grouping by due date, Time left), the heading now says \"Anytime\"." },
@@ -1150,6 +1157,136 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClose,onGo}:{
             <button onClick={()=>close(true)} style={{...btn,background:T.accent,border:"none",color:contrastColor(T.accent)}}>Dismiss</button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// The Calendar tab: a month grid (6 fixed rows, so it doesn't jump between
+// months) where each day is shaded by how much open work is due that day
+// (heatLevel) and dotted with its open tasks' subject colors, plus the chosen
+// day's tasks underneath. Undated tasks aren't shown -- there's no day to put
+// them on. Module scope like TaskModal, so the `now` tick doesn't remount it
+// (which would reset the month you're looking at).
+function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,now,onOpenTask,onToggleDone,onAddOn}:{
+  tasks:Task[]; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
+  weekStart:number; h24:boolean; now:number;
+  onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void; onAddOn:(date:string)=>void;
+}){
+  const today=localDateStr(new Date(now));
+  const [ym,setYm]=useState<[number,number]>(()=>{const d=new Date(now);return [d.getFullYear(),d.getMonth()];});
+  const [selected,setSelected]=useState(today);
+  const [year,month]=ym;
+  const days=monthGrid(year,month,weekStart);
+  const due=byDueDate(tasks.filter(t=>!t.archived));
+  const gridRef=useRef<HTMLDivElement>(null);
+  const refocus=useRef(false);
+  // Moving the selection with the arrow keys keeps keyboard focus on it,
+  // including when it crosses into the next or previous month.
+  useEffect(()=>{
+    if(!refocus.current)return;
+    refocus.current=false;
+    gridRef.current?.querySelector<HTMLElement>(`[data-day="${selected}"]`)?.focus();
+  },[selected,ym]);
+  const inMonth=(iso:string)=>Number(iso.slice(5,7))-1===month;
+  function select(iso:string,viaKeys=false){
+    refocus.current=viaKeys;
+    setSelected(iso);
+    const d=new Date(iso+"T00:00");
+    if(d.getFullYear()!==year||d.getMonth()!==month)setYm([d.getFullYear(),d.getMonth()]);
+  }
+  // Changing month selects today if it's in view, else the 1st.
+  function goMonth(delta:number){
+    const [y,m]=shiftMonth(year,month,delta);
+    setYm([y,m]);
+    const t=new Date(now);
+    setSelected(t.getFullYear()===y&&t.getMonth()===m?today:localDateStr(new Date(y,m,1)));
+  }
+  function onGridKey(e:React.KeyboardEvent){
+    const step=({ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7} as Record<string,number>)[e.key];
+    if(!step)return;
+    e.preventDefault();
+    const d=new Date(selected+"T00:00"); d.setDate(d.getDate()+step);
+    select(localDateStr(d),true);
+  }
+  // Swipe left/right on the grid to change month.
+  const swipeX=useRef<number|null>(null);
+  const heat=["transparent",T.accent+"10",T.accent+"1f",T.accent+"2e",T.accent+"40"];
+  const monthName=new Date(year,month,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const dayTasks=(due.get(selected)||[]).slice().sort((a,b)=>a.done!==b.done?(a.done?1:-1):(a.dueTime||"99").localeCompare(b.dueTime||"99")||a.order-b.order);
+  const openMins=dayTasks.filter(t=>!t.done).reduce((n,t)=>n+(t.estMins||0),0);
+  const card={background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`};
+  const navBtn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,width:34,height:34,cursor:"pointer",color:T.text,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",padding:0};
+  const showToday=!(ym[0]===new Date(now).getFullYear()&&ym[1]===new Date(now).getMonth()&&selected===today);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      <div style={card}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+          <h2 aria-live="polite" style={{flex:1,margin:0,fontFamily:F.heading,fontWeight:400,fontSize:20,color:T.text}}>{monthName}</h2>
+          {showToday&&<button onClick={()=>{setYm([new Date(now).getFullYear(),new Date(now).getMonth()]);setSelected(today);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,height:34,padding:"0 12px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Today</button>}
+          <button onClick={()=>goMonth(-1)} aria-label="Previous month" style={navBtn}>‹</button>
+          <button onClick={()=>goMonth(1)} aria-label="Next month" style={navBtn}>›</button>
+        </div>
+        <div aria-hidden="true" style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:4}}>
+          {weekdayLabels(weekStart).map(l=><div key={l} style={{textAlign:"center",fontFamily:F.body,fontSize:10,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.04em"}}>{l.slice(0,2)}</div>)}
+        </div>
+        <div ref={gridRef} key={`${year}-${month}`} className="sec-body" role="group" aria-label={`${monthName}, use arrow keys to move between days`} onKeyDown={onGridKey}
+          onPointerDown={e=>{swipeX.current=e.clientX;}}
+          onPointerUp={e=>{const x=swipeX.current;swipeX.current=null;if(x!=null&&Math.abs(e.clientX-x)>50)goMonth(e.clientX<x?1:-1);}}
+          style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,touchAction:"pan-y"}}>
+          {days.map(iso=>{
+            const list=due.get(iso)||[];
+            const open=list.filter(t=>!t.done);
+            const mins=open.reduce((n,t)=>n+(t.estMins||0),0);
+            const lvl=heatLevel(mins,open.length);
+            const isSel=iso===selected, isToday=iso===today, other=!inMonth(iso);
+            const overdue=iso<today&&open.length>0;
+            const label=new Date(iso+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})
+              +(open.length?`, ${open.length} due${mins?`, ${formatDuration(mins)}`:""}`:"")+(overdue?", overdue":"");
+            return(
+              <button key={iso} data-day={iso} onClick={()=>select(iso)} aria-label={label} aria-pressed={isSel} aria-current={isToday?"date":undefined} tabIndex={isSel?0:-1}
+                style={{position:"relative",height:48,borderRadius:10,cursor:"pointer",padding:"5px 0 0",display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                  background:heat[lvl],border:`${isSel?2:1}px solid ${isSel?T.accent:isToday?T.textMuted:"transparent"}`,opacity:other?0.4:1,color:T.text}}>
+                <span style={{fontFamily:F.body,fontSize:13,lineHeight:1,fontWeight:isToday?600:400,color:overdue?ink(priColor("high",colorCodeUrgency),T.light):T.text}}>{Number(iso.slice(8))}</span>
+                <span aria-hidden="true" style={{display:"flex",gap:3,alignItems:"center",height:6}}>
+                  {open.slice(0,3).map(t=><span key={t.id} style={{width:5,height:5,borderRadius:"50%",background:subjectColors[t.subject]||T.textMuted}}/>)}
+                  {open.length>3&&<span style={{fontFamily:F.body,fontSize:8,lineHeight:1,color:T.textMuted}}>+</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div aria-hidden="true" style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4,marginTop:10,fontFamily:F.body,fontSize:9,color:T.textFaint}}>
+          Less{heat.map((c,i)=><span key={i} style={{width:10,height:10,borderRadius:3,background:c,border:`1px solid ${T.borderFaint}`}}/>)}More
+        </div>
+      </div>
+      <div style={card}>
+        <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:10,marginBottom:10}}>
+          <div style={{fontFamily:F.heading,fontSize:17,color:T.text}}>{selected===today?"Today":new Date(selected+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}</div>
+          {dayTasks.length>0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,flexShrink:0}}>{dayTasks.filter(t=>!t.done).length} due{openMins?` · ${formatDuration(openMins)}`:""}</div>}
+        </div>
+        {dayTasks.length===0
+          ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:10}}>Nothing due.</div>
+          :<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
+            {dayTasks.map(t=>{
+              const sc=subjectColors[t.subject]||T.accent;
+              return(
+                <div key={t.id} onClick={()=>onOpenTask(t)} style={{display:"flex",alignItems:"center",gap:10,background:T.surface,borderRadius:10,padding:"9px 11px",cursor:"pointer"}}>
+                  <button aria-label={t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();onToggleDone(t.id);}}
+                    style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {t.done&&<CheckMark size={10}/>}
+                  </button>
+                  <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                  {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
+                  {t.dueTime&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatTime(t.dueTime,h24)}</span>}
+                  {!t.dueTime&&t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
+                </div>
+              );
+            })}
+          </div>}
+        <button onClick={()=>onAddOn(selected)} style={{width:"100%",background:"none",border:`1px dashed ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12}}>
+          + Add homework due {selected===today?"today":new Date(selected+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"})}
+        </button>
       </div>
     </div>
   );
@@ -3307,7 +3444,7 @@ export default function HomeworkPlanner() {
   },[tasks,selectedTask]);
 
   // "Take me there" on an Inbox update (WhatsNewItem.go): opens the place
-  // ("settings", "tasks", "task", "history", "import", "menu", "profile", "focus") and then
+  // ("settings", "tasks", "task", "calendar", "history", "import", "menu", "profile", "focus") and then
   // highlights the data-tour anchor, if any. Shows where things are rather than
   // doing them -- e.g. it points at Select instead of starting a selection.
   function goTo(dest:string){
@@ -3315,7 +3452,7 @@ export default function HomeworkPlanner() {
     setOpenUpdate(null);
     // "menu" opens the title menu itself; everything else closes it.
     setTitleMenuOpen(place==="menu");
-    if(place==="history"||place==="import")setActiveTab(place);
+    if(place==="history"||place==="import"||place==="calendar")setActiveTab(place);
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
@@ -3334,6 +3471,16 @@ export default function HomeworkPlanner() {
       if(t)setSelectedTask(t);
     }
     if(anchor)flashTarget(anchor,T.accent);
+  }
+  // The Calendar's "+ Add homework due <day>": the usual add-task questions on
+  // the Tasks tab, with that day already picked -- the due-date question opens
+  // straight on "what time?", or, if that question is turned off, the task
+  // just gets the date.
+  function addHomeworkOn(date:string){
+    setActiveTab("tasks");
+    startAdding();
+    setNewTask(t=>({...t,dueDate:date}));
+    if(askQuestions.some(q=>q.type==="date"))setPendingDueDate(date);
   }
   // Props shared by every Settings dropdown.
   const sec=(id:string)=>({id,open:openSettings.includes(id),onToggle:toggleSettingsSection,T,F});
@@ -3819,7 +3966,7 @@ export default function HomeworkPlanner() {
           // flat pill: opaque surface, and each active button just gets its
           // own card-colored background (no sheen, no sliding lens).
           const dark=effectiveThemeMode==="dark";
-          const tabIds=["tasks","focus"] as const;
+          const tabIds=["tasks","calendar","focus"] as const;
           const activeIdx=tabIds.indexOf(activeTab as typeof tabIds[number]);
           return (
         <div className="tab-bar" style={!liquidGlass
@@ -3843,8 +3990,8 @@ export default function HomeworkPlanner() {
             transition:"transform 0.45s cubic-bezier(.34,1.3,.64,1), opacity 0.2s"}}/>
           </>}
           {tabIds.map(id=>{
-            const labels:Record<string,string>={tasks:"Tasks",focus:"Focus"};
-            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,focus:IconFocus};
+            const labels:Record<string,string>={tasks:"Tasks",calendar:"Calendar",focus:"Focus"};
+            const icons:Record<string,()=>React.JSX.Element>={tasks:IconTasks,calendar:IconCalendar,focus:IconFocus};
             const Icon=icons[id];
             const active=activeTab===id;
             return <button key={id} data-tour={`tab-${id}`} className="glass-tab" onClick={()=>id==="focus"?setFocusModeAnimated(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
@@ -4024,6 +4171,10 @@ export default function HomeworkPlanner() {
         </>}
 
         {/* OPTIONS TAB */}
+        {/* CALENDAR TAB */}
+        {activeTab==="calendar"&&<CalendarView tasks={tasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
+          weekStart={weekStart} h24={h24} now={now}
+          onOpenTask={t=>setSelectedTask(t)} onToggleDone={toggleDone} onAddOn={addHomeworkOn}/>}
         {/* Inbox, History and Import/Export: full screens opened from the title
             menu, like Settings (they used to be dropdowns inside the menu). */}
         {activeTab==="inbox"&&(

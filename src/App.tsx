@@ -238,6 +238,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"time-left-no-start", date:"2026-09-27", kind:"UI change", headline:"Simpler Time left", where:"Tasks tab → Time left, top right", go:"tasks:time-left", description:"The Start button is gone from the Time left breakdown -- it's just your time by due date and subject now. Start a focus session from the Focus tab." },
   { id:"menu-screens", date:"2026-09-27", kind:"UI change", headline:"Inbox, History and Import/Export get their own screens", where:"Menu (tap DuePlanner) → Inbox, History or Import/Export", go:"menu", description:"Inbox, History and Import/Export now open as full screens, like Settings, instead of dropdowns squeezed into the menu -- more room for your stats, updates, recently deleted tasks and syllabus imports. Tap ‹ Tasks to go back." },
   { id:"no-empty-labels", date:"2026-09-27", kind:"UI change", headline:"Cleaner task cards", where:"Your task list, and a task's details", go:"tasks", description:"Tasks without a due date or subtasks no longer say \"No date\" or \"No subtasks\" -- those spots are simply left out. Where undated tasks are grouped together (the Calendar layout, grouping by due date, Time left), the heading now says \"Anytime\"." },
   { id:"profile-top", date:"2026-09-27", kind:"UI change", headline:"Profile at the top", where:"Menu (tap DuePlanner) → Profile", go:"menu", description:"Profile is now the first thing in the title menu, above Inbox." },
@@ -2524,9 +2525,6 @@ export default function HomeworkPlanner() {
   })();
   // Open tasks with no estimate count as 0 above, so the total reads low.
   const noEstimateCount=openTasks.filter(t=>!t.estMins).length;
-  // Most urgent task in the subject with the most time left, for "Start".
-  const heaviestSubject=timeBySubject[0];
-  const heaviestNext=heaviestSubject?mostUrgent(openTasks.filter(t=>(t.subject||"")===heaviestSubject.name)):undefined;
   const fmtMins=(m:number)=>formatDuration(m)||"0m";
   // Everything finished since local midnight, newest first (Inbox).
   const todayStartMs=(()=>{const d=new Date(now);d.setHours(0,0,0,0);return d.getTime();})();
@@ -3790,11 +3788,6 @@ export default function HomeworkPlanner() {
                 {noEstimateCount>0&&(
                   <button onClick={()=>{setFilter("noest");setActiveTab("tasks");setTimeMenuOpen(false);}} style={{display:"block",width:"100%",marginTop:12,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",fontFamily:F.body,fontSize:11,color:T.textMuted}}>
                     {noEstimateCount} {noEstimateCount===1?"task has":"tasks have"} no estimate, so the total is low. Show them ›
-                  </button>
-                )}
-                {heaviestNext&&(
-                  <button onClick={()=>{setFocusTaskId(heaviestNext.id);setTimeMenuOpen(false);setFocusModeAnimated(true);}} style={{display:"block",width:"100%",marginTop:12,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 10px",cursor:"pointer",fontFamily:F.body,fontSize:12,textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    ▶ Start {heaviestSubject.name||"No subject"}: {heaviestNext.title}
                   </button>
                 )}
               </div>

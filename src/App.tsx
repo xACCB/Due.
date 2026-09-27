@@ -238,6 +238,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"settings-dropdowns", date:"2026-09-27", kind:"UI change", headline:"Tidier Settings", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"Every Settings section is now a dropdown -- tap a heading to open or close it, and the ones you open stay open next time. The list options (grouping, showing completed tasks, auto-archive) are together under Task list, and reminders have their own section." },
   { id:"take-me-there", date:"2026-09-27", kind:"New feature", headline:"Take me there", where:"Menu (tap DuePlanner) → Inbox → tap an update → Take me there", description:"Updates can now take you straight to what's new: tap Take me there and DuePlanner opens the right screen and highlights the feature." },
   { id:"where-to-find", date:"2026-09-27", kind:"Improvement", headline:"Where to find it", where:"Menu (tap DuePlanner) → Inbox → tap any update", description:"Updates now tell you where to find what's new -- open one and look for \"Where to find it\" under the description." },
   { id:"update-browse-fix", date:"2026-09-27", kind:"Bug fix", headline:"Smoother update browsing", where:"Menu (tap DuePlanner) → Inbox → tap any update, then Newer or Older", description:"Pressing Newer or Older on an open update no longer makes it look like it reloaded -- the card stays put, the next update slides in, and the card adjusts to fit." },
@@ -267,7 +268,7 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"snooze", date:"2026-09-22", kind:"New feature", headline:"Snooze", where:"Tap a task → Snooze", go:"task:task-snooze", description:"Snooze a task to later today, tomorrow, or next week from its detail view -- and undo it if you change your mind." },
   { id:"duplicate-restore", date:"2026-09-22", kind:"New feature", headline:"Duplicate and restore", where:"Tap a task → Duplicate, or Restore on an archived task", go:"task:task-duplicate", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
   { id:"json-import", date:"2026-09-22", kind:"New feature", headline:"Import a backup", where:"Menu (tap DuePlanner) → Import/Export → Import backup (JSON)", go:"menu:import-backup", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
-  { id:"week-reminder", date:"2026-09-22", kind:"New feature", headline:"1-week reminders", where:"Menu (tap DuePlanner) → Settings → Due date reminders → Remind me", go:"settings:reminders", description:"New \"1 week before\" reminder option in Settings." },
+  { id:"week-reminder", date:"2026-09-22", kind:"New feature", headline:"1-week reminders", where:"Menu (tap DuePlanner) → Settings → Reminders → Remind me", go:"settings:reminders", description:"New \"1 week before\" reminder option in Settings." },
   { id:"focus-picker", date:"2026-09-22", kind:"New feature", headline:"Pick your focus task", where:"Focus tab → Change task", go:"focus:change-task", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
   { id:"liquid-glass", date:"2026-09-22", kind:"New feature", headline:"Liquid Glass", where:"Menu (tap DuePlanner) → Settings → Looks → Liquid Glass", go:"settings:liquid-glass", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
   { id:"time-left-breakdown", date:"2026-09-22", kind:"New feature", headline:"Time left by subject", where:"Tap Time left, top right", go:"tasks:time-left", description:"Tap \"Time left\" in the header to see how much time each subject needs." },
@@ -277,7 +278,7 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"pomodoro-chime", date:"2026-09-22", kind:"New feature", headline:"Pomodoro chime", where:"Focus tab", go:"tasks:tab-focus", description:"The Pomodoro timer now chimes when it's done, and shows its time on the Focus tab while running." },
   { id:"undo-more", date:"2026-09-22", kind:"New feature", headline:"Undo more", where:"Menu (tap DuePlanner) → History → Undo", go:"menu:history", description:"Bulk delete and Clear completed can now be undone." },
   { id:"calendar-sections", date:"2026-09-22", kind:"UI change", headline:"Calendar sections", where:"Menu (tap DuePlanner) → Settings → Looks → Layout → Calendar", go:"settings:layout", description:"The Calendar layout now shows Overdue and Later sections, so no task disappears from it." },
-  { id:"reminder-fixes", date:"2026-09-22", kind:"Bug fix", headline:"Reminder fixes", where:"Menu (tap DuePlanner) → Settings → Due date reminders", go:"settings:reminders", description:"\"At due time\" reminders now fire, and you no longer get several reminders for one task at once." },
+  { id:"reminder-fixes", date:"2026-09-22", kind:"Bug fix", headline:"Reminder fixes", where:"Menu (tap DuePlanner) → Settings → Reminders", go:"settings:reminders", description:"\"At due time\" reminders now fire, and you no longer get several reminders for one task at once." },
   { id:"recurring-fix", date:"2026-09-22", kind:"Bug fix", headline:"No more duplicate repeats", where:"Tap the circle on a repeating task", description:"Un-completing a repeating task no longer leaves a duplicate behind." },
   { id:"icon-color-fix", date:"2026-09-22", kind:"Bug fix", headline:"Icon colors fixed", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
   { id:"history-collapsible", date:"2026-09-22", kind:"UI change", headline:"Collapsible History", where:"Menu (tap DuePlanner) → History", go:"menu:history", description:"History is now a collapsible section in the title menu instead of always expanded." },
@@ -846,6 +847,27 @@ function CheckMark({size=10,color="#111",animate=false}:{size?:number;color?:str
 // Defined at module scope for the same reason as TaskModal above: it's
 // rendered from several places (toggles in the Settings tab) and stability
 // matters so it isn't torn down and recreated on every unrelated re-render.
+// One Settings section as a dropdown: the whole header row toggles it, and
+// the body is only rendered while open. Which sections are open is
+// remembered per device (openSettings, "hw-settings-open"). `tour` is the
+// data-tour anchor "Take me there" highlights (see goTo).
+function SettingsSection({id,title,open,onToggle,T,F,tour,danger,gap=0,children}:{
+  id:string; title:string; open:boolean; onToggle:(id:string)=>void; T:ThemeObj; F:typeof FONT;
+  tour?:string; danger?:boolean; gap?:number; children:React.ReactNode;
+}){
+  const color=danger?ink("#FF4757",T.light):T.textMuted;
+  return(
+    <div data-tour={tour} style={{background:T.card,borderRadius:12,border:`1px solid ${danger?"#FF475744":T.border}`}}>
+      <button onClick={()=>onToggle(id)} aria-expanded={open} aria-controls={`settings-${id}`}
+        style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:"16px",borderRadius:12,WebkitTapHighlightColor:"transparent"}}>
+        <span style={{color,fontFamily:F.body,fontSize:10,letterSpacing:".08em",textTransform:"uppercase"}}>{title}</span>
+        <span aria-hidden="true" style={{color,fontSize:13,transform:open?"rotate(180deg)":"none",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
+      </button>
+      {open&&<div id={`settings-${id}`} className="sec-body" style={{display:"flex",flexDirection:"column",gap,padding:"0 16px 16px"}}>{children}</div>}
+    </div>
+  );
+}
+
 function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeObj;label:string}){
   const trackColor=on?T.accent:T.solidBorder;
   return <button className="tog" role="switch" aria-checked={on} aria-label={label} onClick={()=>onChange(!on)} style={{background:trackColor}}>
@@ -2231,7 +2253,10 @@ export default function HomeworkPlanner() {
     document.addEventListener("keydown",onKeyDown);
     return ()=>{document.removeEventListener("pointerdown",onPointerDown);document.removeEventListener("keydown",onKeyDown);};
   },[timeMenuOpen]);
-  const [looksOpen,setLooksOpen]=useState(false);
+  // Which Settings dropdowns are open (SettingsSection ids), remembered on this
+  // device so returning to Settings doesn't mean reopening everything.
+  const [openSettings,setOpenSettings]=usePersistedState<string[]>("hw-settings-open",[]);
+  function toggleSettingsSection(id:string){setOpenSettings(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);}
   // Syllabus import: transient by design (a paste-and-review staging area, not
   // something worth persisting across reloads like tasks are).
   const [importText,setImportText]=useState("");
@@ -3098,6 +3123,8 @@ export default function HomeworkPlanner() {
     .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
     @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
     .search-pop{animation:pop .3s cubic-bezier(.2,.8,.3,1) backwards;}
+    .sec-body{animation:secIn .2s ease-out;}
+    @keyframes secIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
     .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
     /* iOS zooms the page into any focused field under 16px. */
     @media (pointer:coarse){.edit-field{font-size:16px!important;}}
@@ -3129,7 +3156,7 @@ export default function HomeworkPlanner() {
     .strike{text-decoration:none!important;background-image:linear-gradient(currentColor,currentColor);background-repeat:no-repeat;background-position:0 55%;background-size:100% 1.5px;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
     .strike-anim{animation:strikeDraw .5s .22s cubic-bezier(.65,0,.35,1) both;}
     @keyframes strikeDraw{from{background-size:0% 1.5px}}
-    @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim,.search-pop{animation:none;}}
+    @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim,.search-pop,.sec-body{animation:none;}}
     .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}
     .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background 0.2s;position:relative;flex-shrink:0;}
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;}
@@ -3279,7 +3306,9 @@ export default function HomeworkPlanner() {
     }else setTitleMenuOpen(false);
     if(place==="settings"){
       setActiveTab("options");
-      if(anchor==="looks"||anchor==="layout"||anchor==="liquid-glass")setLooksOpen(true);
+      // Open the dropdown holding the anchor first.
+      const section=({layout:"looks","liquid-glass":"looks","date-time":"datetime","focus-timer":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
+      if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
     if(place==="profile")setShowProfile(true);
@@ -3294,6 +3323,8 @@ export default function HomeworkPlanner() {
     }
     if(anchor)flashTarget(anchor,T.accent);
   }
+  // Props shared by every Settings dropdown.
+  const sec=(id:string)=>({id,open:openSettings.includes(id),onToggle:toggleSettingsSection,T,F});
 
   // ─── LAYOUT RENDERERS ─────────────────────────────────────────────────────────
   function renderTasks(tasks:Task[]) {
@@ -4162,12 +4193,7 @@ export default function HomeworkPlanner() {
             </div>
 
             {/* Looks */}
-            <div style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`}}>
-              <button onClick={()=>setLooksOpen(o=>!o)} aria-expanded={looksOpen} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:0,outline:"none",WebkitTapHighlightColor:"transparent"}}>
-                <span style={{color:T.textMuted,fontFamily:"'DM Mono',monospace",fontSize:10,letterSpacing:".08em",textTransform:"uppercase"}}>Looks</span>
-                <span aria-hidden="true" style={{color:T.textMuted,fontSize:13,transform:looksOpen?"rotate(180deg)":"none",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
-              </button>
-              {looksOpen&&<div style={{display:"flex",flexDirection:"column",gap:20,marginTop:16}}>
+            <SettingsSection title="Looks" gap={20} {...sec("looks")}>
               {/* Appearance mode */}
               <div>
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Appearance</div>
@@ -4234,11 +4260,9 @@ export default function HomeworkPlanner() {
                 <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Liquid Glass</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4}}>Translucent, glassy cards and tab bar</div></div>
                 <Toggle on={liquidGlass} onChange={setLiquidGlass} T={T} label="Liquid Glass"/>
               </div>
-            </div>}
-            </div>
+            </SettingsSection>
             {/* Date & time */}
-            <div data-tour="date-time" style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Date &amp; time</div>
+            <SettingsSection title="Date & time" tour="date-time" {...sec("datetime")}>
               <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Time format</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>
                 {([["12h","12-hour (3:05 PM)"],["24h","24-hour (15:05)"]] as const).map(([k,l])=>(
@@ -4251,10 +4275,9 @@ export default function HomeworkPlanner() {
                   <button key={k} onClick={()=>setWeekStart(k)} aria-pressed={weekStart===k} style={{background:weekStart===k?T.accent+"22":T.surface,border:`1.5px solid ${weekStart===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:weekStart===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
                 ))}
               </div>
-            </div>
+            </SettingsSection>
             {/* Focus timer (Pomodoro) */}
-            <div data-tour="focus-timer" style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Focus timer</div>
+            <SettingsSection title="Focus timer" tour="focus-timer" {...sec("focus")}>
               <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Focus length</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:12}}>
                 {[15,25,45,60].map(v=>(
@@ -4271,11 +4294,10 @@ export default function HomeworkPlanner() {
                 <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Start breaks automatically</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>When a focus session ends. After a break, you get a suggestion for what to work on next.</div></div>
                 <Toggle on={autoStartBreaks} onChange={setAutoStartBreaks} T={T} label="Start breaks automatically"/>
               </div>
-            </div>
+            </SettingsSection>
             {/* New task questions: which add-task questions are asked, in what order */}
-            <div data-tour="new-task-questions" style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>New task questions</div>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4,marginBottom:10}}>Asked in this order after the title. Anything you turn off can still be filled in later with Edit.</div>
+            <SettingsSection title="New task questions" tour="new-task-questions" {...sec("questions")}>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:10}}>Asked in this order after the title. Anything you turn off can still be filled in later with Edit.</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:T.surface,borderRadius:9,border:`1px solid ${T.border}`}}>
                   <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,minWidth:14}}>1</span>
@@ -4298,10 +4320,9 @@ export default function HomeworkPlanner() {
                   );
                 })}
               </div>
-            </div>
+            </SettingsSection>
             {/* Subjects -- lives here (not in Profile) so it works signed out too */}
-            <div data-tour="subjects" style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Subjects</div>
+            <SettingsSection title="Subjects" tour="subjects" {...sec("subjects")}>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {subjects.map(s=>{
                   const confirming=pendingSubjectDelete===s;
@@ -4339,10 +4360,12 @@ export default function HomeworkPlanner() {
                 <input value={newSubjectText} maxLength={200} onChange={e=>setNewSubjectText(e.target.value)} placeholder={subjects.length>=LIMITS.subjects?`Limit of ${LIMITS.subjects} subjects reached`:"Add a subject..."} disabled={subjects.length>=LIMITS.subjects} style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:12,outline:"none"}}/>
                 <button type="submit" disabled={!newSubjectText.trim()} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:newSubjectText.trim()?"pointer":"default",opacity:newSubjectText.trim()?1:0.5,fontSize:12,fontWeight:500}}>Add</button>
               </form>
-            </div>
+            </SettingsSection>
+            {/* Task list: grouping, what shows, auto-archive */}
+            <SettingsSection title="Task list" gap={18} {...sec("tasklist")}>
             {/* Group by */}
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted}}>Group Tasks By</div>
+              <div>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Group Tasks By</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
                 {Object.entries(GROUP_BY).map(([key,g])=>(
                   <button key={key} onClick={()=>setGroupBy(key)} aria-pressed={groupBy===key} style={{background:groupBy===key?T.accent+"22":T.surface,border:`1.5px solid ${groupBy===key?T.accent:T.border}`,borderRadius:9,padding:"9px 11px",cursor:"pointer",color:groupBy===key?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",alignItems:"center",gap:7}}>{g.name}</button>
@@ -4350,15 +4373,29 @@ export default function HomeworkPlanner() {
               </div>
             </div>
             {/* Toggles */}
-            <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show smart suggestion</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Your most urgent task, at the top of the list</div></div>
               <Toggle on={showSuggestion} onChange={setShowSuggestion} T={T} label="Show smart suggestion"/>
             </div>
-            <div style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show completed tasks</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Keep done tasks visible</div></div>
               <Toggle on={showDone} onChange={setShowDone} T={T} label="Show completed tasks"/>
             </div>
-            <div data-tour="reminders" style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`}}>
+            {/* Auto-archive */}
+              <div>
+              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Auto-Archive Completed Tasks</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:7}}>
+                {[{l:"Never",v:0},{l:"1 day",v:1},{l:"7 days",v:7},{l:"30 days",v:30}].map(({l,v})=>(
+                  <button key={l} onClick={()=>setAutoArchiveDays(v)} aria-pressed={autoArchiveDays===v} style={{background:autoArchiveDays===v?T.accent+"22":T.surface,border:`1.5px solid ${autoArchiveDays===v?T.accent:T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:autoArchiveDays===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                ))}
+              </div>
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>
+                Done tasks move to Archived after this long. You can still archive any task manually from its detail view.
+              </div>
+            </div>
+            </SettingsSection>
+            {/* Reminders */}
+            <SettingsSection title="Reminders" tour="reminders" {...sec("reminders")}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
                 <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Due date reminders</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Notify for tasks due today or overdue</div></div>
                 <Toggle on={notificationsEnabled} onChange={toggleNotifications} T={T} label="Due date reminders"/>
@@ -4383,25 +4420,12 @@ export default function HomeworkPlanner() {
                   </div>
                 </div>
               )}
-            </div>
-            {/* Auto-archive */}
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-              <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Auto-Archive Completed Tasks</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:7}}>
-                {[{l:"Never",v:0},{l:"1 day",v:1},{l:"7 days",v:7},{l:"30 days",v:30}].map(({l,v})=>(
-                  <button key={l} onClick={()=>setAutoArchiveDays(v)} aria-pressed={autoArchiveDays===v} style={{background:autoArchiveDays===v?T.accent+"22":T.surface,border:`1.5px solid ${autoArchiveDays===v?T.accent:T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:autoArchiveDays===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
-                ))}
-              </div>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>
-                Done tasks move to Archived after this long. You can still archive any task manually from its detail view.
-              </div>
-            </div>
+            </SettingsSection>
             <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>
             {(()=>{const n=tasks.filter(t=>t.done&&!t.archived).length;return(
             <button disabled={n===0} onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived -- you can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:n?"pointer":"default",opacity:n?1:0.45,width:"100%"}}>{n?`Clear ${plural(n)} completed`:"No completed tasks to clear"}</button>);})()}
             {fbUser&&(
-              <div style={{background:T.card,borderRadius:12,padding:"14px",border:"1px solid #FF475744"}}>
-                <div className="sl" style={{color:ink("#FF4757",T.light),paddingTop:0}}>Danger Zone</div>
+              <SettingsSection title="Danger Zone" danger {...sec("danger")}>
                 {!showDeleteAccountConfirm ? (
                   <button onClick={()=>{setShowDeleteAccountConfirm(true);setDeleteConfirmText("");setDeleteAccountError(null);}} style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Delete my account & all data</button>
                 ) : (
@@ -4417,7 +4441,7 @@ export default function HomeworkPlanner() {
                     </div>
                   </div>
                 )}
-              </div>
+              </SettingsSection>
             )}
             <div style={{textAlign:"center",fontFamily:F.body,fontSize:9,color:T.textFaint,paddingTop:4}}>DuePlanner v{__APP_VERSION__} · <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{color:T.textFaint}}>Privacy policy</a></div>
           </div>

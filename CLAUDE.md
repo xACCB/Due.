@@ -319,6 +319,13 @@ should be undoable goes through `changeTasks(fn, label, toast)` -- completing (i
 repeat copy), the Edit panel (`editTask`), archive/restore, snooze, skip, and bulk actions.
 Subtask ticks, tags and priority overrides are deliberately not undoable (too noisy).
 
+**Settings layout.** Every Settings section is a `SettingsSection` dropdown (module scope): Looks,
+Date & time, Focus timer, New task questions, Subjects, Task list (group by, smart suggestion, show
+completed, auto-archive), Reminders, and Danger Zone when signed in. Bodies render only while open;
+which are open is `openSettings` (`hw-settings-open`, local-only), and `goTo()` opens the section
+holding a "Take me there" anchor before highlighting it -- a new section with an anchor needs an
+entry in that map. Feedback, Clear completed and the version line stay outside the dropdowns.
+
 **Settings extras.** Subjects can be renamed/recolored (`updateSubject`, carries the rename to
 tasks, trash and templates). Date & time: `timeFormat` (`formatTime(t, h24)`, passed to
 `TaskModal`/`MiniCard` as `h24`) and `weekStart` (`startOfWeek()` in `src/lib/dates.ts`, used by

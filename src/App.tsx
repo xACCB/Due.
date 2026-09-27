@@ -238,6 +238,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"focus-no-symbols", date:"2026-09-27", kind:"UI change", headline:"Cleaner Focus Mode", where:"The Focus tab", go:"tasks:tab-focus", description:"Focus Mode's buttons are plain words now -- Start, Pause, Reset, Exit and Mark done, without the ▶ ⏸ ↺ ✕ ✓ symbols." },
   { id:"time-left-no-start", date:"2026-09-27", kind:"UI change", headline:"Simpler Time left", where:"Tasks tab → Time left, top right", go:"tasks:time-left", description:"The Start button is gone from the Time left breakdown -- it's just your time by due date and subject now. Start a focus session from the Focus tab." },
   { id:"menu-screens", date:"2026-09-27", kind:"UI change", headline:"Inbox, History and Import/Export get their own screens", where:"Menu (tap DuePlanner) → Inbox, History or Import/Export", go:"menu", description:"Inbox, History and Import/Export now open as full screens, like Settings, instead of dropdowns squeezed into the menu -- more room for your stats, updates, recently deleted tasks and syllabus imports. Tap ‹ Tasks to go back." },
   { id:"no-empty-labels", date:"2026-09-27", kind:"UI change", headline:"Cleaner task cards", where:"Your task list, and a task's details", go:"tasks", description:"Tasks without a due date or subtasks no longer say \"No date\" or \"No subtasks\" -- those spots are simply left out. Where undated tasks are grouped together (the Calendar layout, grouping by due date, Time left), the heading now says \"Anytime\"." },
@@ -3600,8 +3601,8 @@ export default function HomeworkPlanner() {
           </div>
         </div>
         <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-          <button onClick={()=>{setPomodoroActive(a=>!a);setBreakEnded(false);}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"⏸ Pause":onBreak?"▶ Start break":"▶ Start"}</button>
-          <button onClick={resetPomodoro} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{onBreak?"Skip break":"↺ Reset"}</button>
+          <button onClick={()=>{setPomodoroActive(a=>!a);setBreakEnded(false);}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"Pause":onBreak?"Start break":"Start"}</button>
+          <button onClick={resetPomodoro} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{onBreak?"Skip break":"Reset"}</button>
         </div>
       </div>
     );
@@ -3641,7 +3642,7 @@ export default function HomeworkPlanner() {
           <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:2}}>{suggestionIsContinue?"Keep going on":"Next up"}</div>
           <div style={{fontFamily:F.heading,fontSize:17,color:T.text,marginBottom:12,overflowWrap:"anywhere"}}>{nextSuggestion.title}</div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={startSuggested} style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 12px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>▶ Start {pomodoroWorkMins} min</button>
+            <button onClick={startSuggested} style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 12px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Start {pomodoroWorkMins} min</button>
             <button onClick={()=>{setBreakEnded(false);setFocusPickerOpen(true);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Pick another</button>
           </div>
         </>:<div style={{fontFamily:F.body,fontSize:12,color:T.textMuted,marginTop:6}}>Nothing left on your list -- nice.</div>}
@@ -3665,7 +3666,7 @@ export default function HomeworkPlanner() {
         <style>{css}</style>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <h1 style={{fontFamily:F.heading,fontSize:20,color:T.accent,margin:0,fontWeight:400}}>Focus Mode</h1>
-          <button onClick={()=>setFocusModeAnimated(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>✕ Exit</button>
+          <button onClick={()=>setFocusModeAnimated(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Exit</button>
         </div>
         <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
           {renderBreakSuggestion()}
@@ -3691,7 +3692,7 @@ export default function HomeworkPlanner() {
                 {focusTask.dueDate&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(focusTask.dueDate)}{focusTask.dueTime?` ${formatTime(focusTask.dueTime,h24)}`:""}</span>}
                 {focusTask.estMins>0&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDuration(focusTask.estMins)}</span>}
               </div>
-              <button onClick={()=>toggleDone(focusTask.id)} style={{marginTop:14,background:"#2ED57322",color:ink("#2ED573",T.light),border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>✓ Mark done</button>
+              <button onClick={()=>toggleDone(focusTask.id)} style={{marginTop:14,background:"#2ED57322",color:ink("#2ED573",T.light),border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>Mark done</button>
             </div>
           ):(
             <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on</div>

@@ -157,7 +157,6 @@ const LAYOUTS = {
   kanban:    { name:"Kanban",     emoji:"𝄘",  desc:"By urgency" },
   progress:  { name:"Progress",   emoji:"▓",  desc:"Subtask progress" },
   pyramid:   { name:"Pyramid",    emoji:"△",  desc:"By priority" },
-  calendar:  { name:"Calendar",   emoji:"▦", desc:"Next 7 days" },
 } as const;
 type LayoutName = keyof typeof LAYOUTS;
 
@@ -244,6 +243,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"calendar-layout-removed", date:"2026-09-27", kind:"UI change", headline:"One calendar", where:"The Calendar tab -- the middle one in the tab bar", go:"calendar", description:"The Calendar layout is gone now that there's a Calendar tab, which shows the whole month instead of just the next week. If you were using the layout, your tasks are back in List." },
   { id:"calendar-tab", date:"2026-09-27", kind:"New feature", headline:"Calendar", where:"The Calendar tab -- the middle one in the tab bar", go:"calendar", description:"A new Calendar tab: see the whole month, with busier days shaded darker and a dot for each thing due. Tap a day to see its homework, check it off, or add something due that day. Swipe or use the arrows to change month." },
   { id:"focus-no-symbols", date:"2026-09-27", kind:"UI change", headline:"Cleaner Focus Mode", where:"The Focus tab", go:"tasks:tab-focus", description:"Focus Mode's buttons are plain words now -- Start, Pause, Reset, Exit and Mark done, without the ▶ ⏸ ↺ ✕ ✓ symbols." },
   { id:"time-left-no-start", date:"2026-09-27", kind:"UI change", headline:"Simpler Time left", where:"Tasks tab → Time left, top right", go:"tasks:time-left", description:"The Start button is gone from the Time left breakdown -- it's just your time by due date and subject now. Start a focus session from the Focus tab." },
@@ -290,7 +290,7 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"sessions-saved", date:"2026-09-22", kind:"New feature", headline:"Work sessions saved", where:"Tap a task to start a work session; your totals are in Menu (tap DuePlanner) → Inbox", go:"task", description:"Work sessions are now saved on the task, and your Inbox shows real time spent." },
   { id:"pomodoro-chime", date:"2026-09-22", kind:"New feature", headline:"Pomodoro chime", where:"Focus tab", go:"tasks:tab-focus", description:"The Pomodoro timer now chimes when it's done, and shows its time on the Focus tab while running." },
   { id:"undo-more", date:"2026-09-22", kind:"New feature", headline:"Undo more", where:"Menu (tap DuePlanner) → History → Undo", go:"history:undo-redo", description:"Bulk delete and Clear completed can now be undone." },
-  { id:"calendar-sections", date:"2026-09-22", kind:"UI change", headline:"Calendar sections", where:"Menu (tap DuePlanner) → Settings → Looks → Layout → Calendar", go:"settings:layout", description:"The Calendar layout now shows Overdue and Later sections, so no task disappears from it." },
+  { id:"calendar-sections", date:"2026-09-22", kind:"UI change", headline:"Calendar sections", description:"The Calendar layout now shows Overdue and Later sections, so no task disappears from it." },
   { id:"reminder-fixes", date:"2026-09-22", kind:"Bug fix", headline:"Reminder fixes", where:"Menu (tap DuePlanner) → Settings → Reminders", go:"settings:reminders", description:"\"At due time\" reminders now fire, and you no longer get several reminders for one task at once." },
   { id:"recurring-fix", date:"2026-09-22", kind:"Bug fix", headline:"No more duplicate repeats", where:"Tap the circle on a repeating task", description:"Un-completing a repeating task no longer leaves a duplicate behind." },
   { id:"icon-color-fix", date:"2026-09-22", kind:"Bug fix", headline:"Icon colors fixed", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
@@ -3634,67 +3634,8 @@ export default function HomeworkPlanner() {
       );
     }
 
-    if (layout==="calendar") {
-      const week:string[]=[];
-      for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()+i);week.push(localDateStr(d));}
-      const noDate=tasks.filter(t=>!t.dueDate);
-      const overdue=tasks.filter(t=>t.dueDate&&t.dueDate<week[0]);
-      const later=tasks.filter(t=>t.dueDate&&t.dueDate>week[6]);
-      // Overdue / later / undated tasks fall outside the 7-day window above,
-      // so they get their own simpler sections instead of silently vanishing.
-      const extraSection=(label:string,list:Task[],labelColor?:string)=>list.length>0&&(
-            <div key={label} style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:F.body,fontSize:11,color:labelColor||T.textMuted,marginBottom:8}}>{label}</div>
-              <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                {list.map(t=>(
-                  <div key={t.id} data-task-id={t.id} onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
-                    <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
-                    </button>
-                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
-                    {t.dueDate&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDate(t.dueDate)}</span>}
-                    {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
-                  </div>
-                ))}
-              </div>
-            </div>
-      );
-      return(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {extraSection("Overdue",overdue,priColor("high",colorCodeUrgency))}
-          {week.map(day=>{
-            const dayTasks=tasks.filter(t=>t.dueDate===day);
-            if(dayTasks.length===0)return null;
-            const isToday=day===todayISO();
-            return(
-              <div key={day} style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${isToday?T.accent+"66":T.border}`}}>
-                <div style={{fontFamily:F.body,fontSize:11,color:isToday?T.accent:T.textMuted,marginBottom:8,fontWeight:isToday?"500":"normal"}}>
-                  {isToday?"• Today":formatDate(day)}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                  {dayTasks.map(t=>{const sc=subjectColors[t.subject]||T.accent;return(
-                    <div key={t.id} data-task-id={t.id} onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${T.borderFaint}`,cursor:"pointer"}}>
-                      <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:3,width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
-                      </button>
-                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
-                      {t.subject&&<span style={{color:ink(sc,T.light),fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
-                      {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
-                      {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
-                    </div>
-                  );})}
-                </div>
-              </div>
-            );
-          })}
-          {extraSection("Later",later)}
-          {extraSection("Anytime",noDate)}
-        </div>
-      );
-    }
-
     // default: list -- this is also the only layout "Group Tasks By" applies to,
-    // since the other layouts (kanban, progress, pyramid, calendar...) already
+    // since the other layouts (kanban, progress, pyramid...) already
     // have their own built-in grouping and combining the two would conflict.
     if (groupBy!=="none") {
       const groups=new Map<string,Task[]>();
@@ -4389,7 +4330,6 @@ export default function HomeworkPlanner() {
                       kanban:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="2" width="5" height="18" rx="1.5" fill={dim} opacity="0.4"/><rect x="9" y="2" width="5" height="13" rx="1.5" fill={dim} opacity="0.7"/><rect x="16" y="2" width="5" height="9" rx="1.5" fill={dim}/></svg>,
                       progress:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="4" width="14" height="3.5" rx="1.75" fill={dim}/><rect x="2" y="10" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="10" width="9" height="3.5" rx="1.75" fill={dim}/><rect x="2" y="16" width="18" height="3.5" rx="1.75" fill={dim} opacity="0.2"/><rect x="2" y="16" width="16" height="3.5" rx="1.75" fill={dim}/></svg>,
                       pyramid:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="7" y="3" width="8" height="4" rx="1.5" fill={dim}/><rect x="4" y="9" width="14" height="4" rx="1.5" fill={dim} opacity="0.7"/><rect x="1" y="15" width="20" height="4" rx="1.5" fill={dim} opacity="0.4"/></svg>,
-                      calendar:<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="4" width="18" height="16" rx="2" stroke={dim} strokeWidth="1.5"/><line x1="2" y1="9" x2="20" y2="9" stroke={dim} strokeWidth="1.5"/><line x1="7" y1="2" x2="7" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><line x1="15" y1="2" x2="15" y2="6" stroke={dim} strokeWidth="1.5" strokeLinecap="round"/><rect x="5" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="10" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.7"/><rect x="15" y="12" width="3" height="3" rx="0.75" fill={dim} opacity="0.4"/></svg>,
                     };
                     return(
                       <button key={key} aria-pressed={active} onClick={()=>setLayout(key)}

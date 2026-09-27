@@ -240,7 +240,7 @@ the `Toggle` switch thumb) instead of a hardcoded color, so they stay correct un
 a future theme might use. A few needed a conditional version since they only sometimes render on a
 solid `T.accent` fill (e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`,
 in most layouts -- only the branches that actually use `T.accent` as the fill needed the fix).
-`LAYOUTS` (7 task-list display modes, still in `App.tsx`; Compact, Minimal, Sticky, Timeline and By Subject were removed -- a saved removed layout falls back to List via the derived `layout` const). `FONTS` went the same way
+`LAYOUTS` (6 task-list display modes, still in `App.tsx`; Compact, Minimal, Sticky, Timeline, By Subject and Calendar -- replaced by the Calendar tab -- were removed -- a saved removed layout falls back to List via the derived `layout` const). `FONTS` went the same way
 as `THEMES` -- down from 16 selectable heading/body pairings to exactly one (`FONT`, still in
 `App.tsx`: the original DM Serif Display/DM Mono pairing), with the Font picker grid and its
 `fontName`/`setFontName` state gone entirely. `F` is now just `FONT` directly rather than a keyed
@@ -324,7 +324,7 @@ Subtask ticks, tags and priority overrides are deliberately not undoable (too no
 
 **Empty fields aren't labeled.** A task with no due date or no subtasks shows nothing there -- no
 "No date"/"No subtasks" text (`formatDate("")` still returns "No date" for other callers, so guard
-display sites with `task.dueDate&&`). Where undated tasks are grouped (Calendar layout, group by due
+display sites with `task.dueDate&&`). Where undated tasks are grouped (group by due
 date, Time left buckets) the heading is "Anytime".
 
 **Smart suggestion** (the ✦ card above the list): its × hides only the current suggestion
@@ -453,7 +453,7 @@ numbers keep their contrast) with up to 3 subject-colored dots, and the selected
 months; swiping the grid or ‹ › change month, Today jumps back. "+ Add homework due <day>" calls
 `addHomeworkOn()`: switches to Tasks and starts the usual add flow with the date pre-picked
 (`pendingDueDate`, so the date question opens on "what time?"; if that question is off the date is
-set directly). The Calendar *layout* (a week list) still exists alongside it.
+set directly). It replaced the old Calendar *layout* (a rolling week list).
 
 **Accessibility conventions** (from the screen-reader/keyboard pass, checked with axe-core and the
 Chrome accessibility tree):
@@ -481,7 +481,7 @@ Chrome accessibility tree):
 **Bulk edit / multi-select** (`selectionMode`/`selectedIds` state, "Select" in the filter row, with
 "Select all" for the visible tasks) works in every layout. `MiniCard` takes
 `selectionMode`/`isSelected`/`onToggleSelect` and repurposes its done-toggle into a selection check
-(gating swipe/drag off); the other 6 layouts do the same through `openOrSelect(t)` (row tap selects
+(gating swipe/drag off); the other 5 layouts do the same through `openOrSelect(t)` (row tap selects
 instead of opening), `chk(t)` (the done-check shows selection, in the accent color) and
 `data-selected` (outline from the runtime css), with their delete buttons and swipe hidden while
 selecting. The bulk bar (two rows: Done/Archive/Delete, then Subject/Due date/Priority menus) calls

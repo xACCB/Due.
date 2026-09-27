@@ -349,7 +349,15 @@ subject colors win, settings untouched.
 entry whenever a user-facing change ships. Each entry has a `kind` (category: "New feature", "Bug
 fix"...), a `headline` (its short title), the `description`, and a `where` -- how to get to it,
 using the on-screen labels ("Menu (tap DuePlanner) → Settings → ..."), shown as "Where to find it"
-in the update's card. Give every entry a `where` unless there's genuinely nowhere to point. Tapping a row opens
+in the update's card. Give every entry a `where` unless there's genuinely nowhere to point. Also give it a
+`go` when there's a screen to open: `"place"` or `"place:anchor"`, handled by `goTo()` in
+`HomeworkPlanner` (places: `settings`, `tasks`, `task` -- opens a real task, a repeating one for
+`task-skip` -- `menu`, which expands a title-menu section and keeps the menu open, `profile`,
+`focus`). The anchor is a `data-tour="..."` attribute on the thing to highlight; `flashTarget()`
+(module scope) waits for it to render, scrolls it into view, focuses it if it's a control and rings
+it with an inset shadow (not clipped by `overflow:hidden` parents). A new feature's control usually
+needs a new `data-tour` for its entry. The card's "Take me there" button fades the card, then calls
+`goTo`. It shows where things are rather than doing them (points at Select, doesn't start selecting). Tapping a row opens
 `UpdateDetail` (module scope): the card grows from the row's box to a centered card over a blurred
 backdrop (pinned `position:fixed` while its left/top/width/height animate, then released back to
 `relative`) and shrinks back into the row on close, or fades if the row is gone. Newer/Older step

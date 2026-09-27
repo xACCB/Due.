@@ -233,6 +233,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // tapping an entry opens it in a floating panel (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"update-browse-fix", date:"2026-09-27", kind:"Bug fix", headline:"Smoother update browsing", description:"Pressing Newer or Older on an open update no longer makes it look like it reloaded -- the card stays put, the next update slides in, and the card adjusts to fit." },
   { id:"update-details", date:"2026-09-26", kind:"New feature", headline:"Open an update", description:"Tap any update in your Inbox and it grows into a card in the middle of the screen, with its full details. Flip through the others with Newer and Older, or dismiss it from there." },
   { id:"new-task-questions", date:"2026-09-26", kind:"New feature", headline:"Choose your new task questions", description:"Choose which questions you get when adding a task, and in what order: Settings -> New task questions. Turn off the ones you don't need -- you can still fill them in later with Edit." },
   { id:"edit-estimate-fix", date:"2026-09-26", kind:"Bug fix", headline:"Estimate editing fixed", description:"Editing a task's estimate works properly: you can clear the hours and minutes and type new ones, any number of minutes saves (90 minutes becomes 1h 30m), and phones no longer zoom in when you tap a field." },

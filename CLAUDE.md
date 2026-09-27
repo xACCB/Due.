@@ -347,7 +347,9 @@ subject colors win, settings untouched.
 
 **What's New** (`WHATS_NEW`, the Inbox's Updates list) is hand-maintained, newest first -- add an
 entry whenever a user-facing change ships. Each entry has a `kind` (category: "New feature", "Bug
-fix"...) and a `headline` (its short title) plus the `description`. Tapping a row opens
+fix"...), a `headline` (its short title), the `description`, and a `where` -- how to get to it,
+using the on-screen labels ("Menu (tap DuePlanner) → Settings → ..."), shown as "Where to find it"
+in the update's card. Give every entry a `where` unless there's genuinely nowhere to point. Tapping a row opens
 `UpdateDetail` (module scope): the card grows from the row's box to a centered card over a blurred
 backdrop (pinned `position:fixed` while its left/top/width/height animate, then released back to
 `relative`) and shrinks back into the row on close, or fades if the row is gone. Newer/Older step

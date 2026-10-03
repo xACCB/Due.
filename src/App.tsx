@@ -243,6 +243,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"inbox-dropdowns", date:"2026-10-03", kind:"UI change", headline:"A tidier Inbox", where:"Menu (tap DuePlanner) → Inbox", description:"Done today, Personal and Updates are now dropdowns. Tap a heading to open or close it. Updates also has filter buttons, so you can show only new features, bug fixes, or any other kind of update." },
   { id:"copy-no-dashes", date:"2026-10-03", kind:"UI change", headline:"Plainer wording", where:"Everywhere: suggestions, messages and these updates", description:"Messages, suggestions and update notes across the app are written as plain sentences now, without dashes splitting them in two." },
   { id:"profile-counts-archived", date:"2026-10-03", kind:"Bug fix", headline:"Profile counts fixed", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Profile's task numbers (total, done, pending, urgent and the per-subject bars) no longer count archived tasks, so they match what's on your list." },
   { id:"calendar-layout-removed", date:"2026-09-27", kind:"UI change", headline:"One calendar", where:"The Calendar tab, the middle one in the tab bar", go:"calendar", description:"The Calendar layout is gone now that there's a Calendar tab, which shows the whole month instead of just the next week. If you were using the layout, your tasks are back in List." },
@@ -263,7 +264,7 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"floating-search", date:"2026-09-26", kind:"New feature", headline:"Floating search", where:"Tasks tab → Search tasks, above your list", go:"tasks:search", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
   { id:"cards-glide", date:"2026-09-26", kind:"Improvement", headline:"Tasks glide into place", where:"Your task list, in any layout", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once. New ones fade in and removed ones fade out." },
   { id:"fixes-sep23", date:"2026-09-23", kind:"Bug fix", headline:"Timer and account fixes", where:"Focus tab (the Pomodoro), and the timer in a task's details", go:"tasks:tab-focus", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
-  { id:"trash-sync-fix", date:"2026-09-22", kind:"Fix", headline:"Recently deleted stays put", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"history:trash", description:"Tasks you delete while signed in now reliably stay in Recently deleted. A sync timing issue could make them vanish from it." },
+  { id:"trash-sync-fix", date:"2026-09-22", kind:"Bug fix", headline:"Recently deleted stays put", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"history:trash", description:"Tasks you delete while signed in now reliably stay in Recently deleted. A sync timing issue could make them vanish from it." },
   { id:"bulk-everywhere", date:"2026-09-22", kind:"New feature", headline:"Select in every layout", where:"Tasks tab → Select, next to the filters", go:"tasks:select", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
   { id:"a11y-pass", date:"2026-09-22", kind:"Improvement", headline:"Keyboard and screen reader support", where:"Everywhere. Try Tab, Enter and the arrow keys", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
   { id:"complete-anim", date:"2026-09-22", kind:"Improvement", headline:"A more satisfying check-off", where:"Tap the circle next to any task", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
@@ -308,6 +309,8 @@ const WHATS_NEW: WhatsNewItem[] = [
 // Every WHATS_NEW id that existed while the feed was still persisted as a
 // whole array under "hw-whatsnew" (see the dismissed-ids migration below) --
 // frozen, so entries added after that aren't mistaken for dismissed ones.
+const UPDATE_KIND_ORDER=["New feature","Improvement","UI change","Bug fix","Navigation"];
+function kindRank(kind:string){const i=UPDATE_KIND_ORDER.indexOf(kind);return i<0?UPDATE_KIND_ORDER.length:i;}
 const LEGACY_WHATSNEW_IDS = ["icon-color-fix","history-collapsible","undo-redo","settings-in-menu","title-menu","wizard-cancel-moved","wizard-back-skip","subject-colors-fix","time-left-color"];
 const REMINDER_OFFSETS = [
   { key:"1w", label:"1 week before", mins:10080 },
@@ -1823,6 +1826,15 @@ export default function HomeworkPlanner() {
     try{localStorage.setItem("hw-whatsnew-dismissed",JSON.stringify(dismissedWhatsNew));localStorage.removeItem("hw-whatsnew");}catch{/* storage unavailable */}
   },[dismissedWhatsNew]);
   const whatsNew=WHATS_NEW.filter(w=>!dismissedWhatsNew.includes(w.id));
+  // The Inbox's Updates filter: one chip per kind that still has an update
+  // showing, in UPDATE_KIND_ORDER (kinds not listed there go last).
+  const [updateKind,setUpdateKind]=useState("all");
+  const updateKinds=[...new Set(whatsNew.map(w=>w.kind))].sort((a,b)=>kindRank(a)-kindRank(b));
+  const activeKind=updateKinds.includes(updateKind)?updateKind:"all";
+  const shownUpdates=activeKind==="all"?whatsNew:whatsNew.filter(w=>w.kind===activeKind);
+  // Which Inbox dropdowns are open. Not remembered: it starts on Updates.
+  const [openInbox,setOpenInbox]=useState<string[]>(["inbox-updates"]);
+  function toggleInboxSection(id:string){setOpenInbox(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);}
   function dismissWhatsNew(id:string){setDismissedWhatsNew(prev=>[...prev,id]);}
   // The Inbox update open in the floating panel (UpdateDetail), by id, and the
   // row it grew out of (to grow back into on close).
@@ -3487,6 +3499,7 @@ export default function HomeworkPlanner() {
   }
   // Props shared by every Settings dropdown.
   const sec=(id:string)=>({id,open:openSettings.includes(id),onToggle:toggleSettingsSection,T,F});
+  const inboxSec=(id:string)=>({id,open:openInbox.includes(id),onToggle:toggleInboxSection,T,F});
 
   // ─── LAYOUT RENDERERS ─────────────────────────────────────────────────────────
   function renderTasks(tasks:Task[]) {
@@ -4124,9 +4137,7 @@ export default function HomeworkPlanner() {
         {activeTab==="inbox"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <ScreenHeader title="Inbox" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-                      {/* Done today */}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Done today{doneToday.length?` (${doneToday.length})`:""}</div>
+            <SettingsSection {...inboxSec("inbox-done")} title={`Done today${doneToday.length?` (${doneToday.length})`:""}`}>
                       {doneToday.length===0
                         ?<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,}}>Nothing finished yet today.</div>
                         :<div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -4138,10 +4149,8 @@ export default function HomeworkPlanner() {
                             </button>
                           ))}
                         </div>}
-            </div>
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-                      {/* Personal */}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Personal</div>
+            </SettingsSection>
+            <SettingsSection {...inboxSec("inbox-personal")} title="Personal">
                       <div style={{display:"flex",gap:6,marginBottom:10}}>
                         {(["week","month","year"] as const).map(p=>(
                           <button key={p} onClick={()=>setOverviewPeriod(p)} style={{flex:1,background:overviewPeriod===p?T.accent:T.cardAlt,color:overviewPeriod===p?contrastColor(T.accent):T.textMuted,border:`1px solid ${overviewPeriod===p?T.accent:T.border}`,borderRadius:8,padding:"5px 0",fontFamily:F.body,fontSize:11,cursor:"pointer",textTransform:"capitalize"}}>{p}</button>
@@ -4165,14 +4174,16 @@ export default function HomeworkPlanner() {
                           <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Busiest subject</div>
                         </div>
                       </div>
-            </div>
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-                      {/* Updates */}
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Updates</div>
+            </SettingsSection>
+            <SettingsSection {...inboxSec("inbox-updates")} title={`Updates${whatsNew.length?` (${whatsNew.length})`:""}`}>
+                      {/* Filter by the update's kind, same chips as the Tasks tab's filters */}
+                      {updateKinds.length>1&&<div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+                        {["all",...updateKinds].map(k=><button key={k} onClick={()=>setUpdateKind(k)} aria-pressed={activeKind===k} style={{background:activeKind===k?T.accent:"none",color:activeKind===k?contrastColor(T.accent):T.textMuted,border:`1px solid ${activeKind===k?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{k==="all"?"All":k}</button>)}
+                      </div>}
                       <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                        {whatsNew.length===0
+                        {shownUpdates.length===0
                           ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>
-                          : whatsNew.map(item=>(
+                          : shownUpdates.map(item=>(
                           <div key={item.id} style={{display:"flex",gap:4,alignItems:"flex-start"}}>
                             {/* Opens the update in a floating panel (UpdateDetail); hidden
                                 while open, so the panel looks like it grew out of here. */}
@@ -4189,7 +4200,7 @@ export default function HomeworkPlanner() {
                           </div>
                         ))}
                       </div>
-            </div>
+            </SettingsSection>
           </div>
         )}
         {activeTab==="history"&&(
@@ -4560,9 +4571,9 @@ export default function HomeworkPlanner() {
       </div>
       <div className="sr-only" aria-live="polite">{srMessage}</div>
       {openUpdate&&(()=>{
-        const index=whatsNew.findIndex(w=>w.id===openUpdate.id);
-        return index<0?null:<UpdateDetail items={whatsNew} index={index} T={T} F={F} origin={openUpdate.origin}
-          onIndex={i=>{const id=whatsNew[i].id;setOpenUpdate({id,origin:document.querySelector<HTMLElement>(`[data-update-id="${id}"]`)});}}
+        const index=shownUpdates.findIndex(w=>w.id===openUpdate.id);
+        return index<0?null:<UpdateDetail items={shownUpdates} index={index} T={T} F={F} origin={openUpdate.origin}
+          onIndex={i=>{const id=shownUpdates[i].id;setOpenUpdate({id,origin:document.querySelector<HTMLElement>(`[data-update-id="${id}"]`)});}}
           onDismiss={dismissWhatsNew}
           onGo={goTo}
           onClose={()=>{const o=openUpdate.origin;setOpenUpdate(null);requestAnimationFrame(()=>o?.isConnected&&o.focus());}}/>;

@@ -382,7 +382,11 @@ backdrop (pinned `position:fixed` while its left/top/width/height animate, then 
 through the list in place (content slides, card eases to the new height; the grow-from-row
 animation runs once on open, from `openedFrom`, even though `origin` follows the shown update); Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
 the title menu's outside-click/Escape handlers ignore (a leftover from when the Inbox lived in the
-menu; harmless now that it's a screen). Only dismissed ids are persisted
+menu; harmless now that it's a screen). The Inbox's three parts (Done today, Personal,
+Updates) are `SettingsSection` dropdowns (`openInbox`, not persisted, starts on Updates). Updates
+has filter chips, one per `kind` still showing (`updateKinds`, ordered by `UPDATE_KIND_ORDER`);
+`shownUpdates` is what the list and `UpdateDetail`'s Newer/Older use, so reuse an existing `kind`
+rather than inventing a near-duplicate. Only dismissed ids are persisted
 (`hw-whatsnew-dismissed`), so new entries reach returning users; `LEGACY_WHATSNEW_IDS` is a frozen
 list used once to migrate the old whole-feed `hw-whatsnew` key, and must not be extended.
 

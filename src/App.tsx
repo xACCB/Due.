@@ -243,6 +243,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"update-close-smooth", date:"2026-10-03", kind:"Bug fix", headline:"Smoother closing updates", where:"Menu (tap DuePlanner) → Inbox → open an update, then close it", description:"Closing an update now shrinks it back into its row in one smooth move. It no longer stops partway, loses its text, or flashes when it lands." },
   { id:"profile-no-signin-flash", date:"2026-10-03", kind:"Bug fix", headline:"No sign-in flash", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Opening Profile right after the app loads no longer shows the sign-in screen for a moment when you're already signed in." },
   { id:"inbox-dropdowns", date:"2026-10-03", kind:"UI change", headline:"A tidier Inbox", where:"Menu (tap DuePlanner) → Inbox", description:"Done today, Personal and Updates are now dropdowns. Tap a heading to open or close it. Updates also has filter buttons, so you can show only new features, bug fixes, or any other kind of update." },
   { id:"copy-no-dashes", date:"2026-10-03", kind:"UI change", headline:"Plainer wording", where:"Everywhere: suggestions, messages and these updates", description:"Messages, suggestions and update notes across the app are written as plain sentences now, without dashes splitting them in two." },
@@ -1059,10 +1060,10 @@ function unpin(el:HTMLElement){Object.assign(el.style,{position:"relative",margi
 // the card's, so nothing stretches), and shrinks back into the row on close.
 // Newer/Older step through the other updates in place. `origin` is the row
 // element it grew from; module scope like SearchOverlay.
-function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClose,onGo}:{
+function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClose,onGo}:{
   items:WhatsNewItem[]; index:number; T:ThemeObj; F:typeof FONT;
   origin:HTMLElement|null;
-  onIndex:(i:number)=>void; onDismiss:(id:string)=>void; onClose:()=>void;
+  onIndex:(i:number)=>void; onDismiss:(id:string)=>void; onClosing:()=>void; onClose:()=>void;
   onGo:(dest:string)=>void;
 }){
   const item=items[index];
@@ -1116,12 +1117,27 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClose,onGo}:{
     if(!card||reduced()){done();return;}
     const from=card.getBoundingClientRect();
     card.getAnimations().forEach(a=>a.cancel());
+    bodyRef.current?.getAnimations().forEach(a=>a.cancel());
     pin(card,from);
-    backdropRef.current?.animate([{opacity:1},{opacity:0}],{duration:280,easing:"ease-in",fill:"forwards"});
-    const anim=to&&to.width>0&&to.bottom>0&&to.top<window.innerHeight
-      ?(bodyRef.current?.animate([{opacity:1},{opacity:0}],{duration:120,fill:"forwards"}),
-        card.animate([{...box(from),borderRadius:"16px"},{...box(to),borderRadius:"8px"}],{duration:320,easing:"cubic-bezier(.4,0,.2,1)",fill:"forwards"}))
-      :card.animate([{opacity:1,transform:"none"},{opacity:0,transform:"scale(.96)"}],{duration:200,easing:"ease-in",fill:"forwards"});
+    const intoRow=!!to&&to.width>0&&to.bottom>0&&to.top<window.innerHeight;
+    backdropRef.current?.animate([{opacity:1},{opacity:0}],{duration:intoRow?340:200,easing:"ease-out",fill:"forwards"});
+    let anim:Animation;
+    if(intoRow){
+      // One continuous move: the row is shown again underneath right away
+      // (onClosing), and the card shrinks onto it while dissolving, so there's
+      // nothing left to pop in when it lands. The text keeps its size and
+      // wrapping (the body is frozen at its current box and clipped by the
+      // card) instead of vanishing or re-flowing on the way.
+      const body=bodyRef.current;
+      if(body)Object.assign(body.style,{width:`${body.offsetWidth}px`,height:`${body.offsetHeight}px`,flexShrink:"0",overflow:"hidden"});
+      onClosing();
+      const ease="cubic-bezier(.32,.72,0,1)";
+      body?.animate([{opacity:1},{opacity:0}],{duration:200,easing:"ease-out",fill:"forwards"});
+      card.animate([{opacity:1},{opacity:1,offset:0.3},{opacity:0}],{duration:340,easing:"linear",fill:"forwards"});
+      anim=card.animate([{...box(from),borderRadius:"16px"},{...box(to!),borderRadius:"8px"}],{duration:340,easing:ease,fill:"forwards"});
+    } else {
+      anim=card.animate([{opacity:1,transform:"none"},{opacity:0,transform:"scale(.96)"}],{duration:200,easing:"ease-in",fill:"forwards"});
+    }
     anim.finished.then(done,done);
   }
   // "Take me there": a quick fade instead of shrinking back into the row,
@@ -1853,7 +1869,7 @@ export default function HomeworkPlanner() {
   function dismissWhatsNew(id:string){setDismissedWhatsNew(prev=>[...prev,id]);}
   // The Inbox update open in the floating panel (UpdateDetail), by id, and the
   // row it grew out of (to grow back into on close).
-  const [openUpdate,setOpenUpdate]=useState<{id:string;origin:HTMLElement|null}|null>(null);
+  const [openUpdate,setOpenUpdate]=useState<{id:string;origin:HTMLElement|null;closing?:boolean}|null>(null);
   const [subjectColors,setSubjectColors]=useState<Record<string,string>>(()=>{try{const s=localStorage.getItem("hw-subjectcolors");return {...DEFAULT_SUBJECT_COLORS,...(s?JSON.parse(s):{})};}catch{return DEFAULT_SUBJECT_COLORS;}});
   useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
   const [templates,setTemplates]=usePersistedState<TaskTemplate[]>("hw-templates",[]);
@@ -4208,7 +4224,7 @@ export default function HomeworkPlanner() {
                             {/* Opens the update in a floating panel (UpdateDetail); hidden
                                 while open, so the panel looks like it grew out of here. */}
                             <button data-update-id={item.id} onClick={e=>setOpenUpdate({id:item.id,origin:e.currentTarget})} aria-haspopup="dialog"
-                              style={{flex:1,minWidth:0,background:"none",border:"none",borderRadius:8,padding:"4px 6px",margin:"-4px -6px",cursor:"pointer",textAlign:"left",color:"inherit",visibility:openUpdate?.id===item.id?"hidden":undefined}}>
+                              style={{flex:1,minWidth:0,background:"none",border:"none",borderRadius:8,padding:"4px 6px",margin:"-4px -6px",cursor:"pointer",textAlign:"left",color:"inherit",visibility:openUpdate?.id===item.id&&!openUpdate.closing?"hidden":undefined}}>
                               <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
                                 <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.headline}</span>
                                 <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
@@ -4596,7 +4612,8 @@ export default function HomeworkPlanner() {
           onIndex={i=>{const id=shownUpdates[i].id;setOpenUpdate({id,origin:document.querySelector<HTMLElement>(`[data-update-id="${id}"]`)});}}
           onDismiss={dismissWhatsNew}
           onGo={goTo}
-          onClose={()=>{const o=openUpdate.origin;setOpenUpdate(null);requestAnimationFrame(()=>o?.isConnected&&o.focus());}}/>;
+          onClosing={()=>setOpenUpdate(u=>u&&{...u,closing:true})}
+          onClose={()=>{const o=openUpdate.origin;setOpenUpdate(null);requestAnimationFrame(()=>o?.isConnected&&o.focus({preventScroll:true}));}}/>;
       })()}
       {searchOpen&&<SearchOverlay tasks={tasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         origin={searchTriggerRef}

@@ -243,45 +243,46 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"copy-no-dashes", date:"2026-10-03", kind:"UI change", headline:"Plainer wording", where:"Everywhere: suggestions, messages and these updates", description:"Messages, suggestions and update notes across the app are written as plain sentences now, without dashes splitting them in two." },
   { id:"profile-counts-archived", date:"2026-10-03", kind:"Bug fix", headline:"Profile counts fixed", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Profile's task numbers (total, done, pending, urgent and the per-subject bars) no longer count archived tasks, so they match what's on your list." },
-  { id:"calendar-layout-removed", date:"2026-09-27", kind:"UI change", headline:"One calendar", where:"The Calendar tab -- the middle one in the tab bar", go:"calendar", description:"The Calendar layout is gone now that there's a Calendar tab, which shows the whole month instead of just the next week. If you were using the layout, your tasks are back in List." },
-  { id:"calendar-tab", date:"2026-09-27", kind:"New feature", headline:"Calendar", where:"The Calendar tab -- the middle one in the tab bar", go:"calendar", description:"A new Calendar tab: see the whole month, with busier days shaded darker and a dot for each thing due. Tap a day to see its homework, check it off, or add something due that day. Swipe or use the arrows to change month." },
-  { id:"focus-no-symbols", date:"2026-09-27", kind:"UI change", headline:"Cleaner Focus Mode", where:"The Focus tab", go:"tasks:tab-focus", description:"Focus Mode's buttons are plain words now -- Start, Pause, Reset, Exit and Mark done, without the ▶ ⏸ ↺ ✕ ✓ symbols." },
-  { id:"time-left-no-start", date:"2026-09-27", kind:"UI change", headline:"Simpler Time left", where:"Tasks tab → Time left, top right", go:"tasks:time-left", description:"The Start button is gone from the Time left breakdown -- it's just your time by due date and subject now. Start a focus session from the Focus tab." },
-  { id:"menu-screens", date:"2026-09-27", kind:"UI change", headline:"Inbox, History and Import/Export get their own screens", where:"Menu (tap DuePlanner) → Inbox, History or Import/Export", go:"menu", description:"Inbox, History and Import/Export now open as full screens, like Settings, instead of dropdowns squeezed into the menu -- more room for your stats, updates, recently deleted tasks and syllabus imports. Tap ‹ Tasks to go back." },
-  { id:"no-empty-labels", date:"2026-09-27", kind:"UI change", headline:"Cleaner task cards", where:"Your task list, and a task's details", go:"tasks", description:"Tasks without a due date or subtasks no longer say \"No date\" or \"No subtasks\" -- those spots are simply left out. Where undated tasks are grouped together (the Calendar layout, grouping by due date, Time left), the heading now says \"Anytime\"." },
+  { id:"calendar-layout-removed", date:"2026-09-27", kind:"UI change", headline:"One calendar", where:"The Calendar tab, the middle one in the tab bar", go:"calendar", description:"The Calendar layout is gone now that there's a Calendar tab, which shows the whole month instead of just the next week. If you were using the layout, your tasks are back in List." },
+  { id:"calendar-tab", date:"2026-09-27", kind:"New feature", headline:"Calendar", where:"The Calendar tab, the middle one in the tab bar", go:"calendar", description:"A new Calendar tab: see the whole month, with busier days shaded darker and a dot for each thing due. Tap a day to see its homework, check it off, or add something due that day. Swipe or use the arrows to change month." },
+  { id:"focus-no-symbols", date:"2026-09-27", kind:"UI change", headline:"Cleaner Focus Mode", where:"The Focus tab", go:"tasks:tab-focus", description:"Focus Mode's buttons are plain words now: Start, Pause, Reset, Exit and Mark done, without the ▶ ⏸ ↺ ✕ ✓ symbols." },
+  { id:"time-left-no-start", date:"2026-09-27", kind:"UI change", headline:"Simpler Time left", where:"Tasks tab → Time left, top right", go:"tasks:time-left", description:"The Start button is gone from the Time left breakdown. It's just your time by due date and subject now. Start a focus session from the Focus tab." },
+  { id:"menu-screens", date:"2026-09-27", kind:"UI change", headline:"Inbox, History and Import/Export get their own screens", where:"Menu (tap DuePlanner) → Inbox, History or Import/Export", go:"menu", description:"Inbox, History and Import/Export now open as full screens, like Settings, instead of dropdowns squeezed into the menu, so there's more room for your stats, updates, recently deleted tasks and syllabus imports. Tap ‹ Tasks to go back." },
+  { id:"no-empty-labels", date:"2026-09-27", kind:"UI change", headline:"Cleaner task cards", where:"Your task list, and a task's details", go:"tasks", description:"Tasks without a due date or subtasks no longer say \"No date\" or \"No subtasks\". Those spots are simply left out. Where undated tasks are grouped together (the Calendar layout, grouping by due date, Time left), the heading now says \"Anytime\"." },
   { id:"profile-top", date:"2026-09-27", kind:"UI change", headline:"Profile at the top", where:"Menu (tap DuePlanner) → Profile", go:"menu", description:"Profile is now the first thing in the title menu, above Inbox." },
-  { id:"suggestion-hide-fix", date:"2026-09-27", kind:"Bug fix", headline:"Hiding a suggestion", where:"Tasks tab → the ✦ suggestion above your list", go:"tasks", description:"The × on the smart suggestion now just hides that suggestion -- a new one appears when a different task becomes the most urgent. It used to turn suggestions off completely (that's still in Settings → Task list)." },
-  { id:"settings-dropdowns", date:"2026-09-27", kind:"UI change", headline:"Tidier Settings", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"Every Settings section is now a dropdown -- tap a heading to open or close it, and the ones you open stay open next time. The list options (grouping, showing completed tasks, auto-archive) are together under Task list, and reminders have their own section." },
+  { id:"suggestion-hide-fix", date:"2026-09-27", kind:"Bug fix", headline:"Hiding a suggestion", where:"Tasks tab → the ✦ suggestion above your list", go:"tasks", description:"The × on the smart suggestion now just hides that suggestion. A new one appears when a different task becomes the most urgent. It used to turn suggestions off completely (that's still in Settings → Task list)." },
+  { id:"settings-dropdowns", date:"2026-09-27", kind:"UI change", headline:"Tidier Settings", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"Every Settings section is now a dropdown. Tap a heading to open or close it, and the ones you open stay open next time. The list options (grouping, showing completed tasks, auto-archive) are together under Task list, and reminders have their own section." },
   { id:"take-me-there", date:"2026-09-27", kind:"New feature", headline:"Take me there", where:"Menu (tap DuePlanner) → Inbox → tap an update → Take me there", description:"Updates can now take you straight to what's new: tap Take me there and DuePlanner opens the right screen and highlights the feature." },
-  { id:"where-to-find", date:"2026-09-27", kind:"Improvement", headline:"Where to find it", where:"Menu (tap DuePlanner) → Inbox → tap any update", description:"Updates now tell you where to find what's new -- open one and look for \"Where to find it\" under the description." },
-  { id:"update-browse-fix", date:"2026-09-27", kind:"Bug fix", headline:"Smoother update browsing", where:"Menu (tap DuePlanner) → Inbox → tap any update, then Newer or Older", description:"Pressing Newer or Older on an open update no longer makes it look like it reloaded -- the card stays put, the next update slides in, and the card adjusts to fit." },
+  { id:"where-to-find", date:"2026-09-27", kind:"Improvement", headline:"Where to find it", where:"Menu (tap DuePlanner) → Inbox → tap any update", description:"Updates now tell you where to find what's new. Open one and look for \"Where to find it\" under the description." },
+  { id:"update-browse-fix", date:"2026-09-27", kind:"Bug fix", headline:"Smoother update browsing", where:"Menu (tap DuePlanner) → Inbox → tap any update, then Newer or Older", description:"Pressing Newer or Older on an open update no longer makes it look like it reloaded. The card stays put, the next update slides in, and the card adjusts to fit." },
   { id:"update-details", date:"2026-09-26", kind:"New feature", headline:"Open an update", where:"Menu (tap DuePlanner) → Inbox → tap any update", description:"Tap any update in your Inbox and it grows into a card in the middle of the screen, with its full details. Flip through the others with Newer and Older, or dismiss it from there." },
-  { id:"new-task-questions", date:"2026-09-26", kind:"New feature", headline:"Choose your new task questions", where:"Menu (tap DuePlanner) → Settings → New task questions", go:"settings:new-task-questions", description:"Choose which questions you get when adding a task, and in what order: Settings -> New task questions. Turn off the ones you don't need -- you can still fill them in later with Edit." },
+  { id:"new-task-questions", date:"2026-09-26", kind:"New feature", headline:"Choose your new task questions", where:"Menu (tap DuePlanner) → Settings → New task questions", go:"settings:new-task-questions", description:"Choose which questions you get when adding a task, and in what order: Settings -> New task questions. Turn off the ones you don't need. You can still fill them in later with Edit." },
   { id:"edit-estimate-fix", date:"2026-09-26", kind:"Bug fix", headline:"Estimate editing fixed", where:"Tap a task → Edit → Estimate", go:"task:task-edit", description:"Editing a task's estimate works properly: you can clear the hours and minutes and type new ones, any number of minutes saves (90 minutes becomes 1h 30m), and phones no longer zoom in when you tap a field." },
   { id:"floating-search", date:"2026-09-26", kind:"New feature", headline:"Floating search", where:"Tasks tab → Search tasks, above your list", go:"tasks:search", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
-  { id:"cards-glide", date:"2026-09-26", kind:"Improvement", headline:"Tasks glide into place", where:"Your task list, in any layout", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once -- new ones fade in and removed ones fade out." },
+  { id:"cards-glide", date:"2026-09-26", kind:"Improvement", headline:"Tasks glide into place", where:"Your task list, in any layout", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once. New ones fade in and removed ones fade out." },
   { id:"fixes-sep23", date:"2026-09-23", kind:"Bug fix", headline:"Timer and account fixes", where:"Focus tab (the Pomodoro), and the timer in a task's details", go:"tasks:tab-focus", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
-  { id:"trash-sync-fix", date:"2026-09-22", kind:"Fix", headline:"Recently deleted stays put", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"history:trash", description:"Tasks you delete while signed in now reliably stay in Recently deleted -- a sync timing issue could make them vanish from it." },
+  { id:"trash-sync-fix", date:"2026-09-22", kind:"Fix", headline:"Recently deleted stays put", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"history:trash", description:"Tasks you delete while signed in now reliably stay in Recently deleted. A sync timing issue could make them vanish from it." },
   { id:"bulk-everywhere", date:"2026-09-22", kind:"New feature", headline:"Select in every layout", where:"Tasks tab → Select, next to the filters", go:"tasks:select", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
-  { id:"a11y-pass", date:"2026-09-22", kind:"Improvement", headline:"Keyboard and screen reader support", where:"Everywhere -- try Tab, Enter and the arrow keys", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
+  { id:"a11y-pass", date:"2026-09-22", kind:"Improvement", headline:"Keyboard and screen reader support", where:"Everywhere. Try Tab, Enter and the arrow keys", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
   { id:"complete-anim", date:"2026-09-22", kind:"Improvement", headline:"A more satisfying check-off", where:"Tap the circle next to any task", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
   { id:"sheet-spring", date:"2026-09-22", kind:"Improvement", headline:"Springy task details", where:"Tap a task, then drag the handle at the top", go:"task", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
   { id:"glass-cursor", date:"2026-09-22", kind:"Improvement", headline:"Liquid Glass catches the light", where:"Menu (tap DuePlanner) → Settings → Looks → Liquid Glass", go:"settings:liquid-glass", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
-  { id:"pomodoro-breaks", date:"2026-09-22", kind:"New feature", headline:"Pomodoro breaks", where:"Menu (tap DuePlanner) → Settings → Focus timer; the timer is in the Focus tab", go:"settings:focus-timer", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next -- one tap to start." },
+  { id:"pomodoro-breaks", date:"2026-09-22", kind:"New feature", headline:"Pomodoro breaks", where:"Menu (tap DuePlanner) → Settings → Focus timer; the timer is in the Focus tab", go:"settings:focus-timer", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next, with one tap to start." },
   { id:"fixes-sep22", date:"2026-09-22", kind:"Bug fix", headline:"A batch of fixes", description:"Un-completing an archived task no longer makes it disappear; long titles and subject names are capped instead of failing to sync; swiping a finished task now says \"Mark not done\"; Empty in Recently deleted asks to confirm; 24-hour time now applies everywhere; and a few labels say what they actually do (\"In 3 hours\", \"Next 7 days\")." },
   { id:"settings-batch", date:"2026-09-22", kind:"New feature", headline:"Subject colors, Done today and more undo", where:"Menu (tap DuePlanner) → Settings → Subjects, and Settings → Date & time; Done today is in the Inbox", go:"settings:subjects", description:"Rename subjects and change their colors (✎ in Settings -> Subjects); a \"Done today\" list in the Inbox; 24-hour time and a Monday week start in Settings -> Date & time; and completing, editing, archiving and bulk changes can now be undone." },
   { id:"safer-sync", date:"2026-09-22", kind:"Improvement", headline:"Safer syncing", where:"Menu (tap DuePlanner) → Profile shows when you last synced", go:"profile", description:"Syncing between devices is safer: edits made at the same time on two devices are merged field by field instead of one overwriting the other, Recently deleted now syncs too, and the title menu shows when you last synced (or that you're offline)." },
   { id:"time-left-more", date:"2026-09-22", kind:"New feature", headline:"A smarter Time left", where:"Tap Time left, top right", go:"tasks:time-left", description:"The \"Time left\" dropdown now splits time by due date, shows time worked per subject, flags tasks with no estimate, and can start Focus on the most urgent task in your biggest subject." },
   { id:"fewer-layouts", date:"2026-09-22", kind:"UI change", headline:"Seven layouts", where:"Menu (tap DuePlanner) → Settings → Looks → Layout", go:"settings:layout", description:"Trimmed the layouts to seven: Compact, Minimal, Sticky, Timeline and By Subject are gone. If you were using one, you're back on List." },
   { id:"recently-deleted", date:"2026-09-22", kind:"New feature", headline:"Recently deleted", where:"Menu (tap DuePlanner) → History → Recently deleted", go:"history:trash", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
-  { id:"skip-occurrence", date:"2026-09-22", kind:"New feature", headline:"Skip a repeat", where:"Tap a repeating task → Skip this one", go:"task:task-skip", description:"Repeating tasks have \"Skip this one\" in their detail view -- moves to the next occurrence without completing it. Undoable." },
+  { id:"skip-occurrence", date:"2026-09-22", kind:"New feature", headline:"Skip a repeat", where:"Tap a repeating task → Skip this one", go:"task:task-skip", description:"Repeating tasks have \"Skip this one\" in their detail view. It moves to the next occurrence without completing it. Undoable." },
   { id:"countdown", date:"2026-09-22", kind:"New feature", headline:"Live countdowns", where:"Your task list, on tasks due today at a set time", description:"Tasks due today at a set time show a live countdown, like \"Due in 2h 15m\"." },
   { id:"profile-in-menu", date:"2026-09-22", kind:"UI change", headline:"Profile moved to the menu", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Profile now lives only in the title menu, which also shows when there's a sync issue." },
-  { id:"edit-tasks", date:"2026-09-22", kind:"New feature", headline:"Edit tasks", where:"Tap a task → Edit", go:"task:task-edit", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view -- tap Edit." },
-  { id:"snooze", date:"2026-09-22", kind:"New feature", headline:"Snooze", where:"Tap a task → Snooze", go:"task:task-snooze", description:"Snooze a task to later today, tomorrow, or next week from its detail view -- and undo it if you change your mind." },
+  { id:"edit-tasks", date:"2026-09-22", kind:"New feature", headline:"Edit tasks", where:"Tap a task → Edit", go:"task:task-edit", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view. Just tap Edit." },
+  { id:"snooze", date:"2026-09-22", kind:"New feature", headline:"Snooze", where:"Tap a task → Snooze", go:"task:task-snooze", description:"Snooze a task to later today, tomorrow, or next week from its detail view, and undo it if you change your mind." },
   { id:"duplicate-restore", date:"2026-09-22", kind:"New feature", headline:"Duplicate and restore", where:"Tap a task → Duplicate, or Restore on an archived task", go:"task:task-duplicate", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
-  { id:"json-import", date:"2026-09-22", kind:"New feature", headline:"Import a backup", where:"Menu (tap DuePlanner) → Import/Export → Import backup (JSON)", go:"import:import-backup", description:"Import backup (JSON) in the menu's Backup & export section restores an export -- tasks you already have are kept." },
+  { id:"json-import", date:"2026-09-22", kind:"New feature", headline:"Import a backup", where:"Menu (tap DuePlanner) → Import/Export → Import backup (JSON)", go:"import:import-backup", description:"Import backup (JSON) in the menu's Backup & export section restores an export. Tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", kind:"New feature", headline:"1-week reminders", where:"Menu (tap DuePlanner) → Settings → Reminders → Remind me", go:"settings:reminders", description:"New \"1 week before\" reminder option in Settings." },
   { id:"focus-picker", date:"2026-09-22", kind:"New feature", headline:"Pick your focus task", where:"Focus tab → Change task", go:"focus:change-task", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
   { id:"liquid-glass", date:"2026-09-22", kind:"New feature", headline:"Liquid Glass", where:"Menu (tap DuePlanner) → Settings → Looks → Liquid Glass", go:"settings:liquid-glass", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
@@ -297,7 +298,7 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"icon-color-fix", date:"2026-09-22", kind:"Bug fix", headline:"Icon colors fixed", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
   { id:"history-collapsible", date:"2026-09-22", kind:"UI change", headline:"Collapsible History", where:"Menu (tap DuePlanner) → History", go:"history:undo-redo", description:"History is now a collapsible section in the title menu instead of always expanded." },
   { id:"undo-redo", date:"2026-09-22", kind:"New feature", headline:"Undo and redo", where:"Menu (tap DuePlanner) → History", go:"history:undo-redo", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
-  { id:"settings-in-menu", date:"2026-09-22", kind:"Navigation", headline:"Settings moved", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"Settings moved out of the tab bar -- open it from the title menu instead." },
+  { id:"settings-in-menu", date:"2026-09-22", kind:"Navigation", headline:"Settings moved", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"Settings moved out of the tab bar. Open it from the title menu instead." },
   { id:"title-menu", date:"2026-09-22", kind:"UI change", headline:"The title menu", where:"Tap DuePlanner, top left", description:"The DuePlanner title is now a menu with quick access to Inbox, History, Profile, and Settings." },
   { id:"wizard-cancel-moved", date:"2026-09-22", kind:"UI change", headline:"Cancel moved", where:"Tasks tab → + Add homework", go:"tasks:add", description:"Cancel moved out from between the add-task wizard's back/skip buttons to avoid accidental taps." },
   { id:"wizard-back-skip", date:"2026-09-22", kind:"New feature", headline:"Back and skip", where:"Tasks tab → + Add homework, under each question", go:"tasks:add", description:"Added back and skip buttons to the add-task wizard, so you can revisit or skip a question." },
@@ -364,7 +365,7 @@ const DEFAULT_TASKS: Task[] = [
 // broken and insecure; nothing about it needs a network call).
 function buildSuggestion(tasks:Task[]):string {
   const pending=tasks.filter(t=>!t.done&&!t.archived);
-  if (pending.length===0) return "Nothing left to do -- great work!";
+  if (pending.length===0) return "Nothing left to do. Great work!";
   if (pending.length===1) return `Just one task left: "${pending[0].title}". You've got this!`;
   const sorted=[...pending].sort((a,b)=>{
     const o:Record<string,number>={high:0,medium:1,low:2};
@@ -821,7 +822,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
           </button>
           {templateName===null&&<button onClick={()=>{setTemplateSaved(false);setTemplateName(task.title);}}
             style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
-            {templateSaved?"✓ Saved -- find it under \"+ Add homework\"":"Save as template"}
+            {templateSaved?"✓ Saved. Find it under \"+ Add homework\"":"Save as template"}
           </button>}
           {templateName!==null&&<form onSubmit={e=>{e.preventDefault();if(templateName.trim()){onSaveAsTemplate(templateName.trim());setTemplateName(null);setTemplateSaved(true);}}} style={{display:"flex",gap:6,marginTop:8}}>
             <input autoFocus value={templateName} onChange={e=>setTemplateName(e.target.value)} placeholder="Template name" aria-label="Template name" style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:12,outline:"none"}}/>
@@ -1436,7 +1437,7 @@ function ProfileModal({T,F,fbUser,signInError,syncError,syncStatus,visibleTasks,
         </button>
         {signInError&&<div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:ink("#FF4757",T.light),marginBottom:12,lineHeight:1.5}}>{signInError}</div>}
         <div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textFaint,lineHeight:1.6}}>
-          Signing in syncs your homework across your devices. We never sell your data or use it for ads -- see the <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{color:T.textMuted}}>privacy policy</a> for the services that help run the app.
+          Signing in syncs your homework across your devices. We never sell your data or use it for ads. See the <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{color:T.textMuted}}>privacy policy</a> for the services that help run the app.
         </div>
       </div>
       {/* Add to Home Screen -- the browser's own install prompt where it offers
@@ -1709,7 +1710,7 @@ export default function HomeworkPlanner() {
     if(!("Notification" in window)){ setNotificationNote("Notifications aren't supported in this browser."); setNotificationsEnabled(false); return; }
     const perm=await Notification.requestPermission();
     if(perm==="granted"){ setNotificationsEnabled(true); setNotificationNote(null); }
-    else { setNotificationsEnabled(false); setNotificationNote("Notifications were blocked -- allow them for this site in your browser settings to turn this on."); }
+    else { setNotificationsEnabled(false); setNotificationNote("Notifications were blocked. Allow them for this site in your browser settings to turn this on."); }
   }
   // Multiple, independently-toggleable lead times for tasks that have a
   // specific due TIME (not just a date) -- e.g. both "1 day before" and
@@ -2066,7 +2067,7 @@ export default function HomeworkPlanner() {
       setSyncError(null);
     },err=>{
       console.error(err);
-      setSyncError("Couldn't sync with the cloud -- your changes are saved on this device, but may not reach your other devices until this is resolved.");
+      setSyncError("Couldn't sync with the cloud. Your changes are saved on this device, but may not reach your other devices until this is resolved.");
     });
     return unsub;
   },[fbUser,readyForUid,setLayout,setColorCodeUrgency,setSubjects,setTimeFormat,setWeekStart]);
@@ -2082,7 +2083,7 @@ export default function HomeworkPlanner() {
       .then(()=>setSyncError(null))
       .catch(err=>{
         console.error(err);
-        setSyncError("Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
+        setSyncError("Couldn't save to the cloud. Your changes are safe on this device, but won't reach your other devices until this is resolved.");
       })
       .finally(()=>{isSyncingProfile.current=false;});
   },[layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart,fbUser,profileSyncedForUid]);
@@ -2140,7 +2141,7 @@ export default function HomeworkPlanner() {
     };
     const onErr=(err:unknown)=>{
       console.error(err);
-      setSyncError("Couldn't sync with the cloud -- your changes are saved on this device, but may not reach your other devices until this is resolved.");
+      setSyncError("Couldn't sync with the cloud. Your changes are saved on this device, but may not reach your other devices until this is resolved.");
     };
     const toMap=(docs:QueryDocumentSnapshot[],deleted:boolean)=>{
       const m=new Map<number,CloudRecord<Task>>();
@@ -2221,7 +2222,7 @@ export default function HomeworkPlanner() {
           addTaskWriteFromActual(retry,refs,id,L,{tasks:tk.exists(),trash:tr.exists()},updatedAt,counted);
           await retry.commit().catch(err2=>{
             // Still refused while adding: most likely the per-account cap.
-            if(L&&!tk.exists()&&!tr.exists())setSyncError(`You've reached the limit of ${LIMITS.tasks.toLocaleString()} tasks (including archived and recently deleted ones) -- new tasks are saved on this device, but won't sync until you delete some.`);
+            if(L&&!tk.exists()&&!tr.exists())setSyncError(`You've reached the limit of ${LIMITS.tasks.toLocaleString()} tasks (including archived and recently deleted ones). New tasks are saved on this device, but won't sync until you delete some.`);
             throw err2;
           });
         }).finally(()=>{
@@ -2239,7 +2240,7 @@ export default function HomeworkPlanner() {
         .then(()=>setSyncError(null))
         .catch(err=>{
           console.error(err);
-          setSyncError(prev=>prev?.startsWith("You've reached the limit")?prev:"Couldn't save to the cloud -- your changes are safe on this device, but won't reach your other devices until this is resolved.");
+          setSyncError(prev=>prev?.startsWith("You've reached the limit")?prev:"Couldn't save to the cloud. Your changes are safe on this device, but won't reach your other devices until this is resolved.");
         });
     };
     pendingTasksWrite.current=run;
@@ -2289,7 +2290,7 @@ export default function HomeworkPlanner() {
       // site's own origin. Asking the user to allow popups and retry with
       // the *more* reliable method beats silently falling back to the one
       // that's known to fail here.
-      setSignInError("Your browser blocked the sign-in popup. Please allow popups for this site, then try again -- that's more reliable here than the alternative full-page redirect method.");
+      setSignInError("Your browser blocked the sign-in popup. Please allow popups for this site, then try again. That's more reliable here than the alternative full-page redirect method.");
     }
   }
   async function signOutFirebase(){
@@ -2580,7 +2581,7 @@ export default function HomeworkPlanner() {
       const logId=pomodoroTaskRef.current;
       if(logId!=null)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:addSession(t.sessions,{mins:pomodoroWorkMins,at:Date.now()})}:t));
       setLastWorkedTaskId(logId);setPomodoroPhase("break");setPomodoroSecs(pomodoroBreakMins*60);setPomodoroActive(autoStartBreaks);setPomodoroDone(true);setBreakEnded(false);
-      try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:autoStartBreaks?`Nice work -- your ${pomodoroBreakMins}-minute break has started.`:`Nice work -- time for a ${pomodoroBreakMins}-minute break.`}); }catch{/* notifications unavailable */}
+      try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:autoStartBreaks?`Nice work! Your ${pomodoroBreakMins}-minute break has started.`:`Nice work! Time for a ${pomodoroBreakMins}-minute break.`}); }catch{/* notifications unavailable */}
     }else{
       setPomodoroPhase("work");setPomodoroSecs(pomodoroWorkMins*60);setPomodoroActive(false);setPomodoroDone(false);setBreakEnded(true);
       const next=nextSuggestionRef.current;
@@ -2671,7 +2672,7 @@ export default function HomeworkPlanner() {
   const clockTime=(ms:number)=>{const d=new Date(ms);return formatTime(`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`,h24);};
   // One line for the title menu: where this device's changes stand.
   const syncStatus=!fbUser?null
-    :!online?"Offline -- changes will sync when you're back online"
+    :!online?"Offline. Changes will sync when you're back online"
     :hasPendingWrites?"Saving..."
     :lastSyncedAt?`Synced ${formatAgo(lastSyncedAt,now)}`
     :"Connecting...";
@@ -3703,7 +3704,7 @@ export default function HomeworkPlanner() {
     // Focus Mode it's a card above the task instead (renderBreakSuggestion).
     if(breakEnded&&!focusMode&&nextSuggestion) return (
       <div role="status" style={shell}>
-        <span style={{fontFamily:F.body,fontSize:12,color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Break's over -- {suggestionIsContinue?"keep going on":"next up:"} {nextSuggestion.title}</span>
+        <span style={{fontFamily:F.body,fontSize:12,color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Break's over, {suggestionIsContinue?"keep going on":"next up:"} {nextSuggestion.title}</span>
         <button onClick={startSuggested} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Start</button>
         <button onClick={()=>setBreakEnded(false)} aria-label="Dismiss" style={{background:"none",border:"none",color:T.textMuted,fontSize:15,cursor:"pointer",flexShrink:0,padding:"0 4px"}}>×</button>
       </div>
@@ -3711,7 +3712,7 @@ export default function HomeworkPlanner() {
     if(!pomodoroDone)return null;
     return (
       <div role="status" style={shell}>
-        <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{autoStartBreaks?`Pomodoro done -- ${pomodoroBreakMins}-minute break started`:"Pomodoro done -- take a short break"}</span>
+        <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{autoStartBreaks?`Pomodoro done. ${pomodoroBreakMins}-minute break started`:"Pomodoro done. Take a short break"}</span>
         <button onClick={()=>setPomodoroDone(false)} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>OK</button>
       </div>
     );
@@ -3734,7 +3735,7 @@ export default function HomeworkPlanner() {
             <button onClick={startSuggested} style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 12px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Start {pomodoroWorkMins} min</button>
             <button onClick={()=>{setBreakEnded(false);setFocusPickerOpen(true);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Pick another</button>
           </div>
-        </>:<div style={{fontFamily:F.body,fontSize:12,color:T.textMuted,marginTop:6}}>Nothing left on your list -- nice.</div>}
+        </>:<div style={{fontFamily:F.body,fontSize:12,color:T.textMuted,marginTop:6}}>Nothing left on your list. Nice.</div>}
       </div>
     );
   }
@@ -3805,7 +3806,7 @@ export default function HomeworkPlanner() {
           <div ref={titleMenuRef} style={{position:"relative"}}>
             <button onClick={()=>setTitleMenuOpen(o=>!o)} aria-expanded={titleMenuOpen} aria-label="DuePlanner menu" style={{background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",display:"block"}}>
               <div style={{fontFamily:F.heading,fontSize:28,lineHeight:1,color:T.accent}}>Due<span style={{color:T.text}}>Planner</span></div>
-              <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2}}>by due. studios{fbUser&&!online&&<span title="Offline -- changes will sync when you're back online" style={{color:ink("#FFA502",T.light),marginLeft:6}}>· offline</span>}</div>
+              <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2}}>by due. studios{fbUser&&!online&&<span title="Offline. Changes will sync when you're back online" style={{color:ink("#FFA502",T.light),marginLeft:6}}>· offline</span>}</div>
             </button>
             {titleMenuOpen&&(
               <div role="group" aria-label="DuePlanner menu" style={{position:"absolute",top:"calc(100% + 8px)",left:0,zIndex:200,width:280,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",overflow:"hidden"}}>
@@ -3815,7 +3816,7 @@ export default function HomeworkPlanner() {
                     <span style={{display:"block",fontFamily:F.body,fontSize:13,color:T.text}}>Profile</span>
                     {syncStatus&&!syncError&&<span style={{display:"block",fontFamily:F.body,fontSize:10,color:online?T.textFaint:"#FFA502",marginTop:2}}>{syncStatus}</span>}
                   </span>
-                  {syncError&&<span title="Sync issue -- open Profile for details" style={{fontFamily:F.body,fontSize:11,color:ink("#FF4757",T.light)}}>⚠ Sync issue</span>}
+                  {syncError&&<span title="Sync issue. Open Profile for details" style={{fontFamily:F.body,fontSize:11,color:ink("#FF4757",T.light)}}>⚠ Sync issue</span>}
                 </button>
                 <button onClick={()=>{setActiveTab("inbox");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <IconBell/>
@@ -3961,7 +3962,7 @@ export default function HomeworkPlanner() {
                   <span aria-hidden="true" style={{fontSize:12,marginTop:1}}>✦</span>
                   <span style={{fontFamily:F.body,fontSize:12,color:T.text,lineHeight:1.4,whiteSpace:"pre-line"}}>{suggestion}</span>
                 </div>
-                <button onClick={()=>setHiddenSuggestionFor(topTask.id)} aria-label="Hide this suggestion" title="Hide for now -- it comes back when another task becomes most urgent" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
+                <button onClick={()=>setHiddenSuggestionFor(topTask.id)} aria-label="Hide this suggestion" title="Hide for now. It comes back when another task becomes most urgent" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
               </div>
             </div>
           ):null)}
@@ -3990,7 +3991,7 @@ export default function HomeworkPlanner() {
           </div>
 
           {renderTasks(filteredTasks)}
-          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>{filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending -- nice work!":filter==="noest"?"Every open task has an estimate":"Nothing here yet -- add some homework below"}</div>}
+          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>{filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending. Nice work!":filter==="noest"?"Every open task has an estimate":"Nothing here yet. Add some homework below"}</div>}
           <div style={{marginTop:14}}>
             {!adding?(
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,paddingTop:10}}>
@@ -4032,7 +4033,7 @@ export default function HomeworkPlanner() {
                         </div>
                       ):(
                         <div>
-                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10}}>Due {formatDate(pendingDueDate)} -- what time?</div>
+                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10}}>Due {formatDate(pendingDueDate)}. What time?</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:12}}>
                             {[{l:"Any time",v:""},{l:formatTime("09:00",h24),v:"09:00"},{l:formatTime("15:00",h24),v:"15:00"},{l:formatTime("23:59",h24),v:"23:59"}].map(({l,v})=>(
                               <button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>confirmDueTime(v)}>{l}</button>
@@ -4233,7 +4234,7 @@ export default function HomeworkPlanner() {
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
                       <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Import from Syllabus</div>
                       <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:10,lineHeight:1.5}}>
-                        Paste your syllabus below. Lines with a date (e.g. "Sept 20", "9/20", "2026-09-20") are picked up as assignments -- review and uncheck anything that isn't one before adding.
+                        Paste your syllabus below. Lines with a date (e.g. "Sept 20", "9/20", "2026-09-20") are picked up as assignments. Review and uncheck anything that isn't one before adding.
                       </div>
                       <textarea
                         value={importText}
@@ -4260,7 +4261,7 @@ export default function HomeworkPlanner() {
                             Found {importPreview.length} assignment{importPreview.length===1?"":"s"}
                           </div>
                           {importPreview.length===0?(
-                            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"16px 0"}}>No dated lines found -- try a different format.</div>
+                            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"16px 0"}}>No dated lines found. Try a different format.</div>
                           ):(<>
                             <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,maxHeight:200,overflowY:"auto"}}>
                               {importPreview.map((it,i)=>(
@@ -4314,7 +4315,7 @@ export default function HomeworkPlanner() {
                     </button>
                   ))}
                 </div>
-                {themeMode==="auto"&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>Following your device -- currently {effectiveThemeMode}</div>}
+                {themeMode==="auto"&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>Following your device, currently {effectiveThemeMode}</div>}
               </div>
               {/* Layouts */}
               <div data-tour="layout">
@@ -4355,7 +4356,7 @@ export default function HomeworkPlanner() {
                   ))}
                 </div>
                 <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>
-                  Only changes anything on wider screens -- phones always get the narrow view
+                  Only changes anything on wider screens. Phones always get the narrow view
                 </div>
               </div>
               {/* Urgency color coding */}
@@ -4509,7 +4510,7 @@ export default function HomeworkPlanner() {
                 <Toggle on={notificationsEnabled} onChange={toggleNotifications} T={T} label="Due date reminders"/>
               </div>
               {notificationNote&&<div style={{fontFamily:F.body,fontSize:10,color:ink("#FF4757",T.light),marginTop:8}}>{notificationNote}</div>}
-              {notificationsEnabled&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>Only fires while this tab is open or when you reopen it -- not true background push.</div>}
+              {notificationsEnabled&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>Only fires while this tab is open or when you reopen it, not true background push.</div>}
               {notificationsEnabled&&(
                 <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${T.border}`}}>
                   <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Remind me</div>
@@ -4531,7 +4532,7 @@ export default function HomeworkPlanner() {
             </SettingsSection>
             <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>
             {(()=>{const n=tasks.filter(t=>t.done&&!t.archived).length;return(
-            <button disabled={n===0} onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived -- you can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:n?"pointer":"default",opacity:n?1:0.45,width:"100%"}}>{n?`Clear ${plural(n)} completed`:"No completed tasks to clear"}</button>);})()}
+            <button disabled={n===0} onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived. You can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:n?"pointer":"default",opacity:n?1:0.45,width:"100%"}}>{n?`Clear ${plural(n)} completed`:"No completed tasks to clear"}</button>);})()}
             {fbUser&&(
               <SettingsSection title="Danger Zone" danger {...sec("danger")}>
                 {!showDeleteAccountConfirm ? (
@@ -4539,7 +4540,7 @@ export default function HomeworkPlanner() {
                 ) : (
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                     <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,lineHeight:1.5}}>
-                      This permanently deletes your account, every task, and all settings -- on this device and in the cloud. This can't be undone. Type <b>DELETE</b> to confirm.
+                      This permanently deletes your account, every task, and all settings, on this device and in the cloud. This can't be undone. Type <b>DELETE</b> to confirm.
                     </div>
                     <input value={deleteConfirmText} onChange={e=>setDeleteConfirmText(e.target.value)} placeholder="DELETE" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
                     {deleteAccountError&&<div style={{fontFamily:F.body,fontSize:11,color:ink("#FF4757",T.light)}}>{deleteAccountError}</div>}

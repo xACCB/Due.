@@ -243,6 +243,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (UpdateDetail).
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"profile-no-signin-flash", date:"2026-10-03", kind:"Bug fix", headline:"No sign-in flash", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Opening Profile right after the app loads no longer shows the sign-in screen for a moment when you're already signed in." },
   { id:"inbox-dropdowns", date:"2026-10-03", kind:"UI change", headline:"A tidier Inbox", where:"Menu (tap DuePlanner) → Inbox", description:"Done today, Personal and Updates are now dropdowns. Tap a heading to open or close it. Updates also has filter buttons, so you can show only new features, bug fixes, or any other kind of update." },
   { id:"copy-no-dashes", date:"2026-10-03", kind:"UI change", headline:"Plainer wording", where:"Everywhere: suggestions, messages and these updates", description:"Messages, suggestions and update notes across the app are written as plain sentences now, without dashes splitting them in two." },
   { id:"profile-counts-archived", date:"2026-10-03", kind:"Bug fix", headline:"Profile counts fixed", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Profile's task numbers (total, done, pending, urgent and the per-subject bars) no longer count archived tasks, so they match what's on your list." },
@@ -1405,9 +1406,9 @@ function isStandalone(){
 // wipe out the text. newSubjectText/setNewSubjectText are lifted to the
 // parent specifically so they survive that; being hoisted now means this
 // component itself is no longer being recreated in the first place either.
-function ProfileModal({T,F,fbUser,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,setShowProfile,signInWithFirebase,signOutFirebase}:{
+function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,setShowProfile,signInWithFirebase,signOutFirebase}:{
   T:ThemeObj; F:typeof FONT;
-  fbUser:User|null; signInError:string|null; syncError:string|null; syncStatus:string|null;
+  fbUser:User|null; authPending:boolean; signInError:string|null; syncError:string|null; syncStatus:string|null;
   visibleTasks:Task[]; totalMins:number;
   subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
   setShowProfile:(v:boolean)=>void;
@@ -1420,6 +1421,20 @@ function ProfileModal({T,F,fbUser,signInError,syncError,syncStatus,visibleTasks,
   const pct=totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
   const [installHint,setInstallHint]=useState<string|null>(null);
   const subjectCounts=subjects.map(s=>({name:s,count:visibleTasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
+
+  // Signed in last time, but Firebase hasn't said so yet this load: show the
+  // Profile page's own header rather than flashing the sign-in screen.
+  if (!fbUser&&authPending) return (
+    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,overflowY:"auto"}}>
+      <div style={{maxWidth:560,margin:"0 auto",padding:"20px 16px 40px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div style={{fontFamily:F.heading,fontSize:22,color:T.accent}}>Profile</div>
+          <button onClick={()=>setShowProfile(false)} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+        </div>
+        <div role="status" style={{textAlign:"center",fontFamily:F.body,fontSize:12,color:T.textFaint,marginTop:48}}>Loading your profile…</div>
+      </div>
+    </div>
+  );
 
   if (!fbUser) return (
     // ── SIGN IN SCREEN (monkeytype-style) ─────────────────────────────────────
@@ -1885,6 +1900,10 @@ export default function HomeworkPlanner() {
 
   // ── FIREBASE AUTH ─────────────────────────────────────────────────────────────
   const [fbUser,setFbUser]=useState<User|null>(null);
+  // True from load until Firebase first reports the auth state, but only if
+  // this device was signed in last time ("hw-signed-in"). Lets Profile show a
+  // loading state instead of the sign-in screen for that moment.
+  const [authPending,setAuthPending]=useState(()=>localStorage.getItem("hw-signed-in")==="1");
   const [signInError,setSignInError]=useState<string|null>(null);
   // Surfaces a failure from either half of the Firestore sync (read or write)
   // -- previously both failed completely silently, so a permission error or
@@ -1968,8 +1987,9 @@ export default function HomeworkPlanner() {
   useEffect(()=>{
     const unsub=onAuthStateChanged(auth,user=>{
       setFbUser(user);
-      if(user) localStorage.removeItem("hw-signin-redirect-pending");
-      else { setProfileSyncedForUid(null); setTasksSyncedForUid(null); setReadyForUid(null); setIsNewAccountForUid(null); }
+      setAuthPending(false);
+      if(user) { localStorage.removeItem("hw-signin-redirect-pending"); localStorage.setItem("hw-signed-in","1"); }
+      else { localStorage.removeItem("hw-signed-in"); setProfileSyncedForUid(null); setTasksSyncedForUid(null); setReadyForUid(null); setIsNewAccountForUid(null); }
     });
     // Only relevant if signInWithFirebase had to fall back to the redirect
     // method below (e.g. a browser that blocks/mishandles the popup) -- this
@@ -4615,7 +4635,7 @@ export default function HomeworkPlanner() {
       </ErrorBoundary>}
       {showProfile&&<ProfileModal
         T={T} F={F}
-        fbUser={fbUser} signInError={signInError} syncError={syncError} syncStatus={syncStatus}
+        fbUser={fbUser} authPending={authPending} signInError={signInError} syncError={syncError} syncStatus={syncStatus}
         visibleTasks={visibleTasks.filter(t=>!t.archived)} totalMins={totalMins}
         subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         setShowProfile={setShowProfile}

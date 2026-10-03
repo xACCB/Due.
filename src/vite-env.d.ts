@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   // (verified server-side by Google), so it's fine to set directly in
   // Vercel's project env vars without marking it sensitive.
   readonly VITE_RECAPTCHA_SITE_KEY?: string;
+  readonly VITE_GOOGLE_CLIENT_ID?: string;
 }
 
 interface ImportMeta {

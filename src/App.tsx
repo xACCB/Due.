@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { initializeApp } from "firebase/app";
-import { getAuth, connectAuthEmulator, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged, deleteUser } from "firebase/auth";
+import { getAuth, connectAuthEmulator, signInWithCredential, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut as fbSignOut, onAuthStateChanged, deleteUser } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { initializeFirestore, connectFirestoreEmulator, doc, getDoc, getDocFromServer, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
@@ -14,6 +14,7 @@ import { THEMES } from "./themes";
 import type { ThemeName, ThemeObj } from "./themes";
 import { localDateStr, todayISO, advanceDate, startOfWeek } from "./lib/dates";
 import { nextId } from "./lib/id";
+import { googleIdentity, onGoogleCredential } from "./lib/googleIdentity";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, readableOn, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
@@ -83,6 +84,11 @@ if (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULATORS === "1") {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 }
 const googleProvider = new GoogleAuthProvider();
+// The Google OAuth web client id (public, like firebaseConfig). When set, the
+// sign-in screen uses Google's own button (src/lib/googleIdentity.ts) instead
+// of the Firebase popup. Not used against the emulators, which can't verify a
+// real Google token.
+const googleClientId:string|undefined = import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULATORS === "1" ? undefined : import.meta.env.VITE_GOOGLE_CLIENT_ID;
 // App Check proves requests are coming from this real app (not a script
 // hitting the project directly with the public firebaseConfig above) via a
 // reCAPTCHA Enterprise attestation (classic reCAPTCHA v3 is deprecated in
@@ -1406,13 +1412,32 @@ function isStandalone(){
 // wipe out the text. newSubjectText/setNewSubjectText are lifted to the
 // parent specifically so they survive that; being hoisted now means this
 // component itself is no longer being recreated in the first place either.
-function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,setShowProfile,signInWithFirebase,signOutFirebase}:{
+// Google's own sign-in button. `fallback` (the Firebase popup button) is shown
+// instead if Google's script can't be loaded.
+function GoogleSignInButton({clientId,light,onCredential,fallback}:{clientId:string; light:boolean; onCredential:(idToken:string)=>void; fallback:React.ReactNode}){
+  const ref=useRef<HTMLDivElement>(null);
+  const [failed,setFailed]=useState(false);
+  useEffect(()=>{onGoogleCredential(onCredential);});
+  useEffect(()=>{
+    let cancelled=false;
+    googleIdentity(clientId).then(id=>{
+      if(cancelled||!ref.current)return;
+      id.renderButton(ref.current,{type:"standard",theme:light?"outline":"filled_black",size:"large",shape:"pill",text:"continue_with",logo_alignment:"center",width:Math.min(340,ref.current.clientWidth||340)});
+    }).catch(()=>{if(!cancelled)setFailed(true);});
+    return()=>{cancelled=true;};
+  },[clientId,light]);
+  if(failed)return <>{fallback}</>;
+  return <div ref={ref} style={{minHeight:44,marginBottom:12,display:"flex",justifyContent:"center"}}/>;
+}
+
+function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,setShowProfile,signInWithFirebase,signInWithGoogleToken,signOutFirebase}:{
   T:ThemeObj; F:typeof FONT;
   fbUser:User|null; authPending:boolean; signInError:string|null; syncError:string|null; syncStatus:string|null;
   visibleTasks:Task[]; totalMins:number;
   subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
   setShowProfile:(v:boolean)=>void;
   signInWithFirebase:()=>Promise<void>;
+  signInWithGoogleToken:(idToken:string)=>Promise<void>;
   signOutFirebase:()=>Promise<void>;
 }) {
   const doneTasks=visibleTasks.filter(t=>t.done).length;
@@ -1447,12 +1472,19 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
       </div>
       {/* Sign in box */}
       <div style={{width:"100%",maxWidth:340}}>
-        <button onClick={signInWithFirebase}
-          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 20px",cursor:"pointer",marginBottom:12,transition:"all 0.15s"}}>
-          {/* Google icon */}
-          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
-          <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Continue with Google</span>
-        </button>
+        {(()=>{
+          const popupButton=(
+            <button onClick={signInWithFirebase}
+              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 20px",cursor:"pointer",marginBottom:12,transition:"all 0.15s"}}>
+              {/* Google icon */}
+              <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+              <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Continue with Google</span>
+            </button>
+          );
+          return googleClientId
+            ?<GoogleSignInButton clientId={googleClientId} light={!!T.light} onCredential={signInWithGoogleToken} fallback={popupButton}/>
+            :popupButton;
+        })()}
         {signInError&&<div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:ink("#FF4757",T.light),marginBottom:12,lineHeight:1.5}}>{signInError}</div>}
         <div style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textFaint,lineHeight:1.6}}>
           Signing in syncs your homework across your devices. We never sell your data or use it for ads. See the <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{color:T.textMuted}}>privacy policy</a> for the services that help run the app.
@@ -2279,6 +2311,21 @@ export default function HomeworkPlanner() {
     tasksSaveTimer.current=setTimeout(run,400);
     return ()=>clearTimeout(tasksSaveTimer.current);
   },[tasks,trash,fbUser,tasksSyncedForUid]);
+
+  // Sign-in from Google's own button: it hands over a Google ID token, which
+  // Firebase exchanges for a session with no popup of its own.
+  async function signInWithGoogleToken(idToken:string){
+    setSignInError(null);
+    mergeLocalOnSignIn.current=true;
+    try{
+      await signInWithCredential(auth,GoogleAuthProvider.credential(idToken));
+    } catch(e){
+      mergeLocalOnSignIn.current=false;
+      console.error(e);
+      const code=(e as {code?:string})?.code||"unknown";
+      setSignInError(`Sign-in didn't go through (${code}). Please try again.`);
+    }
+  }
 
   async function signInWithFirebase(){
     setSignInError(null);
@@ -4640,6 +4687,7 @@ export default function HomeworkPlanner() {
         subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         setShowProfile={setShowProfile}
         signInWithFirebase={signInWithFirebase}
+        signInWithGoogleToken={signInWithGoogleToken}
         signOutFirebase={signOutFirebase}
       />}
       {renderPomodoroToast()}

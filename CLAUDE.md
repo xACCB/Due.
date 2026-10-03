@@ -82,6 +82,14 @@ auto-falls-back from a blocked popup to `signInWithRedirect`; popup doesn't depe
 Redirect is now only attempted automatically for `auth/operation-not-supported-in-this-environment`
 (genuinely no popup support, e.g. some embedded webviews).
 
+**Google's own sign-in button (optional).** With `VITE_GOOGLE_CLIENT_ID` set (the Firebase
+project's OAuth *web* client id, public), the sign-in screen renders Google Identity Services'
+button (`src/lib/googleIdentity.ts`, `GoogleSignInButton`) and signs in with
+`signInWithCredential` from the ID token it returns, so there's no Firebase popup bouncing through
+`/__/auth/handler` (FedCM browsers show a browser dialog; others get Google's own account
+popup). The OAuth client must list the site under "Authorized JavaScript origins". Unset, or if
+Google's script can't load, the Firebase popup button is used as before.
+
 **App Check.** Live and **enforced** for Cloud Firestore and Authentication (since 2026-09-23):
 requests without a valid App Check token are rejected, so scripts using the public `firebaseConfig`
 can't reach the data -- this is the write-rate/abuse protection that `firestore.rules` can't

@@ -14,6 +14,7 @@ import { THEMES } from "./themes";
 import type { ThemeName, ThemeObj } from "./themes";
 import { localDateStr, todayISO, advanceDate } from "./lib/dates";
 import { nextId } from "./lib/id";
+import { FOCUS_SHOW, normalizeFocusShow, showsPomodoro, showsStopwatch, formatStopwatch, stopwatchMinutes } from "./lib/stopwatch";
 import { ANIM_SPEED, clampSpeed, setAnimationSpeed, animationRate, scaledMs } from "./lib/animSpeed";
 import { newRecaps, mergeRecaps, recapMessage } from "./lib/recaps";
 import type { Recap } from "./lib/recaps";
@@ -247,6 +248,8 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"focus-show", date:"2026-10-03", kind:"New feature", headline:"Choose what Focus shows", where:"Menu (tap DuePlanner) → Settings → Focus timer → Show in Focus", go:"settings:focus-show", description:"Pick what appears in Focus Mode: just the task, the task and the stopwatch, the task and the Pomodoro, or all three." },
+  { id:"focus-stopwatch", date:"2026-10-03", kind:"New feature", headline:"Stopwatch", where:"The Focus tab, under the Pomodoro", go:"focus:stopwatch", description:"Focus Mode has a stopwatch. Start it, pause it, and when you're done, log the time to the task you're focusing on. It keeps counting if you leave Focus Mode, and its time shows on the Focus tab." },
   { id:"menu-no-sync-line", date:"2026-10-03", kind:"UI change", headline:"Cleaner menu", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"The \"Synced 2m ago\" line is gone from under Profile in the menu. You can still see it inside Profile itself." },
   { id:"complete-faster", date:"2026-10-03", kind:"Improvement", headline:"Quicker completing", where:"Your task list: check off a task", go:"tasks", description:"Checking off a task is a little quicker. The checkmark, the strike through the title and the slide down to your done tasks all take about 15% less time." },
   { id:"anim-speed", date:"2026-10-03", kind:"New feature", headline:"Animation speed", where:"Menu (tap DuePlanner) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"A new slider sets how fast the app's animations play, from half speed to twice as fast. It applies everywhere: completing a task, cards sliding into place, opening messages and menus." },
@@ -434,6 +437,8 @@ function dateInDays(days:number):string{ const d=new Date(); d.setDate(d.getDate
 // A timestamp for the card glide's capture (see captureTaskRects). Module scope
 // for the same React Compiler purity reason as dateInDays above.
 function glideClock():number{ return performance.now(); }
+// Wall-clock time for the Focus stopwatch, at module scope for the same lint.
+function wallClock():number{ return Date.now(); }
 
 // Snooze moves a task's due date (and, for "in 3 hours", its time) forward.
 type SnoozeKind="later"|"tomorrow"|"week";
@@ -1852,6 +1857,10 @@ export default function HomeworkPlanner() {
   const [pomodoroWorkMins,setPomodoroWorkMins]=usePersistedState("hw-pomodoro-work",25);
   const [pomodoroBreakMins,setPomodoroBreakMins]=usePersistedState("hw-pomodoro-break",5);
   const [autoStartBreaks,setAutoStartBreaks]=usePersistedState("hw-pomodoro-autobreak",true);
+  // What Focus Mode shows under the task: the Pomodoro, the stopwatch, both or
+  // neither (Settings -> Focus timer; local-only like the lengths above).
+  const [storedFocusShow,setFocusShow]=usePersistedState<string>("hw-focus-show","all");
+  const focusShow=normalizeFocusShow(storedFocusShow);
   // "New task questions": which add-task questions are asked, in what order.
   // Local-only, like the Focus timer settings.
   const [savedAddQuestions,setSavedAddQuestions]=usePersistedState<unknown>("hw-add-questions",null);
@@ -2621,6 +2630,26 @@ export default function HomeworkPlanner() {
     document.addEventListener("visibilitychange",tick);
     return()=>{clearInterval(t);document.removeEventListener("visibilitychange",tick);};
   },[pomodoroActive,pomodoroPhase]);
+  // Focus Mode's stopwatch. Clock-based like the Pomodoro: it counts up from
+  // the moment it was started (plus whatever earlier runs banked), so a
+  // background tab or locked screen doesn't lose time. It keeps running
+  // outside Focus Mode; swElapsed is just what's on screen.
+  const [swStartedAt,setSwStartedAt]=useState<number|null>(null);
+  const [swBanked,setSwBanked]=useState(0);
+  const [swElapsed,setSwElapsed]=useState(0);
+  useEffect(()=>{
+    if(swStartedAt==null)return;
+    const tick=()=>setSwElapsed(swBanked+Date.now()-swStartedAt);
+    const t=setInterval(tick,250);
+    document.addEventListener("visibilitychange",tick);
+    return()=>{clearInterval(t);document.removeEventListener("visibilitychange",tick);};
+  },[swStartedAt,swBanked]);
+  function toggleStopwatch(){
+    if(swStartedAt==null){setSwStartedAt(wallClock());return;}
+    const total=swBanked+wallClock()-swStartedAt;
+    setSwBanked(total);setSwElapsed(total);setSwStartedAt(null);
+  }
+  function resetStopwatch(){setSwStartedAt(null);setSwBanked(0);setSwElapsed(0);}
   const [pomodoroDone,setPomodoroDone]=useState(false);
   // Set when a break runs out; shows the "next up" suggestion until it's
   // started or dismissed.
@@ -3522,7 +3551,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","liquid-glass":"looks","anim-speed":"looks","date-time":"datetime","focus-timer":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","liquid-glass":"looks","anim-speed":"looks","date-time":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -3762,6 +3791,32 @@ export default function HomeworkPlanner() {
     );
   }
 
+  // Saving the stopwatch logs its time to the focus task as a work session
+  // (like a finished Pomodoro does) and clears it.
+  function saveStopwatch(){
+    if(!focusTask)return;
+    const id=focusTask.id, mins=stopwatchMinutes(swStartedAt==null?swBanked:swBanked+wallClock()-swStartedAt);
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,sessions:addSession(t.sessions,{mins,at:wallClock()})}:t));
+    setLastWorkedTaskId(id);
+    resetStopwatch();
+    setSrMessage(`Logged ${formatDuration(mins)} to ${focusTask.title}`);
+  }
+  function renderStopwatchCard(){
+    const running=swStartedAt!=null;
+    const ghost={background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"};
+    return (
+      <div data-tour="stopwatch" style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
+        <div className="sl" style={{color:T.textMuted,textAlign:"left"}}>Stopwatch</div>
+        <div role="timer" aria-label="Stopwatch" style={{fontFamily:F.body,fontSize:34,color:T.text,fontWeight:500,fontVariantNumeric:"tabular-nums",margin:"6px 0 14px"}}>{formatStopwatch(swElapsed)}</div>
+        <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+          <button onClick={toggleStopwatch} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{running?"Pause":swElapsed>0?"Resume":"Start"}</button>
+          {swElapsed>0&&<button onClick={resetStopwatch} style={ghost}>Reset</button>}
+          {swElapsed>=30000&&focusTask&&<button onClick={saveStopwatch} style={ghost}>Log {formatDuration(stopwatchMinutes(swElapsed))} to task</button>}
+        </div>
+      </div>
+    );
+  }
+
   function renderPomodoroToast(){
     const shell:React.CSSProperties={position:"fixed",left:"50%",bottom:undoToast!=null&&!focusMode?76:20,transform:"translateX(-50%)",zIndex:1600,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"};
     // Outside Focus Mode, the end of a break shows its suggestion here; in
@@ -3851,7 +3906,8 @@ export default function HomeworkPlanner() {
           ):(
             <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on</div>
           )}
-          {renderPomodoroCard()}
+          {showsPomodoro(focusShow)&&renderPomodoroCard()}
+          {showsStopwatch(focusShow)&&renderStopwatchCard()}
         </div>
         {renderPomodoroToast()}
       </main>
@@ -4006,6 +4062,7 @@ export default function HomeworkPlanner() {
               style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:!liquidGlass&&active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color 0.2s, transform 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
               <Icon/>
               {id==="focus"&&pomodoroActive&&<span style={{marginLeft:6,fontSize:11,fontVariantNumeric:"tabular-nums"}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</span>}
+              {id==="focus"&&!pomodoroActive&&swStartedAt!=null&&<span style={{marginLeft:6,fontSize:11,fontVariantNumeric:"tabular-nums"}}>{formatStopwatch(swElapsed)}</span>}
             </button>;
           })}
         </div>
@@ -4451,6 +4508,12 @@ export default function HomeworkPlanner() {
             </SettingsSection>
             {/* Focus timer (Pomodoro) */}
             <SettingsSection title="Focus timer" tour="focus-timer" {...sec("focus")}>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Show in Focus</div>
+              <div data-tour="focus-show" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>
+                {FOCUS_SHOW.map(o=>(
+                  <button key={o.key} onClick={()=>setFocusShow(o.key)} aria-pressed={focusShow===o.key} style={{background:focusShow===o.key?T.accent+"22":T.surface,border:`1.5px solid ${focusShow===o.key?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:focusShow===o.key?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,lineHeight:1.35}}>{o.label}</button>
+                ))}
+              </div>
               <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Focus length</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:12}}>
                 {[15,25,45,60].map(v=>(

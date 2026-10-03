@@ -246,6 +246,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"inbox-next-back", date:"2026-10-03", kind:"UI change", headline:"Next and Back", where:"Menu (tap DuePlanner) → Inbox → open a message", description:"The buttons on an open Inbox message now say Back and Next instead of Newer and Older. Next moves down the list, Back moves up." },
   { id:"inbox-recaps", date:"2026-10-03", kind:"New feature", headline:"A real Inbox", where:"Menu (tap DuePlanner) → Inbox → Messages", description:"The Inbox now gets real messages. When a day, week, month or year ends, a recap arrives with what you finished, the time you spent, how much was on time and your busiest subject. Unread ones show a dot, and the menu shows how many are waiting. These replace the old Done today and Personal panels." },
   { id:"update-close-smooth", date:"2026-10-03", kind:"Bug fix", headline:"Smoother closing updates", where:"Menu (tap DuePlanner) → Inbox → open an update, then close it", description:"Closing an update now shrinks it back into its row in one smooth move. It no longer stops partway, loses its text, or flashes when it lands." },
   { id:"profile-no-signin-flash", date:"2026-10-03", kind:"Bug fix", headline:"No sign-in flash", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Opening Profile right after the app loads no longer shows the sign-in screen for a moment when you're already signed in." },
@@ -1062,7 +1063,7 @@ function unpin(el:HTMLElement){Object.assign(el.style,{position:"relative",margi
 // An Inbox update, opened: the row grows out of the menu into a card floating
 // in the middle of a blurred screen (its box animates from the row's box to
 // the card's, so nothing stretches), and shrinks back into the row on close.
-// Newer/Older step through the other updates in place. `origin` is the row
+// Back/Next step through the other updates in place. `origin` is the row
 // element it grew from; module scope like SearchOverlay.
 function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClose,onGo}:{
   items:WhatsNewItem[]; index:number; T:ThemeObj; F:typeof FONT;
@@ -1075,9 +1076,9 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
   const closeRef=useRef<HTMLButtonElement>(null);
   const closing=useRef(false);
   const reduced=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  // Grow out of the row once, on open. `origin` changes with Newer/Older (so
+  // Grow out of the row once, on open. `origin` changes with Back/Next (so
   // close shrinks into the row of the update being shown), but that mustn't
-  // replay this -- it made every Newer/Older look like the panel reloading.
+  // replay this -- it made every Back/Next look like the panel reloading.
   const openedFrom=useRef(origin);
   useLayoutEffect(()=>{
     closeRef.current?.focus({preventScroll:true});
@@ -1091,7 +1092,7 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
     anim.finished.then(release,release);
     bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.45},{opacity:1}],{duration:420,easing:"ease-out"});
   },[]);
-  // Newer/Older swap the content in place: it slides in from the side you're
+  // Back/Next swap the content in place: it slides in from the side you're
   // heading, and the card eases to the new height from the one measured just
   // before the switch (see go()).
   const shown=useRef(index);
@@ -1184,8 +1185,8 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
             {item.go&&<button onClick={()=>goThere(item.go!)} style={{marginTop:10,background:"none",border:`1px solid ${T.accent}`,borderRadius:9,padding:"7px 12px",cursor:"pointer",color:T.accent,fontFamily:F.body,fontSize:12}}>Take me there →</button>}
           </div>}
           <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:4}}>
-            <button onClick={()=>go(index-1)} disabled={index===0} aria-label="Newer update" style={{...btn,opacity:index===0?0.4:1,cursor:index===0?"default":"pointer"}}>‹ Newer</button>
-            <button onClick={()=>go(index+1)} disabled={index===items.length-1} aria-label="Older update" style={{...btn,opacity:index===items.length-1?0.4:1,cursor:index===items.length-1?"default":"pointer"}}>Older ›</button>
+            <button onClick={()=>go(index-1)} disabled={index===0} aria-label="Back to the previous message" style={{...btn,opacity:index===0?0.4:1,cursor:index===0?"default":"pointer"}}>‹ Back</button>
+            <button onClick={()=>go(index+1)} disabled={index===items.length-1} aria-label="Next message" style={{...btn,opacity:index===items.length-1?0.4:1,cursor:index===items.length-1?"default":"pointer"}}>Next ›</button>
             <span style={{flex:1,textAlign:"center",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{index+1} of {items.length}</span>
             <button onClick={()=>close(true)} style={{...btn,background:T.accent,border:"none",color:contrastColor(T.accent)}}>Dismiss</button>
           </div>
@@ -2749,7 +2750,7 @@ export default function HomeworkPlanner() {
   },[tasksLoaded,recapsChecked,todayStr,tasks,weekStart,setRecaps,setRecapsChecked]);
   const recapItems:WhatsNewItem[]=recaps.map(recapMessage);
   const unreadRecaps=recaps.filter(r=>!r.read).map(r=>r.id);
-  // Opening a message (or stepping to it with Newer/Older) marks it read.
+  // Opening a message (or stepping to it with Back/Next) marks it read.
   function openMessage(id:string,origin:HTMLElement|null){
     setOpenUpdate({id,origin});
     if(unreadRecaps.includes(id))setRecaps(prev=>prev.map(r=>r.id===id?{...r,read:true}:r));

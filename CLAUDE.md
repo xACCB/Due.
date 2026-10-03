@@ -378,7 +378,7 @@ needs a new `data-tour` for its entry. The card's "Take me there" button fades t
 `goTo`. It shows where things are rather than doing them (points at Select, doesn't start selecting). Tapping a row opens
 `UpdateDetail` (module scope): the card grows from the row's box to a centered card over a blurred
 backdrop (pinned `position:fixed` while its left/top/width/height animate, then released back to
-`relative`) and shrinks back into the row on close, or fades if the row is gone. Newer/Older step
+`relative`) and shrinks back into the row on close, or fades if the row is gone. Back/Next step
 through the list in place (content slides, card eases to the new height; the grow-from-row
 animation runs once on open, from `openedFrom`, even though `origin` follows the shown update); Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
 the title menu's outside-click/Escape handlers ignore (a leftover from when the Inbox lived in the
@@ -395,7 +395,7 @@ sign-out clears both. `recapMessage()` turns a recap into a `WhatsNewItem` (ids 
 a dot and a count on the menu's Inbox row. These replaced the old live "Done today" and
 "Personal" stats panels. Updates
 has filter chips, one per `kind` still showing (`updateKinds`, ordered by `UPDATE_KIND_ORDER`);
-`shownUpdates` is what the list and `UpdateDetail`'s Newer/Older use, so reuse an existing `kind`
+`shownUpdates` is what the list and `UpdateDetail`'s Back/Next use, so reuse an existing `kind`
 rather than inventing a near-duplicate. Only dismissed ids are persisted
 (`hw-whatsnew-dismissed`), so new entries reach returning users; `LEGACY_WHATSNEW_IDS` is a frozen
 list used once to migrate the old whole-feed `hw-whatsnew` key, and must not be extended.

@@ -134,7 +134,7 @@ require rewriting a user's entire history:
   immediately and retries it. `syncUidRef` resets this state when the account changes.
 - Sync status: both listeners use `includeMetadataChanges` so `lastSyncedAt`/`hasPendingWrites`
   track when writes reach the server; with `online` (browser online/offline events) they drive
-  `syncStatus` ("Synced 2m ago" / "Saving..." / "Offline ...") under Profile in the title menu, plus
+  `syncStatus` ("Synced 2m ago" / "Saving..." / "Offline ...") inside the Profile screen (no longer under Profile in the title menu, which only shows a sync error), plus
   an "offline" note under the wordmark when signed in.
 - An earlier version of this app stored the whole task array as one field on `users/{uid}`, which
   had every edit rewrite every task ever created and could eventually hit Firestore's 1MB

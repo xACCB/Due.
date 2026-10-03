@@ -428,6 +428,14 @@ breaks fixed backgrounds. Device tilt deliberately doesn't drive it. Since glass
 suffix to them (`T.border+"33"`); use `T.borderFaint` for a lighter divider, and `T.solidBorder`
 wherever a real hex is required (e.g. `contrastColor()`).
 
+**Animation speed** (`animSpeed`, `hw-anim-speed`, a slider in Settings -> Looks, 0.5x to 2x,
+local-only) is applied globally by `src/lib/animSpeed.ts` instead of per call site: it wraps
+`Element.prototype.animate` once and listens for `transitionrun`/`animationstart` on the
+document, setting each animation's `playbackRate`. So a new CSS transition or `.animate()` call
+follows the setting with no extra work, but a `setTimeout` that waits out an animation must use
+`scaledMs()` (as the 750ms completion hold does), and rAF-driven motion multiplies its time step by
+`animationRate()` (as `TaskModal`'s sheet spring does).
+
 **Completing a task** (`toggleDone`) animates unless reduced motion is on: the id sits in
 `justDone` for 750ms, during which `allSorted`/`filteredTasks` keep the card where it was while
 `CheckMark` (module scope, an SVG stroke) draws in and the title's `.strike` (a background line,

@@ -14,6 +14,7 @@ import { THEMES } from "./themes";
 import type { ThemeName, ThemeObj } from "./themes";
 import { localDateStr, todayISO, advanceDate } from "./lib/dates";
 import { nextId } from "./lib/id";
+import { ANIM_SPEED, clampSpeed, setAnimationSpeed, animationRate, scaledMs } from "./lib/animSpeed";
 import { newRecaps, mergeRecaps, recapMessage } from "./lib/recaps";
 import type { Recap } from "./lib/recaps";
 import { parseSyllabus } from "./lib/syllabus";
@@ -246,6 +247,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"anim-speed", date:"2026-10-03", kind:"New feature", headline:"Animation speed", where:"Menu (tap DuePlanner) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"A new slider sets how fast the app's animations play, from half speed to twice as fast. It applies everywhere: completing a task, cards sliding into place, opening messages and menus." },
   { id:"inbox-next-back", date:"2026-10-03", kind:"UI change", headline:"Next and Back", where:"Menu (tap DuePlanner) → Inbox → open a message", description:"The buttons on an open Inbox message now say Back and Next instead of Newer and Older. Next moves down the list, Back moves up." },
   { id:"inbox-recaps", date:"2026-10-03", kind:"New feature", headline:"A real Inbox", where:"Menu (tap DuePlanner) → Inbox → Messages", description:"The Inbox now gets real messages. When a day, week, month or year ends, a recap arrives with what you finished, the time you spent, how much was on time and your busiest subject. Unread ones show a dot, and the menu shows how many are waiting. These replace the old Done today and Personal panels." },
   { id:"update-close-smooth", date:"2026-10-03", kind:"Bug fix", headline:"Smoother closing updates", where:"Menu (tap DuePlanner) → Inbox → open an update, then close it", description:"Closing an update now shrinks it back into its row in one smooth move. It no longer stops partway, loses its text, or flashes when it lands." },
@@ -570,7 +572,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
         const y=sheetY.current+v*dt; setSheetY(y);
         if(y>=h){onCloseRef.current();return;}
       }else{
-        const st=stepSpring(sheetY.current,v,0,dt); v=st.vel;
+        const st=stepSpring(sheetY.current,v,0,dt*animationRate()); v=st.vel;
         if(springSettled(st.pos,st.vel,0)){setSheetY(0);return;}
         setSheetY(st.pos);
       }
@@ -1838,6 +1840,11 @@ export default function HomeworkPlanner() {
   // gray (NEUTRAL_PRIORITY_COLOR) everywhere urgency is shown -- default on.
   const [colorCodeUrgency,setColorCodeUrgency]=usePersistedState("hw-colorcode-urgency",true);
   const [liquidGlass,setLiquidGlass]=usePersistedState("hw-liquid-glass",false);
+  // Animation speed (Settings -> Looks; local-only): 1 is normal. Applied app
+  // wide by src/lib/animSpeed.ts.
+  const [storedAnimSpeed,setAnimSpeed]=usePersistedState<number>("hw-anim-speed",1);
+  const animSpeed=clampSpeed(storedAnimSpeed);
+  useEffect(()=>{setAnimationSpeed(animSpeed);},[animSpeed]);
   // Pomodoro lengths (minutes) and whether a break starts on its own when a
   // focus session ends. Local-only, like the other Looks/Focus preferences.
   const [pomodoroWorkMins,setPomodoroWorkMins]=usePersistedState("hw-pomodoro-work",25);
@@ -2891,7 +2898,7 @@ export default function HomeworkPlanner() {
     if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
       if(!task.done){
         setJustDone(prev=>[...prev,id]);
-        setTimeout(()=>{captureTaskRects("settle");setJustDone(prev=>prev.filter(x=>x!==id));},750);
+        setTimeout(()=>{captureTaskRects("settle");setJustDone(prev=>prev.filter(x=>x!==id));},scaledMs(750));
       }else{
         setJustDone(prev=>prev.filter(x=>x!==id));
         captureTaskRects("settle");
@@ -3513,7 +3520,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","liquid-glass":"looks","date-time":"datetime","focus-timer":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","liquid-glass":"looks","anim-speed":"looks","date-time":"datetime","focus-timer":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -4409,6 +4416,21 @@ export default function HomeworkPlanner() {
               <div data-tour="liquid-glass" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
                 <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Liquid Glass</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4}}>Translucent, glassy cards and tab bar</div></div>
                 <Toggle on={liquidGlass} onChange={setLiquidGlass} T={T} label="Liquid Glass"/>
+              </div>
+              {/* Animation speed */}
+              <div data-tour="anim-speed">
+                <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:10}}>
+                  <label htmlFor="anim-speed" className="sl" style={{color:T.textMuted,paddingTop:0}}>Animation speed</label>
+                  <span style={{fontFamily:F.body,fontSize:11,color:T.text}}>{animSpeed}×{animSpeed===1?" (normal)":""}</span>
+                </div>
+                <input id="anim-speed" type="range" min={ANIM_SPEED.min} max={ANIM_SPEED.max} step={ANIM_SPEED.step} value={animSpeed}
+                  onChange={e=>setAnimSpeed(clampSpeed(e.target.value))} aria-valuetext={`${animSpeed} times normal speed`}
+                  style={{width:"100%",accentColor:T.accent,margin:"2px 0 4px",cursor:"pointer"}}/>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",fontFamily:F.body,fontSize:10,color:T.textFaint}}>
+                  <span>Slower</span>
+                  {animSpeed!==1&&<button onClick={()=>setAnimSpeed(1)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:F.body,fontSize:10,color:T.textMuted,textDecoration:"underline"}}>Reset</button>}
+                  <span>Faster</span>
+                </div>
               </div>
             </SettingsSection>
             {/* Date & time */}

@@ -12,8 +12,10 @@ import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/anal
 import type { Priority, Recurrence } from "./types";
 import { THEMES } from "./themes";
 import type { ThemeName, ThemeObj } from "./themes";
-import { localDateStr, todayISO, advanceDate, startOfWeek } from "./lib/dates";
+import { localDateStr, todayISO, advanceDate } from "./lib/dates";
 import { nextId } from "./lib/id";
+import { newRecaps, mergeRecaps, recapMessage } from "./lib/recaps";
+import type { Recap } from "./lib/recaps";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, readableOn, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
@@ -241,8 +243,10 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // (see goTo in HomeworkPlanner), where the anchor is a data-tour attribute on
 // the thing to highlight. Tapping an entry opens it in a floating panel
 // (UpdateDetail).
-type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string};
+// `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
+type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"inbox-recaps", date:"2026-10-03", kind:"New feature", headline:"A real Inbox", where:"Menu (tap DuePlanner) → Inbox → Messages", description:"The Inbox now gets real messages. When a day, week, month or year ends, a recap arrives with what you finished, the time you spent, how much was on time and your busiest subject. Unread ones show a dot, and the menu shows how many are waiting. These replace the old Done today and Personal panels." },
   { id:"update-close-smooth", date:"2026-10-03", kind:"Bug fix", headline:"Smoother closing updates", where:"Menu (tap DuePlanner) → Inbox → open an update, then close it", description:"Closing an update now shrinks it back into its row in one smooth move. It no longer stops partway, loses its text, or flashes when it lands." },
   { id:"profile-no-signin-flash", date:"2026-10-03", kind:"Bug fix", headline:"No sign-in flash", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"Opening Profile right after the app loads no longer shows the sign-in screen for a moment when you're already signed in." },
   { id:"inbox-dropdowns", date:"2026-10-03", kind:"UI change", headline:"A tidier Inbox", where:"Menu (tap DuePlanner) → Inbox", description:"Done today, Personal and Updates are now dropdowns. Tap a heading to open or close it. Updates also has filter buttons, so you can show only new features, bug fixes, or any other kind of update." },
@@ -1168,6 +1172,12 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
             <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:6}}>{longDate(item.date)}</div>
           </div>
           <p style={{margin:0,fontFamily:F.body,fontSize:13,lineHeight:1.6,color:T.text}}>{item.description}</p>
+          {item.list&&<div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px"}}>
+            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Finished</div>
+            <ul style={{margin:0,paddingLeft:16,fontFamily:F.body,fontSize:12,lineHeight:1.6,color:T.text}}>
+              {item.list.map((t,i)=><li key={i} style={{overflowWrap:"anywhere"}}>{t}</li>)}
+            </ul>
+          </div>}
           {item.where&&<div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px"}}>
             <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Where to find it</div>
             <div style={{fontFamily:F.body,fontSize:12,lineHeight:1.5,color:T.text}}>{item.where}</div>
@@ -1863,8 +1873,8 @@ export default function HomeworkPlanner() {
   const updateKinds=[...new Set(whatsNew.map(w=>w.kind))].sort((a,b)=>kindRank(a)-kindRank(b));
   const activeKind=updateKinds.includes(updateKind)?updateKind:"all";
   const shownUpdates=activeKind==="all"?whatsNew:whatsNew.filter(w=>w.kind===activeKind);
-  // Which Inbox dropdowns are open. Not remembered: it starts on Updates.
-  const [openInbox,setOpenInbox]=useState<string[]>(["inbox-updates"]);
+  // Which Inbox dropdowns are open. Not remembered: both start open.
+  const [openInbox,setOpenInbox]=useState<string[]>(["inbox-messages","inbox-updates"]);
   function toggleInboxSection(id:string){setOpenInbox(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);}
   function dismissWhatsNew(id:string){setDismissedWhatsNew(prev=>[...prev,id]);}
   // The Inbox update open in the floating panel (UpdateDetail), by id, and the
@@ -2357,6 +2367,7 @@ export default function HomeworkPlanner() {
     setSubjects(DEFAULT_SUBJECTS);
     setSubjectColors(DEFAULT_SUBJECT_COLORS);
     setTrash([]);
+    setRecaps([]);setRecapsChecked(null);
   }
   const [showDeleteAccountConfirm,setShowDeleteAccountConfirm]=useState(false);
   const [deleteConfirmText,setDeleteConfirmText]=useState("");
@@ -2434,7 +2445,6 @@ export default function HomeworkPlanner() {
   const searchTriggerRef=useRef<HTMLButtonElement>(null);
   const [activeTab,setActiveTab]=useState("tasks");
   const [titleMenuOpen,setTitleMenuOpen]=useState(false);
-  const [overviewPeriod,setOverviewPeriod]=useState<"week"|"month"|"year">("week");
   const titleMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!titleMenuOpen)return;
@@ -2714,10 +2724,6 @@ export default function HomeworkPlanner() {
   // Open tasks with no estimate count as 0 above, so the total reads low.
   const noEstimateCount=openTasks.filter(t=>!t.estMins).length;
   const fmtMins=(m:number)=>formatDuration(m)||"0m";
-  // Everything finished since local midnight, newest first (Inbox).
-  const todayStartMs=(()=>{const d=new Date(now);d.setHours(0,0,0,0);return d.getTime();})();
-  const doneToday=tasks.filter(t=>t.done&&(t.completedAt??0)>=todayStartMs).sort((a,b)=>(b.completedAt??0)-(a.completedAt??0));
-  const clockTime=(ms:number)=>{const d=new Date(ms);return formatTime(`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`,h24);};
   // One line for the title menu: where this device's changes stand.
   const syncStatus=!fbUser?null
     :!online?"Offline. Changes will sync when you're back online"
@@ -2725,34 +2731,33 @@ export default function HomeworkPlanner() {
     :lastSyncedAt?`Synced ${formatAgo(lastSyncedAt,now)}`
     :"Connecting...";
 
-  // Inbox stats. Archived tasks still count here -- archiving is just a view
-  // filter, it doesn't erase completion history.
-  const weekStartMs=startOfWeek(new Date(now),weekStart).getTime();
-  const startOfMonth=(()=>{const d=new Date();d.setDate(1);d.setHours(0,0,0,0);return d.getTime();})();
-  const startOfYear=(()=>{const d=new Date();d.setMonth(0,1);d.setHours(0,0,0,0);return d.getTime();})();
-  // Inbox overview -- Week/Month/Year toggle over the same completedAt data.
-  const overviewStart=overviewPeriod==="week"?weekStartMs:overviewPeriod==="month"?startOfMonth:startOfYear;
-  const overviewCompleted=tasks.filter(t=>t.completedAt&&t.completedAt>=overviewStart);
-  const overviewFinished=overviewCompleted.length;
-  // Real time from the task timer's logged sessions (not estimates), across
-  // every task -- sessions count whenever they happened, finished task or not.
-  const overviewMins=tasks.reduce((s,t)=>s+(t.sessions||[]).filter(x=>x.at>=overviewStart).reduce((a,x)=>a+x.mins,0),0);
-  // On-time vs late -- only counts completions that actually had a due date (a
-  // task with no due date has no deadline to be on time or late against); no
-  // due time on the task means the whole due date counts, so the deadline is
-  // that date's end of day.
-  const overviewDated=overviewCompleted.filter(t=>t.dueDate);
-  const overviewOnTime=overviewDated.filter(t=>{
-    const deadline=new Date(`${t.dueDate}T${t.dueTime||"23:59"}:00`).getTime();
-    return (t.completedAt as number)<=deadline;
-  }).length;
-  const onTimePct=overviewDated.length>0?Math.round(overviewOnTime/overviewDated.length*100):null;
-  const busiestSubject=(()=>{
-    const counts:Record<string,number>={};
-    overviewCompleted.forEach(t=>{if(t.subject)counts[t.subject]=(counts[t.subject]||0)+1;});
-    const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-    return sorted.length?sorted[0][0]:null;
-  })();
+  // Inbox messages: a recap is written when a day, week, month or year ends
+  // (src/lib/recaps.ts), from whatever was finished or worked on in it. They
+  // are snapshots kept on this device ("hw-recaps"); recapsChecked is the last
+  // date this ran, so each period is only written once, even if dismissed.
+  // Waits for the first sync when signed in, so a recap isn't written from a
+  // half-loaded list. Archived tasks count: archiving doesn't erase history.
+  const [recaps,setRecaps]=usePersistedState<Recap[]>("hw-recaps",[]);
+  const [recapsChecked,setRecapsChecked]=usePersistedState<string|null>("hw-recaps-checked",null);
+  const todayStr=localDateStr(new Date(now));
+  const tasksLoaded=!authPending&&(!fbUser||tasksSyncedForUid===fbUser.uid);
+  useEffect(()=>{
+    if(!tasksLoaded||recapsChecked===todayStr)return;
+    const fresh=newRecaps(tasks,recapsChecked,todayStr,weekStart);
+    if(fresh.length)setRecaps(prev=>mergeRecaps(prev,fresh));
+    setRecapsChecked(todayStr);
+  },[tasksLoaded,recapsChecked,todayStr,tasks,weekStart,setRecaps,setRecapsChecked]);
+  const recapItems:WhatsNewItem[]=recaps.map(recapMessage);
+  const unreadRecaps=recaps.filter(r=>!r.read).map(r=>r.id);
+  // Opening a message (or stepping to it with Newer/Older) marks it read.
+  function openMessage(id:string,origin:HTMLElement|null){
+    setOpenUpdate({id,origin});
+    if(unreadRecaps.includes(id))setRecaps(prev=>prev.map(r=>r.id===id?{...r,read:true}:r));
+  }
+  function dismissMessage(id:string){
+    if(id.startsWith("recap-"))setRecaps(prev=>prev.filter(r=>r.id!==id));
+    else dismissWhatsNew(id);
+  }
 
   function startAdding(){
     setAdding(true);setStep(-1);
@@ -3869,7 +3874,8 @@ export default function HomeworkPlanner() {
                 </button>
                 <button onClick={()=>{setActiveTab("inbox");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <IconBell/>
-                  <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Inbox</span>
+                  <span style={{fontFamily:F.body,fontSize:13,color:T.text,flex:1}}>Inbox</span>
+                  {unreadRecaps.length>0&&<span aria-label={`${unreadRecaps.length} unread`} style={{background:T.accent,color:contrastColor(T.accent),borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10,fontWeight:600}}>{unreadRecaps.length}</span>}
                 </button>
                 <button onClick={()=>{setActiveTab("history");setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <IconHistory/>
@@ -4173,42 +4179,29 @@ export default function HomeworkPlanner() {
         {activeTab==="inbox"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <ScreenHeader title="Inbox" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
-            <SettingsSection {...inboxSec("inbox-done")} title={`Done today${doneToday.length?` (${doneToday.length})`:""}`}>
-                      {doneToday.length===0
-                        ?<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,}}>Nothing finished yet today.</div>
-                        :<div style={{display:"flex",flexDirection:"column",gap:4}}>
-                          {doneToday.map(t=>(
-                            <button key={t.id} onClick={()=>{setSelectedTask(t);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer",textAlign:"left"}}>
-                              <span style={{color:ink("#2ED573",T.light),fontSize:11,flexShrink:0}}>✓</span>
-                              <span style={{fontFamily:F.body,fontSize:12,color:T.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-                              <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{clockTime(t.completedAt!)}</span>
+            <SettingsSection {...inboxSec("inbox-messages")} title={`Messages${recapItems.length?` (${recapItems.length})`:""}`}>
+                      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                        {recapItems.length===0
+                          ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,lineHeight:1.5}}>No messages yet. A recap arrives here when a day, week, month or year ends, if you finished or worked on something in it.</div>
+                          : recapItems.map(item=>{
+                          const unread=unreadRecaps.includes(item.id);
+                          return (
+                          <div key={item.id} style={{display:"flex",gap:4,alignItems:"flex-start"}}>
+                            <button data-update-id={item.id} onClick={e=>openMessage(item.id,e.currentTarget)} aria-haspopup="dialog" aria-label={`${unread?"Unread: ":""}${item.headline}, ${formatDate(item.date)}`}
+                              style={{flex:1,minWidth:0,background:"none",border:"none",borderRadius:8,padding:"4px 6px",margin:"-4px -6px",cursor:"pointer",textAlign:"left",color:"inherit",visibility:openUpdate?.id===item.id&&!openUpdate.closing?"hidden":undefined}}>
+                              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                                <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>
+                                  {unread&&<span aria-hidden="true" style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:T.accent,marginRight:7,verticalAlign:"middle"}}/>}
+                                  {item.headline}
+                                </span>
+                                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
+                              </div>
+                              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{item.kind}</div>
+                              <div className="clamp2" style={{fontFamily:F.body,fontSize:11,color:unread?T.text:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
                             </button>
-                          ))}
-                        </div>}
-            </SettingsSection>
-            <SettingsSection {...inboxSec("inbox-personal")} title="Personal">
-                      <div style={{display:"flex",gap:6,marginBottom:10}}>
-                        {(["week","month","year"] as const).map(p=>(
-                          <button key={p} onClick={()=>setOverviewPeriod(p)} style={{flex:1,background:overviewPeriod===p?T.accent:T.cardAlt,color:overviewPeriod===p?contrastColor(T.accent):T.textMuted,border:`1px solid ${overviewPeriod===p?T.accent:T.border}`,borderRadius:8,padding:"5px 0",fontFamily:F.body,fontSize:11,cursor:"pointer",textTransform:"capitalize"}}>{p}</button>
-                        ))}
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{overviewFinished}</div>
-                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Finished</div>
-                        </div>
-                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{formatDuration(overviewMins)||"0m"}</div>
-                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Time spent</div>
-                        </div>
-                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:18,color:T.accent}}>{onTimePct===null?"--":`${onTimePct}%`}</div>
-                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>On time</div>
-                        </div>
-                        <div style={{background:T.surface,borderRadius:9,padding:"10px 8px",textAlign:"center"}}>
-                          <div style={{fontFamily:F.heading,fontSize:14,color:busiestSubject?subjectColors[busiestSubject]||T.accent:T.accent,marginTop:2}}>{busiestSubject||"--"}</div>
-                          <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:1}}>Busiest subject</div>
-                        </div>
+                            <button onClick={()=>dismissMessage(item.id)} aria-label={`Dismiss ${item.headline}`} title="Dismiss" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
+                          </div>
+                          );})}
                       </div>
             </SettingsSection>
             <SettingsSection {...inboxSec("inbox-updates")} title={`Updates${whatsNew.length?` (${whatsNew.length})`:""}`}>
@@ -4607,10 +4600,12 @@ export default function HomeworkPlanner() {
       </div>
       <div className="sr-only" aria-live="polite">{srMessage}</div>
       {openUpdate&&(()=>{
-        const index=shownUpdates.findIndex(w=>w.id===openUpdate.id);
-        return index<0?null:<UpdateDetail items={shownUpdates} index={index} T={T} F={F} origin={openUpdate.origin}
-          onIndex={i=>{const id=shownUpdates[i].id;setOpenUpdate({id,origin:document.querySelector<HTMLElement>(`[data-update-id="${id}"]`)});}}
-          onDismiss={dismissWhatsNew}
+        // A recap steps through the recaps, an update through the shown updates.
+        const list=openUpdate.id.startsWith("recap-")?recapItems:shownUpdates;
+        const index=list.findIndex(w=>w.id===openUpdate.id);
+        return index<0?null:<UpdateDetail items={list} index={index} T={T} F={F} origin={openUpdate.origin}
+          onIndex={i=>{const id=list[i].id;openMessage(id,document.querySelector<HTMLElement>(`[data-update-id="${id}"]`));}}
+          onDismiss={dismissMessage}
           onGo={goTo}
           onClosing={()=>setOpenUpdate(u=>u&&{...u,closing:true})}
           onClose={()=>{const o=openUpdate.origin;setOpenUpdate(null);requestAnimationFrame(()=>o?.isConnected&&o.focus({preventScroll:true}));}}/>;

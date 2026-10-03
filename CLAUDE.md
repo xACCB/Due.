@@ -272,8 +272,8 @@ down to a fixed end time, as the task session timer counts up from a fixed start
 slow or pause intervals in background tabs and on locked screens; the running time shows
 on the Focus button; finishing chimes via `playChime()`, notifies, and toasts). Settings
 (`activeTab==="options"`) is opened from the title menu, not the tab bar, so it has its own header
-with a back button. The title menu (the DuePlanner wordmark) is a plain list -- Profile (a modal), then Inbox (Done
-today, stats, What's New), History (undo/redo, Recently deleted), Import/Export (syllabus import,
+with a back button. The title menu (the DuePlanner wordmark) is a plain list -- Profile (a modal), then Inbox (recap
+messages, What's New), History (undo/redo, Recently deleted), Import/Export (syllabus import,
 backups) and Settings, each a full screen (`activeTab` "inbox"/"history"/"import"/"options") with
 the shared `ScreenHeader` (‹ Tasks + title), not a dropdown inside the menu; tapping "Time left" in the header opens a
 per-subject time breakdown. The tab bar icons and menu icons (`IconTasks`/`IconFocus`/
@@ -341,7 +341,7 @@ entry in that map. Feedback, Clear completed and the version line stay outside t
 **Settings extras.** Subjects can be renamed/recolored (`updateSubject`, carries the rename to
 tasks, trash and templates). Date & time: `timeFormat` (`formatTime(t, h24)`, passed to
 `TaskModal`/`MiniCard` as `h24`) and `weekStart` (`startOfWeek()` in `src/lib/dates.ts`, used by
-the Inbox's week stats). The Inbox starts with a "Done today" list (`doneToday`).
+the Inbox's weekly recap).
 
 **Task detail actions.** `TaskModal` can edit a task's own fields (an Edit panel, via
 `onUpdateTask(patch)` -> `updateTask`; its estimate hours/minutes are digit-only text fields kept as
@@ -382,8 +382,18 @@ backdrop (pinned `position:fixed` while its left/top/width/height animate, then 
 through the list in place (content slides, card eases to the new height; the grow-from-row
 animation runs once on open, from `openedFrom`, even though `origin` follows the shown update); Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
 the title menu's outside-click/Escape handlers ignore (a leftover from when the Inbox lived in the
-menu; harmless now that it's a screen). The Inbox's three parts (Done today, Personal,
-Updates) are `SettingsSection` dropdowns (`openInbox`, not persisted, starts on Updates). Updates
+menu; harmless now that it's a screen). The Inbox's two parts (Messages, Updates) are
+`SettingsSection` dropdowns (`openInbox`, not persisted, both start open). **Messages** are
+recaps (`src/lib/recaps.ts`, unit-tested): when a day, week, month or year ends, an effect in
+`HomeworkPlanner` writes a snapshot (finished count, logged minutes, on-time count, busiest
+subject, finished titles) into `recaps` (`hw-recaps`, local-only, newest 60), skipping periods
+where nothing was finished or worked on. `recapsChecked` (`hw-recaps-checked`) is the last date
+it ran, so a period is written once even if its recap is dismissed; days catch up at most a week,
+and only the latest week/month/year is considered. It waits for the first sync when signed in, and
+sign-out clears both. `recapMessage()` turns a recap into a `WhatsNewItem` (ids start `recap-`,
+`list` holds the finished titles) so it opens in the same `UpdateDetail` card; unread ones show
+a dot and a count on the menu's Inbox row. These replaced the old live "Done today" and
+"Personal" stats panels. Updates
 has filter chips, one per `kind` still showing (`updateKinds`, ordered by `UPDATE_KIND_ORDER`);
 `shownUpdates` is what the list and `UpdateDetail`'s Newer/Older use, so reuse an existing `kind`
 rather than inventing a near-duplicate. Only dismissed ids are persisted

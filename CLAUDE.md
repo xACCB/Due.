@@ -433,17 +433,17 @@ local-only) is applied globally by `src/lib/animSpeed.ts` instead of per call si
 `Element.prototype.animate` once and listens for `transitionrun`/`animationstart` on the
 document, setting each animation's `playbackRate`. So a new CSS transition or `.animate()` call
 follows the setting with no extra work, but a `setTimeout` that waits out an animation must use
-`scaledMs()` (as the 750ms completion hold does), and rAF-driven motion multiplies its time step by
+`scaledMs()` (as the 640ms completion hold does), and rAF-driven motion multiplies its time step by
 `animationRate()` (as `TaskModal`'s sheet spring does).
 
 **Completing a task** (`toggleDone`) animates unless reduced motion is on: the id sits in
-`justDone` for 750ms, during which `allSorted`/`filteredTasks` keep the card where it was while
+`justDone` for 640ms, during which `allSorted`/`filteredTasks` keep the card where it was while
 `CheckMark` (module scope, an SVG stroke) draws in and the title's `.strike` (a background line,
 not `text-decoration`, so it can animate) draws across. Then `captureTaskRects()` records every
 `[data-task-id]` card's position and a `useLayoutEffect` FLIP-animates each card from its old spot
 to its new one: the farthest-moving card (the completed one) lifts slightly (scale 1.025, raised
-z-index) and slides the whole way down over ~1.5-2s at an even pace, while the others make room in
-~1s. The same FLIP engine animates other list changes: `captureTaskRects(mode)` is called right
+z-index) and slides the whole way down over ~1.3-1.8s at an even pace, while the others make room in
+under ~1s. The same FLIP engine animates other list changes: `captureTaskRects(mode)` is called right
 before the state change -- `"settle"` (completion, above), `"shift"` (filter chips,
 add/duplicate, `deleteTasks`, `changeTasks` so every bulk/archive/snooze/edit, undo/redo; ~0.35-0.5s)
 or `"quick"` (keyboard reorder, 320ms). Moves are 2D (grid/column layouts move sideways). Cards

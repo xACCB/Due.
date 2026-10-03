@@ -247,6 +247,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"complete-faster", date:"2026-10-03", kind:"Improvement", headline:"Quicker completing", where:"Your task list: check off a task", go:"tasks", description:"Checking off a task is a little quicker. The checkmark, the strike through the title and the slide down to your done tasks all take about 15% less time." },
   { id:"anim-speed", date:"2026-10-03", kind:"New feature", headline:"Animation speed", where:"Menu (tap DuePlanner) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"A new slider sets how fast the app's animations play, from half speed to twice as fast. It applies everywhere: completing a task, cards sliding into place, opening messages and menus." },
   { id:"inbox-next-back", date:"2026-10-03", kind:"UI change", headline:"Next and Back", where:"Menu (tap DuePlanner) → Inbox → open a message", description:"The buttons on an open Inbox message now say Back and Next instead of Newer and Older. Next moves down the list, Back moves up." },
   { id:"inbox-recaps", date:"2026-10-03", kind:"New feature", headline:"A real Inbox", where:"Menu (tap DuePlanner) → Inbox → Messages", description:"The Inbox now gets real messages. When a day, week, month or year ends, a recap arrives with what you finished, the time you spent, how much was on time and your busiest subject. Unread ones show a dot, and the menu shows how many are waiting. These replace the old Done today and Personal panels." },
@@ -2898,7 +2899,7 @@ export default function HomeworkPlanner() {
     if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
       if(!task.done){
         setJustDone(prev=>[...prev,id]);
-        setTimeout(()=>{captureTaskRects("settle");setJustDone(prev=>prev.filter(x=>x!==id));},scaledMs(750));
+        setTimeout(()=>{captureTaskRects("settle");setJustDone(prev=>prev.filter(x=>x!==id));},scaledMs(640));
       }else{
         setJustDone(prev=>prev.filter(x=>x!==id));
         captureTaskRects("settle");
@@ -2945,7 +2946,7 @@ export default function HomeworkPlanner() {
       document.body.appendChild(g);
       taskGhosts.current.get(id)?.remove();
       taskGhosts.current.set(id,g);
-      const anim=g.animate([{opacity:1,transform:"scale(1)"},{opacity:0,transform:"scale(.96)"}],{duration:mode==="settle"?320:200,easing:"ease-in",fill:"forwards"});
+      const anim=g.animate([{opacity:1,transform:"scale(1)"},{opacity:0,transform:"scale(.96)"}],{duration:mode==="settle"?270:200,easing:"ease-in",fill:"forwards"});
       const done=()=>{g.remove();if(taskGhosts.current.get(id)===g)taskGhosts.current.delete(id);};
       anim.finished.then(done,done);
     }
@@ -2969,11 +2970,11 @@ export default function HomeworkPlanner() {
       }
       // "settle": the card that travels farthest (the one just completed) is
       // the star: it lifts slightly, slides the whole way down at an even pace
-      // over about 1.5-2s, and sets down softly, riding above the cards it
+      // over about 1.3-1.8s, and sets down softly, riding above the cards it
       // passes. The others just make room, quicker and without the lift.
       const lead=dist===farthest&&moves.length>1;
       if(lead){
-        const duration=Math.min(2100,1300+dist*1.1);
+        const duration=Math.min(1800,1100+dist*0.95);
         el.style.zIndex="3";
         const anim=el.animate([
           {transform:`${from} scale(1)`,easing:"cubic-bezier(.3,0,.2,1)"},
@@ -2984,7 +2985,7 @@ export default function HomeworkPlanner() {
         const done=()=>{el.style.zIndex="";};
         anim.finished.then(done,done);
       }else{
-        el.animate([{transform:from},{transform:"none"}],{duration:Math.min(1200,700+dist*0.8),easing:"cubic-bezier(.45,0,.2,1)"});
+        el.animate([{transform:from},{transform:"none"}],{duration:Math.min(1020,600+dist*0.68),easing:"cubic-bezier(.45,0,.2,1)"});
       }
     }
   });
@@ -3365,12 +3366,12 @@ export default function HomeworkPlanner() {
        title's strike-through draws left to right. .strike is a background line
        rather than text-decoration so it can animate; box-decoration-break
        repeats it on every line of a wrapped title. */
-    .check-draw polyline{stroke-dashoffset:1;animation:checkDraw .42s .08s cubic-bezier(.65,0,.35,1) forwards;}
+    .check-draw polyline{stroke-dashoffset:1;animation:checkDraw .36s .07s cubic-bezier(.65,0,.35,1) forwards;}
     @keyframes checkDraw{to{stroke-dashoffset:0}}
-    .check-pop{animation:checkPop .45s cubic-bezier(.34,1.56,.64,1);}
+    .check-pop{animation:checkPop .38s cubic-bezier(.34,1.56,.64,1);}
     @keyframes checkPop{0%{transform:scale(.7)}100%{transform:scale(1)}}
     .strike{text-decoration:none!important;background-image:linear-gradient(currentColor,currentColor);background-repeat:no-repeat;background-position:0 55%;background-size:100% 1.5px;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
-    .strike-anim{animation:strikeDraw .5s .22s cubic-bezier(.65,0,.35,1) both;}
+    .strike-anim{animation:strikeDraw .42s .19s cubic-bezier(.65,0,.35,1) both;}
     @keyframes strikeDraw{from{background-size:0% 1.5px}}
     @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim,.search-pop,.sec-body{animation:none;}}
     .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}

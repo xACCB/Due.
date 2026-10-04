@@ -248,6 +248,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"edit-date-time-overlap", date:"2026-10-04", kind:"Bug fix", headline:"Due date and time fit", where:"Tap a task → Edit", go:"task:task-edit", description:"In a task's Edit panel, the Due date and Time boxes no longer spill over each other. They now sit side by side at the same size." },
   { id:"focus-show", date:"2026-10-03", kind:"New feature", headline:"Choose what Focus shows", where:"Menu (tap DuePlanner) → Settings → Focus timer → Show in Focus", go:"settings:focus-show", description:"Pick what appears in Focus Mode: just the task, the task and the stopwatch, the task and the Pomodoro, or all three." },
   { id:"focus-stopwatch", date:"2026-10-03", kind:"New feature", headline:"Stopwatch", where:"The Focus tab, under the Pomodoro", go:"focus:stopwatch", description:"Focus Mode has a stopwatch. Start it, pause it, and when you're done, log the time to the task you're focusing on. It keeps counting if you leave Focus Mode, and its time shows on the Focus tab." },
   { id:"menu-no-sync-line", date:"2026-10-03", kind:"UI change", headline:"Cleaner menu", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"The \"Synced 2m ago\" line is gone from under Profile in the menu. You can still see it inside Profile itself." },
@@ -650,9 +651,12 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
                   {subjectOptions.map(s=><option key={s} value={s}>{s}</option>)}
                 </select></label>
               <div style={{display:"flex",gap:8}}>
-                <label style={{flex:1}}><span style={label}>Due date</span>
+                {/* minWidth:0 lets the two halves shrink evenly: iOS gives date and
+                    time inputs an intrinsic width that otherwise pushes one over
+                    the other (see .edit-field in the runtime css). */}
+                <label style={{flex:"1 1 0",minWidth:0}}><span style={label}>Due date</span>
                   <input className="edit-field" type="date" value={draft.dueDate} onChange={e=>setDraft({...draft,dueDate:e.target.value})} style={field}/></label>
-                <label style={{flex:1}}><span style={label}>Time</span>
+                <label style={{flex:"1 1 0",minWidth:0}}><span style={label}>Time</span>
                   <input className="edit-field" type="time" value={draft.dueTime} disabled={!draft.dueDate} onChange={e=>setDraft({...draft,dueTime:e.target.value})} style={{...field,opacity:draft.dueDate?1:0.5}}/></label>
               </div>
               <div style={{display:"flex",gap:8}}>
@@ -3375,6 +3379,12 @@ export default function HomeworkPlanner() {
     .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
     /* iOS zooms the page into any focused field under 16px. */
     @media (pointer:coarse){.edit-field{font-size:16px!important;}}
+    /* iOS draws date/time inputs as its own pill with an intrinsic width that
+       ignores width:100%, so side by side they spilled over each other. Plain
+       appearance makes them size like the other fields; the min-height keeps
+       an empty one from collapsing, and the value sits left like the rest. */
+    .edit-field[type=date],.edit-field[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;min-height:calc(1.25em + 18px);}
+    .edit-field::-webkit-date-and-time-value{text-align:left;margin:0;}
     .sli{animation:sli 0.22s ease forwards;}
     @keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
     .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}

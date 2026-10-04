@@ -405,7 +405,8 @@ through the list in place (content slides, card eases to the new height; the gro
 animation runs once on open, from `openedFrom`, even though `origin` follows the shown update); Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
 the title menu's outside-click/Escape handlers ignore (a leftover from when the Inbox lived in the
 menu; harmless now that it's a screen). The Inbox's two parts (Messages, Updates) are
-`SettingsSection` dropdowns (`openInbox`, not persisted, both start open; the Import/Export screen's two
+`SettingsSection` dropdowns (`openInbox`, not persisted: they start closed and close again when `activeTab` leaves the
+screen, tracked by `lastTab`, like Settings; the Import/Export screen's two
 sections, Import from Syllabus and Backup & export, are dropdowns in the same list). **Messages** are
 recaps (`src/lib/recaps.ts`, unit-tested): when a day, week, month or year ends, an effect in
 `HomeworkPlanner` writes a snapshot (finished count, logged minutes, on-time count, busiest
@@ -524,10 +525,13 @@ list itself is no longer filtered by search.
 grid (only that month's days by default; `calendarMonthOnly`, `hw-calendar-month-only`, local-only,
 Settings -> Date & time -> Calendar shows, switches back to six full weeks with neighbouring days) where each day shows up to 3 subject-colored dots for its open tasks (the workload heatmap
 shading was removed at the user's request; don't bring it back), and the selected day's tasks below
-(check off, tap to open). Tapping a day also opens `DayDetail` (module scope): a floating card that
-grows out of the day's cell and shrinks back on close, the same pin/animate approach as `UpdateDetail`,
-with the date, that day's tasks and the add button. It's rendered inside `CalendarView` (so inside
-`.app-inner`): it locks page scroll itself and has no focus trap, only Escape/backdrop/× to close. Undated tasks aren't shown. Arrow keys move the selection (and focus) across
+(check off, tap to open). Tapping a day also opens `DayDetail` (module scope), built on
+`GrowCard`: a floating card that grows out of whatever was tapped and shrinks back on close (the same
+pin/animate approach as `UpdateDetail`), locking page scroll in a layout effect *before* it measures
+where to land. `GrowCard` takes a render function `(close, closeRef)`; `CardTaskRow` is the shared task
+row. `DayDetail` is rendered inside `CalendarView` (so inside `.app-inner`, no focus trap). The Time
+left dropdown's rows open `TimeDetail` the same way (`openTime`, rendered beside `UpdateDetail`, with
+`.app-inner` inert): totals plus the open tasks of one due-date group or subject. Undated tasks aren't shown. Arrow keys move the selection (and focus) across
 months; swiping the grid or ‹ › change month without changing the selected day (nothing is auto-selected
 in the new month; `tabStop` keeps one day reachable by Tab), Today jumps back. "+ Add homework due <day>" calls
 `addHomeworkOn()`: switches to Tasks and starts the usual add flow with the date pre-picked

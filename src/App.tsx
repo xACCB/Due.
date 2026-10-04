@@ -251,6 +251,9 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"animation-two-step", date:"2026-10-04", kind:"Bug fix", headline:"No more double moves", where:"Search, a task's details, and cards that open from a row", description:"Some animations went to one spot and then shifted to another. The search bar now flies straight to where it ends up once the keyboard is open, a task's details settle back without overshooting, and cards that open from a row land exactly where they stay." },
+  { id:"dropdowns-close", date:"2026-10-04", kind:"UI change", headline:"Dropdowns fold up when you leave", where:"Menu (tap DuePlanner) → Inbox, or Import/Export", go:"menu", description:"Like Settings, the dropdowns in the Inbox and Import/Export now close when you leave the screen, so each one opens folded up." },
+  { id:"time-left-detail", date:"2026-10-04", kind:"New feature", headline:"Time left, in depth", where:"Tap Time left, top right, then tap any row", go:"tasks:time-left", description:"Every row in Time left now opens. Tap a due-date group or a subject to see its time left, how many tasks it has, how long you've already worked on them, and each task with when it's due and how long it should take. You can check tasks off or open them from there." },
   { id:"motion-consistent", date:"2026-10-04", kind:"Improvement", headline:"One smooth motion everywhere", where:"Everywhere in the app", description:"Animations across the app now match the Calendar tab: quick, smooth, and without the bounce some of them had. Cards, the task sheet, the tab bar, swipes springing back, buttons and toggles all move the same way, and a few things that used to just appear (the Edit panel, the undo message, the Focus task picker) now fade in." },
   { id:"menu-transitions", date:"2026-10-04", kind:"UI change", headline:"Menus open smoothly", where:"Menu (tap DuePlanner) and anything you open from it", go:"menu", description:"The menu, Time left, Profile, Inbox, History, Import/Export and Settings now open with the same short fade as the Calendar tab, instead of appearing instantly." },
   { id:"settings-close-on-leave", date:"2026-10-04", kind:"UI change", headline:"Settings tidy themselves", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"The dropdowns in Settings now close when you leave Settings, so it always opens with everything folded up." },
@@ -623,7 +626,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
         const y=sheetY.current+v*dt; setSheetY(y);
         if(y>=h){onCloseRef.current();return;}
       }else{
-        const st=stepSpring(sheetY.current,v,0,dt*animationRate()); v=st.vel;
+        const st=stepSpring(sheetY.current,v,0,dt*animationRate(),380,1); // zeta 1: settles without overshooting v=st.vel;
         if(springSettled(st.pos,st.vel,0)){setSheetY(0);return;}
         setSheetY(st.pos);
       }
@@ -1074,7 +1077,9 @@ function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTa
   },[]);
   // The page underneath stays put while search is open: dragging on the
   // backdrop does nothing (the results list scrolls on its own).
-  useEffect(()=>{
+  // (A layout effect, ahead of the fly-in below: hiding the page's scrollbar
+  // shifts the layout, and the bar's landing spot must be measured after that.)
+  useLayoutEffect(()=>{
     const backdrop=backdropRef.current;
     if(!backdrop)return;
     const stop=(e:TouchEvent)=>e.preventDefault();
@@ -1083,6 +1088,11 @@ function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTa
     root.style.overflow="hidden";
     return()=>{backdrop.removeEventListener("touchmove",stop);root.style.overflow=before;};
   },[]);
+  // On a phone the keyboard slides up a moment after the bar has flown in,
+  // which shrinks the visible area and used to move the bar a second time.
+  // Until the keyboard is up, aim for where the bar will sit once it is.
+  const keyboardComing=window.matchMedia("(pointer:coarse)").matches&&view.h>window.innerHeight*0.8;
+  const aimH=keyboardComing?view.h*0.58:view.h;
   const q=query.trim().toLowerCase();
   const results=!q?[]:tasks
     .filter(t=>!t.archived&&(t.title.toLowerCase().includes(q)||t.subject.toLowerCase().includes(q)||(t.tags||[]).some(g=>g.toLowerCase().includes(q))))
@@ -1134,7 +1144,7 @@ function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTa
   };
   return(
     <div role="dialog" aria-modal="true" aria-label="Search tasks" onKeyDown={onKeyDown}
-      style={{position:"fixed",left:0,right:0,top:view.top,height:view.h,zIndex:900,display:"flex",justifyContent:"center",padding:`${Math.max(24,Math.round(view.h*0.34-28))}px 16px 16px`,transition:"padding-top .25s ease"}}>
+      style={{position:"fixed",left:0,right:0,top:view.top,height:view.h,zIndex:900,display:"flex",justifyContent:"center",padding:`${Math.max(24,Math.round(aimH*0.34-28))}px 16px 16px`,transition:"padding-top .25s ease"}}>
       {/* Fixed to the whole screen (and past its edges, for overscroll), not to
           this box: the box follows the visible viewport above the keyboard, which
           left the rest of the page unblurred. */}
@@ -1341,20 +1351,33 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
   );
 }
 
-// A Calendar day, opened: the day's cell grows into a card floating over a
-// blurred screen, the same way an Inbox message opens (UpdateDetail), and
-// shrinks back into the cell on close. The card has the date, that day's tasks
-// (check off, tap to open) and the add button. `origin` is the day's cell.
-function DayDetail({iso,today,list,origin,T,F,subjectColors,h24,onOpenTask,onToggleDone,onAddOn,onClose}:{
-  iso:string; today:string; list:Task[]; origin:HTMLElement|null;
-  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; h24:boolean;
-  onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void; onAddOn:(date:string)=>void; onClose:()=>void;
+// A card that grows out of whatever was tapped (`origin`) into the middle of
+// a blurred screen, and shrinks back into it on close: the same motion an
+// Inbox message uses (UpdateDetail). Shared by a Calendar day (DayDetail) and
+// a Time left breakdown (TimeDetail). It draws its own close button, top
+// right (it takes focus on open, and plays the exit before calling onClose),
+// so content should leave about 28px free there.
+function GrowCard({origin,labelledBy,T,onClose,children}:{
+  origin:HTMLElement|null; labelledBy:string; T:ThemeObj; onClose:()=>void;
+  children:React.ReactNode;
 }){
   const backdropRef=useRef<HTMLDivElement>(null), cardRef=useRef<HTMLDivElement>(null), bodyRef=useRef<HTMLDivElement>(null);
   const closeRef=useRef<HTMLButtonElement>(null);
   const closing=useRef(false);
   const openedFrom=useRef(origin);
   const reduced=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // The page behind stays put while the card is open. A layout effect, and
+  // declared before the one that measures the card: hiding the page's
+  // scrollbar changes the layout width, and measuring first would aim the
+  // opening animation at a spot the card then jumps away from.
+  useLayoutEffect(()=>{
+    const backdrop=backdropRef.current;
+    const stop=(e:TouchEvent)=>e.preventDefault();
+    backdrop?.addEventListener("touchmove",stop,{passive:false});
+    const root=document.documentElement, before=root.style.overflow;
+    root.style.overflow="hidden";
+    return()=>{backdrop?.removeEventListener("touchmove",stop);root.style.overflow=before;};
+  },[]);
   useLayoutEffect(()=>{
     closeRef.current?.focus({preventScroll:true});
     const card=cardRef.current, from=openedFrom.current?.getBoundingClientRect();
@@ -1367,18 +1390,8 @@ function DayDetail({iso,today,list,origin,T,F,subjectColors,h24,onOpenTask,onTog
     anim.finished.then(release,release);
     bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.4},{opacity:1}],{duration:400,easing:"ease-out"});
   },[]);
-  // The page behind stays put while the card is open.
-  useEffect(()=>{
-    const backdrop=backdropRef.current;
-    if(!backdrop)return;
-    const stop=(e:TouchEvent)=>e.preventDefault();
-    backdrop.addEventListener("touchmove",stop,{passive:false});
-    const root=document.documentElement, before=root.style.overflow;
-    root.style.overflow="hidden";
-    return()=>{backdrop.removeEventListener("touchmove",stop);root.style.overflow=before;};
-  },[]);
-  // Back into the cell, dissolving as it lands (the cell is still there
-  // underneath); a plain fade if the cell is gone.
+  // Back into where it came from, dissolving as it lands (that element is
+  // still there underneath); a plain fade if it's gone.
   function close(){
     if(closing.current)return;
     closing.current=true;
@@ -1390,7 +1403,7 @@ function DayDetail({iso,today,list,origin,T,F,subjectColors,h24,onOpenTask,onTog
     pin(card,from);
     backdropRef.current?.animate([{opacity:1},{opacity:0}],{duration:320,easing:"ease-out",fill:"forwards"});
     let anim:Animation;
-    if(to&&to.width>0){
+    if(to&&to.width>0&&to.bottom>0&&to.top<window.innerHeight){
       const body=bodyRef.current;
       if(body)Object.assign(body.style,{width:`${body.offsetWidth}px`,height:`${body.offsetHeight}px`,flexShrink:"0",overflow:"hidden"});
       body?.animate([{opacity:1},{opacity:0}],{duration:180,easing:"ease-out",fill:"forwards"});
@@ -1401,6 +1414,47 @@ function DayDetail({iso,today,list,origin,T,F,subjectColors,h24,onOpenTask,onTog
     }
     anim.finished.then(onClose,onClose);
   }
+  return(
+    <div role="dialog" aria-modal="true" aria-labelledby={labelledBy} data-keeps-menu onKeyDown={e=>{if(e.key==="Escape"){e.stopPropagation();close();}}}
+      style={{position:"fixed",inset:0,zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div ref={backdropRef} onClick={close} style={{position:"fixed",top:-200,bottom:-200,left:0,right:0,background:T.light?"rgba(245,245,245,0.55)":"rgba(0,0,0,0.5)",backdropFilter:"blur(14px)",WebkitBackdropFilter:"blur(14px)"}}/>
+      <div ref={cardRef} style={{position:"relative",width:"min(460px,100%)",maxHeight:"100%",overflow:"hidden",background:T.bg,border:`1px solid ${T.border}`,borderRadius:20,boxShadow:T.light?"0 16px 48px rgba(0,0,0,0.16)":"0 16px 48px rgba(0,0,0,0.6)",display:"flex",flexDirection:"column"}}>
+        <div ref={bodyRef} style={{padding:"20px 20px 18px",display:"flex",flexDirection:"column",minHeight:0}}>
+          <button ref={closeRef} onClick={close} aria-label="Close" style={{position:"absolute",top:16,right:14,zIndex:1,background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:20,lineHeight:1,padding:"2px 4px"}}>×</button>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// One task as a row inside a GrowCard: check it off, tap to open, and a short
+// note on the right (`note`), e.g. its time or how long it'll take.
+function CardTaskRow({t,T,F,subjectColors,note,onOpenTask,onToggleDone}:{
+  t:Task; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; note?:string;
+  onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void;
+}){
+  const sc=subjectColors[t.subject]||T.accent;
+  return(
+    <div onClick={()=>onOpenTask(t)} style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:10,padding:"10px 11px",cursor:"pointer",flexShrink:0}}>
+      <button aria-label={t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();onToggleDone(t.id);}}
+        style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {t.done&&<CheckMark size={10}/>}
+      </button>
+      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:15,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+      {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
+      {note&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{note}</span>}
+    </div>
+  );
+}
+
+// A Calendar day, opened (tap a day in the month grid): the date, that day's
+// tasks and the add button. `origin` is the day's cell.
+function DayDetail({iso,today,list,origin,T,F,subjectColors,h24,onOpenTask,onToggleDone,onAddOn,onClose}:{
+  iso:string; today:string; list:Task[]; origin:HTMLElement|null;
+  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; h24:boolean;
+  onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void; onAddOn:(date:string)=>void; onClose:()=>void;
+}){
   const d=new Date(iso+"T00:00:00");
   const dayMs=(s:string)=>new Date(s+"T00:00:00").getTime();
   const diff=Math.round((dayMs(iso)-dayMs(today))/86400000);
@@ -1409,47 +1463,78 @@ function DayDetail({iso,today,list,origin,T,F,subjectColors,h24,onOpenTask,onTog
   const mins=open.reduce((n,t)=>n+(t.estMins||0),0);
   const late=diff<0&&open.length>0;
   return(
-    <div role="dialog" aria-modal="true" aria-labelledby="day-detail-title" onKeyDown={e=>{if(e.key==="Escape"){e.stopPropagation();close();}}}
-      style={{position:"fixed",inset:0,zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div ref={backdropRef} onClick={close} style={{position:"fixed",top:-200,bottom:-200,left:0,right:0,background:T.light?"rgba(245,245,245,0.55)":"rgba(0,0,0,0.5)",backdropFilter:"blur(14px)",WebkitBackdropFilter:"blur(14px)"}}/>
-      <div ref={cardRef} style={{position:"relative",width:"min(460px,100%)",maxHeight:"100%",overflow:"hidden",background:T.bg,border:`1px solid ${T.border}`,borderRadius:20,boxShadow:T.light?"0 16px 48px rgba(0,0,0,0.16)":"0 16px 48px rgba(0,0,0,0.6)",display:"flex",flexDirection:"column"}}>
-        <div ref={bodyRef} style={{padding:"20px 20px 18px",display:"flex",flexDirection:"column",minHeight:0}}>
-          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
-            <div style={{minWidth:0}}>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{d.toLocaleDateString(undefined,{weekday:"long"})}</div>
-              <h2 id="day-detail-title" style={{margin:"4px 0 0",fontFamily:F.heading,fontWeight:400,fontSize:30,lineHeight:1.1,color:T.text}}>{d.toLocaleDateString(undefined,{month:"long",day:"numeric"})}</h2>
-              <div style={{fontFamily:F.body,fontSize:11,color:late?ink("#FF4757",T.light):T.textMuted,marginTop:6}}>
-                {rel}{late?", overdue":""}{list.length>0?` · ${open.length===0?"all done":`${open.length} due`}${mins?` · ${formatDuration(mins)}`:""}`:""}
-              </div>
-            </div>
-            <button ref={closeRef} onClick={close} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:20,lineHeight:1,padding:"2px 4px",flexShrink:0}}>×</button>
+    <GrowCard origin={origin} labelledBy="day-detail-title" T={T} onClose={onClose}>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,paddingRight:28}}>
+        <div style={{minWidth:0}}>
+          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{d.toLocaleDateString(undefined,{weekday:"long"})}</div>
+          <h2 id="day-detail-title" style={{margin:"4px 0 0",fontFamily:F.heading,fontWeight:400,fontSize:30,lineHeight:1.1,color:T.text}}>{d.toLocaleDateString(undefined,{month:"long",day:"numeric"})}</h2>
+          <div style={{fontFamily:F.body,fontSize:11,color:late?ink("#FF4757",T.light):T.textMuted,marginTop:6}}>
+            {rel}{late?", overdue":""}{list.length>0?` · ${open.length===0?"all done":`${open.length} due`}${mins?` · ${formatDuration(mins)}`:""}`:""}
           </div>
-          <div style={{height:1,background:T.border,margin:"14px 0 12px",flexShrink:0}}/>
-          {list.length===0
-            ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:12}}>Nothing due.</div>
-            :<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,overflowY:"auto",overscrollBehavior:"contain",minHeight:0}}>
-              {list.map(t=>{
-                const sc=subjectColors[t.subject]||T.accent;
-                return(
-                  <div key={t.id} onClick={()=>onOpenTask(t)} style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:10,padding:"10px 11px",cursor:"pointer",flexShrink:0}}>
-                    <button aria-label={t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();onToggleDone(t.id);}}
-                      style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {t.done&&<CheckMark size={10}/>}
-                    </button>
-                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:15,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-                    {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
-                    {t.dueTime&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatTime(t.dueTime,h24)}</span>}
-                    {!t.dueTime&&t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
-                  </div>
-                );
-              })}
-            </div>}
-          <button onClick={()=>onAddOn(iso)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12,flexShrink:0}}>
-            + Add homework due {diff===0?"today":d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
-          </button>
         </div>
       </div>
+      <div style={{height:1,background:T.border,margin:"14px 0 12px",flexShrink:0}}/>
+      {list.length===0
+        ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:12}}>Nothing due.</div>
+        :<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,overflowY:"auto",overscrollBehavior:"contain",minHeight:0}}>
+          {list.map(t=><CardTaskRow key={t.id} t={t} T={T} F={F} subjectColors={subjectColors} onOpenTask={onOpenTask} onToggleDone={onToggleDone}
+            note={t.dueTime?formatTime(t.dueTime,h24):formatDuration(t.estMins)}/>)}
+        </div>}
+      <button onClick={()=>onAddOn(iso)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12,flexShrink:0}}>
+        + Add homework due {diff===0?"today":d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
+      </button>
+    </GrowCard>
+  );
+}
+
+// A row of the Time left dropdown, opened: one due-date group or one subject
+// in depth. Totals (time left, tasks, time already worked, how many have no
+// estimate) and every open task in it, soonest first, each with when it's due
+// and how long it should take. `origin` is the row that was tapped.
+function TimeDetail({title,kicker,color,list,origin,T,F,subjectColors,h24,now,onOpenTask,onToggleDone,onClose}:{
+  title:string; kicker:string; color?:string; list:Task[]; origin:HTMLElement|null;
+  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; h24:boolean; now:number;
+  onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void; onClose:()=>void;
+}){
+  const open=list.filter(t=>!t.done);
+  const mins=open.reduce((n,t)=>n+(t.estMins||0),0);
+  const worked=open.reduce((n,t)=>n+(t.sessions||[]).reduce((a,x)=>a+x.mins,0),0);
+  const noEstimate=open.filter(t=>!t.estMins).length;
+  const sorted=list.slice().sort((a,b)=>a.done!==b.done?(a.done?1:-1):(a.dueDate||"9999").localeCompare(b.dueDate||"9999")||(a.dueTime||"99").localeCompare(b.dueTime||"99")||a.order-b.order);
+  const stat=(label:string,value:string)=>(
+    <div style={{flex:1,minWidth:0,background:T.card,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+      <div style={{fontFamily:F.heading,fontSize:18,color:T.text,whiteSpace:"nowrap"}}>{value}</div>
+      <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2,textTransform:"uppercase",letterSpacing:"0.06em"}}>{label}</div>
     </div>
+  );
+  const noteFor=(t:Task)=>{
+    const when=!t.dueDate?"Anytime":countdown(t.dueDate,t.dueTime,now)??`${formatDate(t.dueDate)}${t.dueTime?` ${formatTime(t.dueTime,h24)}`:""}`;
+    return `${when} · ${formatDuration(t.estMins)||"no estimate"}`;
+  };
+  return(
+    <GrowCard origin={origin} labelledBy="time-detail-title" T={T} onClose={onClose}>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,paddingRight:28}}>
+        <div style={{minWidth:0}}>
+          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{kicker}</div>
+          <h2 id="time-detail-title" style={{margin:"4px 0 0",fontFamily:F.heading,fontWeight:400,fontSize:28,lineHeight:1.15,color:T.text,display:"flex",alignItems:"center",gap:10}}>
+            {color&&<span aria-hidden="true" style={{width:12,height:12,borderRadius:"50%",background:color,flexShrink:0}}/>}
+            <span style={{minWidth:0,overflow:"hidden",textOverflow:"ellipsis"}}>{title}</span>
+          </h2>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8,margin:"14px 0 0",flexShrink:0}}>
+        {stat("Time left",formatDuration(mins)||"0m")}
+        {stat(open.length===1?"Task":"Tasks",String(open.length))}
+        {stat("Worked",formatDuration(worked)||"0m")}
+      </div>
+      {noEstimate>0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:10,flexShrink:0}}>{noEstimate} {noEstimate===1?"task has":"tasks have"} no estimate, so the time left reads low.</div>}
+      <div style={{height:1,background:T.border,margin:"14px 0 12px",flexShrink:0}}/>
+      {sorted.length===0
+        ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Nothing left here.</div>
+        :<div style={{display:"flex",flexDirection:"column",gap:6,overflowY:"auto",overscrollBehavior:"contain",minHeight:0}}>
+          {sorted.map(t=><CardTaskRow key={t.id} t={t} T={T} F={F} subjectColors={subjectColors} onOpenTask={onOpenTask} onToggleDone={onToggleDone} note={noteFor(t)}/>)}
+        </div>}
+    </GrowCard>
   );
 }
 
@@ -2324,8 +2409,9 @@ export default function HomeworkPlanner() {
   const updateKinds=[...new Set(whatsNew.map(w=>w.kind))].sort((a,b)=>kindRank(a)-kindRank(b));
   const activeKind=updateKinds.includes(updateKind)?updateKind:"all";
   const shownUpdates=activeKind==="all"?whatsNew:whatsNew.filter(w=>w.kind===activeKind);
-  // Which Inbox and Import/Export dropdowns are open. Not remembered: all start open.
-  const [openInbox,setOpenInbox]=useState<string[]>(["inbox-messages","inbox-updates","import-syllabus","import-backup"]);
+  // Which Inbox and Import/Export dropdowns are open. Not remembered: they start
+  // closed and close again when you leave the screen (see lastTab).
+  const [openInbox,setOpenInbox]=useState<string[]>([]);
   function toggleInboxSection(id:string){setOpenInbox(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);}
   function dismissWhatsNew(id:string){setDismissedWhatsNew(prev=>[...prev,id]);}
   // The Inbox update open in the floating panel (UpdateDetail), by id, and the
@@ -2912,10 +2998,15 @@ export default function HomeworkPlanner() {
   // Escape-to-close handling as the title menu above.
   const [timeMenuOpen,setTimeMenuOpen]=useState(false);
   const timeMenuRef=useRef<HTMLDivElement>(null);
+  // The Time left row opened as a card: a due-date group or a subject.
+  const [openTime,setOpenTime]=useState<{kind:"due"|"subject";key:string;origin:HTMLElement}|null>(null);
   useEffect(()=>{
     if(!timeMenuOpen)return;
-    function onPointerDown(e:PointerEvent){if(timeMenuRef.current&&!timeMenuRef.current.contains(e.target as Node))setTimeMenuOpen(false);}
-    function onKeyDown(e:KeyboardEvent){if(e.key==="Escape")setTimeMenuOpen(false);}
+    // A card opened from a row (data-keeps-menu, see GrowCard) sits outside the
+    // dropdown; taps and Escape inside it must not close the dropdown under it.
+    const keeps=(t:EventTarget|null)=>t instanceof Element&&!!t.closest("[data-keeps-menu]");
+    function onPointerDown(e:PointerEvent){if(keeps(e.target))return;if(timeMenuRef.current&&!timeMenuRef.current.contains(e.target as Node))setTimeMenuOpen(false);}
+    function onKeyDown(e:KeyboardEvent){if(e.key==="Escape"&&!keeps(e.target))setTimeMenuOpen(false);}
     document.addEventListener("pointerdown",onPointerDown);
     document.addEventListener("keydown",onKeyDown);
     return ()=>{document.removeEventListener("pointerdown",onPointerDown);document.removeEventListener("keydown",onKeyDown);};
@@ -2929,9 +3020,13 @@ export default function HomeworkPlanner() {
   useEffect(()=>{localStorage.removeItem("hw-settings-open");},[]);
   // Reset while rendering when the screen changes (React's pattern for
   // adjusting state to a changed value), not in an effect.
-  const inSettings=activeTab==="options";
-  const [wasInSettings,setWasInSettings]=useState(inSettings);
-  if(inSettings!==wasInSettings){setWasInSettings(inSettings);if(!inSettings)setOpenSettings([]);}
+  // The same goes for the Inbox's and Import/Export's dropdowns (openInbox).
+  const [lastTab,setLastTab]=useState(activeTab);
+  if(activeTab!==lastTab){
+    setLastTab(activeTab);
+    if(lastTab==="options")setOpenSettings([]);
+    if(lastTab==="inbox"||lastTab==="import")setOpenInbox([]);
+  }
   function toggleSettingsSection(id:string){setOpenSettings(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);}
   // Syllabus import: transient by design (a paste-and-review staging area, not
   // something worth persisting across reloads like tasks are).
@@ -3049,7 +3144,7 @@ export default function HomeworkPlanner() {
   useEffect(()=>{try{localStorage.setItem("hw-bg",T.bg);}catch{/* storage unavailable */}},[T.bg]);
   // Pull down at the top of the page to reload, in the installed app (a browser
   // tab already has its own). Off while anything is open over the page.
-  usePullToReload(isStandalone()&&selectedTask==null&&!searchOpen&&openUpdate==null&&!showProfile,T.card,T.text,T.solidBorder);
+  usePullToReload(isStandalone()&&selectedTask==null&&!searchOpen&&openUpdate==null&&openTime==null&&!showProfile,T.card,T.text,T.solidBorder);
 
   const suggestion=buildSuggestion(tasks);
 
@@ -4427,7 +4522,7 @@ export default function HomeworkPlanner() {
       <style>{css}</style>
       {/* inert while the task sheet is open, so screen readers and Tab stay in
           the dialog instead of wandering through the list behind it. */}
-      <div className="app-inner" inert={selectedTask!=null||searchOpen||openUpdate!=null||undefined}>
+      <div className="app-inner" inert={selectedTask!=null||searchOpen||openUpdate!=null||openTime!=null||undefined}>
         {/* Header */}
         <header style={{position:"relative",display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
           {/* Hidden inline as well as by .sr-only, so it can never show as a
@@ -4478,12 +4573,14 @@ export default function HomeworkPlanner() {
                 {timeByDue.length===0
                   ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Nothing left to do</div>
                   :<div style={{display:"flex",flexDirection:"column",gap:7}}>
+                    {/* Each row opens that group in depth (TimeDetail), growing out of the row. */}
                     {timeByDue.map(b=>(
-                      <div key={b.key} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <button key={b.key} onClick={e=>setOpenTime({kind:"due",key:b.key,origin:e.currentTarget})} aria-haspopup="dialog" style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left"}}>
                         <span style={{fontFamily:F.body,fontSize:12,color:b.key==="overdue"?"#FF4757":T.text,flex:1}}>{b.label}</span>
                         <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{b.count} {b.count===1?"task":"tasks"}</span>
                         <span style={{fontFamily:F.body,fontSize:12,color:T.text,width:52,textAlign:"right"}}>{fmtMins(b.mins)}</span>
-                      </div>
+                        <span aria-hidden="true" style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>›</span>
+                      </button>
                     ))}
                   </div>}
                 {timeBySubject.length>0&&<>
@@ -4491,18 +4588,19 @@ export default function HomeworkPlanner() {
                   <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By subject</div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
                     {timeBySubject.map(r=>{const c=r.name?(subjectColors[r.name]||T.accent):T.textMuted;return(
-                      <div key={r.name}>
+                      <button key={r.name} onClick={e=>setOpenTime({kind:"subject",key:r.name,origin:e.currentTarget})} aria-haspopup="dialog" style={{display:"block",width:"100%",background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left"}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           <span style={{width:8,height:8,borderRadius:"50%",background:c,flexShrink:0}}/>
                           <span style={{fontFamily:F.body,fontSize:12,color:r.name?T.text:T.textMuted,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name||"No subject"}</span>
                           <span style={{fontFamily:F.body,fontSize:12,color:T.text,flexShrink:0}}>{fmtMins(r.mins)}</span>
                           <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted,width:34,textAlign:"right",flexShrink:0}}>{r.pct}%</span>
+                          <span aria-hidden="true" style={{fontFamily:F.body,fontSize:12,color:T.textFaint,flexShrink:0}}>›</span>
                         </div>
                         <div style={{height:3,borderRadius:99,background:T.cardAlt,marginTop:5,marginLeft:16,overflow:"hidden"}}>
                           <div style={{height:"100%",width:`${r.pct}%`,background:c,borderRadius:99}}/>
                         </div>
                         {r.spent>0&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:4,marginLeft:16}}>{fmtMins(r.spent)} worked of {fmtMins(r.mins)} planned</div>}
-                      </div>
+                      </button>
                     );})}
                   </div>
                 </>}
@@ -4859,7 +4957,7 @@ export default function HomeworkPlanner() {
         {activeTab==="import"&&(
           <div className="sec-body" style={{display:"flex",flexDirection:"column",gap:8}}>
             <ScreenHeader title="Import/Export" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
-            {/* Dropdowns like the Inbox's (same open list, both start open). */}
+            {/* Dropdowns like the Inbox's (same open list). */}
             <SettingsSection {...inboxSec("import-syllabus")} title="Import from Syllabus">
                       <textarea
                         value={importText}
@@ -5216,6 +5314,17 @@ export default function HomeworkPlanner() {
         </div>
       </div>
       <div className="sr-only" aria-live="polite">{srMessage}</div>
+      {openTime&&(()=>{
+        const inGroup=(t:Task)=>openTime.kind==="due"?dueBucket(t.dueDate,todayStr)===openTime.key:(t.subject||"")===openTime.key;
+        // A task just checked off stays until it settles, like in the list.
+        const list=tasks.filter(t=>!t.archived&&(!t.done||justDone.includes(t.id))&&inGroup(t));
+        const title=openTime.kind==="due"?(DUE_BUCKETS.find(b=>b.key===openTime.key)?.label??"Time left"):(openTime.key||"No subject");
+        return <TimeDetail title={title} kicker={openTime.kind==="due"?"Time left · by due date":"Time left · subject"}
+          color={openTime.kind==="subject"&&openTime.key?(subjectColors[openTime.key]||T.accent):undefined}
+          list={list} origin={openTime.origin} T={T} F={F} subjectColors={subjectColors} h24={h24} now={now}
+          onOpenTask={t=>setSelectedTask(t)} onToggleDone={toggleDone}
+          onClose={()=>{const o=openTime.origin;setOpenTime(null);requestAnimationFrame(()=>o.isConnected&&o.focus({preventScroll:true}));}}/>;
+      })()}
       {openUpdate&&(()=>{
         // A recap steps through the recaps, an update through the shown updates.
         const list=openUpdate.id.startsWith("recap-")?recapItems:shownUpdates;

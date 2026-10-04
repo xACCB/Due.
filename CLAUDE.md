@@ -514,7 +514,8 @@ in the new month; `tabStop` keeps one day reachable by Tab), Today jumps back. "
 set directly). It replaced the old Calendar *layout* (a rolling week list). The tab has a Month/Deck switch
 (`calendarView`, `hw-calendar-view`, local-only). **Deck** (`DueDeck`, module scope) is one card per
 date that still has an open task or is today or later: a large date, that day's tasks (check off, tap
-to open) and the same "+ Add homework due" button. The top three cards are stacked; swiping the top
+to open) and the same "+ Add homework due" button. Up to four cards are drawn: the ones behind sit lower and narrower (scaled from the bottom edge), so
+their rims show under the top card as a visible stack; swiping the top
 one left flies it off and the next rises, swiping right (or ‹, ArrowLeft) brings the earlier date
 back in from the left. The top card is tracked by its date (`picked`), not its index, and defaults
 to the first date from today on. Drag is direct style writes on the top card, like the task sheet.

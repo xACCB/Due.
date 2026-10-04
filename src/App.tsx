@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"deck-stack", date:"2026-10-04", kind:"UI change", headline:"A deck that looks stacked", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"The Deck now looks like a real stack: the edges of the next few cards show under the top one, so you can see there are more days behind it. The Next up button is gone; use the arrows or swipe." },
   { id:"due-deck", date:"2026-10-04", kind:"New feature", headline:"Due date deck", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"A new way to see what's coming: a deck of cards, one for each day something is due, with the date written large and that day's tasks underneath. Swipe a card left for the next day and right to go back. It opens on today or the next day with something due." },
   { id:"slider-colors", date:"2026-10-04", kind:"UI change", headline:"Clearer speed slider", where:"Menu (tap DuePlanner) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"The Animation speed slider is easier to read: the bar is white and the knob is black with a white ring in the dark theme, and the other way round in the light theme." },
   { id:"calendar-month-only", date:"2026-10-04", kind:"New feature", headline:"Calendar shows one month", where:"Menu (tap DuePlanner) → Settings → Date & time → Calendar shows", go:"settings:calendar-days", description:"The Calendar now shows only the days of the month you're looking at, without the faded days from the months either side. Prefer the old view? Choose \"Six full weeks\" in Settings." },
@@ -1485,7 +1486,10 @@ function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone,onAddO
   const leaving=useRef(false);
   const cameBack=useRef(false);
   const reduced=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const depthTransform=(k:number)=>`translateY(${k*12}px) scale(${1-k*0.05})`;
+  // Each card behind sits a little lower and narrower, scaled from its bottom
+  // edge, so its rim shows under the one in front: a visible stack of edges
+  // that tells you how many more cards there are (up to three).
+  const depthTransform=(k:number)=>`translateY(${k*10}px) scale(${1-k*0.045})`;
   // Forward: the top card flies off to the left and the one under it rises.
   // Back: the earlier card comes back in from the left, on top.
   function go(delta:number):boolean{
@@ -1554,8 +1558,8 @@ function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone,onAddO
     <div>
       <div role="group" aria-roledescription="deck" aria-label="Due dates, use the left and right arrow keys to move between days" tabIndex={0}
         onKeyDown={e=>{if(e.target!==e.currentTarget)return;if(e.key==="ArrowRight"){e.preventDefault();go(1);}else if(e.key==="ArrowLeft"){e.preventDefault();go(-1);}}}
-        style={{position:"relative",height:"min(540px,calc(100dvh - 300px))",minHeight:380,marginBottom:34,borderRadius:24}}>
-        {dates.slice(idx,idx+3).map((iso,k)=>{
+        style={{position:"relative",height:"min(540px,calc(100dvh - 300px))",minHeight:380,marginBottom:42,borderRadius:24}}>
+        {dates.slice(idx,idx+4).map((iso,k)=>{
           const d=new Date(iso+"T00:00:00");
           const list=(due.get(iso)||[]).slice().sort((a,b)=>a.done!==b.done?(a.done?1:-1):(a.dueTime||"99").localeCompare(b.dueTime||"99")||a.order-b.order);
           const open=list.filter(t=>!t.done);
@@ -1568,8 +1572,8 @@ function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone,onAddO
             <div key={iso} ref={top?topRef:undefined} aria-hidden={top?undefined:true} inert={top?undefined:true}
               {...(top?{onPointerDown:onDown,onPointerMove:onMove,onPointerUp:onUp,onPointerCancel:onCancel}:{})}
               style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",background:T.bg,border:`1px solid ${T.border}`,borderRadius:24,padding:"22px 20px 18px",
-                boxShadow:T.light?"0 10px 30px rgba(0,0,0,0.10)":"0 10px 30px rgba(0,0,0,0.5)",transform:depthTransform(k),opacity:k===0?1:k===1?0.75:0.45,zIndex:3-k,
-                transition:"transform .28s cubic-bezier(.2,.8,.3,1), opacity .28s",touchAction:"pan-y",userSelect:"none",WebkitUserSelect:"none",overflow:"hidden"}}>
+                boxShadow:T.light?"0 6px 16px rgba(0,0,0,0.10)":"0 6px 16px rgba(0,0,0,0.55)",transform:depthTransform(k),transformOrigin:"50% 100%",zIndex:4-k,
+                transition:"transform .28s cubic-bezier(.2,.8,.3,1)",touchAction:"pan-y",userSelect:"none",WebkitUserSelect:"none",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
                 <div style={{minWidth:0}}>
                   <div style={{fontFamily:F.body,fontSize:12,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{d.toLocaleDateString(undefined,{weekday:"long"})}</div>
@@ -1609,7 +1613,6 @@ function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone,onAddO
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <button onClick={()=>go(-1)} disabled={idx===0} aria-label="Earlier date" style={{...navBtn,opacity:idx===0?0.4:1,cursor:idx===0?"default":"pointer"}}>‹</button>
         <span aria-live="polite" style={{flex:1,textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textFaint}}>{idx+1} of {dates.length}</span>
-        {current!==fallback&&<button onClick={()=>setPicked(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,height:38,padding:"0 12px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>{fallback===today?"Today":"Next up"}</button>}
         <button onClick={()=>go(1)} disabled={idx===dates.length-1} aria-label="Later date" style={{...navBtn,opacity:idx===dates.length-1?0.4:1,cursor:idx===dates.length-1?"default":"pointer"}}>›</button>
       </div>
     </div>

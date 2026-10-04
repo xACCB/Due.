@@ -45,7 +45,10 @@ Everything with real UI logic — tab bodies, pickers, `TaskModal` — is still 
 is just a minimal box-sizing reset — all real styling comes from inline style objects plus one
 runtime-generated stylesheet string (`css`, built from the active theme/font inside the component)
 injected via `<style>{css}</style>` in both the main view and Focus Mode. There's no CSS modules,
-styled-components, or Tailwind. A tiny inline script in `index.html` reads a `hw-bg` localStorage
+styled-components, or Tailwind. The fonts are loaded by non-blocking `<link>`s in `index.html`, never by an `@import`
+in that runtime stylesheet: an `@import` holds back the whole stylesheet until it loads, which showed
+the app unstyled for a moment on slow connections (the visually hidden `<h1>` appearing as a second
+title, the layout stretched). A tiny inline script in `index.html` reads a `hw-bg` localStorage
 key (kept in sync with the active theme's background by `App.tsx`) and paints it on `<html>`
 before React mounts, to avoid a flash of the default background for returning dark-theme users.
 

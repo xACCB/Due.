@@ -20,6 +20,14 @@
     <meta name="twitter:title" content="DuePlanner" />
     <meta name="twitter:description" content="A fast, highly personalizable homework and task planner: due dates, subjects, recurring tasks, reminders, and focus tools, all in one place." />
     <meta name="twitter:image" content="https://dueplanner.vercel.app/favicon-512.png" />
+    <!-- The app's fonts. Loaded here, without blocking, rather than by an
+         @import in the app's runtime stylesheet (which held back the whole
+         stylesheet until the fonts answered). Same family list as FONT.google
+         in src/App.tsx. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" /></noscript>
     <script>
       // Prevents a flash of the browser's default white background for
       // returning dark-theme users: paints the last-known theme background

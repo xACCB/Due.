@@ -223,6 +223,8 @@ function IconSettings(){
 // Down to exactly one -- the original DM Serif Display/DM Mono pairing -- with
 // every other option removed, so there's no per-user Font picker/state
 // anymore (same treatment THEMES got when it went down to two).
+// `google` is the Google Fonts family query; index.html's font <link>s use the
+// same string, so change both together.
 const FONT = { name:"DM Serif", heading:"'DM Serif Display', serif", body:"'DM Mono', monospace", google:"DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500" } as const;
 
 const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:"▥"}, priority:{name:"Priority",emoji:"‼"}, dueDate:{name:"Due Date",emoji:"▦"} };
@@ -249,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"no-double-title", date:"2026-10-04", kind:"Bug fix", headline:"No more double title", where:"When the app opens", description:"Opening the app on a slow connection could briefly show a second DuePlanner title in a different font, with the page stretched. The app now appears fully styled from the first moment." },
   { id:"sheet-drag-anywhere", date:"2026-10-04", kind:"Improvement", headline:"Gestures that feel native", where:"Tap a task, then pull its details down", go:"task", description:"A task's details now pull down from anywhere on the sheet, not only the small bar at the top, and the page behind no longer scrolls instead. If you've scrolled down in the details, the first pull scrolls back to the top and the next one closes it. Swiping a task in the list also works with a quick flick, without dragging all the way." },
   { id:"session-no-symbols", date:"2026-10-04", kind:"UI change", headline:"Plain session buttons", where:"Tap a task, then the timer in its details", go:"task", description:"The Start Session and End Session buttons are plain words now, without the ▶ and ⏹ symbols." },
   { id:"focus-time-counts", date:"2026-10-04", kind:"Improvement", headline:"Focus time always counts", where:"The Focus tab", go:"tasks:tab-focus", description:"Time you spend in a Pomodoro now counts toward the task even if you don't finish it. Resetting the timer, switching to another task or marking the task done logs the minutes you worked so far, like the Start session button in a task." },
@@ -3491,7 +3494,10 @@ export default function HomeworkPlanner() {
   // the same way as the other glass rules in the css below.
   const glassCardSel=`[style*="border: 1px solid ${T.border.replace(/,/g,", ")}"][style*="border-radius"]:not([style*="gradient"])`;
   const css=useMemo(()=>`
-    @import url('https://fonts.googleapis.com/css2?family=${F.google}&display=swap');
+    /* No @import for the fonts here: an @import holds back every rule in this
+       stylesheet until it has loaded, so on a slow connection the app showed
+       unstyled for a moment (the hidden heading visible beside the wordmark,
+       the layout stretched). index.html loads the fonts instead. */
     *{box-sizing:border-box;}
     /* Form controls don't inherit the page font by default -- without this, any
        button/input without an explicit fontFamily fell back to the system font. */
@@ -3603,7 +3609,7 @@ export default function HomeworkPlanner() {
     @media (max-width:600px){
       input,textarea{font-size:16px!important;}
     }
-  `,[T.bg,T.card,T.border,T.light,T.accent,liquidGlass,glassCardSel,F.google,F.body]);
+  `,[T.bg,T.card,T.border,T.light,T.accent,liquidGlass,glassCardSel,F.body]);
 
   // Feeds the Liquid Glass pointer highlight (see the css above): the mouse or
   // finger position, relative to each glass card it's over, as CSS variables on
@@ -4074,7 +4080,9 @@ export default function HomeworkPlanner() {
       <div className="app-inner" inert={selectedTask!=null||searchOpen||openUpdate!=null||undefined}>
         {/* Header */}
         <header style={{position:"relative",display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
-          <h1 className="sr-only">DuePlanner</h1>
+          {/* Hidden inline as well as by .sr-only, so it can never show as a
+              second title while the stylesheet is still on its way. */}
+          <h1 className="sr-only" style={{position:"absolute",width:1,height:1,margin:-1,padding:0,overflow:"hidden",clip:"rect(0,0,0,0)",whiteSpace:"nowrap",border:0}}>DuePlanner</h1>
           <div ref={titleMenuRef} style={{position:"relative"}}>
             <button onClick={()=>setTitleMenuOpen(o=>!o)} aria-expanded={titleMenuOpen} aria-label="DuePlanner menu" style={{background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",display:"block"}}>
               <div style={{fontFamily:F.heading,fontSize:28,lineHeight:1,color:T.accent}}>Due<span style={{color:T.text}}>Planner</span></div>

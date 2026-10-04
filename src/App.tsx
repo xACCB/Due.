@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"import-no-instructions", date:"2026-10-04", kind:"UI change", headline:"Cleaner syllabus import", where:"Menu (tap DuePlanner) → Import/Export → Import from Syllabus", go:"import", description:"The paragraph of instructions under Import from Syllabus is gone. Paste your syllabus in the box and tap the button as before." },
   { id:"deck-stack", date:"2026-10-04", kind:"UI change", headline:"A deck that looks stacked", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"The Deck now looks like a real stack: the edges of the next few cards show under the top one, so you can see there are more days behind it. The Next up and Add homework buttons are gone from the cards, leaving just the date and what is due." },
   { id:"due-deck", date:"2026-10-04", kind:"New feature", headline:"Due date deck", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"A new way to see what's coming: a deck of cards, one for each day something is due, with the date written large and that day's tasks underneath. Swipe a card left for the next day and right to go back. It opens on today or the next day with something due." },
   { id:"slider-colors", date:"2026-10-04", kind:"UI change", headline:"Clearer speed slider", where:"Menu (tap DuePlanner) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"The Animation speed slider is easier to read: the bar is white and the knob is black with a white ring in the dark theme, and the other way round in the light theme." },
@@ -4696,9 +4697,6 @@ export default function HomeworkPlanner() {
             <ScreenHeader title="Import/Export" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
                       <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Import from Syllabus</div>
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:10,lineHeight:1.5}}>
-                        Paste your syllabus below. Lines with a date (e.g. "Sept 20", "9/20", "2026-09-20") are picked up as assignments. Review and uncheck anything that isn't one before adding.
-                      </div>
                       <textarea
                         value={importText}
                         onChange={e=>{setImportText(e.target.value);setImportPreview(null);setImportedCount(null);}}

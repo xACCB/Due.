@@ -511,7 +511,13 @@ months; swiping the grid or ‹ › change month without changing the selected d
 in the new month; `tabStop` keeps one day reachable by Tab), Today jumps back. "+ Add homework due <day>" calls
 `addHomeworkOn()`: switches to Tasks and starts the usual add flow with the date pre-picked
 (`pendingDueDate`, so the date question opens on "what time?"; if that question is off the date is
-set directly). It replaced the old Calendar *layout* (a rolling week list).
+set directly). It replaced the old Calendar *layout* (a rolling week list). The tab has a Month/Deck switch
+(`calendarView`, `hw-calendar-view`, local-only). **Deck** (`DueDeck`, module scope) is one card per
+date that still has an open task or is today or later: a large date, that day's tasks (check off, tap
+to open) and the same "+ Add homework due" button. The top three cards are stacked; swiping the top
+one left flies it off and the next rises, swiping right (or ‹, ArrowLeft) brings the earlier date
+back in from the left. The top card is tracked by its date (`picked`), not its index, and defaults
+to the first date from today on. Drag is direct style writes on the top card, like the task sheet.
 
 **Accessibility conventions** (from the screen-reader/keyboard pass, checked with axe-core and the
 Chrome accessibility tree):

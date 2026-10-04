@@ -481,7 +481,8 @@ flip-flopping the swap), layout switches, and changes arriving from sync (cards 
 under your finger). `glideClock()` (module scope) exists for the React Compiler purity lint.
 
 **Tab entrance.** The Tasks tab's content and Focus Mode's content are wrapped in `.sec-body`, the
-same short fade-and-settle the Calendar grid and Settings sections use, so every tab opens alike.
+same short fade-and-settle the Calendar grid and Settings sections use, so every tab opens alike. The title menu, the Time
+left dropdown, Profile and the four menu screens (Inbox, History, Import/Export, Settings) carry it too.
 
 **Layouts stay consistent** through shared helpers at the top of `renderTasks`: every layout's card is a
 `[data-task-id]` wrapper (relative, clipped) holding the swipe reveal and the `.tc` card, so all six

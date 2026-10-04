@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"menu-transitions", date:"2026-10-04", kind:"UI change", headline:"Menus open smoothly", where:"Menu (tap DuePlanner) and anything you open from it", go:"menu", description:"The menu, Time left, Profile, Inbox, History, Import/Export and Settings now open with the same short fade as the Calendar tab, instead of appearing instantly." },
   { id:"settings-close-on-leave", date:"2026-10-04", kind:"UI change", headline:"Settings tidy themselves", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"The dropdowns in Settings now close when you leave Settings, so it always opens with everything folded up." },
   { id:"import-dropdowns", date:"2026-10-04", kind:"UI change", headline:"Import/Export dropdowns", where:"Menu (tap DuePlanner) → Import/Export", go:"import", description:"Import from Syllabus and Backup & export are now dropdowns, like the Inbox. Tap a heading to close or open it." },
   { id:"profile-no-ring", date:"2026-10-04", kind:"UI change", headline:"No ring on your picture", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"The thick ring around your profile picture is gone, so the picture stands on its own." },
@@ -1880,7 +1881,7 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
   // Signed in last time, but Firebase hasn't said so yet this load: show the
   // Profile page's own header rather than flashing the sign-in screen.
   if (!fbUser&&authPending) return (
-    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,overflowY:"auto"}}>
+    <div className="sec-body" style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,overflowY:"auto"}}>
       <div style={{maxWidth:560,margin:"0 auto",padding:"20px 16px 40px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
           <div style={{fontFamily:F.heading,fontSize:22,color:T.accent}}>Profile</div>
@@ -1893,7 +1894,7 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
 
   if (!fbUser) return (
     // ── SIGN IN SCREEN (monkeytype-style) ─────────────────────────────────────
-    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+    <div className="sec-body" style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px"}}>
       <button onClick={()=>setShowProfile(false)} aria-label="Close" style={{position:"absolute",top:20,right:20,background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
       {/* Logo */}
       <div style={{marginBottom:40,textAlign:"center"}}>
@@ -1937,7 +1938,7 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
 
   // ── PROFILE SCREEN (signed in) ─────────────────────────────────────────────
   return (
-    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,overflowY:"auto"}}>
+    <div className="sec-body" style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,overflowY:"auto"}}>
       <div style={{maxWidth:560,margin:"0 auto",padding:"20px 16px 40px"}}>
         {/* Header */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
@@ -4431,7 +4432,7 @@ export default function HomeworkPlanner() {
               <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2}}>by due. studios{fbUser&&!online&&<span title="Offline. Changes will sync when you're back online" style={{color:ink("#FFA502",T.light),marginLeft:6}}>· offline</span>}</div>
             </button>
             {titleMenuOpen&&(
-              <div role="group" aria-label="DuePlanner menu" style={{position:"absolute",top:"calc(100% + 8px)",left:0,zIndex:200,width:280,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",overflow:"hidden"}}>
+              <div role="group" aria-label="DuePlanner menu" className="sec-body" style={{position:"absolute",top:"calc(100% + 8px)",left:0,zIndex:200,width:280,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",overflow:"hidden"}}>
                 <button onClick={()=>{setShowProfile(true);setTitleMenuOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"12px 14px",cursor:"pointer",textAlign:"left",borderBottom:`1px solid ${T.border}`,color:T.text}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke={T.text} strokeWidth="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={T.text} strokeWidth="2" strokeLinecap="round"/></svg>
                   <span style={{flex:1,minWidth:0}}>
@@ -4465,7 +4466,7 @@ export default function HomeworkPlanner() {
               <div style={{fontFamily:F.heading,fontSize:20,color:effectiveThemeMode==="dark"?"#fff":"#000"}}>{fmtMins(totalMins)}</div>
             </button>
             {timeMenuOpen&&(
-              <div role="dialog" aria-label="Time left breakdown" style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,width:250,maxWidth:"calc(100vw - 28px)",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",padding:"12px 14px"}}>
+              <div role="dialog" aria-label="Time left breakdown" className="sec-body" style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,width:250,maxWidth:"calc(100vw - 28px)",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",padding:"12px 14px"}}>
                 <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By due date</div>
                 {timeByDue.length===0
                   ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Nothing left to do</div>
@@ -4757,7 +4758,7 @@ export default function HomeworkPlanner() {
         {/* Inbox, History and Import/Export: full screens opened from the title
             menu, like Settings (they used to be dropdowns inside the menu). */}
         {activeTab==="inbox"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div className="sec-body" style={{display:"flex",flexDirection:"column",gap:8}}>
             <ScreenHeader title="Inbox" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
             <SettingsSection {...inboxSec("inbox-messages")} title={`Messages${recapItems.length?` (${recapItems.length})`:""}`}>
                       <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -4813,7 +4814,7 @@ export default function HomeworkPlanner() {
           </div>
         )}
         {activeTab==="history"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div className="sec-body" style={{display:"flex",flexDirection:"column",gap:8}}>
             <ScreenHeader title="History" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
             <div data-tour="undo-redo" style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
                       <div style={{display:"flex",gap:8}}>
@@ -4849,7 +4850,7 @@ export default function HomeworkPlanner() {
           </div>
         )}
         {activeTab==="import"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div className="sec-body" style={{display:"flex",flexDirection:"column",gap:8}}>
             <ScreenHeader title="Import/Export" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
             {/* Dropdowns like the Inbox's (same open list, both start open). */}
             <SettingsSection {...inboxSec("import-syllabus")} title="Import from Syllabus">
@@ -4912,7 +4913,7 @@ export default function HomeworkPlanner() {
           </div>
         )}
         {activeTab==="options"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div className="sec-body" style={{display:"flex",flexDirection:"column",gap:8}}>
             {/* Settings is opened from the title menu, not the tab bar, so it
                 names itself and offers a way back instead of leaving the tab
                 bar with nothing highlighted and no hint where you are. */}

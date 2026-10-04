@@ -41,6 +41,38 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Launch screen: the dp mark on black, shown at once (before the app's
+         code has loaded) and faded out when the app has drawn, but never sooner
+         than about half a second so it doesn't just flicker. Plain HTML and a
+         small script, so it needs nothing from the app to appear. -->
+    <style>
+      #splash{position:fixed;inset:0;z-index:99999;background:#000;display:flex;align-items:center;justify-content:center;transition:opacity .28s ease;}
+      #splash.hide{opacity:0;pointer-events:none;}
+      @media (prefers-reduced-motion:reduce){#splash{transition:none;}}
+    </style>
+    <div id="splash" aria-hidden="true">
+      <svg width="132" height="132" viewBox="0 0 100 100" role="img" aria-label="DuePlanner">
+        <text x="50" y="66" text-anchor="middle" font-family="'Bodoni MT', Georgia, 'Times New Roman', serif" font-size="52" fill="#fff">dp</text>
+      </svg>
+    </div>
+    <script>
+      (function () {
+        var splash = document.getElementById("splash"), root = document.getElementById("root");
+        var shownAt = Date.now(), MIN_MS = 600, done = false;
+        function hide() {
+          if (done) return; done = true;
+          setTimeout(function () {
+            splash.classList.add("hide");
+            setTimeout(function () { splash.remove(); }, 320);
+          }, Math.max(0, MIN_MS - (Date.now() - shownAt)));
+        }
+        if (root.firstChild) { hide(); return; }
+        var seen = new MutationObserver(function () { if (root.firstChild) { seen.disconnect(); hide(); } });
+        seen.observe(root, { childList: true });
+        // Never leave it up if the app fails to start.
+        setTimeout(function () { seen.disconnect(); hide(); }, 4000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

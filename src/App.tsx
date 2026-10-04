@@ -248,6 +248,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"edit-no-due-time", date:"2026-10-04", kind:"New feature", headline:"No due time", where:"Tap a task → Edit, under the Time box", go:"task:task-edit", description:"When you're editing a task, a \"No due time\" button under the Time box clears the time if you set one by accident, and \"No due date\" under the date clears both." },
   { id:"edit-date-time-overlap", date:"2026-10-04", kind:"Bug fix", headline:"Due date and time fit", where:"Tap a task → Edit", go:"task:task-edit", description:"In a task's Edit panel, the Due date and Time boxes no longer spill over each other. They now sit side by side at the same size." },
   { id:"focus-show", date:"2026-10-03", kind:"New feature", headline:"Choose what Focus shows", where:"Menu (tap DuePlanner) → Settings → Focus timer → Show in Focus", go:"settings:focus-show", description:"Pick what appears in Focus Mode: just the task, the task and the stopwatch, the task and the Pomodoro, or all three." },
   { id:"focus-stopwatch", date:"2026-10-03", kind:"New feature", headline:"Stopwatch", where:"The Focus tab, under the Pomodoro", go:"focus:stopwatch", description:"Focus Mode has a stopwatch. Start it, pause it, and when you're done, log the time to the task you're focusing on. It keeps counting if you leave Focus Mode, and its time shows on the Focus tab." },
@@ -640,6 +641,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
           {draft&&(()=>{
             const field={background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"8px 10px",fontSize:12,outline:"none",width:"100%",boxSizing:"border-box" as const};
             const label={fontSize:10,color:T.textMuted,textTransform:"uppercase" as const,letterSpacing:"0.08em",marginBottom:4,display:"block"};
+            const clear={background:"none",border:"none",padding:"6px 0 0",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11,textDecoration:"underline"};
             const subjectOptions=draft.subject&&!subjects.includes(draft.subject)?[...subjects,draft.subject]:subjects;
             return (
             <form onSubmit={e=>{e.preventDefault();saveEdit();}} style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.accent}44`,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
@@ -654,10 +656,19 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
                 {/* minWidth:0 lets the two halves shrink evenly: iOS gives date and
                     time inputs an intrinsic width that otherwise pushes one over
                     the other (see .edit-field in the runtime css). */}
-                <label style={{flex:"1 1 0",minWidth:0}}><span style={label}>Due date</span>
-                  <input className="edit-field" type="date" value={draft.dueDate} onChange={e=>setDraft({...draft,dueDate:e.target.value})} style={field}/></label>
-                <label style={{flex:"1 1 0",minWidth:0}}><span style={label}>Time</span>
-                  <input className="edit-field" type="time" value={draft.dueTime} disabled={!draft.dueDate} onChange={e=>setDraft({...draft,dueTime:e.target.value})} style={{...field,opacity:draft.dueDate?1:0.5}}/></label>
+                {/* The clear buttons sit outside the labels (inside one, a tap would
+                    open the picker again). The phone's own date/time pickers have no
+                    "none" choice, so these are the way back from a stray tap. */}
+                <div style={{flex:"1 1 0",minWidth:0}}>
+                  <label style={{display:"block"}}><span style={label}>Due date</span>
+                    <input className="edit-field" type="date" value={draft.dueDate} onChange={e=>setDraft({...draft,dueDate:e.target.value})} style={field}/></label>
+                  {draft.dueDate&&<button type="button" onClick={()=>setDraft({...draft,dueDate:"",dueTime:""})} style={clear}>No due date</button>}
+                </div>
+                <div style={{flex:"1 1 0",minWidth:0}}>
+                  <label style={{display:"block"}}><span style={label}>Time</span>
+                    <input className="edit-field" type="time" value={draft.dueTime} disabled={!draft.dueDate} onChange={e=>setDraft({...draft,dueTime:e.target.value})} style={{...field,opacity:draft.dueDate?1:0.5}}/></label>
+                  {draft.dueTime&&<button type="button" data-tour="no-due-time" onClick={()=>setDraft({...draft,dueTime:""})} style={clear}>No due time</button>}
+                </div>
               </div>
               <div style={{display:"flex",gap:8}}>
                 {/* Plain text fields with the number keypad, not type="number":

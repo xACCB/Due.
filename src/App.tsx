@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"settings-close-on-leave", date:"2026-10-04", kind:"UI change", headline:"Settings tidy themselves", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"The dropdowns in Settings now close when you leave Settings, so it always opens with everything folded up." },
   { id:"import-dropdowns", date:"2026-10-04", kind:"UI change", headline:"Import/Export dropdowns", where:"Menu (tap DuePlanner) → Import/Export", go:"import", description:"Import from Syllabus and Backup & export are now dropdowns, like the Inbox. Tap a heading to close or open it." },
   { id:"profile-no-ring", date:"2026-10-04", kind:"UI change", headline:"No ring on your picture", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"The thick ring around your profile picture is gone, so the picture stands on its own." },
   { id:"launch-screen", date:"2026-10-04", kind:"New feature", headline:"Launch screen", where:"When the app opens", description:"Opening the app now shows the dp logo on a black screen for a moment, then fades into your tasks." },
@@ -1002,7 +1003,7 @@ function CheckMark({size=10,color="#111",animate=false}:{size?:number;color?:str
 // matters so it isn't torn down and recreated on every unrelated re-render.
 // One Settings section as a dropdown: the whole header row toggles it, and
 // the body is only rendered while open. Which sections are open is
-// remembered per device (openSettings, "hw-settings-open"). `tour` is the
+// kept only while Settings is on screen (openSettings). `tour` is the
 // data-tour anchor "Take me there" highlights (see goTo).
 // The header of a screen opened from the title menu (Inbox, History,
 // Import/Export, Settings): a way back to Tasks and the screen's name, since
@@ -2919,7 +2920,16 @@ export default function HomeworkPlanner() {
   },[timeMenuOpen]);
   // Which Settings dropdowns are open (SettingsSection ids), remembered on this
   // device so returning to Settings doesn't mean reopening everything.
-  const [openSettings,setOpenSettings]=usePersistedState<string[]>("hw-settings-open",[]);
+  // Which Settings dropdowns are open. They all close when you leave Settings
+  // (at the user's request), so it isn't remembered; the old saved list
+  // ("hw-settings-open") is cleared once.
+  const [openSettings,setOpenSettings]=useState<string[]>([]);
+  useEffect(()=>{localStorage.removeItem("hw-settings-open");},[]);
+  // Reset while rendering when the screen changes (React's pattern for
+  // adjusting state to a changed value), not in an effect.
+  const inSettings=activeTab==="options";
+  const [wasInSettings,setWasInSettings]=useState(inSettings);
+  if(inSettings!==wasInSettings){setWasInSettings(inSettings);if(!inSettings)setOpenSettings([]);}
   function toggleSettingsSection(id:string){setOpenSettings(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);}
   // Syllabus import: transient by design (a paste-and-review staging area, not
   // something worth persisting across reloads like tasks are).

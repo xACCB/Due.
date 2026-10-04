@@ -345,7 +345,8 @@ becomes most urgent. `showSuggestion` (Settings → Task list) turns it off enti
 **Settings layout.** Every Settings section is a `SettingsSection` dropdown (module scope): Looks,
 Date & time, Focus timer, New task questions, Subjects, Task list (group by, smart suggestion, show
 completed, auto-archive), Reminders, and Danger Zone when signed in. Bodies render only while open;
-which are open is `openSettings` (`hw-settings-open`, local-only), and `goTo()` opens the section
+which are open is `openSettings` (plain state, not saved: they all close when `activeTab` leaves
+"options"), and `goTo()` opens the section
 holding a "Take me there" anchor before highlighting it -- a new section with an anchor needs an
 entry in that map. Feedback, Clear completed and the version line stay outside the dropdowns.
 

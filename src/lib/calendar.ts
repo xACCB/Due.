@@ -26,17 +26,6 @@ export function weekdayLabels(weekStart:number):string[] {
   return names.map((_,i)=>names[(i+weekStart)%7]);
 }
 
-// How busy a day looks on the heatmap, from the minutes of open work due that
-// day: 0 = nothing, then light / medium / heavy / very heavy. A day with open
-// tasks but no estimates still counts as light, so it doesn't look empty.
-export function heatLevel(mins:number, openCount:number):0|1|2|3|4 {
-  if(openCount===0)return 0;
-  if(mins<60)return 1;
-  if(mins<120)return 2;
-  if(mins<180)return 3;
-  return 4;
-}
-
 // Tasks grouped by due date (tasks without one are left out -- the calendar
 // has nowhere to put them).
 export function byDueDate<T extends {dueDate:string}>(tasks:T[]):Map<string,T[]> {

@@ -21,7 +21,7 @@ import type { Recap } from "./lib/recaps";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, readableOn, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
-import { monthGrid, shiftMonth, weekdayLabels, heatLevel, byDueDate } from "./lib/calendar";
+import { monthGrid, shiftMonth, weekdayLabels, byDueDate } from "./lib/calendar";
 import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "./lib/spring";
 import { reconcile, same } from "./lib/sync";
 import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
@@ -248,6 +248,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"calendar-no-tint", date:"2026-10-04", kind:"UI change", headline:"No more tinted days", where:"The Calendar tab", go:"calendar", description:"Days in the Calendar are no longer shaded by how much is due, and the Less/More key is gone. The colored dots still show which days have homework." },
   { id:"calendar-add-solid", date:"2026-10-04", kind:"UI change", headline:"Solid Add button in Calendar", where:"The Calendar tab, under the selected day", go:"calendar", description:"The \"Add homework due\" button in the Calendar has a solid outline now instead of a dotted one." },
   { id:"calendar-no-auto-select", date:"2026-10-04", kind:"UI change", headline:"Calendar keeps your day", where:"The Calendar tab: swipe or use the arrows to change month", go:"calendar", description:"Changing month in the Calendar no longer selects the 1st for you. The day you picked stays selected, and nothing is outlined in the new month until you tap a day." },
   { id:"edit-no-due-time", date:"2026-10-04", kind:"New feature", headline:"No due time", where:"Tap a task → Edit, under the Time box", go:"task:task-edit", description:"When you're editing a task, a \"No due time\" button under the Time box clears the time if you set one by accident, and \"No due date\" under the date clears both." },
@@ -1223,9 +1224,8 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
 }
 
 // The Calendar tab: a month grid (6 fixed rows, so it doesn't jump between
-// months) where each day is shaded by how much open work is due that day
-// (heatLevel) and dotted with its open tasks' subject colors, plus the chosen
-// day's tasks underneath. Undated tasks aren't shown -- there's no day to put
+// months) where each day is dotted with its open tasks' subject colors, plus
+// the chosen day's tasks underneath. Undated tasks aren't shown -- there's no day to put
 // them on. Module scope like TaskModal, so the `now` tick doesn't remount it
 // (which would reset the month you're looking at).
 function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,now,onOpenTask,onToggleDone,onAddOn}:{
@@ -1275,7 +1275,6 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
   }
   // Swipe left/right on the grid to change month.
   const swipeX=useRef<number|null>(null);
-  const heat=["transparent",T.accent+"10",T.accent+"1f",T.accent+"2e",T.accent+"40"];
   const monthName=new Date(year,month,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
   const dayTasks=(due.get(selected)||[]).slice().sort((a,b)=>a.done!==b.done?(a.done?1:-1):(a.dueTime||"99").localeCompare(b.dueTime||"99")||a.order-b.order);
   const openMins=dayTasks.filter(t=>!t.done).reduce((n,t)=>n+(t.estMins||0),0);
@@ -1302,7 +1301,6 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
             const list=due.get(iso)||[];
             const open=list.filter(t=>!t.done);
             const mins=open.reduce((n,t)=>n+(t.estMins||0),0);
-            const lvl=heatLevel(mins,open.length);
             const isSel=iso===selected, isToday=iso===today, other=!inMonth(iso);
             const overdue=iso<today&&open.length>0;
             const label=new Date(iso+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})
@@ -1310,7 +1308,7 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
             return(
               <button key={iso} data-day={iso} onClick={()=>select(iso)} aria-label={label} aria-pressed={isSel} aria-current={isToday?"date":undefined} tabIndex={iso===tabStop?0:-1}
                 style={{position:"relative",height:48,borderRadius:10,cursor:"pointer",padding:"5px 0 0",display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-                  background:heat[lvl],border:`${isSel?2:1}px solid ${isSel?T.accent:isToday?T.textMuted:"transparent"}`,opacity:other?0.4:1,color:T.text}}>
+                  background:"transparent",border:`${isSel?2:1}px solid ${isSel?T.accent:isToday?T.textMuted:"transparent"}`,opacity:other?0.4:1,color:T.text}}>
                 <span style={{fontFamily:F.body,fontSize:13,lineHeight:1,fontWeight:isToday?600:400,color:overdue?ink(priColor("high",colorCodeUrgency),T.light):T.text}}>{Number(iso.slice(8))}</span>
                 <span aria-hidden="true" style={{display:"flex",gap:3,alignItems:"center",height:6}}>
                   {open.slice(0,3).map(t=><span key={t.id} style={{width:5,height:5,borderRadius:"50%",background:subjectColors[t.subject]||T.textMuted}}/>)}
@@ -1319,9 +1317,6 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
               </button>
             );
           })}
-        </div>
-        <div aria-hidden="true" style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4,marginTop:10,fontFamily:F.body,fontSize:9,color:T.textFaint}}>
-          Less{heat.map((c,i)=><span key={i} style={{width:10,height:10,borderRadius:3,background:c,border:`1px solid ${T.borderFaint}`}}/>)}More
         </div>
       </div>
       <div style={card}>

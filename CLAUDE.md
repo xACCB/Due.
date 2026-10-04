@@ -262,7 +262,7 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
   split by due date, time worked per subject, a "no estimate" link that sets the hidden
   `filter==="noest"` view).
 - `calendar.ts`: `monthGrid` (6 fixed rows of 7 local dates, honoring `weekStart`) / `shiftMonth` /
-  `weekdayLabels` / `heatLevel` (0-4 from open minutes due) / `byDueDate` -- behind the Calendar tab.
+  `weekdayLabels` / `byDueDate` -- behind the Calendar tab.
 - `download.ts`: `downloadFile` — the `Blob` + object URL + synthetic `<a download>` click pattern
   used by data export.
 
@@ -474,8 +474,8 @@ list; `.app-inner` is `inert` while it's open, and focus returns to the field on
 list itself is no longer filtered by search.
 
 **Calendar tab** (`CalendarView`, module scope so the `now` tick doesn't reset the month): a month
-grid where each day is shaded by open work due (the workload heatmap, `T.accent` at up to 25% so day
-numbers keep their contrast) with up to 3 subject-colored dots, and the selected day's tasks below
+grid where each day shows up to 3 subject-colored dots for its open tasks (the workload heatmap
+shading was removed at the user's request; don't bring it back), and the selected day's tasks below
 (check off, tap to open). Undated tasks aren't shown. Arrow keys move the selection (and focus) across
 months; swiping the grid or ‹ › change month without changing the selected day (nothing is auto-selected
 in the new month; `tabStop` keeps one day reachable by Tab), Today jumps back. "+ Add homework due <day>" calls

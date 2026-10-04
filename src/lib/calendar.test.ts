@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { monthGrid, shiftMonth, weekdayLabels, heatLevel, byDueDate } from "./calendar";
+import { monthGrid, shiftMonth, weekdayLabels, byDueDate } from "./calendar";
 
 describe("monthGrid", () => {
   it("is 42 consecutive days starting on the week holding the 1st", () => {
@@ -35,19 +35,6 @@ describe("weekdayLabels", () => {
   it("follows the week start", () => {
     expect(weekdayLabels(0)[0]).toBe("Sun");
     expect(weekdayLabels(1)).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-  });
-});
-
-describe("heatLevel", () => {
-  it("is 0 with nothing open, and at least 1 with open tasks", () => {
-    expect(heatLevel(0, 0)).toBe(0);
-    expect(heatLevel(0, 2)).toBe(1);
-  });
-  it("steps up by the hour", () => {
-    expect(heatLevel(45, 1)).toBe(1);
-    expect(heatLevel(60, 1)).toBe(2);
-    expect(heatLevel(150, 2)).toBe(3);
-    expect(heatLevel(240, 3)).toBe(4);
   });
 });
 

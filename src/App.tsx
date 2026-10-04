@@ -248,6 +248,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"calendar-add-solid", date:"2026-10-04", kind:"UI change", headline:"Solid Add button in Calendar", where:"The Calendar tab, under the selected day", go:"calendar", description:"The \"Add homework due\" button in the Calendar has a solid outline now instead of a dotted one." },
   { id:"calendar-no-auto-select", date:"2026-10-04", kind:"UI change", headline:"Calendar keeps your day", where:"The Calendar tab: swipe or use the arrows to change month", go:"calendar", description:"Changing month in the Calendar no longer selects the 1st for you. The day you picked stays selected, and nothing is outlined in the new month until you tap a day." },
   { id:"edit-no-due-time", date:"2026-10-04", kind:"New feature", headline:"No due time", where:"Tap a task → Edit, under the Time box", go:"task:task-edit", description:"When you're editing a task, a \"No due time\" button under the Time box clears the time if you set one by accident, and \"No due date\" under the date clears both." },
   { id:"edit-date-time-overlap", date:"2026-10-04", kind:"Bug fix", headline:"Due date and time fit", where:"Tap a task → Edit", go:"task:task-edit", description:"In a task's Edit panel, the Due date and Time boxes no longer spill over each other. They now sit side by side at the same size." },
@@ -1347,7 +1348,7 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
               );
             })}
           </div>}
-        <button onClick={()=>onAddOn(selected)} style={{width:"100%",background:"none",border:`1px dashed ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12}}>
+        <button onClick={()=>onAddOn(selected)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12}}>
           + Add homework due {selected===today?"today":new Date(selected+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"})}
         </button>
       </div>

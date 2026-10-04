@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"import-dropdowns", date:"2026-10-04", kind:"UI change", headline:"Import/Export dropdowns", where:"Menu (tap DuePlanner) → Import/Export", go:"import", description:"Import from Syllabus and Backup & export are now dropdowns, like the Inbox. Tap a heading to close or open it." },
   { id:"profile-no-ring", date:"2026-10-04", kind:"UI change", headline:"No ring on your picture", where:"Menu (tap DuePlanner) → Profile", go:"profile", description:"The thick ring around your profile picture is gone, so the picture stands on its own." },
   { id:"launch-screen", date:"2026-10-04", kind:"New feature", headline:"Launch screen", where:"When the app opens", description:"Opening the app now shows the dp logo on a black screen for a moment, then fades into your tasks." },
   { id:"focus-toggles", date:"2026-10-04", kind:"UI change", headline:"Focus, arranged your way", where:"Menu (tap DuePlanner) → Settings → Focus timer", go:"settings:focus-show", description:"Focus Mode now puts your task in the middle, with the Pomodoro above it and the stopwatch below, centered on the screen. In Settings, two switches turn the Pomodoro and the stopwatch on or off, so Focus only shows what you use. With the Pomodoro off, its length settings are hidden too." },
@@ -2320,8 +2321,8 @@ export default function HomeworkPlanner() {
   const updateKinds=[...new Set(whatsNew.map(w=>w.kind))].sort((a,b)=>kindRank(a)-kindRank(b));
   const activeKind=updateKinds.includes(updateKind)?updateKind:"all";
   const shownUpdates=activeKind==="all"?whatsNew:whatsNew.filter(w=>w.kind===activeKind);
-  // Which Inbox dropdowns are open. Not remembered: both start open.
-  const [openInbox,setOpenInbox]=useState<string[]>(["inbox-messages","inbox-updates"]);
+  // Which Inbox and Import/Export dropdowns are open. Not remembered: all start open.
+  const [openInbox,setOpenInbox]=useState<string[]>(["inbox-messages","inbox-updates","import-syllabus","import-backup"]);
   function toggleInboxSection(id:string){setOpenInbox(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);}
   function dismissWhatsNew(id:string){setDismissedWhatsNew(prev=>[...prev,id]);}
   // The Inbox update open in the floating panel (UpdateDetail), by id, and the
@@ -4026,6 +4027,8 @@ export default function HomeworkPlanner() {
     // "menu" opens the title menu itself; everything else closes it.
     setTitleMenuOpen(place==="menu");
     if(place==="history"||place==="import"||place==="calendar")setActiveTab(place);
+    // A "Take me there" into Import/Export opens its dropdowns, so the anchor exists.
+    if(place==="import")setOpenInbox(prev=>[...new Set([...prev,"import-syllabus","import-backup"])]);
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
@@ -4838,8 +4841,8 @@ export default function HomeworkPlanner() {
         {activeTab==="import"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <ScreenHeader title="Import/Export" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Import from Syllabus</div>
+            {/* Dropdowns like the Inbox's (same open list, both start open). */}
+            <SettingsSection {...inboxSec("import-syllabus")} title="Import from Syllabus">
                       <textarea
                         value={importText}
                         onChange={e=>{setImportText(e.target.value);setImportPreview(null);setImportedCount(null);}}
@@ -4886,9 +4889,8 @@ export default function HomeworkPlanner() {
                           </>)}
                         </div>
                       )}
-            </div>
-            <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-                      <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Backup &amp; export</div>
+            </SettingsSection>
+            <SettingsSection {...inboxSec("import-backup")} title="Backup & export">
                       <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
                         <button data-tour="import-backup" onClick={()=>importFileRef.current?.click()} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Import backup (JSON)</button>
                         <input ref={importFileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)importBackupJSON(f);e.target.value="";}}/>
@@ -4896,7 +4898,7 @@ export default function HomeworkPlanner() {
                         <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export tasks (CSV)</button>
                       </div>
                       {importBackupNote&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:8}}>{importBackupNote}</div>}
-            </div>
+            </SettingsSection>
           </div>
         )}
         {activeTab==="options"&&(

@@ -404,7 +404,8 @@ through the list in place (content slides, card eases to the new height; the gro
 animation runs once on open, from `openedFrom`, even though `origin` follows the shown update); Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
 the title menu's outside-click/Escape handlers ignore (a leftover from when the Inbox lived in the
 menu; harmless now that it's a screen). The Inbox's two parts (Messages, Updates) are
-`SettingsSection` dropdowns (`openInbox`, not persisted, both start open). **Messages** are
+`SettingsSection` dropdowns (`openInbox`, not persisted, both start open; the Import/Export screen's two
+sections, Import from Syllabus and Backup & export, are dropdowns in the same list). **Messages** are
 recaps (`src/lib/recaps.ts`, unit-tested): when a day, week, month or year ends, an effect in
 `HomeworkPlanner` writes a snapshot (finished count, logged minutes, on-time count, busiest
 subject, finished titles) into `recaps` (`hw-recaps`, local-only, newest 60), skipping periods

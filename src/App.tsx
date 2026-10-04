@@ -21,7 +21,7 @@ import type { Recap } from "./lib/recaps";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, readableOn, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
-import { monthGrid, shiftMonth, weekdayLabels, byDueDate } from "./lib/calendar";
+import { monthGrid, monthOnlyGrid, shiftMonth, weekdayLabels, byDueDate } from "./lib/calendar";
 import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "./lib/spring";
 import { reconcile, same } from "./lib/sync";
 import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"calendar-month-only", date:"2026-10-04", kind:"New feature", headline:"Calendar shows one month", where:"Menu (tap DuePlanner) → Settings → Date & time → Calendar shows", go:"settings:calendar-days", description:"The Calendar now shows only the days of the month you're looking at, without the faded days from the months either side. Prefer the old view? Choose \"Six full weeks\" in Settings." },
   { id:"no-double-title", date:"2026-10-04", kind:"Bug fix", headline:"No more double title", where:"When the app opens", description:"Opening the app on a slow connection could briefly show a second DuePlanner title in a different font, with the page stretched. The app now appears fully styled from the first moment." },
   { id:"sheet-drag-anywhere", date:"2026-10-04", kind:"Improvement", headline:"Gestures that feel native", where:"Tap a task, then pull its details down", go:"task", description:"A task's details now pull down from anywhere on the sheet, not only the small bar at the top, and the page behind no longer scrolls instead. If you've scrolled down in the details, the first pull scrolls back to the top and the next one closes it. Swiping a task in the list also works with a quick flick, without dragging all the way." },
   { id:"session-no-symbols", date:"2026-10-04", kind:"UI change", headline:"Plain session buttons", where:"Tap a task, then the timer in its details", go:"task", description:"The Start Session and End Session buttons are plain words now, without the ▶ and ⏹ symbols." },
@@ -1321,16 +1322,21 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
 // the chosen day's tasks underneath. Undated tasks aren't shown -- there's no day to put
 // them on. Module scope like TaskModal, so the `now` tick doesn't remount it
 // (which would reset the month you're looking at).
-function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,now,onOpenTask,onToggleDone,onAddOn}:{
+function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,monthOnly,h24,now,onOpenTask,onToggleDone,onAddOn}:{
   tasks:Task[]; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
-  weekStart:number; h24:boolean; now:number;
+  weekStart:number; monthOnly:boolean; h24:boolean; now:number;
   onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void; onAddOn:(date:string)=>void;
 }){
   const today=localDateStr(new Date(now));
   const [ym,setYm]=useState<[number,number]>(()=>{const d=new Date(now);return [d.getFullYear(),d.getMonth()];});
   const [selected,setSelected]=useState(today);
   const [year,month]=ym;
-  const days=monthGrid(year,month,weekStart);
+  // What the grid draws: six full weeks including the neighbouring months'
+  // days, or (monthOnly) just this month's days, blank elsewhere, in as many
+  // rows as it needs. `days` is the real dates in it.
+  const cells:(string|null)[]=monthOnly?monthOnlyGrid(year,month,weekStart):monthGrid(year,month,weekStart);
+  const days=cells.filter((c):c is string=>c!=null);
+  const rows=cells.length/7;
   const due=byDueDate(tasks.filter(t=>!t.archived));
   const gridRef=useRef<HTMLDivElement>(null);
   const refocus=useRef(false);
@@ -1386,11 +1392,16 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
         <div aria-hidden="true" style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:4}}>
           {weekdayLabels(weekStart).map(l=><div key={l} style={{textAlign:"center",fontFamily:F.body,fontSize:10,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.04em"}}>{l.slice(0,2)}</div>)}
         </div>
+        {/* The fixed height (48px rows, 4px gaps) eases when a month needs a
+            different number of rows, so the panel below slides instead of jumping.
+            The 3px of padding (cancelled by the margin) leaves room for focus rings. */}
+        <div style={{height:rows*48+(rows-1)*4+6,margin:-3,padding:3,boxSizing:"border-box",transition:"height .22s ease",overflow:"hidden"}}>
         <div ref={gridRef} key={`${year}-${month}`} className="sec-body" role="group" aria-label={`${monthName}, use arrow keys to move between days`} onKeyDown={onGridKey}
           onPointerDown={e=>{swipeX.current=e.clientX;}}
           onPointerUp={e=>{const x=swipeX.current;swipeX.current=null;if(x!=null&&Math.abs(e.clientX-x)>50)goMonth(e.clientX<x?1:-1);}}
           style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,touchAction:"pan-y"}}>
-          {days.map(iso=>{
+          {cells.map((iso,i)=>{
+            if(iso==null)return <div key={`blank-${i}`} aria-hidden="true" style={{height:48}}/>;
             const list=due.get(iso)||[];
             const open=list.filter(t=>!t.done);
             const mins=open.reduce((n,t)=>n+(t.estMins||0),0);
@@ -1410,6 +1421,7 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
               </button>
             );
           })}
+        </div>
         </div>
       </div>
       <div style={card}>
@@ -1809,6 +1821,9 @@ export default function HomeworkPlanner() {
   // Date & time settings (Settings -> Date & time); synced with the profile.
   const [timeFormat,setTimeFormat]=usePersistedState<"12h"|"24h">("hw-timeformat","12h");
   const [weekStart,setWeekStart]=usePersistedState<number>("hw-weekstart",0); // 0 = Sunday, 1 = Monday
+  // Calendar tab: only the month's own days (true) or six full weeks with the
+  // neighbouring months' days faded in (false). Local-only.
+  const [calendarMonthOnly,setCalendarMonthOnly]=usePersistedState<boolean>("hw-calendar-month-only",true);
   const h24=timeFormat==="24h";
   const [selectedTask,setSelectedTask]=useState<Task|null>(null);
   // Wall clock for live countdowns ("due in 2h 15m"), refreshed every 30s.
@@ -3702,7 +3717,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","liquid-glass":"looks","anim-speed":"looks","date-time":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","liquid-glass":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -4399,7 +4414,7 @@ export default function HomeworkPlanner() {
         {/* OPTIONS TAB */}
         {/* CALENDAR TAB */}
         {activeTab==="calendar"&&<CalendarView tasks={tasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
-          weekStart={weekStart} h24={h24} now={now}
+          weekStart={weekStart} monthOnly={calendarMonthOnly} h24={h24} now={now}
           onOpenTask={t=>setSelectedTask(t)} onToggleDone={toggleDone} onAddOn={addHomeworkOn}/>}
         {/* Inbox, History and Import/Export: full screens opened from the title
             menu, like Settings (they used to be dropdowns inside the menu). */}
@@ -4664,6 +4679,12 @@ export default function HomeworkPlanner() {
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
                 {([[0,"Sunday"],[1,"Monday"]] as const).map(([k,l])=>(
                   <button key={k} onClick={()=>setWeekStart(k)} aria-pressed={weekStart===k} style={{background:weekStart===k?T.accent+"22":T.surface,border:`1.5px solid ${weekStart===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:weekStart===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                ))}
+              </div>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,margin:"12px 0 6px"}}>Calendar shows</div>
+              <div data-tour="calendar-days" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+                {([[true,"This month only"],[false,"Six full weeks"]] as const).map(([k,l])=>(
+                  <button key={l} onClick={()=>setCalendarMonthOnly(k)} aria-pressed={calendarMonthOnly===k} style={{background:calendarMonthOnly===k?T.accent+"22":T.surface,border:`1.5px solid ${calendarMonthOnly===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:calendarMonthOnly===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
                 ))}
               </div>
             </SettingsSection>

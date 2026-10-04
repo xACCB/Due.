@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { monthGrid, shiftMonth, weekdayLabels, byDueDate } from "./calendar";
+import { monthGrid, monthOnlyGrid, shiftMonth, weekdayLabels, byDueDate } from "./calendar";
 
 describe("monthGrid", () => {
   it("is 42 consecutive days starting on the week holding the 1st", () => {
@@ -35,6 +35,29 @@ describe("weekdayLabels", () => {
   it("follows the week start", () => {
     expect(weekdayLabels(0)[0]).toBe("Sun");
     expect(weekdayLabels(1)).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+  });
+});
+
+describe("monthOnlyGrid", () => {
+  it("blanks the other months' days and drops empty weeks", () => {
+    // October 2026: Thursday the 1st to Saturday the 31st, five weeks from Sunday.
+    const oct = monthOnlyGrid(2026, 9, 0);
+    expect(oct).toHaveLength(35);
+    expect(oct.slice(0, 5)).toEqual([null, null, null, null, "2026-10-01"]);
+    expect(oct[34]).toBe("2026-10-31");
+    expect(oct.filter(c => c != null)).toHaveLength(31);
+  });
+  it("can be four rows or six", () => {
+    // February 2026 starts on a Sunday and has 28 days.
+    const feb = monthOnlyGrid(2026, 1, 0);
+    expect(feb).toHaveLength(28);
+    expect(feb.every(c => c != null)).toBe(true);
+    // August 2026 starts on a Saturday: 31 days need six weeks from Sunday.
+    const aug = monthOnlyGrid(2026, 7, 0);
+    expect(aug).toHaveLength(42);
+    expect(aug[6]).toBe("2026-08-01");
+    expect(aug[36]).toBe("2026-08-31");
+    expect(aug.slice(37)).toEqual([null, null, null, null, null]);
   });
 });
 

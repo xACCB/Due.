@@ -14,6 +14,20 @@ export function monthGrid(year:number, month:number, weekStart:number):string[] 
   return out;
 }
 
+// The same grid with only that month's days: cells from the months before and
+// after are null (drawn blank), and a week with no day of the month in it is
+// dropped, so the grid is 4 to 6 rows.
+export function monthOnlyGrid(year:number, month:number, weekStart:number):(string|null)[] {
+  const prefix=`${year}-${String(month+1).padStart(2,"0")}-`;
+  const cells=monthGrid(year,month,weekStart).map(iso=>iso.startsWith(prefix)?iso:null);
+  const out:(string|null)[]=[];
+  for(let i=0;i<cells.length;i+=7){
+    const week=cells.slice(i,i+7);
+    if(week.some(c=>c!=null))out.push(...week);
+  }
+  return out;
+}
+
 // The month `delta` months from year/month, as [year, month].
 export function shiftMonth(year:number, month:number, delta:number):[number,number] {
   const d=new Date(year,month+delta,1);

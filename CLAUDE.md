@@ -462,11 +462,24 @@ already follows the finger, and moving the others would shift what `elementFromP
 flip-flopping the swap), layout switches, and changes arriving from sync (cards shouldn't move
 under your finger). `glideClock()` (module scope) exists for the React Compiler purity lint.
 
+**Tab entrance.** The Tasks tab's content and Focus Mode's content are wrapped in `.sec-body`, the
+same short fade-and-settle the Calendar grid and Settings sections use, so every tab opens alike.
+
+**Swipes** on task cards lock in as soon as sideways movement is the larger direction (6px), give up
+to scrolling only when vertical is larger (10px), and act past `SWIPE_THRESHOLD` (64px). The earlier,
+stricter rule (1.5x flatter than tall, 90px) dropped most real thumb swipes.
+
+**Pull to reload** (`src/hooks/usePullToReload.ts`): in the installed app only (`isStandalone()`;
+browser tabs have their own), pulling down 90px from the top of the page reloads it. Off while a
+task, search, an Inbox message or Profile is open; ignores pulls that start on something scrollable,
+a dialog, a field or the reorder handle.
+
 **Search** is a floating panel, not an inline filter: the Tasks tab's "Search tasks..." field is
 a button (`searchTriggerRef`, hidden while open) that opens `SearchOverlay` (module scope, like
 `TaskModal`, so the `now` tick doesn't remount it and lose the query). The bar flies out of the
 field (WAAPI translate + height) into the upper middle of the *visible* viewport
-(`visualViewport`, so it stays above a phone keyboard) over a blurred backdrop, and flies back on
+(`visualViewport`, so it stays above a phone keyboard) over a blurred backdrop (fixed to the
+whole screen, not to that viewport box, and the page is scroll-locked while it's open), and flies back on
 close (Cancel, Escape, backdrop tap). Results (title/subject/tag match, archived excluded,
 pending first, max 50) are keyed by id with a `.search-pop` CSS animation, so each newly matching
 task pops in while ones that still match stay put. Enter opens the first result, arrows walk the
@@ -506,8 +519,10 @@ Chrome accessibility tree):
   React Compiler's `preserve-manual-memoization` check, like the forward-reference note above; the
   swipe-reveal label keeps plain hex for that reason.
 
-**Bulk edit / multi-select** (`selectionMode`/`selectedIds` state, "Select" in the filter row, with
-"Select all" for the visible tasks) works in every layout. `MiniCard` takes
+**Bulk edit / multi-select is currently unreachable.** The "Select" button in the filter row was
+removed at the user's request (2026-10-04), and nothing else turns `selectionMode` on, so the code
+below is dormant; give it a different way in rather than restoring that button. As built
+(`selectionMode`/`selectedIds` state, with "Select all" for the visible tasks) it works in every layout. `MiniCard` takes
 `selectionMode`/`isSelected`/`onToggleSelect` and repurposes its done-toggle into a selection check
 (gating swipe/drag off); the other 5 layouts do the same through `openOrSelect(t)` (row tap selects
 instead of opening), `chk(t)` (the done-check shows selection, in the accent color) and

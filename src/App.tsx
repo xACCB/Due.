@@ -31,6 +31,7 @@ import type { SyncRecord, CloudRecord } from "./lib/sync";
 import { downloadFile } from "./lib/download";
 import { LIMITS, addSession, sanitizeTask } from "./lib/limits";
 import { usePersistedState } from "./hooks/usePersistedState";
+import { usePullToReload } from "./hooks/usePullToReload";
 import { normalizeQuestionPrefs, moveQuestion } from "./lib/addQuestions";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -248,6 +249,11 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"pull-to-reload", date:"2026-10-04", kind:"New feature", headline:"Pull to reload", where:"Any screen in the installed app: pull down from the very top", description:"In the installed app, pulling down when you're already at the top of the page reloads it. Keep pulling until it says \"Release to reload\", then let go." },
+  { id:"search-full-blur", date:"2026-10-04", kind:"Bug fix", headline:"Search covers the whole screen", where:"Tasks tab → Search tasks...", go:"tasks", description:"The blur behind search now covers the whole screen and hides your tasks properly, and the page no longer scrolls underneath while search is open." },
+  { id:"swipes-easier", date:"2026-10-04", kind:"Improvement", headline:"Easier swipes", where:"Your task list in the List and Checklist layouts", go:"tasks", description:"Swiping a task right to finish it or left to delete it is much more forgiving. It no longer needs a perfectly straight swipe, and you don't have to drag as far." },
+  { id:"tab-transitions", date:"2026-10-04", kind:"UI change", headline:"Every tab opens the same way", where:"The tab bar: Tasks, Calendar and Focus", go:"tasks", description:"Tasks and Focus now open with the same short fade as Calendar, instead of appearing instantly." },
+  { id:"select-removed", date:"2026-10-04", kind:"UI change", headline:"Select button removed", where:"Tasks tab, the row of filters above your tasks", go:"tasks", description:"The Select button beside Archived is gone. Selecting several tasks at once is unavailable for now." },
   { id:"calendar-no-tint", date:"2026-10-04", kind:"UI change", headline:"No more tinted days", where:"The Calendar tab", go:"calendar", description:"Days in the Calendar are no longer shaded by how much is due, and the Less/More key is gone. The colored dots still show which days have homework." },
   { id:"calendar-add-solid", date:"2026-10-04", kind:"UI change", headline:"Solid Add button in Calendar", where:"The Calendar tab, under the selected day", go:"calendar", description:"The \"Add homework due\" button in the Calendar has a solid outline now instead of a dotted one." },
   { id:"calendar-no-auto-select", date:"2026-10-04", kind:"UI change", headline:"Calendar keeps your day", where:"The Calendar tab: swipe or use the arrows to change month", go:"calendar", description:"Changing month in the Calendar no longer selects the 1st for you. The day you picked stays selected, and nothing is outlined in the new month until you tap a day." },
@@ -968,6 +974,17 @@ function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTa
     vv.addEventListener("resize",update);vv.addEventListener("scroll",update);
     return()=>{vv.removeEventListener("resize",update);vv.removeEventListener("scroll",update);};
   },[]);
+  // The page underneath stays put while search is open: dragging on the
+  // backdrop does nothing (the results list scrolls on its own).
+  useEffect(()=>{
+    const backdrop=backdropRef.current;
+    if(!backdrop)return;
+    const stop=(e:TouchEvent)=>e.preventDefault();
+    backdrop.addEventListener("touchmove",stop,{passive:false});
+    const root=document.documentElement, before=root.style.overflow;
+    root.style.overflow="hidden";
+    return()=>{backdrop.removeEventListener("touchmove",stop);root.style.overflow=before;};
+  },[]);
   const q=query.trim().toLowerCase();
   const results=!q?[]:tasks
     .filter(t=>!t.archived&&(t.title.toLowerCase().includes(q)||t.subject.toLowerCase().includes(q)||(t.tags||[]).some(g=>g.toLowerCase().includes(q))))
@@ -1020,7 +1037,10 @@ function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTa
   return(
     <div role="dialog" aria-modal="true" aria-label="Search tasks" onKeyDown={onKeyDown}
       style={{position:"fixed",left:0,right:0,top:view.top,height:view.h,zIndex:900,display:"flex",justifyContent:"center",padding:`${Math.max(24,Math.round(view.h*0.34-28))}px 16px 16px`,transition:"padding-top .25s ease"}}>
-      <div ref={backdropRef} onClick={close} style={{position:"absolute",inset:0,background:T.light?"rgba(245,245,245,0.55)":"rgba(0,0,0,0.5)",backdropFilter:"blur(14px)",WebkitBackdropFilter:"blur(14px)"}}/>
+      {/* Fixed to the whole screen (and past its edges, for overscroll), not to
+          this box: the box follows the visible viewport above the keyboard, which
+          left the rest of the page unblurred. */}
+      <div ref={backdropRef} onClick={close} style={{position:"fixed",top:-200,bottom:-200,left:0,right:0,background:T.light?"rgba(245,245,245,0.8)":"rgba(0,0,0,0.74)",backdropFilter:"blur(18px)",WebkitBackdropFilter:"blur(18px)"}}/>
       <div style={{position:"relative",width:"min(548px,100%)",display:"flex",flexDirection:"column",gap:10,maxHeight:"100%"}}>
         <div ref={barRef} className="search-bar" style={{display:"flex",alignItems:"center",gap:9,height:54,flexShrink:0,overflow:"hidden",background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"0 8px 0 15px",color:T.textMuted,boxShadow:T.light?"0 12px 40px rgba(0,0,0,0.14)":"0 12px 40px rgba(0,0,0,0.55)"}}>
           <IconSearch/>
@@ -2566,7 +2586,7 @@ export default function HomeworkPlanner() {
   const swipeStart=useRef({x:0,y:0});
   const swipeLocked=useRef(false);
   const swipeMoved=useRef(false);
-  const SWIPE_THRESHOLD=90;
+  const SWIPE_THRESHOLD=64;
   // Undo/redo action history. Actions apply immediately (so Firestore sync,
   // which just diffs against `tasks`, doesn't need special-casing) and keep
   // what's needed to reverse them: "delete" keeps the removed tasks; "change"
@@ -2621,6 +2641,9 @@ export default function HomeworkPlanner() {
   // hydrates -- prevents a flash of the browser's default white background for
   // returning dark-theme users, without duplicating the THEMES palette there.
   useEffect(()=>{try{localStorage.setItem("hw-bg",T.bg);}catch{/* storage unavailable */}},[T.bg]);
+  // Pull down at the top of the page to reload, in the installed app (a browser
+  // tab already has its own). Off while anything is open over the page.
+  usePullToReload(isStandalone()&&selectedTask==null&&!searchOpen&&openUpdate==null&&!showProfile,T.card,T.text,T.solidBorder);
 
   const suggestion=buildSuggestion(tasks);
 
@@ -3294,11 +3317,13 @@ export default function HomeworkPlanner() {
     const dx=e.clientX-swipeStart.current.x;
     const dy=e.clientY-swipeStart.current.y;
     if(!swipeLocked.current){
-      if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)*1.5){
+      // Sideways wins as soon as it's the larger direction: a thumb swipe
+      // arcs, and demanding a nearly flat line made most swipes get dropped.
+      if(Math.abs(dx)>=6&&Math.abs(dx)>Math.abs(dy)){
         swipeLocked.current=true;
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         setSwipeId(id);
-      } else if(Math.abs(dy)>8){
+      } else if(Math.abs(dy)>=10&&Math.abs(dy)>=Math.abs(dx)){
         swipeActiveId.current=null; // vertical intent -- let the page scroll instead
         return;
       } else return;
@@ -3899,7 +3924,7 @@ export default function HomeworkPlanner() {
           <h1 style={{fontFamily:F.heading,fontSize:20,color:T.accent,margin:0,fontWeight:400}}>Focus Mode</h1>
           <button onClick={()=>setFocusModeAnimated(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Exit</button>
         </div>
-        <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
+        <div className="sec-body" style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
           {renderBreakSuggestion()}
           {focusTask?(
             <div className="pop" style={{background:T.gradientCard,borderRadius:16,padding:"20px",border:`1px solid ${T.accent}44`}}>
@@ -4094,7 +4119,8 @@ export default function HomeworkPlanner() {
         <main className="app-main" style={selectionMode?{paddingBottom:130}:undefined}>
 
         {/* TASKS TAB */}
-        {activeTab==="tasks"&&<>
+        {/* .sec-body: the same short fade-and-settle the Calendar tab opens with. */}
+        {activeTab==="tasks"&&<div className="sec-body">
           {/* Suggestion -- hidden once there's no pending homework left (nothing
               to suggest), when turned off in Settings, or when its × hid this
               particular suggestion (see hiddenSuggestionFor). */}
@@ -4126,10 +4152,10 @@ export default function HomeworkPlanner() {
               const ids=filteredTasks.map(t=>t.id), all=ids.length>0&&ids.every(id=>selectedIds.includes(id));
               return <button onClick={()=>setSelectedIds(all?[]:ids)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{all?"Select none":`Select all (${ids.length})`}</button>;
             })()}
-            {(selectionMode
-              ? <button onClick={exitSelectionMode} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>
-              : <button data-tour="select" onClick={()=>setSelectionMode(true)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Select</button>
-            )}
+            {/* The "Select" button that used to start selection mode was removed at
+                the user's request; nothing turns selectionMode on now, so the bulk
+                bar below is dormant until it gets another way in. */}
+            {selectionMode&&<button onClick={exitSelectionMode} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>}
             <div style={{marginLeft:"auto",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{visibleTasks.filter(t=>!t.done&&!t.archived).length} pending</div>
           </div>
 
@@ -4255,7 +4281,7 @@ export default function HomeworkPlanner() {
               </div>
             )}
           </div>
-        </>}
+        </div>}
 
         {/* OPTIONS TAB */}
         {/* CALENDAR TAB */}

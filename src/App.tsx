@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"motion-consistent", date:"2026-10-04", kind:"Improvement", headline:"One smooth motion everywhere", where:"Everywhere in the app", description:"Animations across the app now match the Calendar tab: quick, smooth, and without the bounce some of them had. Cards, the task sheet, the tab bar, swipes springing back, buttons and toggles all move the same way, and a few things that used to just appear (the Edit panel, the undo message, the Focus task picker) now fade in." },
   { id:"menu-transitions", date:"2026-10-04", kind:"UI change", headline:"Menus open smoothly", where:"Menu (tap DuePlanner) and anything you open from it", go:"menu", description:"The menu, Time left, Profile, Inbox, History, Import/Export and Settings now open with the same short fade as the Calendar tab, instead of appearing instantly." },
   { id:"settings-close-on-leave", date:"2026-10-04", kind:"UI change", headline:"Settings tidy themselves", where:"Menu (tap DuePlanner) → Settings", go:"settings", description:"The dropdowns in Settings now close when you leave Settings, so it always opens with everything folded up." },
   { id:"import-dropdowns", date:"2026-10-04", kind:"UI change", headline:"Import/Export dropdowns", where:"Menu (tap DuePlanner) → Import/Export", go:"import", description:"Import from Syllabus and Backup & export are now dropdowns, like the Inbox. Tap a heading to close or open it." },
@@ -697,7 +698,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
     };
   },[]);
   return(
-    <div ref={overlayRef} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.53)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
+    <div ref={overlayRef} className="fade-in" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.53)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
       {/* The drag offset lives on this wrapper, not the panel: the panel's "pop"
           entrance animation (fill-mode forwards) would override its transform. */}
       <div ref={sheetRef} style={{width:"100%",maxWidth:580}}>
@@ -750,7 +751,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
             const clear={background:"none",border:"none",padding:"6px 0 0",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11,textDecoration:"underline"};
             const subjectOptions=draft.subject&&!subjects.includes(draft.subject)?[...subjects,draft.subject]:subjects;
             return (
-            <form onSubmit={e=>{e.preventDefault();saveEdit();}} style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.accent}44`,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
+            <form className="sec-body" onSubmit={e=>{e.preventDefault();saveEdit();}} style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.accent}44`,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
               <label><span style={label}>Title</span>
                 <input className="edit-field" autoFocus value={draft.title} maxLength={500} onChange={e=>setDraft({...draft,title:e.target.value})} style={field}/></label>
               <label><span style={label}>Subject</span>
@@ -890,7 +891,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
           </div>
 
           {/* Session timer */}
-          <div style={{background:T.card,borderRadius:16,padding:"20px",border:`1px solid ${sessionActive?T.accent+"66":T.border}`,marginBottom:16,textAlign:"center",transition:"border-color 0.3s"}}>
+          <div style={{background:T.card,borderRadius:16,padding:"20px",border:`1px solid ${sessionActive?T.accent+"66":T.border}`,marginBottom:16,textAlign:"center",transition:"border-color .2s ease-out"}}>
             {sessionActive?(
               <>
                 <div style={{fontFamily:F.body,fontSize:11,color:T.accent,marginBottom:8,letterSpacing:"0.1em",textTransform:"uppercase"}}>Session in progress</div>
@@ -1028,7 +1029,7 @@ function SettingsSection({id,title,open,onToggle,T,F,tour,danger,gap=0,children}
       <button onClick={()=>onToggle(id)} aria-expanded={open} aria-controls={`settings-${id}`}
         style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:"16px",borderRadius:12,WebkitTapHighlightColor:"transparent"}}>
         <span style={{color,fontFamily:F.body,fontSize:10,letterSpacing:".08em",textTransform:"uppercase"}}>{title}</span>
-        <span aria-hidden="true" style={{color,fontSize:13,transform:open?"rotate(180deg)":"none",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
+        <span aria-hidden="true" style={{color,fontSize:13,transform:open?"rotate(180deg)":"none",transition:"transform .2s ease-out",display:"inline-block"}}>⌄</span>
       </button>
       {open&&<div id={`settings-${id}`} className="sec-body" style={{display:"flex",flexDirection:"column",gap,padding:"0 16px 16px"}}>{children}</div>}
     </div>
@@ -1038,7 +1039,7 @@ function SettingsSection({id,title,open,onToggle,T,F,tour,danger,gap=0,children}
 function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeObj;label:string}){
   const trackColor=on?T.accent:T.solidBorder;
   return <button className="tog" role="switch" aria-checked={on} aria-label={label} onClick={()=>onChange(!on)} style={{background:trackColor}}>
-    <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),boxShadow:"0 1px 3px rgba(0,0,0,0.4)",transition:"left 0.2s",display:"block"}}/>
+    <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),boxShadow:"0 1px 3px rgba(0,0,0,0.4)",transition:"left .2s ease-out",display:"block"}}/>
   </button>;
 }
 
@@ -1231,10 +1232,10 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
     const to=card.getBoundingClientRect();
     pin(card,to);
     backdropRef.current?.animate([{opacity:0},{opacity:1}],{duration:280,easing:"ease-out"});
-    const anim=card.animate([{...box(from),borderRadius:"8px"},{...box(to),borderRadius:"16px"}],{duration:420,easing:"cubic-bezier(.2,.9,.25,1)"});
+    const anim=card.animate([{...box(from),borderRadius:"8px"},{...box(to),borderRadius:"16px"}],{duration:400,easing:"cubic-bezier(.2,.9,.25,1)"});
     const release=()=>{if(!closing.current)unpin(card);};
     anim.finished.then(release,release);
-    bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.45},{opacity:1}],{duration:420,easing:"ease-out"});
+    bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.4},{opacity:1}],{duration:400,easing:"ease-out"});
   },[]);
   // Back/Next swap the content in place: it slides in from the side you're
   // heading, and the card eases to the new height from the one measured just
@@ -1808,14 +1809,14 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
             <span aria-hidden="true">⠿</span>
           </div>
         )}
-        <button aria-label={selectionMode?(isSelected?`Deselect ${task.title}`:`Select ${task.title}`):task.done?`Mark ${task.title} not done`:`Mark ${task.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode){onToggleSelect?.(task.id);}else{onToggleDone(task.id);}}} style={{background:selectionMode?(isSelected?T.accent:"none"):task.done?"#2ED573":"none",border:`2px solid ${selectionMode?(isSelected?T.accent:T.textFaint):task.done?"#2ED573":T.textFaint}`,borderRadius:selectionMode?4:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}} className={justDone&&!selectionMode?"check-pop":undefined}>
+        <button aria-label={selectionMode?(isSelected?`Deselect ${task.title}`:`Select ${task.title}`):task.done?`Mark ${task.title} not done`:`Mark ${task.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode){onToggleSelect?.(task.id);}else{onToggleDone(task.id);}}} style={{background:selectionMode?(isSelected?T.accent:"none"):task.done?"#2ED573":"none",border:`2px solid ${selectionMode?(isSelected?T.accent:T.textFaint):task.done?"#2ED573":T.textFaint}`,borderRadius:selectionMode?4:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}} className={justDone&&!selectionMode?"check-pop":undefined}>
           {(selectionMode?isSelected:task.done)&&<CheckMark size={11} color={selectionMode?contrastColor(T.accent):"#111"} animate={justDone&&!selectionMode}/>}
         </button>
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
             {isTop&&<span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>}
             {isNext&&<span className="rb" style={{background:T.text+"11",color:T.text}}>next up</span>}
-            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(task.done?(justDone?" strike strike-anim":" strike"):"")} aria-haspopup={selectionMode?undefined:"dialog"} style={{fontFamily:F.heading,fontSize:15,color:task.done?T.textFaint:T.text,transition:"color 0.3s"}}>{task.title}</span>
+            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(task.done?(justDone?" strike strike-anim":" strike"):"")} aria-haspopup={selectionMode?undefined:"dialog"} style={{fontFamily:F.heading,fontSize:15,color:task.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{task.title}</span>
             {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
             {task.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>}
             {task.priorityOverride&&<span className="rb" title="Priority set manually" style={{background:priColor(task.priorityOverride,colorCodeUrgency)+"22",color:ink(priColor(task.priorityOverride,colorCodeUrgency),T.light)}}>{task.priorityOverride}</span>}
@@ -1904,7 +1905,7 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
       {/* Sign in box */}
       <div style={{width:"100%",maxWidth:340}}>
         <button onClick={signInWithFirebase}
-          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 20px",cursor:"pointer",marginBottom:12,transition:"all 0.15s"}}>
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 20px",cursor:"pointer",marginBottom:12,transition:"all .2s ease-out"}}>
           {/* Google icon */}
           <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
           <span style={{fontFamily:F.body,fontSize:13,color:T.text}}>Continue with Google</span>
@@ -3799,7 +3800,7 @@ export default function HomeworkPlanner() {
   function swipeContentStyle(id:number):React.CSSProperties{
     const active=swipeId===id;
     const dx=active?swipeX:0;
-    return {transform:dx?`translateX(${dx}px)`:undefined,transition:active?"none":"transform 0.25s cubic-bezier(.34,1.4,.64,1)",touchAction:"pan-y"};
+    return {transform:dx?`translateX(${dx}px)`:undefined,transition:active?"none":"transform .2s ease-out",touchAction:"pan-y"};
   }
   function swipeClickGuard(onOpen:()=>void){
     return ()=>{ if(swipeMoved.current){swipeMoved.current=false;return;} onOpen(); };
@@ -3836,16 +3837,24 @@ export default function HomeworkPlanner() {
     body{margin:0;background:${T.bg};transition:background 0.4s;font-family:${F.body};}
     html{background:${T.bg};}
     .app-shell{min-height:100svh;min-height:100dvh;}
-    .tc{transition:all 0.22s cubic-bezier(.34,1.2,.64,1);}
+    .tc{transition:all .2s ease-out;}
     /* Hover effects only where there's a real hover (mouse/trackpad) -- on touch
        screens :hover sticks after a tap, leaving cards stuck "lifted". */
     @media (hover:hover){
       .tc:hover{transform:translateY(-2px);filter:brightness(1.05);}
       .chip:hover{transform:scale(1.05);filter:brightness(1.1);}
     }
-    .pop{animation:pop 0.28s cubic-bezier(.34,1.4,.64,1) forwards;}
-    @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
-    .search-pop{animation:pop .3s cubic-bezier(.2,.8,.3,1) backwards;}
+    /* Motion: everything that appears uses the Calendar tab's entrance or a close
+       relative of it: 0.2s, ease-out, a few pixels of travel, no bounce or
+       overshoot. .sec-body settles down from above (screens, dropdowns, panels),
+       .pop rises from below (sheets and cards), .fade-in only fades (things
+       positioned with their own transform, like toasts). State changes
+       (hover, color, selection) use the same 0.2s ease-out. */
+    .pop{animation:pop .2s ease-out forwards;}
+    @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .fade-in{animation:fadeIn .2s ease-out;}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .search-pop{animation:pop .2s ease-out backwards;}
     .sec-body{animation:secIn .2s ease-out;}
     @keyframes secIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
     .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
@@ -3865,9 +3874,7 @@ export default function HomeworkPlanner() {
        an empty one from collapsing, and the value sits left like the rest. */
     .edit-field[type=date],.edit-field[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;min-height:calc(1.25em + 18px);}
     .edit-field::-webkit-date-and-time-value{text-align:left;margin:0;}
-    .sli{animation:sli 0.22s ease forwards;}
-    @keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
-    .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all 0.13s;}
+    .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all .2s ease-out;}
     .chip:active{transform:scale(.97);}
     input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);}
     /* Keyboard focus ring. !important so it also beats the inline
@@ -3888,14 +3895,14 @@ export default function HomeworkPlanner() {
        repeats it on every line of a wrapped title. */
     .check-draw polyline{stroke-dashoffset:1;animation:checkDraw .36s .07s cubic-bezier(.65,0,.35,1) forwards;}
     @keyframes checkDraw{to{stroke-dashoffset:0}}
-    .check-pop{animation:checkPop .38s cubic-bezier(.34,1.56,.64,1);}
+    .check-pop{animation:checkPop .25s ease-out;}
     @keyframes checkPop{0%{transform:scale(.7)}100%{transform:scale(1)}}
     .strike{text-decoration:none!important;background-image:linear-gradient(currentColor,currentColor);background-repeat:no-repeat;background-position:0 55%;background-size:100% 1.5px;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
     .strike-anim{animation:strikeDraw .42s .19s cubic-bezier(.65,0,.35,1) both;}
     @keyframes strikeDraw{from{background-size:0% 1.5px}}
-    @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim,.search-pop,.sec-body{animation:none;}}
+    @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim,.search-pop,.sec-body,.pop,.fade-in{animation:none;}}
     .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}
-    .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background 0.2s;position:relative;flex-shrink:0;}
+    .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background .2s ease-out;position:relative;flex-shrink:0;}
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;}
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${T.border};border-radius:99px}
     .glass-tab:active{transform:scale(0.92);}
@@ -4104,7 +4111,7 @@ export default function HomeworkPlanner() {
             {renderSwipeReveal(t.id)}
             <div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.card,borderRadius:10,border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
               <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,minWidth:18}}>{String(i+1).padStart(2,"0")}</span>
-              <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:4,background:chk(t).on?chk(t).color:"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.2s"}}>
+              <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:4,background:chk(t).on?chk(t).color:"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}}>
                 {chk(t).on&&<CheckMark size={12} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
               <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
@@ -4370,7 +4377,7 @@ export default function HomeworkPlanner() {
   // other tasks, no settings. Plain useState above, nothing to persist.
   if(focusMode){
     return (
-      <main className="app-shell" style={{background:T.bg,fontFamily:F.body,color:T.text,minHeight:"100dvh",display:"flex",flexDirection:"column",padding:20,transition:"background 0.3s,color 0.3s"}}>
+      <main className="app-shell" style={{background:T.bg,fontFamily:F.body,color:T.text,minHeight:"100dvh",display:"flex",flexDirection:"column",padding:20,transition:"background .2s ease-out,color .2s ease-out"}}>
         <style>{css}</style>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <h1 style={{fontFamily:F.heading,fontSize:20,color:T.accent,margin:0,fontWeight:400}}>Focus Mode</h1>
@@ -4389,7 +4396,7 @@ export default function HomeworkPlanner() {
                 <button data-tour="change-task" onClick={()=>setFocusPickerOpen(o=>!o)} style={{marginLeft:"auto",background:"none",border:`1px solid ${T.border}`,borderRadius:999,padding:"2px 10px",color:T.textMuted,fontSize:10,cursor:"pointer"}}>{focusPickerOpen?"Close":"Change task"}</button>
               </div>
               {focusPickerOpen&&(
-                <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,maxHeight:180,overflowY:"auto"}}>
+                <div className="sec-body" style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,maxHeight:180,overflowY:"auto"}}>
                   {allSorted.filter(t=>!t.done&&!t.archived).map(t=>(
                     <button key={t.id} onClick={()=>{if(t.id!==focusTask.id)creditPomodoro(focusTask.id);setFocusTaskId(t.id);setFocusPickerOpen(false);}}
                       style={{textAlign:"left",background:t.id===focusTask.id?T.accent+"22":T.surface,border:`1px solid ${t.id===focusTask.id?T.accent:T.border}`,borderRadius:8,padding:"7px 10px",color:T.text,fontSize:12,cursor:"pointer"}}>
@@ -4416,7 +4423,7 @@ export default function HomeworkPlanner() {
   }
 
   return (
-    <div className={"app-shell dl-"+desktopLayout} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background 0.3s,color 0.3s"}}>
+    <div className={"app-shell dl-"+desktopLayout} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background .2s ease-out,color .2s ease-out"}}>
       <style>{css}</style>
       {/* inert while the task sheet is open, so screen readers and Tab stay in
           the dialog instead of wandering through the list behind it. */}
@@ -4554,7 +4561,7 @@ export default function HomeworkPlanner() {
               ?"inset 0 1px 0 rgba(255,255,255,0.22), inset 0 0 0 0.5px rgba(255,255,255,0.08), 0 2px 8px rgba(0,0,0,0.35)"
               :"inset 0 1px 0 #fff, 0 0 0 0.5px rgba(0,0,0,0.05), 0 3px 10px rgba(0,0,0,0.10)",
             transform:`translateX(${Math.max(activeIdx,0)*100}%)`,opacity:activeIdx<0?0:1,
-            transition:"transform 0.45s cubic-bezier(.34,1.3,.64,1), opacity 0.2s"}}/>
+            transition:"transform .25s ease-out, opacity .2s ease-out"}}/>
           </>}
           {tabIds.map(id=>{
             const labels:Record<string,string>={tasks:"Tasks",calendar:"Calendar",focus:"Focus"};
@@ -4562,7 +4569,7 @@ export default function HomeworkPlanner() {
             const Icon=icons[id];
             const active=activeTab===id;
             return <button key={id} data-tour={`tab-${id}`} className="glass-tab" onClick={()=>id==="focus"?setFocusModeAnimated(true):setActiveTab(id)} aria-label={labels[id]} aria-pressed={id==="focus"?false:active} title={labels[id]}
-              style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:!liquidGlass&&active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color 0.2s, transform 0.18s cubic-bezier(.34,1.4,.64,1)"}}>
+              style={{position:"relative",zIndex:1,flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:!liquidGlass&&active?T.card:"transparent",color:active?T.accent:T.textMuted,border:"none",borderRadius:999,padding:"10px 0",cursor:"pointer",transition:"color .2s ease-out, transform .2s ease-out"}}>
               <Icon/>
               {id==="focus"&&pomodoroActive&&<span style={{marginLeft:6,fontSize:11,fontVariantNumeric:"tabular-nums"}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</span>}
               {id==="focus"&&!pomodoroActive&&swStartedAt!=null&&<span style={{marginLeft:6,fontSize:11,fontVariantNumeric:"tabular-nums"}}>{formatStopwatch(swElapsed)}</span>}
@@ -4620,7 +4627,7 @@ export default function HomeworkPlanner() {
           <div style={{marginTop:14}}>
             {!adding?(
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,paddingTop:10}}>
-                <button data-tour="add" onClick={startAdding} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:14,padding:"13px 28px",fontFamily:F.heading,fontSize:17,cursor:"pointer",boxShadow:`0 4px 20px ${T.accentGlow}`,transition:"all 0.2s"}}>+ Add homework</button>
+                <button data-tour="add" onClick={startAdding} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:14,padding:"13px 28px",fontFamily:F.heading,fontSize:17,cursor:"pointer",boxShadow:`0 4px 20px ${T.accentGlow}`,transition:"all .2s ease-out"}}>+ Add homework</button>
                 {templates.length>0&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.08em"}}>or start from a template</div>}
                 {templates.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center",maxWidth:340}}>
                   {templates.map(tpl=>(
@@ -4635,7 +4642,7 @@ export default function HomeworkPlanner() {
               <div style={{background:T.card,borderRadius:16,padding:"18px",border:`1px solid ${T.borderAccent}`,position:"relative"}}>
                 <button onClick={()=>setAdding(false)} aria-label="Cancel" title="Cancel" style={{position:"absolute",top:10,right:10,background:"none",border:"none",color:T.textFaint,fontSize:20,lineHeight:1,cursor:"pointer",padding:4}}>×</button>
                 <div style={{display:"flex",gap:5,marginBottom:14,justifyContent:"center"}}>
-                  {[...Array(askQuestions.length+1)].map((_,i)=><div key={i} style={{width:i===step+1?20:6,height:6,borderRadius:999,background:i<=step+1?T.accent:T.border,transition:"all 0.3s"}}/>)}
+                  {[...Array(askQuestions.length+1)].map((_,i)=><div key={i} style={{width:i===step+1?20:6,height:6,borderRadius:999,background:i<=step+1?T.accent:T.border,transition:"all .2s ease-out"}}/>)}
                 </div>
                 <div>
                   {step===-1?(
@@ -4874,7 +4881,7 @@ export default function HomeworkPlanner() {
                       </button>
                       {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:12,color:ink("#2ED573",T.light),marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
                       {importPreview&&(
-                        <div style={{marginTop:12}}>
+                        <div className="sec-body" style={{marginTop:12}}>
                           <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8}}>
                             Found {importPreview.length} assignment{importPreview.length===1?"":"s"}
                           </div>
@@ -4952,7 +4959,7 @@ export default function HomeworkPlanner() {
                     };
                     return(
                       <button key={key} aria-pressed={active} onClick={()=>setLayout(key)}
-                        style={{background:active?T.accent+"22":"none",border:`1.5px solid ${active?T.accent:T.border}`,borderRadius:11,padding:"10px 7px",cursor:"pointer",color:active?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all 0.14s"}}>
+                        style={{background:active?T.accent+"22":"none",border:`1.5px solid ${active?T.accent:T.border}`,borderRadius:11,padding:"10px 7px",cursor:"pointer",color:active?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all .2s ease-out"}}>
                         {icons[key]}
                         <span style={{fontWeight:500,fontSize:10}}>{l.name}</span>
                         <span style={{fontSize:9,opacity:0.6}}>{l.desc}</span>
@@ -5268,7 +5275,7 @@ export default function HomeworkPlanner() {
       {/* Undo toast (any undoable change) -- bottom-center; lifted above the
           bulk-action bar when that's showing. */}
       {undoToast!=null&&(
-        <div role="status" style={{position:"fixed",left:"50%",bottom:selectionMode&&selectedIds.length>0?130:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
+        <div role="status" className="fade-in" style={{position:"fixed",left:"50%",bottom:selectionMode&&selectedIds.length>0?130:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
           <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:200}}>{undoToast}</span>
           <button onClick={undo} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
         </div>

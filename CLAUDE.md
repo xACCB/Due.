@@ -480,6 +480,15 @@ already follows the finger, and moving the others would shift what `elementFromP
 flip-flopping the swap), layout switches, and changes arriving from sync (cards shouldn't move
 under your finger). `glideClock()` (module scope) exists for the React Compiler purity lint.
 
+**Motion standard.** One look everywhere, taken from the Calendar tab: 0.2s, `ease-out`, a few pixels
+of travel, no bounce or overshoot (the old `cubic-bezier(.34,1.x,.64,1)` curves are gone; don't add
+new ones). Entrances are one of three classes in the runtime css: `.sec-body` (settles from above:
+screens, dropdowns, panels), `.pop` (rises from below: the task sheet, cards) and `.fade-in` (opacity
+only, for anything positioned with its own `transform` such as toasts, since an animated transform
+would override it). State changes use `transition: … .2s ease-out`. The exceptions are deliberate:
+progress fills and the timer ring, the shared-element opens (`UpdateDetail`, `DayDetail`, search) and
+the FLIP list moves.
+
 **Tab entrance.** The Tasks tab's content and Focus Mode's content are wrapped in `.sec-body`, the
 same short fade-and-settle the Calendar grid and Settings sections use, so every tab opens alike. The title menu, the Time
 left dropdown, Profile and the four menu screens (Inbox, History, Import/Export, Settings) carry it too.

@@ -249,6 +249,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"sheet-drag-anywhere", date:"2026-10-04", kind:"Improvement", headline:"Gestures that feel native", where:"Tap a task, then pull its details down", go:"task", description:"A task's details now pull down from anywhere on the sheet, not only the small bar at the top, and the page behind no longer scrolls instead. If you've scrolled down in the details, the first pull scrolls back to the top and the next one closes it. Swiping a task in the list also works with a quick flick, without dragging all the way." },
   { id:"session-no-symbols", date:"2026-10-04", kind:"UI change", headline:"Plain session buttons", where:"Tap a task, then the timer in its details", go:"task", description:"The Start Session and End Session buttons are plain words now, without the ▶ and ⏹ symbols." },
   { id:"focus-time-counts", date:"2026-10-04", kind:"Improvement", headline:"Focus time always counts", where:"The Focus tab", go:"tasks:tab-focus", description:"Time you spend in a Pomodoro now counts toward the task even if you don't finish it. Resetting the timer, switching to another task or marking the task done logs the minutes you worked so far, like the Start session button in a task." },
   { id:"solid-separator", date:"2026-10-04", kind:"UI change", headline:"Solid divider line", where:"The line under DuePlanner and Time left, at the top", go:"tasks", description:"The line under the title and Time left is a plain solid line now, instead of fading out to the right." },
@@ -603,14 +604,79 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
     sheetAnim.current=requestAnimationFrame(frame);
   }
   useEffect(()=>()=>cancelAnimationFrame(sheetAnim.current),[]);
+  // On a touch screen the whole sheet is the handle, like an iOS sheet: pull
+  // down anywhere on it and it follows the finger, as long as its content is
+  // scrolled to the top (otherwise the pull scrolls the content back up, and a
+  // second pull moves the sheet). Touch events with a non-passive touchmove,
+  // not pointer events: the browser cancels a pointer the moment it starts
+  // scrolling, and preventDefault here is what stops it scrolling the page
+  // instead. The page behind is scroll-locked while the sheet is open, and a
+  // drag on the dimmed backdrop does nothing. Fields and the handle itself
+  // (which has its own pointer handlers, for a mouse) are left alone.
+  const sheetApi=useRef({setSheetY,releaseSheet});
+  useEffect(()=>{sheetApi.current={setSheetY,releaseSheet};});
+  useEffect(()=>{
+    const panel=panelRef.current, overlay=overlayRef.current;
+    if(!panel||!overlay)return;
+    let start:{x:number;y:number;base:number}|null=null, dragging=false, samples:{t:number;y:number}[]=[];
+    const onStart=(e:TouchEvent)=>{
+      dragging=false; start=null;
+      if(sessionActiveRef.current||e.touches.length!==1)return;
+      if((e.target as Element|null)?.closest?.("input,textarea,select,[data-sheet-handle]"))return;
+      cancelAnimationFrame(sheetAnim.current); // catch the sheet mid-spring
+      start={x:e.touches[0].clientX,y:e.touches[0].clientY,base:sheetY.current};
+      samples=[{t:e.timeStamp,y:e.touches[0].clientY}];
+    };
+    const onMove=(e:TouchEvent)=>{
+      if(!start)return;
+      const t=e.touches[0], dy=t.clientY-start.y, dx=t.clientX-start.x;
+      if(!dragging){
+        if(Math.abs(dy)<6&&Math.abs(dx)<6)return;
+        if(dy>0&&Math.abs(dy)>=Math.abs(dx)&&panel.scrollTop<=0)dragging=true;
+        else{
+          // Not a pull on the sheet. If the content has nowhere to scroll, stop
+          // the gesture from scrolling the page behind instead.
+          if(panel.scrollHeight<=panel.clientHeight&&e.cancelable)e.preventDefault();
+          if(start.base>0)sheetApi.current.releaseSheet(0,false);
+          start=null;return;
+        }
+      }
+      if(e.cancelable)e.preventDefault();
+      samples.push({t:e.timeStamp,y:t.clientY}); if(samples.length>8)samples.shift();
+      sheetApi.current.setSheetY(Math.max(0,start.base+dy));
+    };
+    const onEnd=()=>{
+      const was=dragging, had=start;
+      dragging=false; start=null;
+      if(!was){if(had&&had.base>0)sheetApi.current.releaseSheet(0,false);return;}
+      const v=releaseVelocity(samples);
+      sheetApi.current.releaseSheet(v,shouldDismiss(sheetY.current,v));
+    };
+    const onBackdrop=(e:TouchEvent)=>{if(e.target===overlay&&e.cancelable)e.preventDefault();};
+    panel.addEventListener("touchstart",onStart,{passive:true});
+    panel.addEventListener("touchmove",onMove,{passive:false});
+    panel.addEventListener("touchend",onEnd);
+    panel.addEventListener("touchcancel",onEnd);
+    overlay.addEventListener("touchmove",onBackdrop,{passive:false});
+    const root=document.documentElement, before=root.style.overflow;
+    root.style.overflow="hidden";
+    return()=>{
+      panel.removeEventListener("touchstart",onStart);
+      panel.removeEventListener("touchmove",onMove);
+      panel.removeEventListener("touchend",onEnd);
+      panel.removeEventListener("touchcancel",onEnd);
+      overlay.removeEventListener("touchmove",onBackdrop);
+      root.style.overflow=before;
+    };
+  },[]);
   return(
     <div ref={overlayRef} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.53)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
       {/* The drag offset lives on this wrapper, not the panel: the panel's "pop"
           entrance animation (fill-mode forwards) would override its transform. */}
       <div ref={sheetRef} style={{width:"100%",maxWidth:580}}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={task.title} className="pop" style={{background:T.bg,borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"90vh",overflowY:"auto",border:`1px solid ${T.border}`,borderBottom:"none"}}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={task.title} className="pop" style={{background:T.bg,borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"90vh",overflowY:"auto",overscrollBehavior:"contain",border:`1px solid ${T.border}`,borderBottom:"none"}}>
         {/* Handle -- drag down to close (not while a session is running) */}
-        {!sessionActive&&<div
+        {!sessionActive&&<div data-sheet-handle
           onPointerDown={e=>{
             cancelAnimationFrame(sheetAnim.current); // catch the sheet mid-spring
             sheetDrag.current={startY:e.clientY-sheetY.current,samples:[{t:e.timeStamp,y:e.clientY}]};
@@ -2591,6 +2657,7 @@ export default function HomeworkPlanner() {
   const swipeLocked=useRef(false);
   const swipeMoved=useRef(false);
   const SWIPE_THRESHOLD=64;
+  const SWIPE_FLICK=600; // px/s
   // Undo/redo action history. Actions apply immediately (so Firestore sync,
   // which just diffs against `tasks`, doesn't need special-casing) and keep
   // what's needed to reverse them: "delete" keeps the removed tasks; "change"
@@ -3331,8 +3398,11 @@ export default function HomeworkPlanner() {
   // row mid-gesture and silently swallow the browser's native click event. State
   // (swipeId/swipeX) only gets touched once a gesture actually locks in as a swipe.
   const swipeActiveId=useRef<number|null>(null);
+  // Recent (time, x) samples of the swipe, for its speed at release.
+  const swipeSamples=useRef<{t:number;y:number}[]>([]);
   function onSwipeStart(id:number,e:React.PointerEvent){
     swipeActiveId.current=id;
+    swipeSamples.current=[{t:e.timeStamp,y:e.clientX}];
     swipeStart.current={x:e.clientX,y:e.clientY};
     swipeLocked.current=false;
     swipeMoved.current=false;
@@ -3354,6 +3424,7 @@ export default function HomeworkPlanner() {
       } else return;
     }
     swipeMoved.current=true;
+    swipeSamples.current.push({t:e.timeStamp,y:e.clientX}); if(swipeSamples.current.length>8)swipeSamples.current.shift();
     setSwipeX(Math.max(-140,Math.min(140,dx)));
   }
   function onSwipeEnd(id:number){
@@ -3365,8 +3436,10 @@ export default function HomeworkPlanner() {
     const dx=swipeX;
     setSwipeId(null);
     setSwipeX(0);
-    if(dx<=-SWIPE_THRESHOLD)deleteTask(id);
-    else if(dx>=SWIPE_THRESHOLD)toggleDone(id);
+    // Past the threshold, or a quick flick in that direction (as iOS lists do).
+    const v=releaseVelocity(swipeSamples.current);
+    if(dx<=-SWIPE_THRESHOLD||(v<-SWIPE_FLICK&&dx<-24))deleteTask(id);
+    else if(dx>=SWIPE_THRESHOLD||(v>SWIPE_FLICK&&dx>24))toggleDone(id);
   }
   function onSwipeCancel(id:number){
     if(swipeActiveId.current!==id)return;

@@ -288,7 +288,10 @@ focus trap (Tab/Shift+Tab cycle within the panel, focus-return to whatever opene
 Escape-to-close unless a session is active) since it's a custom `<div>` overlay rather than a
 native `<dialog>`; the trap effect intentionally runs once (mount/unmount only) and reads
 `sessionActive`/`onClose` through refs rather than including them as effect deps, so it doesn't
-re-steal focus into the first element on every unrelated re-render. Dragging its top handle moves the sheet
+re-steal focus into the first element on every unrelated re-render. Dragging the sheet moves it: on touch, a downward pull anywhere on it
+while its content is scrolled to the top (native touch listeners with a non-passive `touchmove`, so
+the page behind can't scroll instead; the page is also scroll-locked while it's open), and with a
+mouse, its top handle (pointer events, `data-sheet-handle`). It
 (follows the finger, rubber-bands upward, backdrop fades) and on release it springs back or flies
 off and closes, carrying the finger's velocity (`src/lib/spring.ts`, unit-tested; driven through refs
 and direct style writes, not state, so a drag doesn't re-render the modal per frame; reduced motion
@@ -475,7 +478,7 @@ countdown when due today at a time), and `settled(t)` decides when a completed t
 Done column or tier (not while it's in `justDone`). Use these for any new layout.
 
 **Swipes** on task cards lock in as soon as sideways movement is the larger direction (6px), give up
-to scrolling only when vertical is larger (10px), and act past `SWIPE_THRESHOLD` (64px). The earlier,
+to scrolling only when vertical is larger (10px), and act past `SWIPE_THRESHOLD` (64px) or on a flick (over 600px/s after 24px). The earlier,
 stricter rule (1.5x flatter than tall, 90px) dropped most real thumb swipes.
 
 **Pull to reload** (`src/hooks/usePullToReload.ts`): in the installed app only (`isStandalone()`;

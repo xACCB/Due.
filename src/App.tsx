@@ -249,6 +249,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"focus-time-counts", date:"2026-10-04", kind:"Improvement", headline:"Focus time always counts", where:"The Focus tab", go:"tasks:tab-focus", description:"Time you spend in a Pomodoro now counts toward the task even if you don't finish it. Resetting the timer, switching to another task or marking the task done logs the minutes you worked so far, like the Start session button in a task." },
   { id:"solid-separator", date:"2026-10-04", kind:"UI change", headline:"Solid divider line", where:"The line under DuePlanner and Time left, at the top", go:"tasks", description:"The line under the title and Time left is a plain solid line now, instead of fading out to the right." },
   { id:"layouts-consistent", date:"2026-10-04", kind:"Improvement", headline:"Layouts behave alike", where:"Menu (tap DuePlanner) → Settings → Looks → Layout", go:"settings:layout", description:"Every layout now works the same way. You can swipe a task right to finish it or left to delete it in Board, Kanban, Progress and Pyramid, not only List and Checklist. Finished tasks are struck through the same way everywhere, tasks due today at a set time show a live countdown in every layout, and a task you just finished stays put in Kanban and Pyramid until its checkmark has drawn." },
   { id:"pull-to-reload", date:"2026-10-04", kind:"New feature", headline:"Pull to reload", where:"Any screen in the installed app: pull down from the very top", description:"In the installed app, pulling down when you're already at the top of the page reloads it. Keep pulling until it says \"Release to reload\", then let go." },
@@ -2710,14 +2711,20 @@ export default function HomeworkPlanner() {
   const [srMessage,setSrMessage]=useState("");
   const [focusPickerOpen,setFocusPickerOpen]=useState(false);
   const pomodoroTaskRef=useRef<number|null>(null);
+  // Seconds of the current focus session already logged to a task (see creditPomodoro).
+  const pomCredited=useRef(0);
   const nextSuggestionRef=useRef<string|null>(null);
   useEffect(()=>{
     if(!pomodoroActive||pomodoroSecs>0)return;
     playChime();
     if(pomodoroPhase==="work"){
-      // A finished focus session counts as a work session on the focus task.
+      // A finished focus session counts as a work session on the focus task:
+      // the whole length, less anything already logged along the way (see
+      // creditPomodoro).
       const logId=pomodoroTaskRef.current;
-      if(logId!=null)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:addSession(t.sessions,{mins:pomodoroWorkMins,at:Date.now()})}:t));
+      const mins=Math.max(0,Math.round((pomodoroWorkMins*60-pomCredited.current)/60));
+      pomCredited.current=0;
+      if(logId!=null&&mins>0)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:addSession(t.sessions,{mins,at:Date.now()})}:t));
       setLastWorkedTaskId(logId);setPomodoroPhase("break");setPomodoroSecs(pomodoroBreakMins*60);setPomodoroActive(autoStartBreaks);setPomodoroDone(true);setBreakEnded(false);
       try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:autoStartBreaks?`Nice work! Your ${pomodoroBreakMins}-minute break has started.`:`Nice work! Time for a ${pomodoroBreakMins}-minute break.`}); }catch{/* notifications unavailable */}
     }else{
@@ -2732,7 +2739,22 @@ export default function HomeworkPlanner() {
     return()=>clearTimeout(t);
   },[pomodoroDone]);
   // Back to a fresh focus session (also how a break is skipped).
-  function resetPomodoro(){setPomodoroActive(false);setPomodoroPhase("work");setPomodoroSecs(pomodoroWorkMins*60);}
+  // Focus time counts toward the task like the task timer's sessions do, even
+  // when a Pomodoro isn't finished: whatever part of the current focus session
+  // hasn't been logged yet goes to `taskId` as a work session (whole minutes;
+  // under half a minute is dropped). pomCredited is how many seconds of this
+  // focus session are already logged, so nothing is counted twice. Called when
+  // the Pomodoro is reset, when the focus task changes or is marked done, and
+  // by the finish effect for the remainder.
+  function creditPomodoro(taskId:number|null){
+    if(pomodoroPhase!=="work"||taskId==null)return;
+    const mins=Math.round((pomodoroWorkMins*60-pomodoroSecs-pomCredited.current)/60);
+    if(mins<1)return;
+    pomCredited.current+=mins*60;
+    setTasks(prev=>prev.map(t=>t.id===taskId?{...t,sessions:addSession(t.sessions,{mins,at:wallClock()})}:t));
+    setLastWorkedTaskId(taskId);
+  }
+  function resetPomodoro(){creditPomodoro(pomodoroTaskRef.current);pomCredited.current=0;setPomodoroActive(false);setPomodoroPhase("work");setPomodoroSecs(pomodoroWorkMins*60);}
   // Changing a length only moves the timer if it's sitting untouched at the
   // start of that phase -- a paused session keeps its remaining time.
   function changePomodoroLength(phase:"work"|"break",mins:number){
@@ -3945,7 +3967,7 @@ export default function HomeworkPlanner() {
               {focusPickerOpen&&(
                 <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,maxHeight:180,overflowY:"auto"}}>
                   {allSorted.filter(t=>!t.done&&!t.archived).map(t=>(
-                    <button key={t.id} onClick={()=>{setFocusTaskId(t.id);setFocusPickerOpen(false);}}
+                    <button key={t.id} onClick={()=>{if(t.id!==focusTask.id)creditPomodoro(focusTask.id);setFocusTaskId(t.id);setFocusPickerOpen(false);}}
                       style={{textAlign:"left",background:t.id===focusTask.id?T.accent+"22":T.surface,border:`1px solid ${t.id===focusTask.id?T.accent:T.border}`,borderRadius:8,padding:"7px 10px",color:T.text,fontSize:12,cursor:"pointer"}}>
                       {t.title}{t.subject&&<span style={{color:T.textFaint}}> · {t.subject}</span>}
                     </button>
@@ -3957,7 +3979,7 @@ export default function HomeworkPlanner() {
                 {focusTask.dueDate&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(focusTask.dueDate)}{focusTask.dueTime?` ${formatTime(focusTask.dueTime,h24)}`:""}</span>}
                 {focusTask.estMins>0&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDuration(focusTask.estMins)}</span>}
               </div>
-              <button onClick={()=>toggleDone(focusTask.id)} style={{marginTop:14,background:"#2ED57322",color:ink("#2ED573",T.light),border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>Mark done</button>
+              <button onClick={()=>{toggleDone(focusTask.id);creditPomodoro(focusTask.id);}} style={{marginTop:14,background:"#2ED57322",color:ink("#2ED573",T.light),border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>Mark done</button>
             </div>
           ):(
             <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on</div>

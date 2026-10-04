@@ -355,7 +355,10 @@ restore it from the archive. **Recently deleted** (`trash`, `hw-trash`; synced v
 when signed in, see the Firestore data model above): every delete also lands here for 30 days (pruned on load, capped at 200), restorable from the
 History menu; undo/redo of a delete keeps it in step. **Focus Mode** targets `focusTask` (`focusTaskId`, falling back to
 the first pending task); a finished Pomodoro logs a session of the configured length to it (read
-through `pomodoroTaskRef`, since the finish effect is declared before `focusTask` is computed), and a
+through `pomodoroTaskRef`, since the finish effect is declared before `focusTask` is computed), and
+an unfinished one still counts: `creditPomodoro(taskId)` logs the not-yet-logged part of the current
+focus session when the timer is reset, the focus task is switched, or it's marked done from Focus
+Mode (`pomCredited` tracks what's already logged, so the finish effect only adds the remainder), and a
 Screen Wake Lock is held while Focus Mode is open. The Pomodoro alternates `pomodoroPhase`
 work/break; lengths and auto-start-breaks are local-only settings (`hw-pomodoro-*`, Settings ->
 Focus timer). When a break ends, `breakEnded` shows a suggestion (`nextSuggestion`: the task just

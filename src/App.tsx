@@ -251,7 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
-  { id:"deck-stack", date:"2026-10-04", kind:"UI change", headline:"A deck that looks stacked", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"The Deck now looks like a real stack: the edges of the next few cards show under the top one, so you can see there are more days behind it. The Next up button is gone; use the arrows or swipe." },
+  { id:"deck-stack", date:"2026-10-04", kind:"UI change", headline:"A deck that looks stacked", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"The Deck now looks like a real stack: the edges of the next few cards show under the top one, so you can see there are more days behind it. The Next up and Add homework buttons are gone from the cards, leaving just the date and what is due." },
   { id:"due-deck", date:"2026-10-04", kind:"New feature", headline:"Due date deck", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"A new way to see what's coming: a deck of cards, one for each day something is due, with the date written large and that day's tasks underneath. Swipe a card left for the next day and right to go back. It opens on today or the next day with something due." },
   { id:"slider-colors", date:"2026-10-04", kind:"UI change", headline:"Clearer speed slider", where:"Menu (tap DuePlanner) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"The Animation speed slider is easier to read: the bar is white and the knob is black with a white ring in the dark theme, and the other way round in the light theme." },
   { id:"calendar-month-only", date:"2026-10-04", kind:"New feature", headline:"Calendar shows one month", where:"Menu (tap DuePlanner) → Settings → Date & time → Calendar shows", go:"settings:calendar-days", description:"The Calendar now shows only the days of the month you're looking at, without the faded days from the months either side. Prefer the old view? Choose \"Six full weeks\" in Settings." },
@@ -1460,16 +1460,16 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,monthO
 }
 
 // The Calendar tab's Deck view: one card per date that has something due,
-// with the date written large and that day's tasks under it, stacked like a
+// with the date written large and that day's tasks under it (no add button here; adding is the Month view's job), stacked like a
 // deck. Swipe the top card left for the next date and right for the one
 // before (or use the arrows / arrow keys). A date is in the deck if it still
 // has an open task, or is today or later. It opens on the first date from
 // today on. Module scope like CalendarView, so the `now` tick doesn't reset
 // which card you're on.
-function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone,onAddOn}:{
+function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone}:{
   tasks:Task[]; T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>;
   h24:boolean; now:number;
-  onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void; onAddOn:(date:string)=>void;
+  onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void;
 }){
   const today=localDateStr(new Date(now));
   const due=byDueDate(tasks.filter(t=>!t.archived));
@@ -1549,8 +1549,7 @@ function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone,onAddO
   if(dates.length===0)return(
     <div style={{background:T.card,borderRadius:14,padding:"28px 16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
       <div style={{fontFamily:F.heading,fontSize:20,color:T.text,marginBottom:6}}>Nothing due</div>
-      <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:14}}>Tasks with a due date show up here, one card per day.</div>
-      <button onClick={()=>onAddOn(today)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12}}>+ Add homework due today</button>
+      <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Tasks with a due date show up here, one card per day.</div>
     </div>
   );
   const dayMs=(iso:string)=>new Date(iso+"T00:00:00").getTime();
@@ -1603,9 +1602,6 @@ function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone,onAddO
                   );
                 })}
               </div>
-              <button onClick={()=>onAddOn(iso)} style={{marginTop:12,width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12,flexShrink:0}}>
-                + Add homework due {diff===0?"today":d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
-              </button>
             </div>
           );
         })}
@@ -4596,7 +4592,7 @@ export default function HomeworkPlanner() {
           </div>
           {calendarView==="deck"
             ?<DueDeck tasks={tasks} T={T} F={F} subjectColors={subjectColors} h24={h24} now={now}
-              onOpenTask={t=>setSelectedTask(t)} onToggleDone={toggleDone} onAddOn={addHomeworkOn}/>
+              onOpenTask={t=>setSelectedTask(t)} onToggleDone={toggleDone}/>
             :<CalendarView tasks={tasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
               weekStart={weekStart} monthOnly={calendarMonthOnly} h24={h24} now={now}
               onOpenTask={t=>setSelectedTask(t)} onToggleDone={toggleDone} onAddOn={addHomeworkOn}/>}

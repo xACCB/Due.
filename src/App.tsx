@@ -4061,7 +4061,7 @@ export default function HomeworkPlanner() {
             )}
           </div>
         </header>
-        <div aria-hidden="true" style={{height:1,background:T.border,marginBottom:16}}/>
+        <div aria-hidden="true" style={{height:1,background:T.accent,marginBottom:16}}/>
 
         <div className="app-body">
         <nav className="app-sidebar" aria-label="Main">

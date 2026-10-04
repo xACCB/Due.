@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"no-example-tasks", date:"2026-10-04", kind:"UI change", headline:"No more example tasks", where:"Tasks tab, when you first open the app", go:"tasks", description:"The app no longer starts with four made-up example tasks. A new list starts empty, and if the examples were still sitting untouched on this device, they've been cleared." },
   { id:"empty-list-shorter", date:"2026-10-04", kind:"UI change", headline:"Shorter empty list message", where:"Tasks tab, when you have no tasks", go:"tasks", description:"An empty task list now just says \"Nothing here yet\", without telling you to add some homework below." },
   { id:"import-no-instructions", date:"2026-10-04", kind:"UI change", headline:"Cleaner syllabus import", where:"Menu (tap DuePlanner) → Import/Export → Import from Syllabus", go:"import", description:"The paragraph of instructions under Import from Syllabus is gone. Paste your syllabus in the box and tap the button as before." },
   { id:"deck-stack", date:"2026-10-04", kind:"UI change", headline:"A deck that looks stacked", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"The Deck now looks like a real stack: the edges of the next few cards show under the top one, so you can see there are more days behind it. The Next up and Add homework buttons are gone from the cards, leaving just the date and what is due." },
@@ -395,12 +396,22 @@ interface Task {
 // not core data, and don't currently justify a second synced collection.
 interface TaskTemplate { id:string; name:string; subject:string; estMins:number; recurrence?:Recurrence; subtasks?:{text:string}[]; }
 
-const DEFAULT_TASKS: Task[] = [
-  { id:1, title:"Chapter 5 Review", subject:"Math", dueDate:localDateStr(new Date(Date.now()+86400000)), dueTime:"", estMins:45, done:false, order:0 },
-  { id:2, title:"Essay Draft", subject:"English", dueDate:localDateStr(new Date(Date.now()+3*86400000)), dueTime:"23:59", estMins:90, done:false, order:1 },
-  { id:3, title:"Lab Report", subject:"Science", dueDate:localDateStr(new Date(Date.now()+5*86400000)), dueTime:"", estMins:60, done:false, order:2 },
-  { id:4, title:"History Reading", subject:"History", dueDate:localDateStr(new Date(Date.now()+2*86400000)), dueTime:"09:00", estMins:30, done:false, order:3 },
+// A new user starts with an empty list. The app used to seed four example
+// tasks; these are what they looked like, kept only to recognise them: they
+// are cleared once from a device that still has them untouched (see the tasks
+// initializer), and never treated as the user's own work when signing in.
+const LEGACY_EXAMPLE_TASKS=[
+  { id:1, title:"Chapter 5 Review", subject:"Math", estMins:45 },
+  { id:2, title:"Essay Draft", subject:"English", estMins:90 },
+  { id:3, title:"Lab Report", subject:"Science", estMins:60 },
+  { id:4, title:"History Reading", subject:"History", estMins:30 },
 ];
+// An example exactly as it was seeded: same id, title, subject and estimate,
+// not finished, nothing added to it.
+function isUntouchedExample(t:Task):boolean{
+  return !t.done&&!t.archived&&!t.subtasks?.length&&!t.sessions?.length&&!t.tags?.length
+    &&LEGACY_EXAMPLE_TASKS.some(d=>d.id===t.id&&d.title===t.title&&d.subject===t.subject&&d.estMins===t.estMins);
+}
 
 // Picks the most urgent pending task, computed locally and instantly from the
 // task data (this once called an AI API from the browser, which was both
@@ -1963,10 +1974,15 @@ export default function HomeworkPlanner() {
   const [tasks,setTasks]=useState<Task[]>(()=>{
     try{
       const s=localStorage.getItem("hw-tasks");
-      const loaded:Task[]=s?JSON.parse(s):DEFAULT_TASKS;
+      let loaded:Task[]=s?JSON.parse(s):[];
+      // One-time: drop the old example tasks if they're still as seeded.
+      if(!localStorage.getItem("hw-examples-removed")){
+        loaded=loaded.filter(t=>!isUntouchedExample(t));
+        localStorage.setItem("hw-examples-removed","1");
+      }
       // Backfill order for tasks saved before drag-to-reorder existed.
       return loaded.map((t,i)=>t.order===undefined?{...t,order:i}:t);
-    }catch{return DEFAULT_TASKS;}
+    }catch{return [];}
   });
   // Latest tasks, readable from long-lived callbacks (the Firestore listener)
   // without re-subscribing on every change.
@@ -2472,14 +2488,14 @@ export default function HomeworkPlanner() {
       // nothing synced yet vs. a returning account that legitimately has zero
       // tasks. isNewAccountForUid (set by the migration effect above, from
       // whether a profile doc existed at all) tells them apart -- for a new
-      // account, leave local state (e.g. DEFAULT_TASKS) alone so the save
-      // effect pushes it up as the first write.
+      // account, leave local state (tasks added while signed out) alone so
+      // the save effect pushes it up as the first write.
       if(cloud.size===0&&isNewAccountForUid===uid&&baseRef.current.size===0){ mergeLocalOnSignIn.current=false; setTasksSyncedForUid(uid); return; }
       const local=localRecords(tasksRef.current,trashRef.current);
       if(mergeLocalOnSignIn.current){
         // Explicit sign-in: keep tasks created while signed out (marking them
         // as unsaved local changes) instead of letting the cloud replace them.
-        const isStarter=(t:Task)=>!t.done&&DEFAULT_TASKS.some(d=>d.id===t.id&&d.title===t.title);
+        const isStarter=(t:Task)=>!t.done&&LEGACY_EXAMPLE_TASKS.some(d=>d.id===t.id&&d.title===t.title);
         const at=Date.now();
         for(const [id,r] of local) if(!cloud.has(id)&&r.deletedAt===undefined&&!isStarter(r.task)) dirtyAtRef.current.set(id,at);
         mergeLocalOnSignIn.current=false;

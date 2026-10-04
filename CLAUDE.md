@@ -148,7 +148,9 @@ require rewriting a user's entire history:
 - An empty tasks subcollection is ambiguous (brand-new account with nothing synced yet, vs. a
   returning account that legitimately has zero tasks) -- `isNewAccountForUid` (set from whether a
   profile doc existed at all when migration was checked) disambiguates it, so a first sign-in
-  doesn't wipe local starter tasks before they've had a chance to sync up.
+  doesn't wipe tasks added while signed out before they've had a chance to sync up. (The app no longer
+  seeds example tasks: a new list starts empty. `LEGACY_EXAMPLE_TASKS` only exists to recognise the old
+  four, which are cleared once per device if untouched, `hw-examples-removed`.)
 - The outbound tasks write is debounced 400ms behind local state, since drag-to-reorder calls `setTasks()` once per card the dragged item passes over --
   without this, a single reorder drag would fire one Firestore write per intermediate step instead
   of one at the end. Local state and `localStorage` stay instant regardless; only the cloud write

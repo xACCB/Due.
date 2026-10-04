@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"calendar-day-card", date:"2026-10-04", kind:"New feature", headline:"Tap a day to open it", where:"The Calendar tab → Month: tap any day", go:"calendar", description:"Tapping a day in the Calendar now opens it as a card that grows out of the day, like an Inbox message. It shows the date, everything due that day, and a button to add homework for it. Tap outside the card or the × to close it." },
   { id:"no-example-tasks", date:"2026-10-04", kind:"UI change", headline:"No more example tasks", where:"Tasks tab, when you first open the app", go:"tasks", description:"The app no longer starts with four made-up example tasks. A new list starts empty, and if the examples were still sitting untouched on this device, they've been cleared." },
   { id:"empty-list-shorter", date:"2026-10-04", kind:"UI change", headline:"Shorter empty list message", where:"Tasks tab, when you have no tasks", go:"tasks", description:"An empty task list now just says \"Nothing here yet\", without telling you to add some homework below." },
   { id:"import-no-instructions", date:"2026-10-04", kind:"UI change", headline:"Cleaner syllabus import", where:"Menu (tap DuePlanner) → Import/Export → Import from Syllabus", go:"import", description:"The paragraph of instructions under Import from Syllabus is gone. Paste your syllabus in the box and tap the button as before." },
@@ -1333,6 +1334,118 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
   );
 }
 
+// A Calendar day, opened: the day's cell grows into a card floating over a
+// blurred screen, the same way an Inbox message opens (UpdateDetail), and
+// shrinks back into the cell on close. The card has the date, that day's tasks
+// (check off, tap to open) and the add button. `origin` is the day's cell.
+function DayDetail({iso,today,list,origin,T,F,subjectColors,h24,onOpenTask,onToggleDone,onAddOn,onClose}:{
+  iso:string; today:string; list:Task[]; origin:HTMLElement|null;
+  T:ThemeObj; F:typeof FONT; subjectColors:Record<string,string>; h24:boolean;
+  onOpenTask:(t:Task)=>void; onToggleDone:(id:number)=>void; onAddOn:(date:string)=>void; onClose:()=>void;
+}){
+  const backdropRef=useRef<HTMLDivElement>(null), cardRef=useRef<HTMLDivElement>(null), bodyRef=useRef<HTMLDivElement>(null);
+  const closeRef=useRef<HTMLButtonElement>(null);
+  const closing=useRef(false);
+  const openedFrom=useRef(origin);
+  const reduced=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  useLayoutEffect(()=>{
+    closeRef.current?.focus({preventScroll:true});
+    const card=cardRef.current, from=openedFrom.current?.getBoundingClientRect();
+    if(!card||!from||reduced())return;
+    const to=card.getBoundingClientRect();
+    pin(card,to);
+    backdropRef.current?.animate([{opacity:0},{opacity:1}],{duration:280,easing:"ease-out"});
+    const anim=card.animate([{...box(from),borderRadius:"10px"},{...box(to),borderRadius:"20px"}],{duration:400,easing:"cubic-bezier(.2,.9,.25,1)"});
+    const release=()=>{if(!closing.current)unpin(card);};
+    anim.finished.then(release,release);
+    bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.4},{opacity:1}],{duration:400,easing:"ease-out"});
+  },[]);
+  // The page behind stays put while the card is open.
+  useEffect(()=>{
+    const backdrop=backdropRef.current;
+    if(!backdrop)return;
+    const stop=(e:TouchEvent)=>e.preventDefault();
+    backdrop.addEventListener("touchmove",stop,{passive:false});
+    const root=document.documentElement, before=root.style.overflow;
+    root.style.overflow="hidden";
+    return()=>{backdrop.removeEventListener("touchmove",stop);root.style.overflow=before;};
+  },[]);
+  // Back into the cell, dissolving as it lands (the cell is still there
+  // underneath); a plain fade if the cell is gone.
+  function close(){
+    if(closing.current)return;
+    closing.current=true;
+    const card=cardRef.current, to=origin?.isConnected?origin.getBoundingClientRect():null;
+    if(!card||reduced()){onClose();return;}
+    const from=card.getBoundingClientRect();
+    card.getAnimations().forEach(a=>a.cancel());
+    bodyRef.current?.getAnimations().forEach(a=>a.cancel());
+    pin(card,from);
+    backdropRef.current?.animate([{opacity:1},{opacity:0}],{duration:320,easing:"ease-out",fill:"forwards"});
+    let anim:Animation;
+    if(to&&to.width>0){
+      const body=bodyRef.current;
+      if(body)Object.assign(body.style,{width:`${body.offsetWidth}px`,height:`${body.offsetHeight}px`,flexShrink:"0",overflow:"hidden"});
+      body?.animate([{opacity:1},{opacity:0}],{duration:180,easing:"ease-out",fill:"forwards"});
+      card.animate([{opacity:1},{opacity:1,offset:0.3},{opacity:0}],{duration:320,easing:"linear",fill:"forwards"});
+      anim=card.animate([{...box(from),borderRadius:"20px"},{...box(to),borderRadius:"10px"}],{duration:320,easing:"cubic-bezier(.32,.72,0,1)",fill:"forwards"});
+    }else{
+      anim=card.animate([{opacity:1,transform:"none"},{opacity:0,transform:"scale(.96)"}],{duration:200,easing:"ease-in",fill:"forwards"});
+    }
+    anim.finished.then(onClose,onClose);
+  }
+  const d=new Date(iso+"T00:00:00");
+  const dayMs=(s:string)=>new Date(s+"T00:00:00").getTime();
+  const diff=Math.round((dayMs(iso)-dayMs(today))/86400000);
+  const rel=diff===0?"Today":diff===1?"Tomorrow":diff===-1?"Yesterday":diff>0?`In ${diff} days`:`${-diff} days ago`;
+  const open=list.filter(t=>!t.done);
+  const mins=open.reduce((n,t)=>n+(t.estMins||0),0);
+  const late=diff<0&&open.length>0;
+  return(
+    <div role="dialog" aria-modal="true" aria-labelledby="day-detail-title" onKeyDown={e=>{if(e.key==="Escape"){e.stopPropagation();close();}}}
+      style={{position:"fixed",inset:0,zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div ref={backdropRef} onClick={close} style={{position:"fixed",top:-200,bottom:-200,left:0,right:0,background:T.light?"rgba(245,245,245,0.55)":"rgba(0,0,0,0.5)",backdropFilter:"blur(14px)",WebkitBackdropFilter:"blur(14px)"}}/>
+      <div ref={cardRef} style={{position:"relative",width:"min(460px,100%)",maxHeight:"100%",overflow:"hidden",background:T.bg,border:`1px solid ${T.border}`,borderRadius:20,boxShadow:T.light?"0 16px 48px rgba(0,0,0,0.16)":"0 16px 48px rgba(0,0,0,0.6)",display:"flex",flexDirection:"column"}}>
+        <div ref={bodyRef} style={{padding:"20px 20px 18px",display:"flex",flexDirection:"column",minHeight:0}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{d.toLocaleDateString(undefined,{weekday:"long"})}</div>
+              <h2 id="day-detail-title" style={{margin:"4px 0 0",fontFamily:F.heading,fontWeight:400,fontSize:30,lineHeight:1.1,color:T.text}}>{d.toLocaleDateString(undefined,{month:"long",day:"numeric"})}</h2>
+              <div style={{fontFamily:F.body,fontSize:11,color:late?ink("#FF4757",T.light):T.textMuted,marginTop:6}}>
+                {rel}{late?", overdue":""}{list.length>0?` · ${open.length===0?"all done":`${open.length} due`}${mins?` · ${formatDuration(mins)}`:""}`:""}
+              </div>
+            </div>
+            <button ref={closeRef} onClick={close} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:20,lineHeight:1,padding:"2px 4px",flexShrink:0}}>×</button>
+          </div>
+          <div style={{height:1,background:T.border,margin:"14px 0 12px",flexShrink:0}}/>
+          {list.length===0
+            ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:12}}>Nothing due.</div>
+            :<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,overflowY:"auto",overscrollBehavior:"contain",minHeight:0}}>
+              {list.map(t=>{
+                const sc=subjectColors[t.subject]||T.accent;
+                return(
+                  <div key={t.id} onClick={()=>onOpenTask(t)} style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:10,padding:"10px 11px",cursor:"pointer",flexShrink:0}}>
+                    <button aria-label={t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();onToggleDone(t.id);}}
+                      style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {t.done&&<CheckMark size={10}/>}
+                    </button>
+                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:15,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                    {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
+                    {t.dueTime&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatTime(t.dueTime,h24)}</span>}
+                    {!t.dueTime&&t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
+                  </div>
+                );
+              })}
+            </div>}
+          <button onClick={()=>onAddOn(iso)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12,flexShrink:0}}>
+            + Add homework due {diff===0?"today":d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // The Calendar tab: a month grid (6 fixed rows, so it doesn't jump between
 // months) where each day is dotted with its open tasks' subject colors, plus
 // the chosen day's tasks underneath. Undated tasks aren't shown -- there's no day to put
@@ -1391,7 +1504,11 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,monthO
   // Swipe left/right on the grid to change month.
   const swipeX=useRef<number|null>(null);
   const monthName=new Date(year,month,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
-  const dayTasks=(due.get(selected)||[]).slice().sort((a,b)=>a.done!==b.done?(a.done?1:-1):(a.dueTime||"99").localeCompare(b.dueTime||"99")||a.order-b.order);
+  const sortDay=(list:Task[])=>list.slice().sort((a,b)=>a.done!==b.done?(a.done?1:-1):(a.dueTime||"99").localeCompare(b.dueTime||"99")||a.order-b.order);
+  const dayTasks=sortDay(due.get(selected)||[]);
+  // Tapping a day also opens it as a floating card (DayDetail), growing out of
+  // its cell. Arrow keys still only move the selection; Enter opens.
+  const [openDay,setOpenDay]=useState<{iso:string;origin:HTMLElement}|null>(null);
   const openMins=dayTasks.filter(t=>!t.done).reduce((n,t)=>n+(t.estMins||0),0);
   const card={background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`};
   const navBtn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,width:34,height:34,cursor:"pointer",color:T.text,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",padding:0};
@@ -1426,7 +1543,7 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,monthO
             const label=new Date(iso+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})
               +(open.length?`, ${open.length} due${mins?`, ${formatDuration(mins)}`:""}`:"")+(overdue?", overdue":"");
             return(
-              <button key={iso} data-day={iso} onClick={()=>select(iso)} aria-label={label} aria-pressed={isSel} aria-current={isToday?"date":undefined} tabIndex={iso===tabStop?0:-1}
+              <button key={iso} data-day={iso} onClick={e=>{select(iso);setOpenDay({iso,origin:e.currentTarget});}} aria-haspopup="dialog" aria-label={label} aria-pressed={isSel} aria-current={isToday?"date":undefined} tabIndex={iso===tabStop?0:-1}
                 style={{position:"relative",height:48,borderRadius:10,cursor:"pointer",padding:"5px 0 0",display:"flex",flexDirection:"column",alignItems:"center",gap:4,
                   background:"transparent",border:`${isSel?2:1}px solid ${isSel?T.accent:isToday?T.textMuted:"transparent"}`,opacity:other?0.4:1,color:T.text}}>
                 <span style={{fontFamily:F.body,fontSize:13,lineHeight:1,fontWeight:isToday?600:400,color:overdue?ink(priColor("high",colorCodeUrgency),T.light):T.text}}>{Number(iso.slice(8))}</span>
@@ -1468,6 +1585,10 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,monthO
           + Add homework due {selected===today?"today":new Date(selected+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"})}
         </button>
       </div>
+      {openDay&&<DayDetail iso={openDay.iso} today={today} list={sortDay(due.get(openDay.iso)||[])} origin={openDay.origin}
+        T={T} F={F} subjectColors={subjectColors} h24={h24}
+        onOpenTask={onOpenTask} onToggleDone={onToggleDone} onAddOn={onAddOn}
+        onClose={()=>{const o=openDay.origin;setOpenDay(null);requestAnimationFrame(()=>o.isConnected&&o.focus({preventScroll:true}));}}/>}
     </div>
   );
 }

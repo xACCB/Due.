@@ -508,7 +508,10 @@ list itself is no longer filtered by search.
 grid (only that month's days by default; `calendarMonthOnly`, `hw-calendar-month-only`, local-only,
 Settings -> Date & time -> Calendar shows, switches back to six full weeks with neighbouring days) where each day shows up to 3 subject-colored dots for its open tasks (the workload heatmap
 shading was removed at the user's request; don't bring it back), and the selected day's tasks below
-(check off, tap to open). Undated tasks aren't shown. Arrow keys move the selection (and focus) across
+(check off, tap to open). Tapping a day also opens `DayDetail` (module scope): a floating card that
+grows out of the day's cell and shrinks back on close, the same pin/animate approach as `UpdateDetail`,
+with the date, that day's tasks and the add button. It's rendered inside `CalendarView` (so inside
+`.app-inner`): it locks page scroll itself and has no focus trap, only Escape/backdrop/× to close. Undated tasks aren't shown. Arrow keys move the selection (and focus) across
 months; swiping the grid or ‹ › change month without changing the selected day (nothing is auto-selected
 in the new month; `tabStop` keeps one day reachable by Tab), Today jumps back. "+ Add homework due <day>" calls
 `addHomeworkOn()`: switches to Tasks and starts the usual add flow with the date pre-picked

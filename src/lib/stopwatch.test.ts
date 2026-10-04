@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatStopwatch, stopwatchMinutes, normalizeFocusShow, showsPomodoro, showsStopwatch } from "./stopwatch";
+import { formatStopwatch, stopwatchMinutes, normalizeFocusShow, focusShowFor, showsPomodoro, showsStopwatch } from "./stopwatch";
 
 describe("formatStopwatch", () => {
   it("shows minutes and seconds", () => {
@@ -31,6 +31,14 @@ describe("focus show setting", () => {
     expect(normalizeFocusShow("task")).toBe("task");
     expect(normalizeFocusShow("nope")).toBe("all");
     expect(normalizeFocusShow(null)).toBe("all");
+  });
+  it("maps two switches to the stored value and back", () => {
+    for (const p of [true, false]) for (const s of [true, false]) {
+      const v = focusShowFor(p, s);
+      expect([showsPomodoro(v), showsStopwatch(v)]).toEqual([p, s]);
+    }
+    expect(focusShowFor(false, false)).toBe("task");
+    expect(focusShowFor(true, true)).toBe("all");
   });
   it("says which timers each option shows", () => {
     expect([showsPomodoro("task"),showsStopwatch("task")]).toEqual([false,false]);

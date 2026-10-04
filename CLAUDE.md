@@ -376,8 +376,10 @@ one-tap Start. Focus Mode also has a **stopwatch** (`swStartedAt`/`swBanked`/
 `swElapsed`, clock-based, keeps running outside Focus Mode, shown on the Focus button when the
 Pomodoro isn't running); "Log Xm to task" (`saveStopwatch`) adds a session to `focusTask` and resets
 it. `focusShow` (`hw-focus-show`, local-only, Settings -> Focus timer -> Show in Focus; options
-and helpers in `src/lib/stopwatch.ts`) picks what's under the task: nothing, the stopwatch, the
-Pomodoro, or both (the default). **JSON import** (`importBackupJSON`) merges an
+and helpers in `src/lib/stopwatch.ts`) decides which timers show; Settings presents it as two
+switches, Pomodoro and Stopwatch (`focusShowFor()` maps them to the stored value), and hides the
+Pomodoro's length settings while it's off. In Focus Mode the order is Pomodoro, task, stopwatch,
+centered as a group. **JSON import** (`importBackupJSON`) merges an
 export: tasks with ids already present are skipped, subjects/templates added if missing, existing
 subject colors win, settings untouched.
 

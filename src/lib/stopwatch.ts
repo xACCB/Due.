@@ -25,5 +25,10 @@ export type FocusShow=typeof FOCUS_SHOW[number]["key"];
 export function normalizeFocusShow(value:unknown):FocusShow{
   return FOCUS_SHOW.some(o=>o.key===value)?value as FocusShow:"all";
 }
+// The setting's value for a pair of on/off switches (Settings shows it as two
+// toggles, Pomodoro and Stopwatch).
+export function focusShowFor(pomodoro:boolean,stopwatch:boolean):FocusShow{
+  return pomodoro?(stopwatch?"all":"task-pomodoro"):(stopwatch?"task-stopwatch":"task");
+}
 export const showsPomodoro=(v:FocusShow)=>v==="task-pomodoro"||v==="all";
 export const showsStopwatch=(v:FocusShow)=>v==="task-stopwatch"||v==="all";

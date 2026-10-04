@@ -14,7 +14,7 @@ import { THEMES } from "./themes";
 import type { ThemeName, ThemeObj } from "./themes";
 import { localDateStr, todayISO, advanceDate } from "./lib/dates";
 import { nextId } from "./lib/id";
-import { FOCUS_SHOW, normalizeFocusShow, showsPomodoro, showsStopwatch, formatStopwatch, stopwatchMinutes } from "./lib/stopwatch";
+import { normalizeFocusShow, focusShowFor, showsPomodoro, showsStopwatch, formatStopwatch, stopwatchMinutes } from "./lib/stopwatch";
 import { ANIM_SPEED, clampSpeed, setAnimationSpeed, animationRate, scaledMs } from "./lib/animSpeed";
 import { newRecaps, mergeRecaps, recapMessage } from "./lib/recaps";
 import type { Recap } from "./lib/recaps";
@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"focus-toggles", date:"2026-10-04", kind:"UI change", headline:"Focus, arranged your way", where:"Menu (tap DuePlanner) → Settings → Focus timer", go:"settings:focus-show", description:"Focus Mode now puts your task in the middle, with the Pomodoro above it and the stopwatch below, centered on the screen. In Settings, two switches turn the Pomodoro and the stopwatch on or off, so Focus only shows what you use. With the Pomodoro off, its length settings are hidden too." },
   { id:"calendar-day-card", date:"2026-10-04", kind:"New feature", headline:"Tap a day to open it", where:"The Calendar tab → Month: tap any day", go:"calendar", description:"Tapping a day in the Calendar now opens it as a card that grows out of the day, like an Inbox message. It shows the date, everything due that day, and a button to add homework for it. Tap outside the card or the × to close it." },
   { id:"no-example-tasks", date:"2026-10-04", kind:"UI change", headline:"No more example tasks", where:"Tasks tab, when you first open the app", go:"tasks", description:"The app no longer starts with four made-up example tasks. A new list starts empty, and if the examples were still sitting untouched on this device, they've been cleared." },
   { id:"empty-list-shorter", date:"2026-10-04", kind:"UI change", headline:"Shorter empty list message", where:"Tasks tab, when you have no tasks", go:"tasks", description:"An empty task list now just says \"Nothing here yet\", without telling you to add some homework below." },
@@ -4361,6 +4362,9 @@ export default function HomeworkPlanner() {
         </div>
         <div className="sec-body" style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
           {renderBreakSuggestion()}
+          {/* The task sits between the two timers; whichever are turned on, the
+              group is centered in the screen by this container. */}
+          {showsPomodoro(focusShow)&&renderPomodoroCard()}
           {focusTask?(
             <div className="pop" style={{background:T.gradientCard,borderRadius:16,padding:"20px",border:`1px solid ${T.accent}44`}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
@@ -4388,7 +4392,6 @@ export default function HomeworkPlanner() {
           ):(
             <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on</div>
           )}
-          {showsPomodoro(focusShow)&&renderPomodoroCard()}
           {showsStopwatch(focusShow)&&renderStopwatchCard()}
         </div>
         {renderPomodoroToast()}
@@ -5007,12 +5010,17 @@ export default function HomeworkPlanner() {
             </SettingsSection>
             {/* Focus timer (Pomodoro) */}
             <SettingsSection title="Focus timer" tour="focus-timer" {...sec("focus")}>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Show in Focus</div>
-              <div data-tour="focus-show" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>
-                {FOCUS_SHOW.map(o=>(
-                  <button key={o.key} onClick={()=>setFocusShow(o.key)} aria-pressed={focusShow===o.key} style={{background:focusShow===o.key?T.accent+"22":T.surface,border:`1.5px solid ${focusShow===o.key?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:focusShow===o.key?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,lineHeight:1.35}}>{o.label}</button>
-                ))}
+              <div data-tour="focus-show" style={{display:"flex",flexDirection:"column",gap:12,marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                  <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Pomodoro timer</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Show it in Focus, above the task</div></div>
+                  <Toggle on={showsPomodoro(focusShow)} onChange={v=>setFocusShow(focusShowFor(v,showsStopwatch(focusShow)))} T={T} label="Pomodoro timer"/>
+                </div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                  <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Stopwatch</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Show it in Focus, below the task</div></div>
+                  <Toggle on={showsStopwatch(focusShow)} onChange={v=>setFocusShow(focusShowFor(showsPomodoro(focusShow),v))} T={T} label="Stopwatch"/>
+                </div>
               </div>
+              {showsPomodoro(focusShow)&&<>
               <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Focus length</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:12}}>
                 {[15,25,45,60].map(v=>(
@@ -5029,6 +5037,7 @@ export default function HomeworkPlanner() {
                 <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Start breaks automatically</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>When a focus session ends. After a break, you get a suggestion for what to work on next.</div></div>
                 <Toggle on={autoStartBreaks} onChange={setAutoStartBreaks} T={T} label="Start breaks automatically"/>
               </div>
+              </>}
             </SettingsSection>
             {/* New task questions: which add-task questions are asked, in what order */}
             <SettingsSection title="New task questions" tour="new-task-questions" {...sec("questions")}>

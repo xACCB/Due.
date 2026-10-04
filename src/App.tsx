@@ -251,6 +251,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"slider-colors", date:"2026-10-04", kind:"UI change", headline:"Clearer speed slider", where:"Menu (tap DuePlanner) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"The Animation speed slider is easier to read: the bar is white and the knob is black with a white ring in the dark theme, and the other way round in the light theme." },
   { id:"calendar-month-only", date:"2026-10-04", kind:"New feature", headline:"Calendar shows one month", where:"Menu (tap DuePlanner) → Settings → Date & time → Calendar shows", go:"settings:calendar-days", description:"The Calendar now shows only the days of the month you're looking at, without the faded days from the months either side. Prefer the old view? Choose \"Six full weeks\" in Settings." },
   { id:"no-double-title", date:"2026-10-04", kind:"Bug fix", headline:"No more double title", where:"When the app opens", description:"Opening the app on a slow connection could briefly show a second DuePlanner title in a different font, with the page stretched. The app now appears fully styled from the first moment." },
   { id:"sheet-drag-anywhere", date:"2026-10-04", kind:"Improvement", headline:"Gestures that feel native", where:"Tap a task, then pull its details down", go:"task", description:"A task's details now pull down from anywhere on the sheet, not only the small bar at the top, and the page behind no longer scrolls instead. If you've scrolled down in the details, the first pull scrolls back to the top and the next one closes it. Swiping a task in the list also works with a quick flick, without dragging all the way." },
@@ -3534,6 +3535,14 @@ export default function HomeworkPlanner() {
     @keyframes secIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
     .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
     /* iOS zooms the page into any focused field under 16px. */
+    /* Sliders: the bar in the accent color (white on dark, black on light) and
+       the knob in the opposite one with an accent ring, so the two never match
+       (the browser default paints both in one color). */
+    .range{-webkit-appearance:none;appearance:none;background:transparent;height:26px;padding:0;}
+    .range::-webkit-slider-runnable-track{height:4px;border-radius:999px;background:${T.accent};}
+    .range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:${T.light?"#ffffff":"#000000"};border:2px solid ${T.accent};margin-top:-9px;box-shadow:0 1px 4px rgba(0,0,0,0.35);}
+    .range::-moz-range-track{height:4px;border-radius:999px;background:${T.accent};}
+    .range::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:${T.light?"#ffffff":"#000000"};border:2px solid ${T.accent};box-shadow:0 1px 4px rgba(0,0,0,0.35);}
     @media (pointer:coarse){.edit-field{font-size:16px!important;}}
     /* iOS draws date/time inputs as its own pill with an intrinsic width that
        ignores width:100%, so side by side they spilled over each other. Plain
@@ -4657,9 +4666,9 @@ export default function HomeworkPlanner() {
                   <label htmlFor="anim-speed" className="sl" style={{color:T.textMuted,paddingTop:0}}>Animation speed</label>
                   <span style={{fontFamily:F.body,fontSize:11,color:T.text}}>{animSpeed}×{animSpeed===1?" (normal)":""}</span>
                 </div>
-                <input id="anim-speed" type="range" min={ANIM_SPEED.min} max={ANIM_SPEED.max} step={ANIM_SPEED.step} value={animSpeed}
+                <input id="anim-speed" className="range" type="range" min={ANIM_SPEED.min} max={ANIM_SPEED.max} step={ANIM_SPEED.step} value={animSpeed}
                   onChange={e=>setAnimSpeed(clampSpeed(e.target.value))} aria-valuetext={`${animSpeed} times normal speed`}
-                  style={{width:"100%",accentColor:T.accent,margin:"2px 0 4px",cursor:"pointer"}}/>
+                  style={{width:"100%",margin:"2px 0 4px",cursor:"pointer"}}/>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",fontFamily:F.body,fontSize:10,color:T.textFaint}}>
                   <span>Slower</span>
                   {animSpeed!==1&&<button onClick={()=>setAnimSpeed(1)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:F.body,fontSize:10,color:T.textMuted,textDecoration:"underline"}}>Reset</button>}

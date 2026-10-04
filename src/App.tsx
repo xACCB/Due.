@@ -248,6 +248,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"calendar-no-auto-select", date:"2026-10-04", kind:"UI change", headline:"Calendar keeps your day", where:"The Calendar tab: swipe or use the arrows to change month", go:"calendar", description:"Changing month in the Calendar no longer selects the 1st for you. The day you picked stays selected, and nothing is outlined in the new month until you tap a day." },
   { id:"edit-no-due-time", date:"2026-10-04", kind:"New feature", headline:"No due time", where:"Tap a task → Edit, under the Time box", go:"task:task-edit", description:"When you're editing a task, a \"No due time\" button under the Time box clears the time if you set one by accident, and \"No due date\" under the date clears both." },
   { id:"edit-date-time-overlap", date:"2026-10-04", kind:"Bug fix", headline:"Due date and time fit", where:"Tap a task → Edit", go:"task:task-edit", description:"In a task's Edit panel, the Due date and Time boxes no longer spill over each other. They now sit side by side at the same size." },
   { id:"focus-show", date:"2026-10-03", kind:"New feature", headline:"Choose what Focus shows", where:"Menu (tap DuePlanner) → Settings → Focus timer → Show in Focus", go:"settings:focus-show", description:"Pick what appears in Focus Mode: just the task, the task and the stopwatch, the task and the Pomodoro, or all three." },
@@ -1253,18 +1254,22 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
     const d=new Date(iso+"T00:00");
     if(d.getFullYear()!==year||d.getMonth()!==month)setYm([d.getFullYear(),d.getMonth()]);
   }
-  // Changing month selects today if it's in view, else the 1st.
+  // Changing month only changes what's in view: the selected day stays the
+  // one you last picked (so the panel below doesn't change under you), and
+  // nothing in the new month is selected until you tap a day.
   function goMonth(delta:number){
-    const [y,m]=shiftMonth(year,month,delta);
-    setYm([y,m]);
-    const t=new Date(now);
-    setSelected(t.getFullYear()===y&&t.getMonth()===m?today:localDateStr(new Date(y,m,1)));
+    setYm(shiftMonth(year,month,delta));
   }
+  // The one day Tab lands on: the selected day when it's in view, otherwise
+  // today, otherwise the 1st of the month shown.
+  const tabStop=days.includes(selected)?selected:days.includes(today)&&inMonth(today)?today:localDateStr(new Date(year,month,1));
   function onGridKey(e:React.KeyboardEvent){
     const step=({ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7} as Record<string,number>)[e.key];
     if(!step)return;
     e.preventDefault();
-    const d=new Date(selected+"T00:00"); d.setDate(d.getDate()+step);
+    // From the focused day, which isn't the selected one after a month change.
+    const from=(e.target as HTMLElement).dataset?.day||selected;
+    const d=new Date(from+"T00:00"); d.setDate(d.getDate()+step);
     select(localDateStr(d),true);
   }
   // Swipe left/right on the grid to change month.
@@ -1302,7 +1307,7 @@ function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart,h24,no
             const label=new Date(iso+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})
               +(open.length?`, ${open.length} due${mins?`, ${formatDuration(mins)}`:""}`:"")+(overdue?", overdue":"");
             return(
-              <button key={iso} data-day={iso} onClick={()=>select(iso)} aria-label={label} aria-pressed={isSel} aria-current={isToday?"date":undefined} tabIndex={isSel?0:-1}
+              <button key={iso} data-day={iso} onClick={()=>select(iso)} aria-label={label} aria-pressed={isSel} aria-current={isToday?"date":undefined} tabIndex={iso===tabStop?0:-1}
                 style={{position:"relative",height:48,borderRadius:10,cursor:"pointer",padding:"5px 0 0",display:"flex",flexDirection:"column",alignItems:"center",gap:4,
                   background:heat[lvl],border:`${isSel?2:1}px solid ${isSel?T.accent:isToday?T.textMuted:"transparent"}`,opacity:other?0.4:1,color:T.text}}>
                 <span style={{fontFamily:F.body,fontSize:13,lineHeight:1,fontWeight:isToday?600:400,color:overdue?ink(priColor("high",colorCodeUrgency),T.light):T.text}}>{Number(iso.slice(8))}</span>

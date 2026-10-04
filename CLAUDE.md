@@ -477,7 +477,8 @@ list itself is no longer filtered by search.
 grid where each day is shaded by open work due (the workload heatmap, `T.accent` at up to 25% so day
 numbers keep their contrast) with up to 3 subject-colored dots, and the selected day's tasks below
 (check off, tap to open). Undated tasks aren't shown. Arrow keys move the selection (and focus) across
-months; swiping the grid or ‹ › change month, Today jumps back. "+ Add homework due <day>" calls
+months; swiping the grid or ‹ › change month without changing the selected day (nothing is auto-selected
+in the new month; `tabStop` keeps one day reachable by Tab), Today jumps back. "+ Add homework due <day>" calls
 `addHomeworkOn()`: switches to Tasks and starts the usual add flow with the date pre-picked
 (`pendingDueDate`, so the date question opens on "what time?"; if that question is off the date is
 set directly). It replaced the old Calendar *layout* (a rolling week list).

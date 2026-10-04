@@ -249,6 +249,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"layouts-consistent", date:"2026-10-04", kind:"Improvement", headline:"Layouts behave alike", where:"Menu (tap DuePlanner) → Settings → Looks → Layout", go:"settings:layout", description:"Every layout now works the same way. You can swipe a task right to finish it or left to delete it in Board, Kanban, Progress and Pyramid, not only List and Checklist. Finished tasks are struck through the same way everywhere, tasks due today at a set time show a live countdown in every layout, and a task you just finished stays put in Kanban and Pyramid until its checkmark has drawn." },
   { id:"pull-to-reload", date:"2026-10-04", kind:"New feature", headline:"Pull to reload", where:"Any screen in the installed app: pull down from the very top", description:"In the installed app, pulling down when you're already at the top of the page reloads it. Keep pulling until it says \"Release to reload\", then let go." },
   { id:"search-full-blur", date:"2026-10-04", kind:"Bug fix", headline:"Search covers the whole screen", where:"Tasks tab → Search tasks...", go:"tasks", description:"The blur behind search now covers the whole screen and hides your tasks properly, and the page no longer scrolls underneath while search is open." },
   { id:"swipes-easier", date:"2026-10-04", kind:"Improvement", headline:"Easier swipes", where:"Your task list in the List and Checklist layouts", go:"tasks", description:"Swiping a task right to finish it or left to delete it is much more forgiving. It no longer needs a perfectly straight swipe, and you don't have to drag as far." },
@@ -3644,6 +3645,13 @@ export default function HomeworkPlanner() {
     // of opening it, and its done-check shows (and toggles) selection.
     const openOrSelect=(t:Task)=>{if(selectionMode)toggleSelected(t.id);else setSelectedTask(t);};
     const chk=(t:Task)=>selectionMode?{on:selectedIds.includes(t.id),color:T.accent}:{on:t.done,color:"#2ED573"};
+    // Every layout swipes (right: done, left: delete), strikes a done title the
+    // same way, and labels due dates the same way (a live countdown for tasks
+    // due today at a time). A task just completed stays in its column or tier
+    // until it settles, as it holds its place in the List.
+    const settled=(t:Task)=>t.done&&!justDone.includes(t.id);
+    const dueText=(t:Task)=>countdown(t.dueDate,t.dueTime,now)??daysUntil(t.dueDate);
+    const titleClass=(t:Task)=>"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"");
 
     if (layout==="checklist") return (
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -3656,7 +3664,7 @@ export default function HomeworkPlanner() {
                 {chk(t).on&&<CheckMark size={12} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
               <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
-              {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light)}}>{daysUntil(t.dueDate)}</span>}
+              {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light)}}>{dueText(t)}</span>}
               {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
           </div>
@@ -3667,27 +3675,27 @@ export default function HomeworkPlanner() {
     if (layout==="board") return (
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))",gap:10}}>
         {tasks.map(t=>{const pr=getPriority(t.dueDate,t.estMins,t.priorityOverride);const sc=subjectColors[t.subject]||T.accent;return(
-          <div key={t.id} data-task-id={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7,cursor:"pointer"}}>
+          <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:12,display:"flex"}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7,cursor:"pointer",flex:1,minWidth:0,...swipeContentStyle(t.id)}}>
             <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:priColor(pr,colorCodeUrgency),borderRadius:"12px 12px 0 0"}}/>
             <div style={{display:"flex",justifyContent:"space-between"}}>
               {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
               {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:"auto"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
-            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className="title-btn" aria-haspopup="dialog" style={{display:"block",fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.title}</span>
-            {t.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}{!t.done?<span style={{color:ink(priColor(pr,colorCodeUrgency),T.light)}}> · {daysUntil(t.dueDate)}</span>:null}</div>}
+            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,lineHeight:1.3}}>{t.title}</span>
+            {t.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}{!t.done?<span style={{color:ink(priColor(pr,colorCodeUrgency),T.light)}}> · {dueText(t)}</span>:null}</div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"auto"}}>
               {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
               <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:17,height:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
                 {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
             </div>
-          </div>
+          </div></div>
         );})}
       </div>
     );
 
     if (layout==="kanban") {
-      const cols=[{key:"high",label:"Urgent",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"Soon",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"Later",tasks:filteredTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✓ Done",tasks:filteredTasks.filter(t=>t.done)}];
+      const cols=[{key:"high",label:"Urgent",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"Soon",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"Later",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✓ Done",tasks:filteredTasks.filter(settled)}];
       return(
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
           {cols.map(col=>(
@@ -3695,13 +3703,13 @@ export default function HomeworkPlanner() {
               <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10,fontWeight:500}}>{col.label} ({col.tasks.length})</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {col.tasks.map(t=>(
-                  <div key={t.id} data-task-id={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:8,padding:"9px 10px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7,cursor:"pointer"}}>
+                  <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:8}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:8,padding:"9px 10px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7,cursor:"pointer",...swipeContentStyle(t.id)}}>
                     <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:14,height:14,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                     </button>
                     <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
                     {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:12,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
-                  </div>
+                  </div></div>
                 ))}
                 {col.tasks.length===0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,textAlign:"center",padding:"10px 0"}}>Empty</div>}
               </div>
@@ -3719,7 +3727,7 @@ export default function HomeworkPlanner() {
           const subs=t.subtasks||[]; const doneSubs=subs.filter(s=>s.done).length;
           const pct=t.done?100:subs.length?Math.round(doneSubs/subs.length*100):0;
           return(
-            <div key={t.id} data-task-id={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,cursor:"pointer"}}>
+            <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:12}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:18,height:18,cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -3738,19 +3746,19 @@ export default function HomeworkPlanner() {
                 </div>
                 {(t.done||subs.length>0)&&<span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{t.done?"Done":`${doneSubs}/${subs.length}`}</span>}
                 {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
-                {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{daysUntil(t.dueDate)}</span>}
+                {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{dueText(t)}</span>}
               </div>
-            </div>
+            </div></div>
           );
         })}
       </div>
     );
 
     if (layout==="pyramid") {
-      const highT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high");
-      const medT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium");
-      const lowT=tasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low");
-      const doneT=tasks.filter(t=>t.done);
+      const highT=tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high");
+      const medT=tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium");
+      const lowT=tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low");
+      const doneT=tasks.filter(settled);
       return(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {[{tasks:highT,color:ink(priColor("high",colorCodeUrgency),T.light),label:"High Priority",w:"100%"},{tasks:medT,color:ink(priColor("medium",colorCodeUrgency),T.light),label:"Medium Priority",w:"85%"},{tasks:lowT,color:ink(priColor("low",colorCodeUrgency),T.light),label:"Low Priority",w:"65%"},{tasks:doneT,color:T.textFaint,label:"✓ Done",w:"45%"}].map(tier=>(
@@ -3759,14 +3767,14 @@ export default function HomeworkPlanner() {
                 <div style={{fontFamily:F.body,fontSize:10,color:tier.color,marginBottom:5,textAlign:"center"}}>{tier.label}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {tier.tasks.map(t=>(
-                    <div key={t.id} data-task-id={t.id} className="tc" onClick={()=>openOrSelect(t)} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} style={{background:T.card,borderRadius:9,padding:"9px 12px",border:`1px solid ${tier.color}44`,display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+                    <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:9}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:9,padding:"9px 12px",border:`1px solid ${tier.color}44`,display:"flex",alignItems:"center",gap:8,cursor:"pointer",...swipeContentStyle(t.id)}}>
                       <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                       </button>
-                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
+                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
                       {t.subject&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.subject}</span>}
-                      {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
-                    </div>
+                      {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
+                    </div></div>
                   ))}
                 </div>
               </div>

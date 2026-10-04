@@ -465,6 +465,12 @@ under your finger). `glideClock()` (module scope) exists for the React Compiler 
 **Tab entrance.** The Tasks tab's content and Focus Mode's content are wrapped in `.sec-body`, the
 same short fade-and-settle the Calendar grid and Settings sections use, so every tab opens alike.
 
+**Layouts stay consistent** through shared helpers at the top of `renderTasks`: every layout's card is a
+`[data-task-id]` wrapper (relative, clipped) holding the swipe reveal and the `.tc` card, so all six
+swipe; `titleClass(t)` gives the done strike (and its draw-in), `dueText(t)` the due label (a live
+countdown when due today at a time), and `settled(t)` decides when a completed task moves to a
+Done column or tier (not while it's in `justDone`). Use these for any new layout.
+
 **Swipes** on task cards lock in as soon as sideways movement is the larger direction (6px), give up
 to scrolling only when vertical is larger (10px), and act past `SWIPE_THRESHOLD` (64px). The earlier,
 stricter rule (1.5x flatter than tall, 90px) dropped most real thumb swipes.

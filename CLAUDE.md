@@ -279,7 +279,7 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
 DuePlanner wordmark and the Desktop Layout setting (`hw-desktoplayout`, cleared once). Top to bottom:
 the profile row (picture, name, sync status; opens Profile, or reads "Sign in"), the fold button,
 Search (opens `SearchOverlay`), Home (`activeTab==="tasks"`) / Calendar / Focus (shows a running
-timer), Inbox (unread count) / History / Import/Export / Settings, and the dp mark at the foot. Rows
+timer), the subjects (below), Inbox (unread count) / History / Import/Export / Settings, and the dp mark at the foot. Rows
 are `SidebarRow` (module scope, `.sb-row` in the runtime css, `aria-current="page"` on the screen
 being shown). From 900px up it is fixed in place and the page is padded to make room (`--sb`, which
 also re-centers the viewport-centered toasts), unless folded away (`sidebarFolded`,
@@ -292,10 +292,15 @@ breakpoint. Wide and unfolded, the css swaps the header's dp mark for the screen
 (`.screen-title`, `SCREEN_TITLES`) and hides `ScreenHeader` (`.screen-header`) and the header's timer
 pill (`.timer-pill`, a running Pomodoro/stopwatch that opens Focus), since the sidebar shows all
 three. The dp mark is live text in Bodoni Moda (`DP_MARK_FONT`), loaded in `index.html` as a
-two-letter subset (`&text=dp`). **Step 2, not built yet:** subjects listed in the sidebar, each
-unfolding (arrow) to its open tasks, most urgent first, capped at about eight with a "show all" row,
-with a "No subject" group last; clicking a subject's name filters Home to it, clicking a task opens
-`TaskModal`.
+two-letter subset (`&text=dp`). **Subjects in the sidebar** (`SidebarSubjects`, module scope; groups from `subjectGroups()` in
+`src/lib/sidebarSubjects.ts`, unit-tested): every subject in the user's order, even with nothing
+open, then subjects that only exist on tasks, then "No subject" (name `""`) when it has tasks. Each
+is two buttons: the arrow unfolds its open tasks (`openSubjects`, `hw-sidebar-subjects-open`,
+local-only), most urgent first, `SIDEBAR_TASK_CAP` (8) of them until "Show all"; the name sets
+`subjectFilter`, which narrows `filteredTasks` on Home on top of the filter chips. Picking it again,
+the Home row, or the subject's chip in the filter row clears it, as does a "Take me there" to the
+task list. Read it through `subjectFilterOn`, which ignores a filter whose subject no longer has a
+row (renamed, deleted, emptied). A nested task opens `TaskModal`; it has no checkbox there.
 
 **UI shape.** The sidebar's Home, Calendar (below) and Focus rows are the main screens; Focus opens the
 separate full-screen Focus Mode (`focusMode` state) with its Pomodoro timer (clock-based: it counts

@@ -21,6 +21,8 @@ import type { Recap } from "./lib/recaps";
 import { parseSyllabus } from "./lib/syllabus";
 import { contrastColor, readableOn, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
+import { SIDEBAR_TASK_CAP, dueShort, subjectGroups } from "./lib/sidebarSubjects";
+import type { SubjectGroup } from "./lib/sidebarSubjects";
 import { monthGrid, monthOnlyGrid, shiftMonth, weekdayLabels, byDueDate } from "./lib/calendar";
 import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "./lib/spring";
 import { reconcile, same } from "./lib/sync";
@@ -257,7 +259,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
-  { id:"sidebar", date:"2026-10-10", kind:"Navigation", headline:"A sidebar", where:"Tap dp at the top left, or swipe in from the left edge. On a computer it's always showing", go:"menu", description:"Everything now lives in one sidebar: your profile, Search, Home, Calendar, Focus, Inbox, History, Import/Export and Settings. On a computer it stays open beside your tasks, and the button at its top right folds it away. On a phone, tap dp or swipe in from the left edge to open it. It replaces the three buttons that sat above your tasks and the menu under the DuePlanner name. While a timer is running, its time shows at the top of the screen, and tapping it opens Focus. The Desktop Layout setting is gone, since the sidebar does that job." },
+  { id:"sidebar", date:"2026-10-10", kind:"Navigation", headline:"A sidebar", where:"Tap dp at the top left, or swipe in from the left edge. On a computer it's always showing", go:"menu", description:"Everything now lives in one sidebar: your profile, Search, Home, Calendar, Focus, your subjects, Inbox, History, Import/Export and Settings. Tap the arrow beside a subject to see what is left to do in it, most urgent first, and tap a task to open it. Tap a subject's name to show only that subject on Home, and tap it again, or Home, to see everything. On a computer it stays open beside your tasks, and the button at its top right folds it away. On a phone, tap dp or swipe in from the left edge to open it. It replaces the three buttons that sat above your tasks and the menu under the DuePlanner name. While a timer is running, its time shows at the top of the screen, and tapping it opens Focus. The Desktop Layout setting is gone, since the sidebar does that job." },
   { id:"animation-two-step", date:"2026-10-04", kind:"Bug fix", headline:"No more double moves", where:"Search, a task's details, and cards that open from a row", description:"Some animations went to one spot and then shifted to another. The search bar now flies straight to where it ends up once the keyboard is open, a task's details settle back without overshooting, and cards that open from a row land exactly where they stay." },
   { id:"dropdowns-close", date:"2026-10-04", kind:"UI change", headline:"Dropdowns fold up when you leave", where:"Sidebar (tap dp) → Inbox, or Import/Export", go:"menu", description:"Like Settings, the dropdowns in the Inbox and Import/Export now close when you leave the screen, so each one opens folded up." },
   { id:"time-left-detail", date:"2026-10-04", kind:"New feature", headline:"Time left, in depth", where:"Tap Time left, top right, then tap any row", go:"tasks:time-left", description:"Every row in Time left now opens. Tap a due-date group or a subject to see its time left, how many tasks it has, how long you've already worked on them, and each task with when it's due and how long it should take. You can check tasks off or open them from there." },
@@ -1037,6 +1039,58 @@ function SidebarRow({icon,label,current,onClick,tour,children}:{icon:React.React
       <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
       {children}
     </button>
+  );
+}
+// The sidebar's subject list (groups from subjectGroups()). Each subject is two
+// buttons, as in Notion: the arrow unfolds its open tasks underneath, the name
+// filters Home to that subject (`picked`; "" is the "No subject" group). An
+// unfolded subject shows SIDEBAR_TASK_CAP tasks until "Show all" is pressed.
+function SidebarSubjects({groups,open,onToggleOpen,picked,onPick,onOpenTask,subjectColors,today,T,F}:{
+  groups:SubjectGroup<Task>[]; open:string[]; onToggleOpen:(name:string)=>void;
+  picked:string|null; onPick:(name:string)=>void; onOpenTask:(t:Task)=>void;
+  subjectColors:Record<string,string>; today:string; T:ThemeObj; F:typeof FONT;
+}){
+  // Which unfolded subjects are showing every task. Not remembered.
+  const [showAll,setShowAll]=useState<string[]>([]);
+  if(groups.length===0)return null;
+  return(
+    <div data-tour="sidebar-subjects">
+      <div className="sb-rule" aria-hidden="true"/>
+      <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:".08em",padding:"4px 10px 6px"}}>Subjects</div>
+      {groups.map(g=>{
+        const label=g.name||"No subject";
+        const isOpen=open.includes(g.name), all=showAll.includes(g.name);
+        const shown=all?g.tasks:g.tasks.slice(0,SIDEBAR_TASK_CAP);
+        const color=g.name?(subjectColors[g.name]||T.accent):T.textMuted;
+        return(
+          <div key={g.name}>
+            <div style={{display:"flex",alignItems:"center"}}>
+              <button onClick={()=>onToggleOpen(g.name)} aria-expanded={isOpen} aria-label={`${isOpen?"Hide":"Show"} ${label} tasks`} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",padding:"8px 4px 8px 8px",borderRadius:8,display:"flex",flexShrink:0}}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{transform:isOpen?"rotate(90deg)":"none",transition:"transform .2s ease-out"}}><polyline points="9,5 16,12 9,19"/></svg>
+              </button>
+              <button className="sb-row" onClick={()=>onPick(g.name)} aria-pressed={picked===g.name} title={`Show only ${label} on Home`} style={{flex:1,minWidth:0,padding:"8px 10px 8px 6px",gap:8}}>
+                <span aria-hidden="true" style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>
+                <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
+                {g.tasks.length>0&&<span aria-label={`${g.tasks.length} to do`} style={{fontSize:11,color:T.textMuted,flexShrink:0}}>{g.tasks.length}</span>}
+              </button>
+            </div>
+            {isOpen&&<div className="sec-body" style={{display:"flex",flexDirection:"column",gap:1,margin:"0 0 4px 13px",paddingLeft:9,borderLeft:`1px solid ${T.borderFaint}`}}>
+              {g.tasks.length===0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,padding:"6px 10px"}}>Nothing to do</div>}
+              {shown.map(t=>{
+                const due=dueShort(t.dueDate,today);
+                return(
+                  <button key={t.id} className="sb-row sb-task" onClick={()=>onOpenTask(t)}>
+                    <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                    {due&&<span style={{fontSize:10,flexShrink:0,color:due==="Overdue"?ink("#FF4757",T.light):T.textMuted}}>{due}</span>}
+                  </button>
+                );
+              })}
+              {g.tasks.length>SIDEBAR_TASK_CAP&&<button className="sb-row sb-task" onClick={()=>setShowAll(a=>all?a.filter(n=>n!==g.name):[...a,g.name])} style={{color:T.textMuted}}>{all?"Show fewer":`Show all ${g.tasks.length}`}</button>}
+            </div>}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 function ScreenHeader({title,onBack,T,F}:{title:string;onBack:()=>void;T:ThemeObj;F:typeof FONT}){
@@ -3016,6 +3070,10 @@ export default function HomeworkPlanner() {
   function openSidebar(){if(isWideScreen())setSidebarFolded(false);else setDrawerOpen(true);}
   function closeSidebar(){if(isWideScreen())setSidebarFolded(true);else setDrawerOpen(false);}
   function navTo(tab:string){setActiveTab(tab);setDrawerOpen(false);}
+  // The sidebar's subjects: which are unfolded (remembered on this device), and
+  // the one Home is filtered to, if any ("" is "No subject"; see subjectFilterOn).
+  const [openSubjects,setOpenSubjects]=usePersistedState<string[]>("hw-sidebar-subjects-open",[]);
+  const [subjectFilter,setSubjectFilter]=useState<string|null>(null);
   useEffect(()=>{
     if(!drawerOpen)return;
     const nav=sidebarRef.current, opener=sidebarOpenerRef.current;
@@ -3334,7 +3392,13 @@ export default function HomeworkPlanner() {
     if(ad!==bd)return ad?1:-1;
     return a.order-b.order;
   });
+  const sidebarGroups=useMemo(()=>subjectGroups(tasks,subjects),[tasks,subjects]);
+  // The subject filter only counts while that subject is still in the sidebar
+  // (it may have been renamed or deleted, or "No subject" emptied), so Home
+  // can't get stuck filtered to something there's no row left to un-pick.
+  const subjectFilterOn=subjectFilter!=null&&sidebarGroups.some(g=>g.name===subjectFilter)?subjectFilter:null;
   const filteredTasks=allSorted.filter(t=>{
+    if(subjectFilterOn!=null&&(t.subject||"")!==subjectFilterOn)return false;
     if(filter==="archived")return !!t.archived;
     if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
     if(filter==="done")return t.done;
@@ -4110,6 +4174,8 @@ export default function HomeworkPlanner() {
     .sb-row{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;background:none;border:none;border-radius:8px;padding:9px 10px;cursor:pointer;text-align:left;
       color:${T.textMuted};font-family:${F.body};font-size:13px;transition:background .2s ease-out,color .2s ease-out;}
     .sb-row[aria-current="page"]{background:${T.card};color:${T.text};}
+    .sb-row[aria-pressed="true"]{background:${T.card};color:${T.text};}
+    .sb-task{padding:6px 10px;font-size:12px;gap:8px;}
     .sb-rule{height:1px;background:${T.borderFaint};margin:8px 10px;flex-shrink:0;}
     @media (hover:hover){.sb-row:hover{background:${T.cardAlt};color:${T.text};}}
     .screen-title{display:none;}
@@ -4224,6 +4290,7 @@ export default function HomeworkPlanner() {
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
+    if(place==="tasks"||place==="task")setSubjectFilter(null);
     if(place==="profile")setShowProfile(true);
     if(place==="focus")setFocusModeAnimated(true);
     if(place==="task"){
@@ -4617,11 +4684,18 @@ export default function HomeworkPlanner() {
         </div>
         <SidebarRow icon={<IconSearch/>} label="Search" tour="sidebar-search" onClick={()=>{setDrawerOpen(false);setSearchOpen(true);}}/>
         <div className="sb-rule" aria-hidden="true"/>
-        <SidebarRow icon={<IconTasks/>} label="Home" tour="tab-tasks" current={activeTab==="tasks"} onClick={()=>navTo("tasks")}/>
+        <SidebarRow icon={<IconTasks/>} label="Home" tour="tab-tasks" current={activeTab==="tasks"&&subjectFilterOn==null} onClick={()=>{if(activeTab==="tasks"&&subjectFilterOn!=null)captureTaskRects();setSubjectFilter(null);navTo("tasks");}}/>
         <SidebarRow icon={<IconCalendar/>} label="Calendar" tour="tab-calendar" current={activeTab==="calendar"} onClick={()=>navTo("calendar")}/>
         <SidebarRow icon={<IconFocus/>} label="Focus" tour="tab-focus" onClick={()=>{setDrawerOpen(false);setFocusModeAnimated(true);}}>
           {runningTimer&&<span style={{fontSize:11,color:T.text,fontVariantNumeric:"tabular-nums"}}>{runningTimer}</span>}
         </SidebarRow>
+        {/* Subjects, each unfolding to its open tasks. Picking a name filters Home
+            to it (picking it again, or Home, shows everything); a task opens its sheet. */}
+        <SidebarSubjects groups={sidebarGroups} open={openSubjects} today={todayStr} subjectColors={subjectColors} T={T} F={F}
+          onToggleOpen={name=>setOpenSubjects(o=>o.includes(name)?o.filter(n=>n!==name):[...o,name])}
+          picked={activeTab==="tasks"?subjectFilterOn:null}
+          onPick={name=>{if(activeTab==="tasks")captureTaskRects();setSubjectFilter(activeTab==="tasks"&&subjectFilterOn===name?null:name);navTo("tasks");}}
+          onOpenTask={t=>{setDrawerOpen(false);setSelectedTask(t);}}/>
         <div className="sb-rule" aria-hidden="true"/>
         <SidebarRow icon={<IconBell/>} label="Inbox" current={activeTab==="inbox"} onClick={()=>navTo("inbox")}>
           {unreadRecaps.length>0&&<span aria-label={`${unreadRecaps.length} unread`} style={{background:T.accent,color:contrastColor(T.accent),borderRadius:999,padding:"1px 7px",fontSize:10,fontWeight:600}}>{unreadRecaps.length}</span>}
@@ -4743,6 +4817,7 @@ export default function HomeworkPlanner() {
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
             {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>{if(f!==filter)captureTaskRects();setFilter(f);}} aria-pressed={filter===f} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f[0].toUpperCase()+f.slice(1)}</button>)}
             {filter==="noest"&&<button onClick={()=>{captureTaskRects();setFilter("all");}} aria-label="Clear no-estimate filter" style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>No estimate ×</button>}
+            {subjectFilterOn!=null&&<button onClick={()=>{captureTaskRects();setSubjectFilter(null);}} aria-label={`Stop showing only ${subjectFilterOn||"No subject"}`} style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{subjectFilterOn||"No subject"} ×</button>}
             {selectionMode&&(()=>{
               const ids=filteredTasks.map(t=>t.id), all=ids.length>0&&ids.every(id=>selectedIds.includes(id));
               return <button onClick={()=>setSelectedIds(all?[]:ids)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{all?"Select none":`Select all (${ids.length})`}</button>;

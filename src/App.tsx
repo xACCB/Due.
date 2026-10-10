@@ -9,7 +9,15 @@ import type { Firestore } from "firebase/firestore";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getPerformance } from "firebase/performance";
 import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
-import type { Priority, Recurrence } from "./types";
+import type { Priority, Recurrence, Subtask, Task, TaskTemplate, HistoryAction } from "./types";
+import { LAYOUTS, GROUP_BY, DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, SUBJECT_COLOR_PALETTE, priColor, REMINDER_OFFSETS, QUESTIONS, QUESTION_KEYS, askedQuestions } from "./constants";
+import type { LayoutName } from "./constants";
+import { WHATS_NEW, kindRank, LEGACY_WHATSNEW_IDS } from "./whatsNew";
+import type { WhatsNewItem } from "./whatsNew";
+import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, dateInDays, snoozeTarget, setDone, nextOrder } from "./lib/tasks";
+import type { SnoozeKind } from "./lib/tasks";
+import { trashEntries, pruneTrash, localRecords } from "./lib/trash";
+import type { TrashEntry } from "./lib/trash";
 import { THEMES } from "./themes";
 import type { ThemeName, ThemeObj } from "./themes";
 import { localDateStr, todayISO, advanceDate } from "./lib/dates";
@@ -28,7 +36,6 @@ import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss }
 import { reconcile, same } from "./lib/sync";
 import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
 import { diffTasks, applyTaskStates } from "./lib/history";
-import type { TaskStates } from "./lib/history";
 import type { SyncRecord, CloudRecord } from "./lib/sync";
 import { downloadFile } from "./lib/download";
 import { LIMITS, addSession, sanitizeTask } from "./lib/limits";
@@ -159,16 +166,6 @@ function isStorageBlockedError(e: unknown): boolean {
 }
 const STORAGE_BLOCKED_MESSAGE = "Sign-in was blocked by your browser's tracking protection. In Firefox: click the shield icon in the address bar and turn off Enhanced Tracking Protection for this site, then try again. Chrome and Edge don't hit this issue.";
 
-const LAYOUTS = {
-  list:      { name:"List",       emoji:"☰",  desc:"Classic cards" },
-  board:     { name:"Board",      emoji:"⊞",  desc:"Grid cards" },
-  checklist: { name:"Checklist",  emoji:"☑",  desc:"Simple ticks" },
-  kanban:    { name:"Kanban",     emoji:"𝄘",  desc:"By urgency" },
-  progress:  { name:"Progress",   emoji:"▓",  desc:"Subtask progress" },
-  pyramid:   { name:"Pyramid",    emoji:"△",  desc:"By priority" },
-} as const;
-type LayoutName = keyof typeof LAYOUTS;
-
 // ─── TAB BAR ICONS ─────────────────────────────────────────────────────────────
 // Small stroke-based SVGs (not Unicode glyphs) for the icon-only main tab bar --
 // built from plain primitives (line/circle/polyline) rather than hand-drawn path
@@ -237,253 +234,6 @@ function IconSettings(){
 // same string, so change both together.
 const FONT = { name:"DM Serif", heading:"'DM Serif Display', serif", body:"'DM Mono', monospace", google:"DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500" } as const;
 
-const GROUP_BY = { none:{name:"None",emoji:"--"}, subject:{name:"Subject",emoji:"▥"}, priority:{name:"Priority",emoji:"‼"}, dueDate:{name:"Due Date",emoji:"▦"} };
-const DEFAULT_SUBJECTS = ["Math","English","Science","History","Art","PE"];
-const DEFAULT_SUBJECT_COLORS: Record<string,string> = { Math:"#FF6B6B",English:"#FF9F43",Science:"#45B7D1",History:"#F7DC6F",Art:"#BB8FCE",PE:"#82E0AA" };
-const SUBJECT_COLOR_PALETTE = ["#FF6B6B","#FF9F43","#45B7D1","#F7DC6F","#BB8FCE","#82E0AA","#C9E06C","#9CE06C","#6EE06C","#6CE0D2","#6C7DE0","#8D6CE0","#E06CCE","#E06C9E"];
-const PRIORITY_COLORS: Record<Priority,string> = { high:"#FF4757",medium:"#FFA502",low:"#2ED573" };
-// Fallback for every priority color/text when the "Urgency color coding" toggle
-// (Options -> Looks) is off -- one neutral gray instead of red/orange/green, so
-// urgency still reads through position/text ("Overdue!" etc.) without color.
-const NEUTRAL_PRIORITY_COLOR = "#8a8a8a";
-function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORITY_COLORS[pr]:NEUTRAL_PRIORITY_COLOR; }
-// What's New feed shown in the title menu's Inbox section -- hand-maintained,
-// newest first; add an entry here whenever a user-facing change ships. Each
-// entry needs a stable id: dismissing one stores just its id (see
-// dismissedWhatsNew below), never a copy of this list. `kind` is the category
-// ("New feature", "Bug fix"...), `headline` the short name shown as its title,
-// `where` how to get to it ("Sidebar (top left button) → Settings → ..."), using the
-// on-screen labels -- give every entry one unless there's truly nowhere to go.
-// `go` powers the card's "Take me there" button: "place" or "place:anchor"
-// (see goTo in HomeworkPlanner), where the anchor is a data-tour attribute on
-// the thing to highlight. Tapping an entry opens it in a floating panel
-// (UpdateDetail).
-// `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
-type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
-const WHATS_NEW: WhatsNewItem[] = [
-  { id:"liquid-glass-removed", date:"2026-10-10", kind:"UI change", headline:"Liquid Glass is gone", where:"Sidebar (top left button) → Settings → Looks", go:"settings", description:"The Liquid Glass look has been removed. If you had it on, the app is back to its normal solid cards." },
-  { id:"layouts-consistent", date:"2026-10-10", kind:"Improvement", headline:"Every layout moves the same way", where:"Sidebar (top left button) → Settings → Looks → Layout", go:"settings:layout", description:"All six layouts now behave alike. The check mark pops and the title fades the same way in each, a finished task keeps its labels until it starts to glide, and cards brighten smoothly under the mouse everywhere. The finished task now rises and glides in one motion. Cards that open from a row show their text in place as they grow, and the page no longer shifts sideways when a scrollbar comes or goes. Kanban with no tasks shows the usual empty message, and Settings says when grouping has no effect in your layout." },
-  { id:"update-fade", date:"2026-10-10", kind:"UI change", headline:"Updates fade between each other", where:"Sidebar (top left button) → Inbox → tap any update, then Back or Next", go:"menu", description:"Pressing Back or Next on an open Inbox message now fades the new one in. It used to slide in from the side as well." },
-  { id:"animation-two-step-2", date:"2026-10-10", kind:"Bug fix", headline:"Things land where they stay", where:"Checking off a task, a task's details, Inbox updates and search", description:"More animations that moved twice now move once. Checking off a task no longer nudges the list before the task glides down, in every layout, and the task sets down as it arrives instead of shrinking afterwards. A task's details spring all the way back when you drag them a little and let go, where they used to stop part of the way. On a computer, an Inbox update, a calendar day and a Time left card no longer snap wider after opening. The search bar no longer slides past its spot and back." },
-  { id:"profile-housekeeping", date:"2026-10-10", kind:"New feature", headline:"Devices, storage and more in Profile", where:"Sidebar (top left button) → your name at the top", go:"profile:profile-devices", description:"Profile now shows every device signed in to your account, and lets you sign any of them out, or all the others at once. A device signs out the next time it has DuePlanner open and online. Below that you can see how much of your task storage is used, install the app, turn reminders on for this device, and send feedback." },
-  { id:"layout-buttons-instant", date:"2026-10-10", kind:"UI change", headline:"Layout buttons switch instantly", where:"Sidebar (top left button) → Settings → Looks", go:"settings:layout", description:"Picking a layout in Settings no longer fades the button in. It now switches at once, the same as the Appearance buttons beside it." },
-  { id:"sidebar", date:"2026-10-10", kind:"Navigation", headline:"A sidebar", where:"Tap the sidebar button at the top left, or swipe in from the left edge. On a computer it's always showing", go:"menu", description:"Everything now lives in one sidebar: your profile, Search, Home, Calendar, Focus, your subjects, Inbox, History, Import/Export and Settings. Tap the arrow beside a subject to see what is left to do in it, most urgent first. Tap a task there to open it as a full page, where its title, subject, due date, estimate and repeat can be changed right on the page, with no Edit button, and each change saves as you make it. Tap a subject's name to show only that subject on Home, and tap it again, or Home, to see everything. On a computer it stays open beside your tasks, and the button at its top right folds it away. On a phone, tap the button at the top left or swipe in from the left edge to open it. It replaces the three buttons that sat above your tasks and the menu under the DuePlanner name. While a timer is running, its time shows at the top of the screen, and tapping it opens Focus. The Desktop Layout setting is gone, since the sidebar does that job." },
-  { id:"animation-two-step", date:"2026-10-04", kind:"Bug fix", headline:"No more double moves", where:"Search, a task's details, and cards that open from a row", description:"Some animations went to one spot and then shifted to another. The search bar now flies straight to where it ends up once the keyboard is open, a task's details settle back without overshooting, and cards that open from a row land exactly where they stay." },
-  { id:"dropdowns-close", date:"2026-10-04", kind:"UI change", headline:"Dropdowns fold up when you leave", where:"Sidebar (top left button) → Inbox, or Import/Export", go:"menu", description:"Like Settings, the dropdowns in the Inbox and Import/Export now close when you leave the screen, so each one opens folded up." },
-  { id:"time-left-detail", date:"2026-10-04", kind:"New feature", headline:"Time left, in depth", where:"Tap Time left, top right, then tap any row", go:"tasks:time-left", description:"Every row in Time left now opens. Tap a due-date group or a subject to see its time left, how many tasks it has, how long you've already worked on them, and each task with when it's due and how long it should take. You can check tasks off or open them from there." },
-  { id:"motion-consistent", date:"2026-10-04", kind:"Improvement", headline:"One smooth motion everywhere", where:"Everywhere in the app", description:"Animations across the app now match the Calendar tab: quick, smooth, and without the bounce some of them had. Cards, the task sheet, the tab bar, swipes springing back, buttons and toggles all move the same way, and a few things that used to just appear (the Edit panel, the undo message, the Focus task picker) now fade in." },
-  { id:"menu-transitions", date:"2026-10-04", kind:"UI change", headline:"Menus open smoothly", where:"Sidebar (top left button) and anything you open from it", go:"menu", description:"The menu, Time left, Profile, Inbox, History, Import/Export and Settings now open with the same short fade as the Calendar tab, instead of appearing instantly." },
-  { id:"settings-close-on-leave", date:"2026-10-04", kind:"UI change", headline:"Settings tidy themselves", where:"Sidebar (top left button) → Settings", go:"settings", description:"The dropdowns in Settings now close when you leave Settings, so it always opens with everything folded up." },
-  { id:"import-dropdowns", date:"2026-10-04", kind:"UI change", headline:"Import/Export dropdowns", where:"Sidebar (top left button) → Import/Export", go:"import", description:"Import from Syllabus and Backup & export are now dropdowns, like the Inbox. Tap a heading to close or open it." },
-  { id:"profile-no-ring", date:"2026-10-04", kind:"UI change", headline:"No ring on your picture", where:"Sidebar (top left button) → Profile", go:"profile", description:"The thick ring around your profile picture is gone, so the picture stands on its own." },
-  { id:"launch-screen", date:"2026-10-04", kind:"New feature", headline:"Launch screen", where:"When the app opens", description:"Opening the app now shows the dp logo on a black screen for a moment, then fades into your tasks." },
-  { id:"focus-toggles", date:"2026-10-04", kind:"UI change", headline:"Focus, arranged your way", where:"Sidebar (top left button) → Settings → Focus timer", go:"settings:focus-show", description:"Focus Mode now puts your task in the middle, with the Pomodoro above it and the stopwatch below, centered on the screen. In Settings, two switches turn the Pomodoro and the stopwatch on or off, so Focus only shows what you use. With the Pomodoro off, its length settings are hidden too." },
-  { id:"calendar-day-card", date:"2026-10-04", kind:"New feature", headline:"Tap a day to open it", where:"The Calendar tab → Month: tap any day", go:"calendar", description:"Tapping a day in the Calendar now opens it as a card that grows out of the day, like an Inbox message. It shows the date, everything due that day, and a button to add homework for it. Tap outside the card or the × to close it." },
-  { id:"no-example-tasks", date:"2026-10-04", kind:"UI change", headline:"No more example tasks", where:"Tasks tab, when you first open the app", go:"tasks", description:"The app no longer starts with four made-up example tasks. A new list starts empty, and if the examples were still sitting untouched on this device, they've been cleared." },
-  { id:"empty-list-shorter", date:"2026-10-04", kind:"UI change", headline:"Shorter empty list message", where:"Tasks tab, when you have no tasks", go:"tasks", description:"An empty task list now just says \"Nothing here yet\", without telling you to add some homework below." },
-  { id:"import-no-instructions", date:"2026-10-04", kind:"UI change", headline:"Cleaner syllabus import", where:"Sidebar (top left button) → Import/Export → Import from Syllabus", go:"import", description:"The paragraph of instructions under Import from Syllabus is gone. Paste your syllabus in the box and tap the button as before." },
-  { id:"deck-stack", date:"2026-10-04", kind:"UI change", headline:"A deck that looks stacked", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"The Deck now looks like a real stack: the edges of the next few cards show under the top one, so you can see there are more days behind it. The Next up and Add homework buttons are gone from the cards, leaving just the date and what is due." },
-  { id:"due-deck", date:"2026-10-04", kind:"New feature", headline:"Due date deck", where:"The Calendar tab → Deck", go:"calendar:calendar-deck", description:"A new way to see what's coming: a deck of cards, one for each day something is due, with the date written large and that day's tasks underneath. Swipe a card left for the next day and right to go back. It opens on today or the next day with something due." },
-  { id:"slider-colors", date:"2026-10-04", kind:"UI change", headline:"Clearer speed slider", where:"Sidebar (top left button) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"The Animation speed slider is easier to read: the bar is white and the knob is black with a white ring in the dark theme, and the other way round in the light theme." },
-  { id:"calendar-month-only", date:"2026-10-04", kind:"New feature", headline:"Calendar shows one month", where:"Sidebar (top left button) → Settings → Date & time → Calendar shows", go:"settings:calendar-days", description:"The Calendar now shows only the days of the month you're looking at, without the faded days from the months either side. Prefer the old view? Choose \"Six full weeks\" in Settings." },
-  { id:"no-double-title", date:"2026-10-04", kind:"Bug fix", headline:"No more double title", where:"When the app opens", description:"Opening the app on a slow connection could briefly show a second DuePlanner title in a different font, with the page stretched. The app now appears fully styled from the first moment." },
-  { id:"sheet-drag-anywhere", date:"2026-10-04", kind:"Improvement", headline:"Gestures that feel native", where:"Tap a task, then pull its details down", go:"task", description:"A task's details now pull down from anywhere on the sheet, not only the small bar at the top, and the page behind no longer scrolls instead. If you've scrolled down in the details, the first pull scrolls back to the top and the next one closes it. Swiping a task in the list also works with a quick flick, without dragging all the way." },
-  { id:"session-no-symbols", date:"2026-10-04", kind:"UI change", headline:"Plain session buttons", where:"Tap a task, then the timer in its details", go:"task", description:"The Start Session and End Session buttons are plain words now, without the ▶ and ⏹ symbols." },
-  { id:"focus-time-counts", date:"2026-10-04", kind:"Improvement", headline:"Focus time always counts", where:"The Focus tab", go:"tasks:tab-focus", description:"Time you spend in a Pomodoro now counts toward the task even if you don't finish it. Resetting the timer, switching to another task or marking the task done logs the minutes you worked so far, like the Start session button in a task." },
-  { id:"solid-separator", date:"2026-10-04", kind:"UI change", headline:"Solid divider line", where:"The line under DuePlanner and Time left, at the top", go:"tasks", description:"The line under the title and Time left is a plain solid line now, instead of fading out to the right." },
-  { id:"layouts-consistent", date:"2026-10-04", kind:"Improvement", headline:"Layouts behave alike", where:"Sidebar (top left button) → Settings → Looks → Layout", go:"settings:layout", description:"Every layout now works the same way. You can swipe a task right to finish it or left to delete it in Board, Kanban, Progress and Pyramid, not only List and Checklist. Finished tasks are struck through the same way everywhere, tasks due today at a set time show a live countdown in every layout, and a task you just finished stays put in Kanban and Pyramid until its checkmark has drawn." },
-  { id:"pull-to-reload", date:"2026-10-04", kind:"New feature", headline:"Pull to reload", where:"Any screen in the installed app: pull down from the very top", description:"In the installed app, pulling down when you're already at the top of the page reloads it. Keep pulling until it says \"Release to reload\", then let go." },
-  { id:"search-full-blur", date:"2026-10-04", kind:"Bug fix", headline:"Search covers the whole screen", where:"Tasks tab → Search tasks...", go:"tasks", description:"The blur behind search now covers the whole screen and hides your tasks properly, and the page no longer scrolls underneath while search is open." },
-  { id:"swipes-easier", date:"2026-10-04", kind:"Improvement", headline:"Easier swipes", where:"Your task list in the List and Checklist layouts", go:"tasks", description:"Swiping a task right to finish it or left to delete it is much more forgiving. It no longer needs a perfectly straight swipe, and you don't have to drag as far." },
-  { id:"tab-transitions", date:"2026-10-04", kind:"UI change", headline:"Every tab opens the same way", where:"The tab bar: Tasks, Calendar and Focus", go:"tasks", description:"Tasks and Focus now open with the same short fade as Calendar, instead of appearing instantly." },
-  { id:"select-removed", date:"2026-10-04", kind:"UI change", headline:"Select button removed", where:"Tasks tab, the row of filters above your tasks", go:"tasks", description:"The Select button beside Archived is gone. Selecting several tasks at once is unavailable for now." },
-  { id:"calendar-no-tint", date:"2026-10-04", kind:"UI change", headline:"No more tinted days", where:"The Calendar tab", go:"calendar", description:"Days in the Calendar are no longer shaded by how much is due, and the Less/More key is gone. The colored dots still show which days have homework." },
-  { id:"calendar-add-solid", date:"2026-10-04", kind:"UI change", headline:"Solid Add button in Calendar", where:"The Calendar tab, under the selected day", go:"calendar", description:"The \"Add homework due\" button in the Calendar has a solid outline now instead of a dotted one." },
-  { id:"calendar-no-auto-select", date:"2026-10-04", kind:"UI change", headline:"Calendar keeps your day", where:"The Calendar tab: swipe or use the arrows to change month", go:"calendar", description:"Changing month in the Calendar no longer selects the 1st for you. The day you picked stays selected, and nothing is outlined in the new month until you tap a day." },
-  { id:"edit-no-due-time", date:"2026-10-04", kind:"New feature", headline:"No due time", where:"Tap a task → Edit, under the Time box", go:"task:task-edit", description:"When you're editing a task, a \"No due time\" button under the Time box clears the time if you set one by accident, and \"No due date\" under the date clears both." },
-  { id:"edit-date-time-overlap", date:"2026-10-04", kind:"Bug fix", headline:"Due date and time fit", where:"Tap a task → Edit", go:"task:task-edit", description:"In a task's Edit panel, the Due date and Time boxes no longer spill over each other. They now sit side by side at the same size." },
-  { id:"focus-show", date:"2026-10-03", kind:"New feature", headline:"Choose what Focus shows", where:"Sidebar (top left button) → Settings → Focus timer → Show in Focus", go:"settings:focus-show", description:"Pick what appears in Focus Mode: just the task, the task and the stopwatch, the task and the Pomodoro, or all three." },
-  { id:"focus-stopwatch", date:"2026-10-03", kind:"New feature", headline:"Stopwatch", where:"The Focus tab, under the Pomodoro", go:"focus:stopwatch", description:"Focus Mode has a stopwatch. Start it, pause it, and when you're done, log the time to the task you're focusing on. It keeps counting if you leave Focus Mode, and its time shows on the Focus tab." },
-  { id:"menu-no-sync-line", date:"2026-10-03", kind:"UI change", headline:"Cleaner menu", where:"Sidebar (top left button) → Profile", go:"profile", description:"The \"Synced 2m ago\" line is gone from under Profile in the menu. You can still see it inside Profile itself." },
-  { id:"complete-faster", date:"2026-10-03", kind:"Improvement", headline:"Quicker completing", where:"Your task list: check off a task", go:"tasks", description:"Checking off a task is a little quicker. The checkmark, the strike through the title and the slide down to your done tasks all take about 15% less time." },
-  { id:"anim-speed", date:"2026-10-03", kind:"New feature", headline:"Animation speed", where:"Sidebar (top left button) → Settings → Looks → Animation speed", go:"settings:anim-speed", description:"A new slider sets how fast the app's animations play, from half speed to twice as fast. It applies everywhere: completing a task, cards sliding into place, opening messages and menus." },
-  { id:"inbox-next-back", date:"2026-10-03", kind:"UI change", headline:"Next and Back", where:"Sidebar (top left button) → Inbox → open a message", description:"The buttons on an open Inbox message now say Back and Next instead of Newer and Older. Next moves down the list, Back moves up." },
-  { id:"inbox-recaps", date:"2026-10-03", kind:"New feature", headline:"A real Inbox", where:"Sidebar (top left button) → Inbox → Messages", description:"The Inbox now gets real messages. When a day, week, month or year ends, a recap arrives with what you finished, the time you spent, how much was on time and your busiest subject. Unread ones show a dot, and the menu shows how many are waiting. These replace the old Done today and Personal panels." },
-  { id:"update-close-smooth", date:"2026-10-03", kind:"Bug fix", headline:"Smoother closing updates", where:"Sidebar (top left button) → Inbox → open an update, then close it", description:"Closing an update now shrinks it back into its row in one smooth move. It no longer stops partway, loses its text, or flashes when it lands." },
-  { id:"profile-no-signin-flash", date:"2026-10-03", kind:"Bug fix", headline:"No sign-in flash", where:"Sidebar (top left button) → Profile", go:"profile", description:"Opening Profile right after the app loads no longer shows the sign-in screen for a moment when you're already signed in." },
-  { id:"inbox-dropdowns", date:"2026-10-03", kind:"UI change", headline:"A tidier Inbox", where:"Sidebar (top left button) → Inbox", description:"Done today, Personal and Updates are now dropdowns. Tap a heading to open or close it. Updates also has filter buttons, so you can show only new features, bug fixes, or any other kind of update." },
-  { id:"copy-no-dashes", date:"2026-10-03", kind:"UI change", headline:"Plainer wording", where:"Everywhere: suggestions, messages and these updates", description:"Messages, suggestions and update notes across the app are written as plain sentences now, without dashes splitting them in two." },
-  { id:"profile-counts-archived", date:"2026-10-03", kind:"Bug fix", headline:"Profile counts fixed", where:"Sidebar (top left button) → Profile", go:"profile", description:"Profile's task numbers (total, done, pending, urgent and the per-subject bars) no longer count archived tasks, so they match what's on your list." },
-  { id:"calendar-layout-removed", date:"2026-09-27", kind:"UI change", headline:"One calendar", where:"The Calendar tab, the middle one in the tab bar", go:"calendar", description:"The Calendar layout is gone now that there's a Calendar tab, which shows the whole month instead of just the next week. If you were using the layout, your tasks are back in List." },
-  { id:"calendar-tab", date:"2026-09-27", kind:"New feature", headline:"Calendar", where:"The Calendar tab, the middle one in the tab bar", go:"calendar", description:"A new Calendar tab: see the whole month, with busier days shaded darker and a dot for each thing due. Tap a day to see its homework, check it off, or add something due that day. Swipe or use the arrows to change month." },
-  { id:"focus-no-symbols", date:"2026-09-27", kind:"UI change", headline:"Cleaner Focus Mode", where:"The Focus tab", go:"tasks:tab-focus", description:"Focus Mode's buttons are plain words now: Start, Pause, Reset, Exit and Mark done, without the ▶ ⏸ ↺ ✕ ✓ symbols." },
-  { id:"time-left-no-start", date:"2026-09-27", kind:"UI change", headline:"Simpler Time left", where:"Tasks tab → Time left, top right", go:"tasks:time-left", description:"The Start button is gone from the Time left breakdown. It's just your time by due date and subject now. Start a focus session from the Focus tab." },
-  { id:"menu-screens", date:"2026-09-27", kind:"UI change", headline:"Inbox, History and Import/Export get their own screens", where:"Sidebar (top left button) → Inbox, History or Import/Export", go:"menu", description:"Inbox, History and Import/Export now open as full screens, like Settings, instead of dropdowns squeezed into the menu, so there's more room for your stats, updates, recently deleted tasks and syllabus imports. Tap ‹ Tasks to go back." },
-  { id:"no-empty-labels", date:"2026-09-27", kind:"UI change", headline:"Cleaner task cards", where:"Your task list, and a task's details", go:"tasks", description:"Tasks without a due date or subtasks no longer say \"No date\" or \"No subtasks\". Those spots are simply left out. Where undated tasks are grouped together (the Calendar layout, grouping by due date, Time left), the heading now says \"Anytime\"." },
-  { id:"profile-top", date:"2026-09-27", kind:"UI change", headline:"Profile at the top", where:"Sidebar (top left button) → Profile", go:"menu", description:"Profile is now the first thing in the title menu, above Inbox." },
-  { id:"suggestion-hide-fix", date:"2026-09-27", kind:"Bug fix", headline:"Hiding a suggestion", where:"Tasks tab → the ✦ suggestion above your list", go:"tasks", description:"The × on the smart suggestion now just hides that suggestion. A new one appears when a different task becomes the most urgent. It used to turn suggestions off completely (that's still in Settings → Task list)." },
-  { id:"settings-dropdowns", date:"2026-09-27", kind:"UI change", headline:"Tidier Settings", where:"Sidebar (top left button) → Settings", go:"settings", description:"Every Settings section is now a dropdown. Tap a heading to open or close it, and the ones you open stay open next time. The list options (grouping, showing completed tasks, auto-archive) are together under Task list, and reminders have their own section." },
-  { id:"take-me-there", date:"2026-09-27", kind:"New feature", headline:"Take me there", where:"Sidebar (top left button) → Inbox → tap an update → Take me there", description:"Updates can now take you straight to what's new: tap Take me there and DuePlanner opens the right screen and highlights the feature." },
-  { id:"where-to-find", date:"2026-09-27", kind:"Improvement", headline:"Where to find it", where:"Sidebar (top left button) → Inbox → tap any update", description:"Updates now tell you where to find what's new. Open one and look for \"Where to find it\" under the description." },
-  { id:"update-browse-fix", date:"2026-09-27", kind:"Bug fix", headline:"Smoother update browsing", where:"Sidebar (top left button) → Inbox → tap any update, then Newer or Older", description:"Pressing Newer or Older on an open update no longer makes it look like it reloaded. The card stays put, the next update slides in, and the card adjusts to fit." },
-  { id:"update-details", date:"2026-09-26", kind:"New feature", headline:"Open an update", where:"Sidebar (top left button) → Inbox → tap any update", description:"Tap any update in your Inbox and it grows into a card in the middle of the screen, with its full details. Flip through the others with Newer and Older, or dismiss it from there." },
-  { id:"new-task-questions", date:"2026-09-26", kind:"New feature", headline:"Choose your new task questions", where:"Sidebar (top left button) → Settings → New task questions", go:"settings:new-task-questions", description:"Choose which questions you get when adding a task, and in what order: Settings -> New task questions. Turn off the ones you don't need. You can still fill them in later with Edit." },
-  { id:"edit-estimate-fix", date:"2026-09-26", kind:"Bug fix", headline:"Estimate editing fixed", where:"Tap a task → Edit → Estimate", go:"task:task-edit", description:"Editing a task's estimate works properly: you can clear the hours and minutes and type new ones, any number of minutes saves (90 minutes becomes 1h 30m), and phones no longer zoom in when you tap a field." },
-  { id:"floating-search", date:"2026-09-26", kind:"New feature", headline:"Floating search", where:"Tasks tab → Search tasks, above your list", go:"tasks:search", description:"Search floats: tap Search tasks and the bar lifts into the middle of a blurred screen, with matching tasks popping in underneath as you type. Tap one to open it." },
-  { id:"cards-glide", date:"2026-09-26", kind:"Improvement", headline:"Tasks glide into place", where:"Your task list, in any layout", description:"Tasks slide smoothly into place in every layout when you filter, search, add, delete, undo, or change several at once. New ones fade in and removed ones fade out." },
-  { id:"fixes-sep23", date:"2026-09-23", kind:"Bug fix", headline:"Timer and account fixes", where:"Focus tab (the Pomodoro), and the timer in a task's details", go:"tasks:tab-focus", description:"The Pomodoro and work-session timers keep time correctly when you switch tabs or lock your phone (they used to nearly stop); deleting an account with lots of tasks no longer fails; and a few smaller fixes." },
-  { id:"trash-sync-fix", date:"2026-09-22", kind:"Bug fix", headline:"Recently deleted stays put", where:"Sidebar (top left button) → History → Recently deleted", go:"history:trash", description:"Tasks you delete while signed in now reliably stay in Recently deleted. A sync timing issue could make them vanish from it." },
-  { id:"bulk-everywhere", date:"2026-09-22", kind:"New feature", headline:"Select in every layout", where:"Tasks tab → Select, next to the filters", go:"tasks:select", description:"Select works in every layout now, with Select all, and you can change the due date or priority of many tasks at once." },
-  { id:"a11y-pass", date:"2026-09-22", kind:"Improvement", headline:"Keyboard and screen reader support", where:"Everywhere. Try Tab, Enter and the arrow keys", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
-  { id:"complete-anim", date:"2026-09-22", kind:"Improvement", headline:"A more satisfying check-off", where:"Tap the circle next to any task", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
-  { id:"sheet-spring", date:"2026-09-22", kind:"Improvement", headline:"Springy task details", where:"Tap a task, then drag the handle at the top", go:"task", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
-  { id:"glass-cursor", date:"2026-09-22", kind:"Improvement", headline:"Liquid Glass catches the light", where:"This look has since been removed", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
-  { id:"pomodoro-breaks", date:"2026-09-22", kind:"New feature", headline:"Pomodoro breaks", where:"Sidebar (top left button) → Settings → Focus timer; the timer is in the Focus tab", go:"settings:focus-timer", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next, with one tap to start." },
-  { id:"fixes-sep22", date:"2026-09-22", kind:"Bug fix", headline:"A batch of fixes", description:"Un-completing an archived task no longer makes it disappear; long titles and subject names are capped instead of failing to sync; swiping a finished task now says \"Mark not done\"; Empty in Recently deleted asks to confirm; 24-hour time now applies everywhere; and a few labels say what they actually do (\"In 3 hours\", \"Next 7 days\")." },
-  { id:"settings-batch", date:"2026-09-22", kind:"New feature", headline:"Subject colors, Done today and more undo", where:"Sidebar (top left button) → Settings → Subjects, and Settings → Date & time; Done today is in the Inbox", go:"settings:subjects", description:"Rename subjects and change their colors (✎ in Settings -> Subjects); a \"Done today\" list in the Inbox; 24-hour time and a Monday week start in Settings -> Date & time; and completing, editing, archiving and bulk changes can now be undone." },
-  { id:"safer-sync", date:"2026-09-22", kind:"Improvement", headline:"Safer syncing", where:"Sidebar (top left button) → Profile shows when you last synced", go:"profile", description:"Syncing between devices is safer: edits made at the same time on two devices are merged field by field instead of one overwriting the other, Recently deleted now syncs too, and the title menu shows when you last synced (or that you're offline)." },
-  { id:"time-left-more", date:"2026-09-22", kind:"New feature", headline:"A smarter Time left", where:"Tap Time left, top right", go:"tasks:time-left", description:"The \"Time left\" dropdown now splits time by due date, shows time worked per subject, flags tasks with no estimate, and can start Focus on the most urgent task in your biggest subject." },
-  { id:"fewer-layouts", date:"2026-09-22", kind:"UI change", headline:"Seven layouts", where:"Sidebar (top left button) → Settings → Looks → Layout", go:"settings:layout", description:"Trimmed the layouts to seven: Compact, Minimal, Sticky, Timeline and By Subject are gone. If you were using one, you're back on List." },
-  { id:"recently-deleted", date:"2026-09-22", kind:"New feature", headline:"Recently deleted", where:"Sidebar (top left button) → History → Recently deleted", go:"history:trash", description:"Recently deleted: deleted tasks stay for 30 days and can be restored from History in the title menu." },
-  { id:"skip-occurrence", date:"2026-09-22", kind:"New feature", headline:"Skip a repeat", where:"Tap a repeating task → Skip this one", go:"task:task-skip", description:"Repeating tasks have \"Skip this one\" in their detail view. It moves to the next occurrence without completing it. Undoable." },
-  { id:"countdown", date:"2026-09-22", kind:"New feature", headline:"Live countdowns", where:"Your task list, on tasks due today at a set time", description:"Tasks due today at a set time show a live countdown, like \"Due in 2h 15m\"." },
-  { id:"profile-in-menu", date:"2026-09-22", kind:"UI change", headline:"Profile moved to the menu", where:"Sidebar (top left button) → Profile", go:"profile", description:"Profile now lives only in the title menu, which also shows when there's a sync issue." },
-  { id:"edit-tasks", date:"2026-09-22", kind:"New feature", headline:"Edit tasks", where:"Tap a task → Edit", go:"task:task-edit", description:"Edit a task's title, subject, due date and time, estimate, and repeat from its detail view. Just tap Edit." },
-  { id:"snooze", date:"2026-09-22", kind:"New feature", headline:"Snooze", where:"Tap a task → Snooze", go:"task:task-snooze", description:"Snooze a task to later today, tomorrow, or next week from its detail view, and undo it if you change your mind." },
-  { id:"duplicate-restore", date:"2026-09-22", kind:"New feature", headline:"Duplicate and restore", where:"Tap a task → Duplicate, or Restore on an archived task", go:"task:task-duplicate", description:"Duplicate any task, and restore archived tasks, from the task's detail view." },
-  { id:"json-import", date:"2026-09-22", kind:"New feature", headline:"Import a backup", where:"Sidebar (top left button) → Import/Export → Import backup (JSON)", go:"import:import-backup", description:"Import backup (JSON) in the menu's Backup & export section restores an export. Tasks you already have are kept." },
-  { id:"week-reminder", date:"2026-09-22", kind:"New feature", headline:"1-week reminders", where:"Sidebar (top left button) → Settings → Reminders → Remind me", go:"settings:reminders", description:"New \"1 week before\" reminder option in Settings." },
-  { id:"focus-picker", date:"2026-09-22", kind:"New feature", headline:"Pick your focus task", where:"Focus tab → Change task", go:"focus:change-task", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
-  { id:"liquid-glass", date:"2026-09-22", kind:"New feature", headline:"Liquid Glass", where:"This look has since been removed", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
-  { id:"time-left-breakdown", date:"2026-09-22", kind:"New feature", headline:"Time left by subject", where:"Tap Time left, top right", go:"tasks:time-left", description:"Tap \"Time left\" in the header to see how much time each subject needs." },
-  { id:"sync-more", date:"2026-09-22", kind:"New feature", headline:"More things sync", where:"Sidebar (top left button) → Profile, to sign in", go:"profile", description:"Subjects, subject colors, and Urgency Color Coding now sync across your devices." },
-  { id:"subjects-in-settings", date:"2026-09-22", kind:"Navigation", headline:"Subjects in Settings", where:"Sidebar (top left button) → Settings → Subjects", go:"settings:subjects", description:"Subjects are now managed in Settings, and work without signing in." },
-  { id:"sessions-saved", date:"2026-09-22", kind:"New feature", headline:"Work sessions saved", where:"Tap a task to start a work session; your totals are in Sidebar (top left button) → Inbox", go:"task", description:"Work sessions are now saved on the task, and your Inbox shows real time spent." },
-  { id:"pomodoro-chime", date:"2026-09-22", kind:"New feature", headline:"Pomodoro chime", where:"Focus tab", go:"tasks:tab-focus", description:"The Pomodoro timer now chimes when it's done, and shows its time on the Focus tab while running." },
-  { id:"undo-more", date:"2026-09-22", kind:"New feature", headline:"Undo more", where:"Sidebar (top left button) → History → Undo", go:"history:undo-redo", description:"Bulk delete and Clear completed can now be undone." },
-  { id:"calendar-sections", date:"2026-09-22", kind:"UI change", headline:"Calendar sections", description:"The Calendar layout now shows Overdue and Later sections, so no task disappears from it." },
-  { id:"reminder-fixes", date:"2026-09-22", kind:"Bug fix", headline:"Reminder fixes", where:"Sidebar (top left button) → Settings → Reminders", go:"settings:reminders", description:"\"At due time\" reminders now fire, and you no longer get several reminders for one task at once." },
-  { id:"recurring-fix", date:"2026-09-22", kind:"Bug fix", headline:"No more duplicate repeats", where:"Tap the circle on a repeating task", description:"Un-completing a repeating task no longer leaves a duplicate behind." },
-  { id:"icon-color-fix", date:"2026-09-22", kind:"Bug fix", headline:"Icon colors fixed", description:"Inbox and Settings menu icons now use the correct theme color instead of the browser's default blue." },
-  { id:"history-collapsible", date:"2026-09-22", kind:"UI change", headline:"Collapsible History", where:"Sidebar (top left button) → History", go:"history:undo-redo", description:"History is now a collapsible section in the title menu instead of always expanded." },
-  { id:"undo-redo", date:"2026-09-22", kind:"New feature", headline:"Undo and redo", where:"Sidebar (top left button) → History", go:"history:undo-redo", description:"Undo and Redo for deleted tasks, available anytime from the title menu." },
-  { id:"settings-in-menu", date:"2026-09-22", kind:"Navigation", headline:"Settings moved", where:"Sidebar (top left button) → Settings", go:"settings", description:"Settings moved out of the tab bar. Open it from the title menu instead." },
-  { id:"title-menu", date:"2026-09-22", kind:"UI change", headline:"The title menu", where:"Tap DuePlanner, top left", description:"The DuePlanner title is now a menu with quick access to Inbox, History, Profile, and Settings." },
-  { id:"wizard-cancel-moved", date:"2026-09-22", kind:"UI change", headline:"Cancel moved", where:"Tasks tab → + Add homework", go:"tasks:add", description:"Cancel moved out from between the add-task wizard's back/skip buttons to avoid accidental taps." },
-  { id:"wizard-back-skip", date:"2026-09-22", kind:"New feature", headline:"Back and skip", where:"Tasks tab → + Add homework, under each question", go:"tasks:add", description:"Added back and skip buttons to the add-task wizard, so you can revisit or skip a question." },
-  { id:"subject-colors-fix", date:"2026-09-22", kind:"Bug fix", headline:"Clearer subject colors", where:"Sidebar (top left button) → Settings → Subjects", go:"settings:subjects", description:"Subject colors for English and Science no longer look nearly identical." },
-  { id:"time-left-color", date:"2026-09-22", kind:"UI change", headline:"Theme-colored time left", where:"Time left, top right", go:"tasks:time-left", description:"The time-left number in the header now follows the theme instead of always being teal." },
-];
-// Every WHATS_NEW id that existed while the feed was still persisted as a
-// whole array under "hw-whatsnew" (see the dismissed-ids migration below) --
-// frozen, so entries added after that aren't mistaken for dismissed ones.
-const UPDATE_KIND_ORDER=["New feature","Improvement","UI change","Bug fix","Navigation"];
-function kindRank(kind:string){const i=UPDATE_KIND_ORDER.indexOf(kind);return i<0?UPDATE_KIND_ORDER.length:i;}
-const LEGACY_WHATSNEW_IDS = ["icon-color-fix","history-collapsible","undo-redo","settings-in-menu","title-menu","wizard-cancel-moved","wizard-back-skip","subject-colors-fix","time-left-color"];
-const REMINDER_OFFSETS = [
-  { key:"1w", label:"1 week before", mins:10080 },
-  { key:"1d", label:"1 day before", mins:1440 },
-  { key:"3h", label:"3 hours before", mins:180 },
-  { key:"1h", label:"1 hour before", mins:60 },
-  { key:"0",  label:"At due time",   mins:0 },
-] as const;
-// The add-task questions asked after the title. Which are asked, and in what
-// order, is the "New task questions" setting (`askQuestions`); `name` is how
-// Settings lists each one.
-const QUESTIONS = [
-  { key:"subject", label:"What subject?", type:"select", name:"Subject" },
-  { key:"dueDate", label:"When is it due?", type:"date", name:"Due date" },
-  { key:"estMins", label:"How long will it take?", type:"time", name:"How long it takes" },
-  { key:"recurrence", label:"Does this repeat?", type:"recurrence", name:"Repeats" },
-];
-const QUESTION_KEYS=QUESTIONS.map(q=>q.key);
-// The questions to ask, in order, from the saved "New task questions" setting.
-// HomeworkPlanner wraps this in useMemo: computed plainly in the component body,
-// the React Compiler treated the list (read by the wizard's JSX) as possibly
-// mutated and bailed out on the whole component (preserve-manual-memoization,
-// reported on the css memo's F.google/F.body deps).
-function askedQuestions(saved:unknown){
-  return normalizeQuestionPrefs(saved,QUESTION_KEYS).filter(p=>p.on).map(p=>QUESTIONS.find(q=>q.key===p.key)!);
-}
-
-interface Subtask { id:string; text:string; done:boolean; }
-interface Task {
-  id:number; title:string; subject:string; dueDate:string; dueTime:string; estMins:number; done:boolean; order:number;
-  subtasks?: Subtask[];
-  recurrence?: Recurrence;
-  archived?: boolean;
-  completedAt?: number | null; // ms timestamp, set when marked done, cleared (null, never undefined -- Firestore's setDoc throws on literal undefined) when un-marked -- drives archive timing + weekly/monthly stats
-  tags?: string[]; // free-form, cross-cutting -- distinct from subject (one per task, these are many)
-  priorityOverride?: Priority; // manual override for getPriority()'s auto-computed value, cleared to go back to "Auto"
-  sessions?: {mins:number; at:number}[]; // work sessions logged from the task modal's timer (at = ms timestamp when it ended)
-  spawnedNextId?: number|null; // recurring tasks: id of the next occurrence created when this one was marked done, so un-marking it can take that copy back
-}
-
-// Reusable task shape -- local-only (localStorage), not synced to Firestore.
-// Deliberate scope call: templates are a personal productivity convenience,
-// not core data, and don't currently justify a second synced collection.
-interface TaskTemplate { id:string; name:string; subject:string; estMins:number; recurrence?:Recurrence; subtasks?:{text:string}[]; }
-
-// A new user starts with an empty list. The app used to seed four example
-// tasks; these are what they looked like, kept only to recognise them: they
-// are cleared once from a device that still has them untouched (see the tasks
-// initializer), and never treated as the user's own work when signing in.
-const LEGACY_EXAMPLE_TASKS=[
-  { id:1, title:"Chapter 5 Review", subject:"Math", estMins:45 },
-  { id:2, title:"Essay Draft", subject:"English", estMins:90 },
-  { id:3, title:"Lab Report", subject:"Science", estMins:60 },
-  { id:4, title:"History Reading", subject:"History", estMins:30 },
-];
-// An example exactly as it was seeded: same id, title, subject and estimate,
-// not finished, nothing added to it.
-function isUntouchedExample(t:Task):boolean{
-  return !t.done&&!t.archived&&!t.subtasks?.length&&!t.sessions?.length&&!t.tags?.length
-    &&LEGACY_EXAMPLE_TASKS.some(d=>d.id===t.id&&d.title===t.title&&d.subject===t.subject&&d.estMins===t.estMins);
-}
-
-// Picks the most urgent pending task, computed locally and instantly from the
-// task data (this once called an AI API from the browser, which was both
-// broken and insecure; nothing about it needs a network call).
-function buildSuggestion(tasks:Task[]):string {
-  const pending=tasks.filter(t=>!t.done&&!t.archived);
-  if (pending.length===0) return "Nothing left to do. Great work!";
-  if (pending.length===1) return `Just one task left: "${pending[0].title}". You've got this!`;
-  const sorted=[...pending].sort((a,b)=>{
-    const o:Record<string,number>={high:0,medium:1,low:2};
-    const d=o[getPriority(a.dueDate,a.estMins,a.priorityOverride)]-o[getPriority(b.dueDate,b.estMins,b.priorityOverride)];
-    return d!==0?d:(a.dueDate||"9999-99-99").localeCompare(b.dueDate||"9999-99-99");
-  });
-  const top=sorted[0];
-  const days=daysUntil(top.dueDate);
-  const timeStr=formatDuration(top.estMins);
-  const urgencyWord=days==="Overdue!"?"overdue":days==="Due today!"?"due today":days==="Due tomorrow"?"due tomorrow":days?days.replace(" days left","d left"):"no deadline";
-  return `Most urgent: "${top.title}"\n${urgencyWord}${timeStr?`, ~${timeStr}`:""}`;
-}
-
-// One entry in the undo/redo history (see undoStack in HomeworkPlanner).
-type HistoryAction =
-  | {type:"delete"; tasks:Task[]}
-  // Any other change (complete, edit, archive, snooze, ...): each affected
-  // task's state before and after -- see src/lib/history.ts.
-  | {type:"change"; before:TaskStates<Task>; after:TaskStates<Task>; label:string};
-
-// Recently deleted entries. Built at module scope because the React
-// Compiler's purity lint rejects Date.now() inside component functions.
-type TrashEntry={task:Task;deletedAt:number};
-const TRASH_DAYS=30;
-function trashEntries(list:Task[]):TrashEntry[]{ const at=Date.now(); return list.map(task=>({task,deletedAt:at})); }
-function pruneTrash(prev:TrashEntry[]):TrashEntry[]{
-  const cutoff=Date.now()-TRASH_DAYS*86400000;
-  return prev.some(e=>e.deletedAt<cutoff)?prev.filter(e=>e.deletedAt>=cutoff):prev;
-}
-// Every task this device knows about, live or in Recently deleted, keyed by id
-// -- the shape src/lib/sync.ts merges.
-function localRecords(tasks:Task[],trash:TrashEntry[]):Map<number,SyncRecord<Task>>{
-  const m=new Map<number,SyncRecord<Task>>();
-  for(const e of trash)m.set(e.task.id,{task:e.task,deletedAt:e.deletedAt});
-  for(const t of tasks)m.set(t.id,{task:t});
-  return m;
-}
 // A tasks/ or trash/ doc as a cloud record. updatedAt/deletedAt are sync
 // metadata, not task fields, so they're split off here.
 function cloudRecord(d:QueryDocumentSnapshot,deleted:boolean):CloudRecord<Task>|null{
@@ -494,28 +244,11 @@ function cloudRecord(d:QueryDocumentSnapshot,deleted:boolean):CloudRecord<Task>|
   return rec;
 }
 
-// A local YYYY-MM-DD `days` from today (bulk "set due date" shortcuts). Module
-// scope for the same React Compiler purity reason as snoozeTarget below.
-function dateInDays(days:number):string{ const d=new Date(); d.setDate(d.getDate()+days); return localDateStr(d); }
-
 // A timestamp for the card glide's capture (see captureTaskRects). Module scope
 // for the same React Compiler purity reason as dateInDays above.
 function glideClock():number{ return performance.now(); }
 // Wall-clock time for the Focus stopwatch, at module scope for the same lint.
 function wallClock():number{ return Date.now(); }
-
-// Snooze moves a task's due date (and, for "in 3 hours", its time) forward.
-type SnoozeKind="later"|"tomorrow"|"week";
-function snoozeTarget(kind:SnoozeKind):{dueDate:string;dueTime?:string}{
-  if(kind==="later"){
-    // Three hours from now, rounded up to the next quarter hour.
-    const d=new Date(Date.now()+3*3600000);
-    d.setMinutes(Math.ceil(d.getMinutes()/15)*15,0,0);
-    return {dueDate:localDateStr(d),dueTime:`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
-  }
-  const d=new Date(); d.setDate(d.getDate()+(kind==="tomorrow"?1:7));
-  return {dueDate:localDateStr(d)};
-}
 
 // ─── TASK SESSION MODAL ───────────────────────────────────────────────────────
 // Defined at module scope (not nested in HomeworkPlanner) so its identity stays
@@ -2376,50 +2109,12 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
   );
 }
 
-// Marks tasks done/undone. A recurring task spawns its next occurrence when
-// marked done -- due date advanced (or still none, if it never had one),
-// subtasks reset to unchecked, no carried-over sessions -- and remembers that
-// copy's id, so marking it undone again removes the copy (if it hasn't been
-// completed itself) instead of leaving a duplicate behind on every toggle.
-function setDone(prev:Task[],ids:number[],done:boolean):Task[]{
-  let next=[...prev];
-  for(const id of ids){
-    const task=next.find(t=>t.id===id);
-    if(!task||task.done===done)continue;
-    // Un-completing also un-archives: an archived task that isn't done would
-    // otherwise be hidden from every view except Archived.
-    next=next.map(t=>t.id===id?{...t,done,completedAt:done?Date.now():null,...(done?{}:{archived:false})}:t);
-    const recurring=task.recurrence&&task.recurrence!=="none";
-    if(done&&recurring&&!(task.spawnedNextId&&next.some(t=>t.id===task.spawnedNextId))){
-      const copyId=nextId();
-      next=next.map(t=>t.id===id?{...t,spawnedNextId:copyId}:t);
-      next.push({...task,id:copyId,done:false,completedAt:null,archived:false,spawnedNextId:null,
-        dueDate:task.dueDate?advanceDate(task.dueDate,task.recurrence as Recurrence):"",
-        order:nextOrder(next),sessions:[],
-        ...(task.subtasks?{subtasks:task.subtasks.map(s=>({...s,id:String(nextId()),done:false}))}:{})});
-    }
-    if(!done&&task.spawnedNextId){
-      const copy=next.find(t=>t.id===task.spawnedNextId);
-      if(copy&&!copy.done) next=next.filter(t=>t.id!==copy.id);
-      next=next.map(t=>t.id===id?{...t,spawnedNextId:null}:t);
-    }
-  }
-  return next;
-}
-
 // `new Notification()` throws on Android Chrome (pages there may only show
 // notifications through a service worker), so fall back to the PWA's service
 // worker registration. Best-effort either way.
 function notify(title:string,options?:NotificationOptions){
   try{ new Notification(title,options); }
   catch{ navigator.serviceWorker?.ready.then(reg=>reg.showNotification(title,options)).catch(()=>{}); }
-}
-
-// Next free manual-order slot. Using list.length collided with existing
-// orders once tasks had been deleted (orders keep their gaps), which made
-// new tasks sort unpredictably among old ones.
-function nextOrder(list:Task[]):number{
-  return list.reduce((m,t)=>Math.max(m,t.order??0),-1)+1;
 }
 
 // Short two-note chime for the end of a Pomodoro -- synthesized with Web Audio

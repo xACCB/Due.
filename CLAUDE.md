@@ -274,17 +274,40 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
 - `download.ts`: `downloadFile` — the `Blob` + object URL + synthetic `<a download>` click pattern
   used by data export.
 
-**UI shape.** `HomeworkPlanner` renders a three-button tab bar -- Tasks, Calendar (below), and Focus, which opens the
+**Sidebar.** All navigation lives in one sidebar (`<nav className="app-sidebar">`, rendered beside
+`.app-inner` inside `.app-shell`); it replaced the three-button tab bar, the title dropdown under the
+DuePlanner wordmark and the Desktop Layout setting (`hw-desktoplayout`, cleared once). Top to bottom:
+the profile row (picture, name, sync status; opens Profile, or reads "Sign in"), the fold button,
+Search (opens `SearchOverlay`), Home (`activeTab==="tasks"`) / Calendar / Focus (shows a running
+timer), Inbox (unread count) / History / Import/Export / Settings, and the dp mark at the foot. Rows
+are `SidebarRow` (module scope, `.sb-row` in the runtime css, `aria-current="page"` on the screen
+being shown). From 900px up it is fixed in place and the page is padded to make room (`--sb`, which
+also re-centers the viewport-centered toasts), unless folded away (`sidebarFolded`,
+`hw-sidebar-folded`, local-only, class `.sb-folded`). Below 900px it is a drawer (`drawerOpen`, class
+`.sb-drawer`, backdrop `.sb-backdrop`): the header's dp mark (`.sb-open-btn`) opens it, as does a
+swipe in from the left 16px of the screen; a swipe left, the backdrop, Escape or picking a row closes
+it. Closed, it is `visibility:hidden`, so it is out of the tab order with no extra code;
+`openSidebar()`/`closeSidebar()` pick fold vs. drawer with `isWideScreen()`, which must match the css
+breakpoint. Wide and unfolded, the css swaps the header's dp mark for the screen's name
+(`.screen-title`, `SCREEN_TITLES`) and hides `ScreenHeader` (`.screen-header`) and the header's timer
+pill (`.timer-pill`, a running Pomodoro/stopwatch that opens Focus), since the sidebar shows all
+three. The dp mark is live text in Bodoni Moda (`DP_MARK_FONT`), loaded in `index.html` as a
+two-letter subset (`&text=dp`). **Step 2, not built yet:** subjects listed in the sidebar, each
+unfolding (arrow) to its open tasks, most urgent first, capped at about eight with a "show all" row,
+with a "No subject" group last; clicking a subject's name filters Home to it, clicking a task opens
+`TaskModal`.
+
+**UI shape.** The sidebar's Home, Calendar (below) and Focus rows are the main screens; Focus opens the
 separate full-screen Focus Mode (`focusMode` state) with its Pomodoro timer (clock-based: it counts
 down to a fixed end time, as the task session timer counts up from a fixed start, because browsers
 slow or pause intervals in background tabs and on locked screens; the running time shows
-on the Focus button; finishing chimes via `playChime()`, notifies, and toasts). Settings
-(`activeTab==="options"`) is opened from the title menu, not the tab bar, so it has its own header
-with a back button. The title menu (the DuePlanner wordmark) is a plain list -- Profile (a modal), then Inbox (recap
+on the sidebar's Focus row and the header pill; finishing chimes via `playChime()`, notifies, and toasts). Settings
+(`activeTab==="options"`) has its own header
+with a back button (shown where the sidebar isn't). The sidebar's lower rows are Profile (a modal, the top row), then Inbox (recap
 messages, What's New), History (undo/redo, Recently deleted), Import/Export (syllabus import,
 backups) and Settings, each a full screen (`activeTab` "inbox"/"history"/"import"/"options") with
-the shared `ScreenHeader` (‹ Tasks + title), not a dropdown inside the menu; tapping "Time left" in the header opens a
-per-subject time breakdown. The tab bar icons and menu icons (`IconTasks`/`IconFocus`/
+the shared `ScreenHeader` (‹ Home + title); tapping "Time left" in the header opens a
+per-subject time breakdown. The sidebar's icons (`IconTasks`/`IconFocus`/
 `IconImport`/`IconSettings` etc., module scope, just above `FONT`) are
 small hand-built SVGs from plain primitives (line/circle/polyline) rather than Unicode glyphs or an
 icon library dependency, styled with `stroke="currentColor"` so they pick up the button's active/
@@ -389,11 +412,11 @@ subject colors win, settings untouched.
 **What's New** (`WHATS_NEW`, the Inbox's Updates list) is hand-maintained, newest first -- add an
 entry whenever a user-facing change ships. Each entry has a `kind` (category: "New feature", "Bug
 fix"...), a `headline` (its short title), the `description`, and a `where` -- how to get to it,
-using the on-screen labels ("Menu (tap DuePlanner) → Settings → ..."), shown as "Where to find it"
+using the on-screen labels ("Sidebar (tap dp) → Settings → ..."), shown as "Where to find it"
 in the update's card. Give every entry a `where` unless there's genuinely nowhere to point. Also give it a
 `go` when there's a screen to open: `"place"` or `"place:anchor"`, handled by `goTo()` in
 `HomeworkPlanner` (places: `settings`, `tasks`, `task` -- opens a real task, a repeating one for
-`task-skip` -- `history`, `import`, `menu` -- opens the title menu itself -- `profile`, `focus`). The anchor is a `data-tour="..."` attribute on the thing to highlight; `flashTarget()`
+`task-skip` -- `history`, `import`, `menu` -- opens the sidebar; an anchor starting `tab-` (a sidebar row) opens it too -- `profile`, `focus`). The anchor is a `data-tour="..."` attribute on the thing to highlight; `flashTarget()`
 (module scope) waits for it to render, scrolls it into view, focuses it if it's a control and rings
 it with an inset shadow (not clipped by `overflow:hidden` parents). A new feature's control usually
 needs a new `data-tour` for its entry. The card's "Take me there" button fades the card, then calls
@@ -438,7 +461,7 @@ swapping which color resolves. This is the same "single helper, many call sites"
 **Liquid Glass** (`liquidGlass` state, `hw-liquid-glass` localStorage key, "Liquid Glass" toggle in
 Options -> Looks, default off, local-only) swaps the theme's surface tokens (`card`/`cardAlt`/
 `surface`/`border`/`borderAccent`) for translucent `rgba()` values when building `T`, adds a fixed
-background glow (`.app-shell::before`), and gives the tab bar a sheen plus a sliding "lens" pill.
+background glow (`.app-shell::before`), (the tab bar that carried its sheen and sliding "lens" pill is gone; the sidebar is plain).
 Card highlights/shadows and floating-element blur are applied from the runtime stylesheet via
 attribute selectors matching the glass border value in the browser-normalized inline `style`
 (e.g. `border: 1px solid rgba(255, 255, 255, 0.11)`), not by editing each inline style -- so
@@ -558,7 +581,7 @@ Chrome accessibility tree):
   effect (inert blurs it before a normal effect runs) so focus returns there on close.
 - Landmarks: `<header>` (with a visually hidden `<h1>`), `<nav className="app-sidebar">`,
   `<main className="app-main">`; Focus Mode's root is `<main>`. Selected-option buttons use
-  `aria-pressed`, disclosures `aria-expanded`. The title menu is a disclosure (`role="group"`), not
+  `aria-pressed`, disclosures `aria-expanded`. The sidebar's opener is a disclosure button (`aria-expanded`), not
   an ARIA menu.
 - Keyboard focus ring: a global `:focus-visible` rule with `!important` (beats inline
   `outline:none`).

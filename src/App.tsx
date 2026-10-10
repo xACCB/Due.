@@ -261,6 +261,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"animation-two-step-2", date:"2026-10-10", kind:"Bug fix", headline:"Things land where they stay", where:"Checking off a task, a task's details, Inbox updates and search", description:"More animations that moved twice now move once. Checking off a task no longer nudges the list before the task glides down, in every layout, and the task sets down as it arrives instead of shrinking afterwards. A task's details spring all the way back when you drag them a little and let go, where they used to stop part of the way. On a computer, an Inbox update, a calendar day and a Time left card no longer snap wider after opening. The search bar no longer slides past its spot and back." },
   { id:"profile-housekeeping", date:"2026-10-10", kind:"New feature", headline:"Devices, storage and more in Profile", where:"Sidebar (top left button) → your name at the top", go:"profile:profile-devices", description:"Profile now shows every device signed in to your account, and lets you sign any of them out, or all the others at once. A device signs out the next time it has DuePlanner open and online. Below that you can see how much of your task storage is used, install the app, turn reminders on for this device, and send feedback." },
   { id:"layout-buttons-instant", date:"2026-10-10", kind:"UI change", headline:"Layout buttons switch instantly", where:"Sidebar (top left button) → Settings → Looks", go:"settings:layout", description:"Picking a layout in Settings no longer fades the button in. It now switches at once, the same as the Appearance buttons beside it." },
   { id:"sidebar", date:"2026-10-10", kind:"Navigation", headline:"A sidebar", where:"Tap the sidebar button at the top left, or swipe in from the left edge. On a computer it's always showing", go:"menu", description:"Everything now lives in one sidebar: your profile, Search, Home, Calendar, Focus, your subjects, Inbox, History, Import/Export and Settings. Tap the arrow beside a subject to see what is left to do in it, most urgent first. Tap a task there to open it as a full page, where its title, subject, due date, estimate and repeat can be changed right on the page, with no Edit button, and each change saves as you make it. Tap a subject's name to show only that subject on Home, and tap it again, or Home, to see everything. On a computer it stays open beside your tasks, and the button at its top right folds it away. On a phone, tap the button at the top left or swipe in from the left edge to open it. It replaces the three buttons that sat above your tasks and the menu under the DuePlanner name. While a timer is running, its time shows at the top of the screen, and tapping it opens Focus. The Desktop Layout setting is gone, since the sidebar does that job." },
@@ -667,7 +668,10 @@ function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency,now,h2
         const y=sheetY.current+v*dt; setSheetY(y);
         if(y>=h){onCloseRef.current();return;}
       }else{
-        const st=stepSpring(sheetY.current,v,0,dt*animationRate(),380,1); // zeta 1: settles without overshooting v=st.vel;
+        // zeta 1: settles without overshooting. The speed has to carry over from
+        // frame to frame (v=st.vel): without it the sheet stalled part-way back.
+        const st=stepSpring(sheetY.current,v,0,dt*animationRate(),380,1);
+        v=st.vel;
         if(springSettled(st.pos,st.vel,0)){setSheetY(0);return;}
         setSheetY(st.pos);
       }
@@ -1232,7 +1236,7 @@ function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTa
     bar.animate([
       {transform:`translate(${from.left-to.left}px,${from.top-to.top}px)`,height:`${from.height}px`,boxShadow:"0 0 0 rgba(0,0,0,0)"},
       {transform:"none",height:`${to.height}px`},
-    ],{duration:440,easing:"cubic-bezier(.2,.9,.25,1.05)"});
+    ],{duration:440,easing:"cubic-bezier(.2,.9,.25,1)"});
   },[origin]);
   // Fly back into the field, then unmount.
   function close(){
@@ -1332,10 +1336,21 @@ function longDate(iso:string):string{
 // it's pinned to fixed screen coordinates (else each width step would re-center
 // it) and released after.
 const box=(r:DOMRect)=>({left:`${r.left}px`,top:`${r.top}px`,width:`${r.width}px`,height:`${r.height}px`});
-function pin(el:HTMLElement,r:DOMRect){Object.assign(el.style,{position:"fixed",margin:"0",...box(r)});}
-// Back to its declared position:relative (clearing it would drop the card
-// under the absolutely positioned backdrop).
-function unpin(el:HTMLElement){Object.assign(el.style,{position:"relative",margin:"",left:"",top:"",width:"",height:""});}
+// Pinning writes over the card's own inline styles, so what they were is kept
+// and put back on release. Clearing them instead lost the card's declared
+// width ("min(460px,100%)"): on a wide screen it grew to its spot and then
+// snapped to the full width of the window.
+const PIN_PROPS=["position","margin","left","top","width","height"] as const;
+const pinnedStyles=new WeakMap<HTMLElement,Record<string,string>>();
+function pin(el:HTMLElement,r:DOMRect){
+  if(!pinnedStyles.has(el))pinnedStyles.set(el,Object.fromEntries(PIN_PROPS.map(p=>[p,el.style[p]])));
+  Object.assign(el.style,{position:"fixed",margin:"0",...box(r)});
+}
+function unpin(el:HTMLElement){
+  const was=pinnedStyles.get(el);
+  pinnedStyles.delete(el);
+  Object.assign(el.style,was??{position:"relative",margin:"",left:"",top:"",width:"",height:""});
+}
 
 // An Inbox update, opened: the row grows out of the menu into a card floating
 // in the middle of a blurred screen (its box animates from the row's box to
@@ -1989,7 +2004,11 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
   const pr=getPriority(task.dueDate,task.estMins,task.priorityOverride);
   const sc=subjectColors[task.subject]||T.accent;
   const dm=countdown(task.dueDate,task.dueTime,now)??daysUntil(task.dueDate);
-  const isTop=rank===0&&!task.done; const isNext=rank===1&&!task.done;
+  // A task just checked off keeps its badge, drag handle and due label until
+  // it settles (justDone), so the card doesn't change size, and shift its
+  // neighbours, before the move.
+  const live=!task.done||!!justDone;
+  const isTop=rank===0&&live; const isNext=rank===1&&live;
   const isDragging=dragTaskId===task.id;
   return(
     <div
@@ -2002,7 +2021,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
       {swipeable&&!selectionMode&&renderSwipeReveal(task.id)}
       {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:priColor(pr,colorCodeUrgency),borderRadius:"13px 0 0 13px"}}/>}
       <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
-        {reorderable&&!task.done&&!selectionMode&&(
+        {reorderable&&live&&!selectionMode&&(
           // Drag handle, and the keyboard way to reorder: focus it and use the
           // arrow keys. A div, not a <button> -- see activateOnKey.
           <div role="button" tabIndex={0} data-reorder aria-label={`Reorder ${task.title}`} title="Drag, or use the arrow keys"
@@ -2032,7 +2051,7 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
           <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
             {task.dueDate&&<span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime,h24)}`:""}</span>}
             {task.estMins>0&&<span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDuration(task.estMins)}</span>}
-            {!task.done&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:ink(priColor(pr,colorCodeUrgency),T.light),fontWeight:500}}>{dm}</span>}
+            {live&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:ink(priColor(pr,colorCodeUrgency),T.light),fontWeight:500}}>{dm}</span>}
           </div>
           {!!task.subtasks?.length&&(
             <div style={{display:"flex",alignItems:"center",gap:6,marginTop:5}}>
@@ -3442,7 +3461,6 @@ export default function HomeworkPlanner() {
     return ()=>{document.removeEventListener("touchstart",onStart);document.removeEventListener("touchend",onEnd);};
   },[drawerOpen,drawerSwipeOff]);
 
-  const suggestion=buildSuggestion(tasks);
 
   // focus input when adding starts
   useEffect(()=>{if(adding){setTimeout(()=>inputRef.current?.focus(),50);}},[adding,step]);
@@ -3583,6 +3601,13 @@ export default function HomeworkPlanner() {
     return showDone||!t.done||justDone.includes(t.id);
   });
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
+  // The suggestion card above the list. A task just checked off still counts
+  // as open for it until that task settles (justDone): otherwise the card
+  // changed, appeared or vanished at the tick, moving the whole list once
+  // then, and again when the completed card glides away.
+  const heldOpen=(t:Task)=>!t.done||justDone.includes(t.id);
+  const suggestionTask=allSorted.find(t=>heldOpen(t)&&!t.archived);
+  const suggestion=buildSuggestion(justDone.length?tasks.map(t=>justDone.includes(t.id)?{...t,done:false}:t):tasks);
   const focusTask=tasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
   useEffect(()=>{pomodoroTaskRef.current=focusTask?.id??null;});
   // What to do when a break ends: keep going on the task from the last session
@@ -3909,8 +3934,10 @@ export default function HomeworkPlanner() {
       }
       // "settle": the card that travels farthest (the one just completed) is
       // the star: it lifts slightly, slides the whole way down at an even pace
-      // over about 1.3-1.8s, and sets down softly, riding above the cards it
-      // passes. The others just make room, quicker and without the lift.
+      // over about 1.3-1.8s, and sets down as it arrives, riding above the
+      // cards it passes. The others just make room, quicker and without the
+      // lift. The lift comes back down during the slide, not after it: landing
+      // first and shrinking afterwards read as two separate moves.
       const lead=dist===farthest&&moves.length>1;
       if(lead){
         const duration=Math.min(1800,1100+dist*0.95);
@@ -3918,7 +3945,6 @@ export default function HomeworkPlanner() {
         const anim=el.animate([
           {transform:`${from} scale(1)`,easing:"cubic-bezier(.3,0,.2,1)"},
           {transform:`translate(${dx*0.92}px,${dy*0.92}px) scale(1.025)`,offset:0.1,easing:"cubic-bezier(.45,0,.25,1)"},
-          {transform:"translate(0,0) scale(1.025)",offset:0.9,easing:"cubic-bezier(.3,0,.2,1)"},
           {transform:"translate(0,0) scale(1)"},
         ],{duration});
         const done=()=>{el.style.zIndex="";};
@@ -4545,7 +4571,9 @@ export default function HomeworkPlanner() {
 
   // ─── LAYOUT RENDERERS ─────────────────────────────────────────────────────────
   function renderTasks(tasks:Task[]) {
-    const pending=allSorted.filter(t=>!t.done);
+    // Ranks ("do first", "next up") hold still while a completed task is in its
+    // hold (justDone): it keeps its place in the ranking until it settles.
+    const pending=allSorted.filter(t=>!t.done||justDone.includes(t.id));
     // Shared props for the (module-scope) MiniCard -- spread at each call site
     // below instead of repeating this whole list three times.
     const miniCardProps={T,F,subjectColors,colorCodeUrgency,now,h24,dragTaskId,dragOffsetY,
@@ -4563,6 +4591,9 @@ export default function HomeworkPlanner() {
     // same way, and labels due dates the same way (a live countdown for tasks
     // due today at a time). A task just completed stays in its column or tier
     // until it settles, as it holds its place in the List.
+    // Use it too for anything that sets a card's size (a due label, a badge):
+    // if that vanished at the tick, the card would shrink and its neighbours
+    // shift once now and again when it moves.
     const settled=(t:Task)=>t.done&&!justDone.includes(t.id);
     const dueText=(t:Task)=>countdown(t.dueDate,t.dueTime,now)??daysUntil(t.dueDate);
     const titleClass=(t:Task)=>"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"");
@@ -4578,7 +4609,7 @@ export default function HomeworkPlanner() {
                 {chk(t).on&&<CheckMark size={12} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
               <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
-              {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light)}}>{dueText(t)}</span>}
+              {!settled(t)&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light)}}>{dueText(t)}</span>}
               {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
           </div>
@@ -4596,7 +4627,7 @@ export default function HomeworkPlanner() {
               {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:"auto"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
             <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,lineHeight:1.3}}>{t.title}</span>
-            {t.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}{!t.done?<span style={{color:ink(priColor(pr,colorCodeUrgency),T.light)}}> · {dueText(t)}</span>:null}</div>}
+            {t.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}{!settled(t)?<span style={{color:ink(priColor(pr,colorCodeUrgency),T.light)}}> · {dueText(t)}</span>:null}</div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"auto"}}>
               {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
               <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:17,height:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
@@ -4611,7 +4642,7 @@ export default function HomeworkPlanner() {
     if (layout==="kanban") {
       const cols=[{key:"high",label:"Urgent",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"Soon",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"Later",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✓ Done",tasks:filteredTasks.filter(settled)}];
       return(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
           {cols.map(col=>(
             <div key={col.key} style={{background:T.surface,borderRadius:12,padding:"12px",border:`1px solid ${T.border}`}}>
               <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10,fontWeight:500}}>{col.label} ({col.tasks.length})</div>
@@ -4660,7 +4691,7 @@ export default function HomeworkPlanner() {
                 </div>
                 {(t.done||subs.length>0)&&<span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{t.done?"Done":`${doneSubs}/${subs.length}`}</span>}
                 {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
-                {!t.done&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{dueText(t)}</span>}
+                {!settled(t)&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{dueText(t)}</span>}
               </div>
             </div></div>
           );
@@ -5067,14 +5098,14 @@ export default function HomeworkPlanner() {
           {/* Suggestion -- hidden once there's no pending homework left (nothing
               to suggest), when turned off in Settings, or when its × hid this
               particular suggestion (see hiddenSuggestionFor). */}
-          {topTask&&(showSuggestion&&hiddenSuggestionFor!==topTask.id?(
+          {suggestionTask&&(showSuggestion&&hiddenSuggestionFor!==suggestionTask.id?(
             <div style={{background:T.gradientCard,borderRadius:12,padding:"10px 12px",marginBottom:16,border:`1px solid ${T.accent}33`,position:"relative",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:7,minWidth:0}}>
                   <span aria-hidden="true" style={{fontSize:12,marginTop:1}}>✦</span>
                   <span style={{fontFamily:F.body,fontSize:12,color:T.text,lineHeight:1.4,whiteSpace:"pre-line"}}>{suggestion}</span>
                 </div>
-                <button onClick={()=>setHiddenSuggestionFor(topTask.id)} aria-label="Hide this suggestion" title="Hide for now. It comes back when another task becomes most urgent" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
+                <button onClick={()=>setHiddenSuggestionFor(suggestionTask.id)} aria-label="Hide this suggestion" title="Hide for now. It comes back when another task becomes most urgent" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
               </div>
             </div>
           ):null)}

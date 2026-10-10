@@ -562,6 +562,26 @@ already follows the finger, and moving the others would shift what `elementFromP
 flip-flopping the swap), layout switches, and changes arriving from sync (cards shouldn't move
 under your finger). `glideClock()` (module scope) exists for the React Compiler purity lint.
 
+**One move, not two.** Nothing should travel to a spot, pause, and travel again. The causes found so
+far, each fixed, and what to keep doing:
+- *Content that changes at the tick.* While a completed task is in its hold (`justDone`), nothing
+  that sets a size may change: the card keeps its badge, drag handle and due label (`live` in
+  `MiniCard`, `settled(t)` in the other layouts), ranks count it as still open (`pending` in
+  `renderTasks`), and the suggestion card above the list does too (`suggestionTask`/`suggestion`,
+  via `heldOpen`). Otherwise the list shifts once at the tick and again at the settle.
+- *The completed card's lift* comes back down during the slide, not after it (two keyframe
+  segments, not three).
+- *Pinned cards* (`pin`/`unpin`, used by `UpdateDetail` and `GrowCard`): `unpin` restores the inline
+  styles that were there before `pin`. Clearing them dropped the card's declared width, so on a wide
+  screen it grew to its spot and then snapped to the window's width.
+- *The task sheet's spring* must carry its speed from frame to frame (`v=st.vel` in `releaseSheet`);
+  without it the sheet stalled part of the way back after a small drag.
+- *Easing curves* never go past 1 (no `cubic-bezier(...,1.05)`): that is an overshoot.
+- Kanban's columns are `minmax(0,1fr)`, so a column doesn't change width with what's in it.
+To check, record each element's box on every frame while the interaction plays, with
+`prefers-reduced-motion` forced off (a headless or remote browser often reports it on, which makes
+the app skip its animations and everything look fine).
+
 **Motion standard.** One look everywhere, taken from the Calendar tab: 0.2s, `ease-out`, a few pixels
 of travel, no bounce or overshoot (the old `cubic-bezier(.34,1.x,.64,1)` curves are gone; don't add
 new ones). Entrances are one of three classes in the runtime css: `.sec-body` (settles from above:

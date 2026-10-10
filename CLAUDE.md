@@ -578,6 +578,13 @@ far, each fixed, and what to keep doing:
   without it the sheet stalled part of the way back after a small drag.
 - *Easing curves* never go past 1 (no `cubic-bezier(...,1.05)`): that is an overshoot.
 - Kanban's columns are `minmax(0,1fr)`, so a column doesn't change width with what's in it.
+- *The completed card's lift* is a separate animation on `scale` laid over a single eased slide. As a
+  first keyframe segment of the slide it made the card rise, hesitate, then set off.
+- *Cards that grow from a row* freeze their contents at the final size first (`freezeBox`), so the
+  text is revealed in place instead of re-wrapping while the box grows.
+- *Scrollbars.* `html{scrollbar-gutter:stable}` and `body{overflow-x:clip}` (`src/index.css`): with
+  `overflow-x:hidden`, body was its own scroll container and grew a second scrollbar while cards
+  were mid-animation below its edge, shifting the page sideways for a moment.
 To check, record each element's box on every frame while the interaction plays, with
 `prefers-reduced-motion` forced off (a headless or remote browser often reports it on, which makes
 the app skip its animations and everything look fine).
@@ -594,6 +601,15 @@ the FLIP list moves.
 **Tab entrance.** The Tasks tab's content and Focus Mode's content are wrapped in `.sec-body`, the
 same short fade-and-settle the Calendar grid and Settings sections use, so every tab opens alike. The title menu, the Time
 left dropdown, Profile and the four menu screens (Inbox, History, Import/Export, Settings) carry it too.
+
+**Layouts animate alike.** Checked 2026-10-10; keep it that way. In every layout: the done-check has
+`transition:all .2s ease-out` and pops (`chkPop(t)`, the List's `check-pop`), the title uses
+`titleClass(t)` with `transition:color .2s ease-out`, anything that sets the card's size waits for
+`settled(t)` (the "Done" label in Progress included), the card gets `swipeContentStyle` (whose
+transition is `all`, so the `.tc` hover eases everywhere), and an empty list renders nothing (Kanban
+used to draw four empty columns). What still differs on purpose: only the List can be reordered and
+grouped (Settings says so when Group by is set in another layout), Kanban and Pyramid sort by
+priority into columns or tiers and show no due label, and check marks are different shapes.
 
 **Layouts stay consistent** through shared helpers at the top of `renderTasks`: every layout's card is a
 `[data-task-id]` wrapper (relative, clipped) holding the swipe reveal and the `.tc` card, so all six

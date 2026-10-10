@@ -261,6 +261,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"layouts-consistent", date:"2026-10-10", kind:"Improvement", headline:"Every layout moves the same way", where:"Sidebar (top left button) → Settings → Looks → Layout", go:"settings:layout", description:"All six layouts now behave alike. The check mark pops and the title fades the same way in each, a finished task keeps its labels until it starts to glide, and cards brighten smoothly under the mouse everywhere. The finished task now rises and glides in one motion. Cards that open from a row show their text in place as they grow, and the page no longer shifts sideways when a scrollbar comes or goes. Kanban with no tasks shows the usual empty message, and Settings says when grouping has no effect in your layout." },
   { id:"update-fade", date:"2026-10-10", kind:"UI change", headline:"Updates fade between each other", where:"Sidebar (top left button) → Inbox → tap any update, then Back or Next", go:"menu", description:"Pressing Back or Next on an open Inbox message now fades the new one in. It used to slide in from the side as well." },
   { id:"animation-two-step-2", date:"2026-10-10", kind:"Bug fix", headline:"Things land where they stay", where:"Checking off a task, a task's details, Inbox updates and search", description:"More animations that moved twice now move once. Checking off a task no longer nudges the list before the task glides down, in every layout, and the task sets down as it arrives instead of shrinking afterwards. A task's details spring all the way back when you drag them a little and let go, where they used to stop part of the way. On a computer, an Inbox update, a calendar day and a Time left card no longer snap wider after opening. The search bar no longer slides past its spot and back." },
   { id:"profile-housekeeping", date:"2026-10-10", kind:"New feature", headline:"Devices, storage and more in Profile", where:"Sidebar (top left button) → your name at the top", go:"profile:profile-devices", description:"Profile now shows every device signed in to your account, and lets you sign any of them out, or all the others at once. A device signs out the next time it has DuePlanner open and online. Below that you can see how much of your task storage is used, install the app, turn reminders on for this device, and send feedback." },
@@ -1341,6 +1342,14 @@ const box=(r:DOMRect)=>({left:`${r.left}px`,top:`${r.top}px`,width:`${r.width}px
 // and put back on release. Clearing them instead lost the card's declared
 // width ("min(460px,100%)"): on a wide screen it grew to its spot and then
 // snapped to the full width of the window.
+// Holds an element at the size it has now (its parent clips it), so its
+// contents don't re-flow while the parent's box animates around it. Returns
+// the undo, which puts back the inline styles exactly as they were.
+function freezeBox(el:HTMLElement){
+  const was=el.style.cssText;
+  Object.assign(el.style,{width:`${el.offsetWidth}px`,height:`${el.offsetHeight}px`,flexShrink:"0",overflow:"hidden"});
+  return ()=>{el.style.cssText=was;};
+}
 const PIN_PROPS=["position","margin","left","top","width","height"] as const;
 const pinnedStyles=new WeakMap<HTMLElement,Record<string,string>>();
 function pin(el:HTMLElement,r:DOMRect){
@@ -1378,10 +1387,14 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
     const card=cardRef.current, from=openedFrom.current?.getBoundingClientRect();
     if(!card||!from||reduced())return;
     const to=card.getBoundingClientRect();
+    // The contents are laid out once, at the card's final size, and revealed as
+    // it grows. Left to follow the growing box they re-wrapped on the way,
+    // which showed as text hopping about while it faded in.
+    const thaw=bodyRef.current?freezeBox(bodyRef.current):null;
     pin(card,to);
     backdropRef.current?.animate([{opacity:0},{opacity:1}],{duration:280,easing:"ease-out"});
     const anim=card.animate([{...box(from),borderRadius:"8px"},{...box(to),borderRadius:"16px"}],{duration:400,easing:"cubic-bezier(.2,.9,.25,1)"});
-    const release=()=>{if(!closing.current)unpin(card);};
+    const release=()=>{if(!closing.current){thaw?.();unpin(card);}};
     anim.finished.then(release,release);
     bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.4},{opacity:1}],{duration:400,easing:"ease-out"});
   },[]);
@@ -1522,10 +1535,12 @@ function GrowCard({origin,labelledBy,T,onClose,children}:{
     const card=cardRef.current, from=openedFrom.current?.getBoundingClientRect();
     if(!card||!from||reduced())return;
     const to=card.getBoundingClientRect();
+    // Contents laid out once at the final size (see UpdateDetail).
+    const thaw=bodyRef.current?freezeBox(bodyRef.current):null;
     pin(card,to);
     backdropRef.current?.animate([{opacity:0},{opacity:1}],{duration:280,easing:"ease-out"});
     const anim=card.animate([{...box(from),borderRadius:"10px"},{...box(to),borderRadius:"20px"}],{duration:400,easing:"cubic-bezier(.2,.9,.25,1)"});
-    const release=()=>{if(!closing.current)unpin(card);};
+    const release=()=>{if(!closing.current){thaw?.();unpin(card);}};
     anim.finished.then(release,release);
     bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.4},{opacity:1}],{duration:400,easing:"ease-out"});
   },[]);
@@ -2019,9 +2034,9 @@ function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colorCodeUr
       data-task-id={task.id}
       onClick={selectionMode?()=>onToggleSelect?.(task.id):swipeClickGuard(()=>{if(dragTaskId==null){onOpen(task);}})}
       {...(swipeable&&!selectionMode?swipeHandlers(task.id):{})}
-      style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isSelected?T.accent:isTop?T.accent+"44":task.done?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
+      style={{background:isTop?T.gradientCard:T.card,borderRadius:13,padding:"13px 15px",border:`1px solid ${isSelected?T.accent:isTop?T.accent+"44":!live?"transparent":T.border}`,position:"relative",overflow:"hidden",cursor:"pointer",transform:isDragging?`translateY(${dragOffsetY}px) scale(1.02)`:"none",transition:isDragging?"none":undefined,boxShadow:isDragging?"0 8px 24px rgba(0,0,0,0.35)":undefined,zIndex:isDragging?10:undefined,touchAction:isDragging?"none":swipeable?"pan-y":undefined,pointerEvents:isDragging?"none":undefined}}>
       {swipeable&&!selectionMode&&renderSwipeReveal(task.id)}
-      {!task.done&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:priColor(pr,colorCodeUrgency),borderRadius:"13px 0 0 13px"}}/>}
+      {live&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:priColor(pr,colorCodeUrgency),borderRadius:"13px 0 0 13px"}}/>}
       <div style={{paddingLeft:8,display:"flex",alignItems:"flex-start",gap:9,...(swipeable?swipeContentStyle(task.id):{})}}>
         {reorderable&&live&&!selectionMode&&(
           // Drag handle, and the keyboard way to reorder: focus it and use the
@@ -3944,11 +3959,13 @@ export default function HomeworkPlanner() {
       if(lead){
         const duration=Math.min(1800,1100+dist*0.95);
         el.style.zIndex="3";
-        const anim=el.animate([
-          {transform:`${from} scale(1)`,easing:"cubic-bezier(.3,0,.2,1)"},
-          {transform:`translate(${dx*0.92}px,${dy*0.92}px) scale(1.025)`,offset:0.1,easing:"cubic-bezier(.45,0,.25,1)"},
-          {transform:"translate(0,0) scale(1)"},
-        ],{duration});
+        // The slide is one eased move from start to finish. The lift is a
+        // separate animation on `scale` laid over it, so there's no keyframe
+        // in the middle of the slide for it to slow down at: with the lift as
+        // a first segment of the same animation, the card rose, hesitated,
+        // and then set off (plain to see at slower animation speeds).
+        const anim=el.animate([{transform:from},{transform:"none"}],{duration,easing:"cubic-bezier(.45,0,.2,1)"});
+        el.animate([{scale:"1",easing:"ease-out"},{scale:"1.025",offset:0.2,easing:"ease-in-out"},{scale:"1"}],{duration});
         const done=()=>{el.style.zIndex="";};
         anim.finished.then(done,done);
       }else{
@@ -4271,7 +4288,10 @@ export default function HomeworkPlanner() {
   function swipeContentStyle(id:number):React.CSSProperties{
     const active=swipeId===id;
     const dx=active?swipeX:0;
-    return {transform:dx?`translateX(${dx}px)`:undefined,transition:active?"none":"transform .2s ease-out",touchAction:"pan-y"};
+    // "all", not just transform: in every layout but the List this lands on the
+    // card itself, where a transform-only transition replaced the card's own
+    // (.tc), so its hover lift eased but its brightness and colours snapped.
+    return {transform:dx?`translateX(${dx}px)`:undefined,transition:active?"none":"all .2s ease-out",touchAction:"pan-y"};
   }
   function swipeClickGuard(onOpen:()=>void){
     return ()=>{ if(swipeMoved.current){swipeMoved.current=false;return;} onOpen(); };
@@ -4375,6 +4395,10 @@ export default function HomeworkPlanner() {
     .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}
     .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background .2s ease-out;position:relative;flex-shrink:0;}
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;}
+    /* Room for the page scrollbar is kept whether or not it shows, so the page
+       doesn't shift sideways when a list gets long enough to scroll, or when a
+       sheet locks scrolling. */
+    html{scrollbar-gutter:stable;}
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${T.border};border-radius:99px}
     ${liquidGlass?`
     /* Liquid glass. The page gets a soft, fixed glow layer behind everything
@@ -4599,6 +4623,8 @@ export default function HomeworkPlanner() {
     const settled=(t:Task)=>t.done&&!justDone.includes(t.id);
     const dueText=(t:Task)=>countdown(t.dueDate,t.dueTime,now)??daysUntil(t.dueDate);
     const titleClass=(t:Task)=>"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"");
+    // The done-check pops as it fills, as the List's does (MiniCard).
+    const chkPop=(t:Task)=>!selectionMode&&justDone.includes(t.id)?"check-pop":undefined;
 
     if (layout==="checklist") return (
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -4607,10 +4633,10 @@ export default function HomeworkPlanner() {
             {renderSwipeReveal(t.id)}
             <div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.card,borderRadius:10,border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
               <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,minWidth:18}}>{String(i+1).padStart(2,"0")}</span>
-              <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:4,background:chk(t).on?chk(t).color:"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}}>
+              <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:4,background:chk(t).on?chk(t).color:"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}}>
                 {chk(t).on&&<CheckMark size={12} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
-              <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text}}>{t.title}</span>
+              <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
               {!settled(t)&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light)}}>{dueText(t)}</span>}
               {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
@@ -4628,11 +4654,11 @@ export default function HomeworkPlanner() {
               {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
               {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:"auto"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
-            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,lineHeight:1.3}}>{t.title}</span>
+            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,lineHeight:1.3,transition:"color .2s ease-out"}}>{t.title}</span>
             {t.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}{!settled(t)?<span style={{color:ink(priColor(pr,colorCodeUrgency),T.light)}}> · {dueText(t)}</span>:null}</div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"auto"}}>
               {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
-              <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:17,height:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
+              <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:17,height:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}}>
                 {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
             </div>
@@ -4642,7 +4668,9 @@ export default function HomeworkPlanner() {
     );
 
     if (layout==="kanban") {
-      const cols=[{key:"high",label:"Urgent",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"Soon",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"Later",tasks:filteredTasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✓ Done",tasks:filteredTasks.filter(settled)}];
+      // No tasks: nothing but the "nothing here" line below, as in the other layouts (not four empty columns).
+      if(tasks.length===0)return null;
+      const cols=[{key:"high",label:"Urgent",tasks:tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"Soon",tasks:tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"Later",tasks:tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✓ Done",tasks:tasks.filter(settled)}];
       return(
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
           {cols.map(col=>(
@@ -4651,10 +4679,10 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {col.tasks.map(t=>(
                   <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:8}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:8,padding:"9px 10px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7,cursor:"pointer",...swipeContentStyle(t.id)}}>
-                    <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:14,height:14,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:14,height:14,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s ease-out"}}>
                       {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                     </button>
-                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
+                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
                     {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:12,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
                   </div></div>
                 ))}
@@ -4677,10 +4705,10 @@ export default function HomeworkPlanner() {
             <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:12}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:12,padding:"13px 15px",border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:18,height:18,cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:18,height:18,cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s ease-out"}}>
                     {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                   </button>
-                  <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"")} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text}}>{t.title}</span>
+                  <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
@@ -4691,7 +4719,7 @@ export default function HomeworkPlanner() {
                 <div style={{flex:1,height:7,background:T.border,borderRadius:999}}>
                   <div style={{width:`${pct}%`,height:"100%",background:t.done?"#2ED573":priColor(pr,colorCodeUrgency),borderRadius:999,transition:"width 0.5s"}}/>
                 </div>
-                {(t.done||subs.length>0)&&<span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{t.done?"Done":`${doneSubs}/${subs.length}`}</span>}
+                {(settled(t)||subs.length>0)&&<span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{settled(t)?"Done":`${doneSubs}/${subs.length}`}</span>}
                 {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
                 {!settled(t)&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{dueText(t)}</span>}
               </div>
@@ -4715,10 +4743,10 @@ export default function HomeworkPlanner() {
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {tier.tasks.map(t=>(
                     <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:9}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:9,padding:"9px 12px",border:`1px solid ${tier.color}44`,display:"flex",alignItems:"center",gap:8,cursor:"pointer",...swipeContentStyle(t.id)}}>
-                      <button aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s ease-out"}}>
                         {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                       </button>
-                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text}}>{t.title}</span>
+                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
                       {t.subject&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.subject}</span>}
                       {!selectionMode&&<button aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
                     </div></div>
@@ -5636,6 +5664,7 @@ export default function HomeworkPlanner() {
                   <button key={key} onClick={()=>setGroupBy(key)} aria-pressed={groupBy===key} style={{background:groupBy===key?T.accent+"22":T.surface,border:`1.5px solid ${groupBy===key?T.accent:T.border}`,borderRadius:9,padding:"9px 11px",cursor:"pointer",color:groupBy===key?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",alignItems:"center",gap:7}}>{g.name}</button>
                 ))}
               </div>
+              {layout!=="list"&&groupBy!=="none"&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>Grouping only shows in the List layout. You're using {LAYOUTS[layout].name}.</div>}
             </div>
             {/* Toggles */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>

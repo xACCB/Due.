@@ -35,6 +35,12 @@ html, body {
 html, body {
   overflow-x: hidden;
 }
+/* On body, clip rather than hide (where supported): "hidden" turns body into a
+   scroll container of its own, and while cards were mid-animation below its
+   edge it briefly grew a second scrollbar, nudging the whole page sideways. */
+body {
+  overflow-x: clip;
+}
 
 body {
   margin: 0;

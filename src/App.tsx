@@ -834,7 +834,8 @@ function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency,now,h2
           </div>
 
           {/* Snooze */}
-          {!task.done&&(!draft||page)&&(
+          {/* Not on the task page (removed at the user's request): the date field is right there. */}
+          {!task.done&&!draft&&!page&&(
             <div data-tour="task-snooze" style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:-8,marginBottom:18}}>
               <span style={{fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginRight:2}}>Snooze</span>
               {([["later","In 3 hours"],["tomorrow","Tomorrow"],["week","Next week"]] as const).map(([k,l])=>(

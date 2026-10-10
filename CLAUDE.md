@@ -312,7 +312,7 @@ heading and the edit form is always open. There's no draft to confirm, so `commi
 field when focus leaves it (the form's `onBlur`, the title's own) and a choice (subject, repeat, the
 "No due date/time" links) at once, and only when something really changed, so each save is one undo
 step rather than one per keystroke. The fields are refilled from the task whenever its saved values
-change (`taskSig`). Mark done and Archive keep the page open (the sheet closes); Delete goes Home.
+change (`taskSig`). Mark done and Archive keep the page open (the sheet closes); Delete goes Home. The page has no Snooze row (removed at the user's request, 2026-10-10; the sheet keeps it).
 Leave the page through `navTo()`, which calls `leaveTaskPage()` to end and log a session running on
 it (both declared below `endSession`, for the React Compiler's forward-reference check); a tab
 change that bypasses it still clears `selectedTask` (the `lastTab` block), so the task can't

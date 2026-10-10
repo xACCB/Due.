@@ -2054,6 +2054,14 @@ let deferredInstallPrompt:InstallPromptEvent|null=null;
 if(typeof window!=="undefined"){
   window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e as InstallPromptEvent;});
 }
+// Installing the app: the browser's own prompt where it offers one, otherwise
+// instructions for this kind of device (handed to `setHint`).
+async function requestInstall(setHint:(hint:string|null)=>void){
+  if(deferredInstallPrompt){ await deferredInstallPrompt.prompt(); deferredInstallPrompt=null; setHint(null); return; }
+  setHint(/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)
+    ?"In Safari, tap the Share button, then \"Add to Home Screen\"."
+    :"Open your browser's menu and choose \"Install app\" or \"Add to Home screen\".");
+}
 function isStandalone(){
   return window.matchMedia?.("(display-mode: standalone)").matches||(navigator as unknown as {standalone?:boolean}).standalone===true;
 }
@@ -2067,11 +2075,15 @@ function isStandalone(){
 // wipe out the text. newSubjectText/setNewSubjectText are lifted to the
 // parent specifically so they survive that; being hoisted now means this
 // component itself is no longer being recreated in the first place either.
-function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,setShowProfile,signInWithFirebase,signOutFirebase}:{
+function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,taskCount,trashCount,notificationsEnabled,notificationNote,onToggleNotifications,setShowProfile,signInWithFirebase,signOutFirebase}:{
   T:ThemeObj; F:typeof FONT;
   fbUser:User|null; authPending:boolean; signInError:string|null; syncError:string|null; syncStatus:string|null;
   visibleTasks:Task[]; totalMins:number;
   subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean;
+  // Housekeeping: how much of the account's room is used (every task, archived
+  // ones too, and Recently deleted), and reminders on this device.
+  taskCount:number; trashCount:number;
+  notificationsEnabled:boolean; notificationNote:string|null; onToggleNotifications:(next:boolean)=>void;
   setShowProfile:(v:boolean)=>void;
   signInWithFirebase:()=>Promise<void>;
   signOutFirebase:()=>Promise<void>;
@@ -2122,12 +2134,7 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
       {/* Add to Home Screen -- the browser's own install prompt where it offers
           one (Chrome/Edge/Android), otherwise platform-specific instructions;
           hidden entirely once the app is already running installed. */}
-      {!isStandalone()&&<button onClick={async()=>{
-        if(deferredInstallPrompt){ await deferredInstallPrompt.prompt(); deferredInstallPrompt=null; setInstallHint(null); return; }
-        setInstallHint(/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)
-          ?"In Safari, tap the Share button, then \"Add to Home Screen\"."
-          :"Open your browser's menu and choose \"Install app\" or \"Add to Home screen\".");
-      }} style={{width:"100%",maxWidth:340,background:"none",border:`1px solid ${T.border}`,borderRadius:12,padding:"12px",fontFamily:F.body,fontSize:12,color:T.textMuted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:12}}>
+      {!isStandalone()&&<button onClick={()=>requestInstall(setInstallHint)} style={{width:"100%",maxWidth:340,background:"none",border:`1px solid ${T.border}`,borderRadius:12,padding:"12px",fontFamily:F.body,fontSize:12,color:T.textMuted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:12}}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 16M12 2L7 7M12 2L17 7" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V16" stroke={T.textMuted} strokeWidth="2" strokeLinecap="round"/></svg>
         Add to Home Screen
       </button>}
@@ -2224,6 +2231,65 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
             ))}
           </div>
         )}
+
+        {/* Housekeeping. Storage: the real number of tasks on this device against
+            the account's caps (LIMITS; the cloud's own counter started at zero
+            when it was added, so it can read low for an older account). */}
+        <div data-tour="profile-storage" style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:14}}>
+          <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>Storage</div>
+          {[{label:"Tasks",used:taskCount,max:LIMITS.tasks},{label:"Recently deleted",used:trashCount,max:LIMITS.trash}].map(r=>{
+            const pctUsed=Math.min(100,r.used/r.max*100), nearlyFull=pctUsed>=90;
+            return(
+              <div key={r.label} style={{marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{r.label}</span>
+                  <span style={{fontFamily:F.body,fontSize:11,color:nearlyFull?ink("#FF4757",T.light):T.textFaint}}>{r.used.toLocaleString()} of {r.max.toLocaleString()}</span>
+                </div>
+                <div role="progressbar" aria-label={`${r.label} storage used`} aria-valuemin={0} aria-valuemax={r.max} aria-valuenow={Math.min(r.used,r.max)} style={{height:5,background:T.border,borderRadius:999}}>
+                  <div style={{width:`${r.used>0?Math.max(pctUsed,1.5):0}%`,height:"100%",background:nearlyFull?"#FF4757":T.accent,borderRadius:999}}/>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,lineHeight:1.5}}>Finished and archived tasks count too. Deleting tasks frees up room.</div>
+        </div>
+
+        {/* This device: installing the app and reminders (both are per device),
+            then the feedback and privacy links. */}
+        <div data-tour="profile-device" style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:14}}>
+          <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>This device</div>
+          {(()=>{
+            const row={display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,minHeight:32};
+            const name={fontFamily:F.body,fontSize:12,color:T.text};
+            const state={fontFamily:F.body,fontSize:11,color:T.textFaint,textAlign:"right" as const};
+            const btn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"6px 12px",color:T.text,fontFamily:F.body,fontSize:11,cursor:"pointer",flexShrink:0};
+            const note={fontFamily:F.body,fontSize:10,color:T.textMuted,lineHeight:1.5,marginTop:4};
+            const permission=typeof Notification==="undefined"?"unsupported":Notification.permission;
+            const remindersOn=notificationsEnabled&&permission==="granted";
+            return <>
+              <div style={row}>
+                <span style={name}>App</span>
+                {isStandalone()
+                  ?<span style={state}>Installed on this device</span>
+                  :<button onClick={()=>requestInstall(setInstallHint)} style={btn}>Install DuePlanner</button>}
+              </div>
+              {installHint&&<div style={note}>{installHint}</div>}
+              <div style={{...row,marginTop:8}}>
+                <span style={name}>Reminders</span>
+                {permission==="unsupported"?<span style={state}>Not supported in this browser</span>
+                  :permission==="denied"?<span style={state}>Blocked</span>
+                  :<button onClick={()=>onToggleNotifications(!remindersOn)} aria-pressed={remindersOn} style={btn}>{remindersOn?"On. Turn off":"Turn on"}</button>}
+              </div>
+              {permission==="denied"&&<div style={note}>Notifications are blocked for this site. Allow them in your browser's site settings, then turn reminders on here.</div>}
+              {notificationNote&&permission!=="denied"&&<div style={note}>{notificationNote}</div>}
+              <div style={{height:1,background:T.borderFaint,margin:"12px 0"}}/>
+              <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+                <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{fontFamily:F.body,fontSize:12,color:T.text}}>Send feedback or report a bug</a>
+                <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>Privacy policy</a>
+              </div>
+            </>;
+          })()}
+        </div>
 
         {/* Sign out */}
         <button onClick={async()=>{await signOutFirebase();setShowProfile(false);}}
@@ -5534,6 +5600,8 @@ export default function HomeworkPlanner() {
         fbUser={fbUser} authPending={authPending} signInError={signInError} syncError={syncError} syncStatus={syncStatus}
         visibleTasks={visibleTasks.filter(t=>!t.archived)} totalMins={totalMins}
         subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
+        taskCount={tasks.length} trashCount={trash.length}
+        notificationsEnabled={notificationsEnabled} notificationNote={notificationNote} onToggleNotifications={toggleNotifications}
         setShowProfile={setShowProfile}
         signInWithFirebase={signInWithFirebase}
         signOutFirebase={signOutFirebase}

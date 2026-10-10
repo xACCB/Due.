@@ -282,7 +282,7 @@ the `Toggle` switch thumb) instead of a hardcoded color, so they stay correct un
 a future theme might use. A few needed a conditional version since they only sometimes render on a
 solid `T.accent` fill (e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`,
 in most layouts -- only the branches that actually use `T.accent` as the fill needed the fix).
-`LAYOUTS` (6 task-list display modes, still in `App.tsx`; Compact, Minimal, Sticky, Timeline, By Subject and Calendar -- replaced by the Calendar tab -- were removed -- a saved removed layout falls back to List via the derived `layout` const). `FONTS` went the same way
+`LAYOUTS` (6 task-list display modes, in `src/constants.ts`; Compact, Minimal, Sticky, Timeline, By Subject and Calendar -- replaced by the Calendar tab -- were removed -- a saved removed layout falls back to List via the derived `layout` const). `FONTS` went the same way
 as `THEMES` -- down from 16 selectable heading/body pairings to exactly one (`FONT`, still in
 `App.tsx`: the original DM Serif Display/DM Mono pairing), with the Font picker grid and its
 `fontName`/`setFontName` state gone entirely. `F` is now just `FONT` directly rather than a keyed
@@ -418,7 +418,7 @@ which still exists as the outer safety net for anything else.
   task so "Sessions today" survives closing the modal, and the Inbox's "Time spent" sums these
   (real time) rather than estimates.
 - `spawnedNextId?: number|null` — set on a recurring task when completing it spawns the next
-  occurrence (see `setDone()`, module scope), so un-completing removes that copy instead of leaving a
+  occurrence (see `setDone()` in `src/lib/tasks.ts`), so un-completing removes that copy instead of leaving a
   duplicate. The copy gets unchecked subtasks and keeps no due date if the original had none.
 - `estMins` can be 0 (estimate step skipped); every display goes through `formatDuration()`
   (`src/lib/format.ts`), which returns "" for 0 so the label is hidden rather than showing "0m".
@@ -484,7 +484,7 @@ centered as a group. **JSON import** (`importBackupJSON`) merges an
 export: tasks with ids already present are skipped, subjects/templates added if missing, existing
 subject colors win, settings untouched.
 
-**What's New** (`WHATS_NEW`, the Inbox's Updates list) is hand-maintained, newest first -- add an
+**What's New** (`WHATS_NEW` in `src/whatsNew.ts`, the Inbox's Updates list) is hand-maintained, newest first -- add an
 entry whenever a user-facing change ships. Each entry has a `kind` (category: "New feature", "Bug
 fix"...), a `headline` (its short title), the `description`, and a `where` -- how to get to it,
 using the on-screen labels ("Sidebar (top left button) → Settings → ..."), shown as "Where to find it"

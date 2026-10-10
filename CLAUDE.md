@@ -13,6 +13,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run test:rules` — Firestore emulator + `@firebase/rules-unit-testing`, verifying
   `firestore.rules` actually rejects malformed writes and cross-user access. Needs Java (a JRE) for
   the emulator; CI installs one and runs it. Run it locally before changing `firestore.rules`.
+- `npm run test:rules` also runs `tests/firestore.contract.test.ts` (everything the app writes at
+  its `LIMITS` is accepted, one step over is refused) and `tests/firestore.fuzz.test.ts` (450 seeded
+  random tasks: valid ones accepted, broken ones refused), and afterwards writes
+  `coverage/rules/summary.txt`: which lines of `firestore.rules` no test evaluated
+  (`tests/rulesCoverage.ts`; the emulator's own HTML report runs to hundreds of MB, so only hit or
+  miss per line is kept). `src/lib/limits.rules.test.ts` (in plain `npm test`) reads the numbers
+  out of `firestore.rules` and checks them against `LIMITS`.
+- `npm run test:e2e` -- two headless Chromes as two devices on one account, against the Auth and
+  Firestore emulators and the dev server in emulator mode (`tests/e2e/`, no extra dependency: it
+  drives Chrome over the DevTools protocol; set `CHROME_PATH` if Chrome isn't found). Covers real
+  sign-in, sync between devices, an edit conflict, a delete, and the device list. Needs Java.
+- `npm run test:stress` -- one account filled to the 5,000 task cap on the emulator with the app's
+  own write builder; timings go to `coverage/stress.txt`. Slow, not in CI. `STRESS_TASKS=300` for a
+  quick run.
+- `npm run rules:rollback` -- shows the previous version of `firestore.rules`; with `-- --yes` it
+  restores and deploys it. Every rules change gets a row in `firestore.rules.CHANGELOG.md`.
+- A pre-push hook (`.husky/pre-push`) runs `npm test`.
 - Emulator mode: `npx firebase-tools emulators:start --only auth,firestore` (needs Java), then
   `VITE_FIREBASE_EMULATORS=1 npm run dev` -- the app talks to the local Auth/Firestore emulators
   (fake Google sign-in, throwaway data) instead of production. Dev server only; never in a build.
@@ -22,9 +39,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   values is a design call on a live, user-facing palette.
 - A pre-commit hook (husky + lint-staged, `.husky/pre-commit`) runs `eslint --fix` on staged
   `.ts`/`.tsx` files. Dependabot (`.github/dependabot.yml`) opens weekly npm dependency-update PRs.
-- `.github/workflows/ci.yml` runs on every push/PR to `main` and weekly (Monday cron). Job
-  `build-and-lint`: `npm run build`, `npm run lint`, `npm test`, `npm run test:rules`. Job
-  `security`: `npm audit --audit-level=high` (blocking, dev dependencies included; Dependabot's PRs
+- `.github/workflows/ci.yml` runs on every push/PR to `main` and weekly (Monday cron). The
+  workflow token is read-only (`permissions: contents: read`), actions are pinned to commit SHAs
+  (Dependabot's `github-actions` entry moves them), and installs use `npm ci --ignore-scripts`. Job
+  `build-and-lint`: `npm run build`, `npm run lint`, `npm test`, `npm run test:rules` (uploading the
+  rules coverage summary as an artifact). Job `e2e`: `npm run test:e2e`, not yet required to pass
+  (`continue-on-error`; remove that once it has proved steady). Job
+  `security`: `npm audit signatures`, `npm audit --audit-level=high` (blocking, dev dependencies included; Dependabot's PRs
   are the usual fix) and a gitleaks secret scan of the full git history (pinned binary, config in
   `.gitleaks.toml`, which allowlists only the public Firebase web API key by exact value). Vercel's
   own build would catch a broken build, but not these. GitHub's own secret scanning and push

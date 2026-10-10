@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:rules": "npx firebase-tools emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\"",
+    "test:stress": "npx firebase-tools emulators:exec --only firestore \"vitest run --config vitest.stress.config.ts\"",
+    "test:e2e": "npx firebase-tools emulators:exec --only auth,firestore \"node tests/e2e/run.mjs\"",
+    "rules:rollback": "node scripts/rules-rollback.mjs",
     "audit:contrast": "node --experimental-strip-types scripts/check-theme-contrast.ts",
     "prepare": "husky"
   },

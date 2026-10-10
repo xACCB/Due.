@@ -10,18 +10,29 @@ on:
   schedule:
     - cron: "0 9 * * 1"
 
+# The workflow's token can only read the repository. No job here needs to
+# write to it, so a compromised step can't push code, tags or releases.
+permissions:
+  contents: read
+
+# Third-party actions are pinned to an exact commit (the tag it was at is in
+# the comment), so a tag being moved to different code can't change what runs
+# here. Dependabot (.github/dependabot.yml) opens PRs to move the pins forward.
 jobs:
   build-and-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      # --ignore-scripts: packages' install scripts don't run. That is the usual
+      # way a malicious dependency attacks a build, and nothing here needs one
+      # (it also skips this project's own "prepare", which only sets up git hooks).
+      - run: npm ci --ignore-scripts
 
       - run: npm run build
 
@@ -30,7 +41,7 @@ jobs:
       - run: npm test
 
       # The Firestore emulator (used by the security-rules tests) needs Java.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: 21
@@ -38,15 +49,50 @@ jobs:
       - name: Firestore security-rules tests
         run: npm run test:rules
 
+      # Which lines of firestore.rules the tests reached (tests/rulesCoverage.ts).
+      - name: Upload rules coverage summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: firestore-rules-coverage
+          path: coverage/rules/summary.txt
+          if-no-files-found: ignore
+
+  # Two headless browsers as two devices on one account, against the Auth and
+  # Firestore emulators: sign-in, sync, an edit conflict, the device list.
+  # Not required to pass yet (continue-on-error): browser tests can fail for
+  # reasons that aren't bugs, so this reports for a while before it can block
+  # a merge. Remove continue-on-error once it has proved steady.
+  e2e:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Two-device end-to-end test
+        run: npm run test:e2e
+
   security:
     runs-on: ubuntu-latest
     steps:
       # Full history, so the secret scan covers every commit, not just the tip.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
 
@@ -55,6 +101,14 @@ jobs:
       # included). Dependabot opens the PRs that fix these.
       - name: Dependency audit (fails on high severity)
         run: npm audit --audit-level=high
+
+      # Checks that each installed package really is the one the npm registry
+      # published (its signature and, where a package has one, its provenance).
+      # Needs the packages on disk, so this is the one install in this job.
+      - name: Verify package signatures
+        run: |
+          npm ci --ignore-scripts
+          npm audit signatures
 
       # Secret scanning with gitleaks' default rules plus .gitleaks.toml (which
       # allowlists only the public Firebase web key). The plain binary rather

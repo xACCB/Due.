@@ -1064,9 +1064,6 @@ function CheckMark({size=10,color="#111",animate=false}:{size?:number;color?:str
 // The sidebar is always there at this width and up (unless folded away); below
 // it, it's a drawer. Must match the min-width in the runtime css.
 const isWideScreen=()=>window.matchMedia("(min-width:900px)").matches;
-// The "dp" mark, as on the favicon and launch screen. Bodoni Moda is loaded in
-// index.html as a two-letter subset, so the mark looks the same on every device.
-const DP_MARK_FONT="'Bodoni Moda', 'Bodoni MT', Georgia, 'Times New Roman', serif";
 // The header shows the current screen's name.
 const SCREEN_TITLES:Record<string,string>={tasks:"Home",calendar:"Calendar",inbox:"Inbox",history:"History",import:"Import/Export",options:"Settings",task:"Task"};
 // One row of the sidebar. Styled by .sb-row in the runtime css; `current` marks
@@ -4792,10 +4789,7 @@ export default function HomeworkPlanner() {
         <SidebarRow icon={<IconImport/>} label="Import/Export" current={activeTab==="import"} onClick={()=>navTo("import")}/>
         <SidebarRow icon={<IconSettings/>} label="Settings" current={activeTab==="options"} onClick={()=>navTo("options")}/>
         <div style={{flex:1}}/>
-        <div style={{display:"flex",alignItems:"baseline",gap:8,padding:"10px 10px 2px"}}>
-          <span style={{fontFamily:DP_MARK_FONT,fontSize:22,lineHeight:1,color:T.text}}>dp</span>
-          <span style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>DuePlanner, by due. studios</span>
-        </div>
+        <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,padding:"10px 10px 2px"}}>DuePlanner, by due. studios</div>
       </nav>
       {/* inert while the task sheet is open, so screen readers and Tab stay in
           the dialog instead of wandering through the list behind it; and while

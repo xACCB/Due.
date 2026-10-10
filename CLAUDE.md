@@ -279,7 +279,7 @@ choice already saved by existing users' browsers, mirroring the `hw-accent` clea
 DuePlanner wordmark and the Desktop Layout setting (`hw-desktoplayout`, cleared once). Top to bottom:
 the profile row (picture, name, sync status; opens Profile, or reads "Sign in"), the fold button,
 Search (opens `SearchOverlay`), Home (`activeTab==="tasks"`) / Calendar / Focus (shows a running
-timer), the subjects (below), Inbox (unread count) / History / Import/Export / Settings, and the dp mark at the foot. Rows
+timer), the subjects (below), Inbox (unread count) / History / Import/Export / Settings, and a "DuePlanner, by due. studios" line at the foot. Rows
 are `SidebarRow` (module scope, `.sb-row` in the runtime css, `aria-current="page"` on the screen
 being shown). From 900px up it is fixed in place and the page is padded to make room (`--sb`, which
 also re-centers the viewport-centered toasts), unless folded away (`sidebarFolded`,
@@ -292,9 +292,9 @@ breakpoint. The header always shows the screen's name (`SCREEN_TITLES`); it used
 on whether the sidebar was showing, which the user disliked (2026-10-10), so don't put a logo back
 there. Wide and unfolded, the css hides the sidebar button, `ScreenHeader` (`.screen-header`, now
 only the "‹ Home" back button) and the header's timer pill (`.timer-pill`, a running
-Pomodoro/stopwatch that opens Focus), since the sidebar covers all three. The dp mark only appears
-at the sidebar's foot: live text in Bodoni Moda (`DP_MARK_FONT`), loaded in `index.html` as a
-two-letter subset (`&text=dp`). **Subjects in the sidebar** (`SidebarSubjects`, module scope; groups from `subjectGroups()` in
+Pomodoro/stopwatch that opens Focus), since the sidebar covers all three. The dp mark isn't in the app at
+all now (also removed from the sidebar's foot at the user's request); it remains the favicon and the
+launch screen. **Subjects in the sidebar** (`SidebarSubjects`, module scope; groups from `subjectGroups()` in
 `src/lib/sidebarSubjects.ts`, unit-tested): every subject in the user's order, even with nothing
 open, then subjects that only exist on tasks, then "No subject" (name `""`) when it has tasks. Each
 is two buttons: the arrow unfolds its open tasks (`openSubjects`, `hw-sidebar-subjects-open`,

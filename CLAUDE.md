@@ -309,8 +309,12 @@ that will reuse them; keep adding logic here, not in the component):
 - `src/lib/reminders.ts`: `dailySummary` and `offsetReminders` decide what is owed; the effect in
   `HomeworkPlanner` only shows the notifications and stores what was sent.
 - `src/lib/backup.ts`: `tasksCsv`, `readBackup` and the `withImported...` merges, `withSyllabusTasks`.
-Still inside `HomeworkPlanner`, to move later: the three timers, the storage calls, and the sync
-engine.
+- `src/lib/timers.ts`: the timers' arithmetic (`secondsLeft`, `stopwatchTotal`,
+  `pomodoroFinishMinutes`, `pomodoroCreditMinutes`, `sessionMinutes`, `withSession`). The state,
+  refs and effects that run the Pomodoro, stopwatch and task session are still in the component.
+Still inside `HomeworkPlanner`, to move later, each a change of structure rather than a move: the
+timers as state machines (or a `useFocusTimer` hook), one wrapper for the storage calls, and the
+sync engine.
 When moving more, prove it the same way: build `main` and the branch side by side and compare what
 each shows (the page text per view, the saved data after each action) for identical output.
 

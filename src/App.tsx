@@ -17,6 +17,7 @@ import type { WhatsNewItem } from "./whatsNew";
 import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, dateInDays, snoozeTarget, setDone } from "./lib/tasks";
 import type { SnoozeKind } from "./lib/tasks";
 import { trashEntries, pruneTrash, localRecords } from "./lib/trash";
+import { secondsLeft, secondsSince, stopwatchTotal, pomodoroFinishMinutes, pomodoroCreditMinutes, lengthChangeResetsTimer, sessionMinutes, withSession } from "./lib/timers";
 import { dailySummary, offsetReminders } from "./lib/reminders";
 import type { SentReminders } from "./lib/reminders";
 import { tasksCsv, readBackup, withImportedSubjects, withImportedColors, withImportedTemplates, withSyllabusTasks } from "./lib/backup";
@@ -43,7 +44,7 @@ import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
 import { diffTasks, applyTaskStates } from "./lib/history";
 import type { SyncRecord, CloudRecord } from "./lib/sync";
 import { downloadFile } from "./lib/download";
-import { LIMITS, addSession } from "./lib/limits";
+import { LIMITS } from "./lib/limits";
 import { describeDevice, deviceAction, listDevices, newDeviceId, pruneDevices } from "./lib/devices";
 import type { DeviceEntry, DeviceMap } from "./lib/devices";
 import { usePersistedState } from "./hooks/usePersistedState";
@@ -3146,7 +3147,7 @@ export default function HomeworkPlanner() {
   useEffect(()=>{
     if(!pomodoroActive)return;
     const endAt=Date.now()+pomodoroSecsRef.current*1000;
-    const tick=()=>setPomodoroSecs(Math.max(0,Math.ceil((endAt-Date.now())/1000)));
+    const tick=()=>setPomodoroSecs(secondsLeft(endAt,Date.now()));
     const t=setInterval(tick,500);
     document.addEventListener("visibilitychange",tick);
     return()=>{clearInterval(t);document.removeEventListener("visibilitychange",tick);};
@@ -3160,14 +3161,14 @@ export default function HomeworkPlanner() {
   const [swElapsed,setSwElapsed]=useState(0);
   useEffect(()=>{
     if(swStartedAt==null)return;
-    const tick=()=>setSwElapsed(swBanked+Date.now()-swStartedAt);
+    const tick=()=>setSwElapsed(stopwatchTotal(swBanked,swStartedAt,Date.now()));
     const t=setInterval(tick,250);
     document.addEventListener("visibilitychange",tick);
     return()=>{clearInterval(t);document.removeEventListener("visibilitychange",tick);};
   },[swStartedAt,swBanked]);
   function toggleStopwatch(){
     if(swStartedAt==null){setSwStartedAt(wallClock());return;}
-    const total=swBanked+wallClock()-swStartedAt;
+    const total=stopwatchTotal(swBanked,swStartedAt,wallClock());
     setSwBanked(total);setSwElapsed(total);setSwStartedAt(null);
   }
   function resetStopwatch(){setSwStartedAt(null);setSwBanked(0);setSwElapsed(0);}
@@ -3201,9 +3202,9 @@ export default function HomeworkPlanner() {
       // the whole length, less anything already logged along the way (see
       // creditPomodoro).
       const logId=pomodoroTaskRef.current;
-      const mins=Math.max(0,Math.round((pomodoroWorkMins*60-pomCredited.current)/60));
+      const mins=pomodoroFinishMinutes(pomodoroWorkMins,pomCredited.current);
       pomCredited.current=0;
-      if(logId!=null&&mins>0)setTasks(prev=>prev.map(t=>t.id===logId?{...t,sessions:addSession(t.sessions,{mins,at:Date.now()})}:t));
+      if(logId!=null&&mins>0)setTasks(prev=>withSession(prev,logId,mins,Date.now()));
       setLastWorkedTaskId(logId);setPomodoroPhase("break");setPomodoroSecs(pomodoroBreakMins*60);setPomodoroActive(autoStartBreaks);setPomodoroDone(true);setBreakEnded(false);
       try{ if("Notification" in window&&Notification.permission==="granted") notify("Pomodoro done",{body:autoStartBreaks?`Nice work! Your ${pomodoroBreakMins}-minute break has started.`:`Nice work! Time for a ${pomodoroBreakMins}-minute break.`}); }catch{/* notifications unavailable */}
     }else{
@@ -3227,10 +3228,10 @@ export default function HomeworkPlanner() {
   // by the finish effect for the remainder.
   function creditPomodoro(taskId:number|null){
     if(pomodoroPhase!=="work"||taskId==null)return;
-    const mins=Math.round((pomodoroWorkMins*60-pomodoroSecs-pomCredited.current)/60);
+    const mins=pomodoroCreditMinutes(pomodoroWorkMins,pomodoroSecs,pomCredited.current);
     if(mins<1)return;
     pomCredited.current+=mins*60;
-    setTasks(prev=>prev.map(t=>t.id===taskId?{...t,sessions:addSession(t.sessions,{mins,at:wallClock()})}:t));
+    setTasks(prev=>withSession(prev,taskId,mins,wallClock()));
     setLastWorkedTaskId(taskId);
   }
   function resetPomodoro(){creditPomodoro(pomodoroTaskRef.current);pomCredited.current=0;setPomodoroActive(false);setPomodoroPhase("work");setPomodoroSecs(pomodoroWorkMins*60);}
@@ -3238,7 +3239,7 @@ export default function HomeworkPlanner() {
   // start of that phase -- a paused session keeps its remaining time.
   function changePomodoroLength(phase:"work"|"break",mins:number){
     const cur=phase==="work"?pomodoroWorkMins:pomodoroBreakMins;
-    if(!pomodoroActive&&pomodoroPhase===phase&&pomodoroSecs===cur*60)setPomodoroSecs(mins*60);
+    if(lengthChangeResetsTimer(pomodoroActive,pomodoroPhase,phase,pomodoroSecs,cur))setPomodoroSecs(mins*60);
     (phase==="work"?setPomodoroWorkMins:setPomodoroBreakMins)(mins);
   }
 
@@ -4030,7 +4031,7 @@ export default function HomeworkPlanner() {
   const sessionStartRef=useRef(0);
   useEffect(()=>{
     if(!sessionActive)return;
-    const tick=()=>setSessionSecs(Math.floor((Date.now()-sessionStartRef.current)/1000));
+    const tick=()=>setSessionSecs(secondsSince(sessionStartRef.current,Date.now()));
     sessionInterval.current=setInterval(tick,1000);
     document.addEventListener("visibilitychange",tick);
     return()=>{clearInterval(sessionInterval.current);document.removeEventListener("visibilitychange",tick);};
@@ -4042,10 +4043,10 @@ export default function HomeworkPlanner() {
   // time the modal was closed and reopened.
   function endSession(){
     setSessionActive(false);
-    if(!selectedTask||sessionSecs<5){setSessionSecs(0);return;}
-    const mins=Math.max(1,Math.round(sessionSecs/60));
+    const mins=sessionMinutes(sessionSecs);
+    if(!selectedTask||mins==null){setSessionSecs(0);return;}
     const id=selectedTask.id;
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,sessions:addSession(t.sessions,{mins,at:Date.now()})}:t));
+    setTasks(prev=>withSession(prev,id,mins,Date.now()));
     setSessionSecs(0);
   }
   // Leaving the task page ends (and logs) a session running on it; the sheet
@@ -4327,8 +4328,8 @@ export default function HomeworkPlanner() {
   // (like a finished Pomodoro does) and clears it.
   function saveStopwatch(){
     if(!focusTask)return;
-    const id=focusTask.id, mins=stopwatchMinutes(swStartedAt==null?swBanked:swBanked+wallClock()-swStartedAt);
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,sessions:addSession(t.sessions,{mins,at:wallClock()})}:t));
+    const id=focusTask.id, mins=stopwatchMinutes(stopwatchTotal(swBanked,swStartedAt,wallClock()));
+    setTasks(prev=>withSession(prev,id,mins,wallClock()));
     setLastWorkedTaskId(id);
     resetStopwatch();
     setSrMessage(`Logged ${formatDuration(mins)} to ${focusTask.title}`);

@@ -289,6 +289,23 @@ as `THEMES` -- down from 16 selectable heading/body pairings to exactly one (`FO
 lookup. A one-time `localStorage.removeItem("hw-font")` on mount clears any stale per-user font
 choice already saved by existing users' browsers, mirroring the `hw-accent` cleanup above.
 
+**Where things live outside `App.tsx`** (moved out 2026-10-10, ahead of a React Native phone app
+that will reuse them; keep adding logic here, not in the component):
+- `src/types.ts`: `Task`, `Subtask`, `TaskTemplate`, `HistoryAction`, `Priority`, `Recurrence`.
+- `src/constants.ts`: `LAYOUTS`, `GROUP_BY`, the default subjects and colours, `PRIORITY_COLORS`/
+  `priColor`, `REMINDER_OFFSETS`, `QUESTIONS`/`askedQuestions`.
+- `src/whatsNew.ts`: `WHATS_NEW` (add new entries here), `UPDATE_KIND_ORDER`, `LEGACY_WHATSNEW_IDS`.
+- `src/lib/tasks.ts`: `setDone` (completing, the repeat copy, un-completing), `nextOrder`,
+  `buildSuggestion`, `snoozeTarget`, `dateInDays`, `isUntouchedExample`.
+- `src/lib/trash.ts`: `TrashEntry`, `trashEntries`, `pruneTrash`, `localRecords`.
+- `src/lib/taskActions.ts`: what each task action does to the data, as plain `list in, list out`
+  functions (`patchTask`, `patchTasks`, `duplicateOf`, `withNewTask`, `withTrashed`,
+  `restoredInto`, `movedOrder`, the subject add/rename helpers, templates). The functions in
+  `HomeworkPlanner` (`editTask`, `duplicateTask`, `moveTaskBy`...) are thin wrappers that add what
+  belongs to the screen: the undo entry, the toast, `captureTaskRects`.
+Still inside `HomeworkPlanner`, to move later: the list calculations (sorting, filtering,
+grouping), the three timers, reminders, import/export, the storage calls, and the sync engine.
+
 **Domain logic as plain functions** (not hooks), all in `src/lib/` and unit-tested via `npm test`:
 - `dates.ts`: `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due
   dates. Deliberately not `toISOString()`/UTC, since a day should roll over at the user's local

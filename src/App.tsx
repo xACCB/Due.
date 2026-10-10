@@ -17,10 +17,11 @@ import type { WhatsNewItem } from "./whatsNew";
 import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, dateInDays, snoozeTarget, setDone, nextOrder } from "./lib/tasks";
 import type { SnoozeKind } from "./lib/tasks";
 import { trashEntries, pruneTrash, localRecords } from "./lib/trash";
+import { patchTask, patchTasks, withoutTasks, skipPatch, snoozePatch, dueDatePatch, duplicateOf, freshSubtasks, withNewTask, templateFromTask, taskFromTemplate, withTrashed, withoutTrashed, restoredInto, movedOrder, withOrder, subjectToAdd, subjectRename, renamedSubjects, recolouredSubjects, withoutSubjectColor, tasksRenamedSubject, trashRenamedSubject, templatesRenamedSubject } from "./lib/taskActions";
 import type { TrashEntry } from "./lib/trash";
 import { THEMES } from "./themes";
 import type { ThemeName, ThemeObj } from "./themes";
-import { localDateStr, todayISO, advanceDate } from "./lib/dates";
+import { localDateStr, todayISO } from "./lib/dates";
 import { nextId } from "./lib/id";
 import { normalizeFocusShow, focusShowFor, showsPomodoro, showsStopwatch, formatStopwatch, stopwatchMinutes } from "./lib/stopwatch";
 import { ANIM_SPEED, clampSpeed, setAnimationSpeed, animationRate, scaledMs } from "./lib/animSpeed";
@@ -2376,34 +2377,32 @@ export default function HomeworkPlanner() {
   useEffect(()=>{localStorage.setItem("hw-subjectcolors",JSON.stringify(subjectColors));},[subjectColors]);
   const [templates,setTemplates]=usePersistedState<TaskTemplate[]>("hw-templates",[]);
   function saveAsTemplate(task:Task,name:string){
-    setTemplates(prev=>[...prev,{id:String(nextId()),name,subject:task.subject,estMins:task.estMins,recurrence:task.recurrence,subtasks:(task.subtasks||[]).map(s=>({text:s.text}))}]);
+    setTemplates(prev=>[...prev,templateFromTask(task,name)]);
   }
   function addSubject(name:string){
-    const trimmed=name.trim();
-    if(!trimmed||subjects.length>=LIMITS.subjects||subjects.some(s=>s.toLowerCase()===trimmed.toLowerCase()))return;
-    const used=new Set(Object.values(subjectColors));
-    const color=SUBJECT_COLOR_PALETTE.find(c=>!used.has(c))||SUBJECT_COLOR_PALETTE[subjects.length%SUBJECT_COLOR_PALETTE.length];
-    setSubjects(prev=>[...prev,trimmed]);
-    setSubjectColors(prev=>({...prev,[trimmed]:color}));
+    const added=subjectToAdd(name,subjects,subjectColors);
+    if(!added)return;
+    setSubjects(prev=>[...prev,added.name]);
+    setSubjectColors(prev=>({...prev,[added.name]:added.color}));
   }
   // Rename and/or recolor a subject; a rename carries over to every task
   // (including Recently deleted) and template using it. False if the new name
   // is empty or taken.
   function updateSubject(old:string,name:string,color:string):boolean{
-    const trimmed=name.trim();
-    if(!trimmed||subjects.some(s=>s!==old&&s.toLowerCase()===trimmed.toLowerCase()))return false;
-    setSubjects(prev=>prev.map(s=>s===old?trimmed:s));
-    setSubjectColors(prev=>{const next={...prev};delete next[old];next[trimmed]=color;return next;});
+    const trimmed=subjectRename(old,name,subjects);
+    if(trimmed==null)return false;
+    setSubjects(prev=>renamedSubjects(prev,old,trimmed));
+    setSubjectColors(prev=>recolouredSubjects(prev,old,trimmed,color));
     if(trimmed!==old){
-      setTasks(prev=>prev.map(t=>t.subject===old?{...t,subject:trimmed}:t));
-      setTrash(prev=>prev.map(e=>e.task.subject===old?{...e,task:{...e.task,subject:trimmed}}:e));
-      setTemplates(prev=>prev.map(tp=>tp.subject===old?{...tp,subject:trimmed}:tp));
+      setTasks(prev=>tasksRenamedSubject(prev,old,trimmed));
+      setTrash(prev=>trashRenamedSubject(prev,old,trimmed));
+      setTemplates(prev=>templatesRenamedSubject(prev,old,trimmed));
     }
     return true;
   }
   function removeSubject(name:string){
     setSubjects(prev=>prev.filter(s=>s!==name));
-    setSubjectColors(prev=>{const next={...prev};delete next[name];return next;});
+    setSubjectColors(prev=>withoutSubjectColor(prev,name));
   }
 
   useEffect(()=>{localStorage.setItem("hw-tasks",JSON.stringify(tasks));},[tasks]);
@@ -3102,18 +3101,16 @@ export default function HomeworkPlanner() {
   const [redoStack,setRedoStack]=useState<HistoryAction[]>([]);
   const [undoToast,setUndoToast]=useState<string|null>(null);
   function addToTrash(list:Task[]){
-    const ids=new Set(list.map(t=>t.id));
     const added=trashEntries(list);
-    setTrash(prev=>[...added,...prev.filter(e=>!ids.has(e.task.id))].slice(0,200));
+    setTrash(prev=>withTrashed(prev,added));
   }
   function removeFromTrash(ids:number[]){
-    const s=new Set(ids);
-    setTrash(prev=>prev.filter(e=>!s.has(e.task.id)));
+    setTrash(prev=>withoutTrashed(prev,ids));
   }
   function restoreFromTrash(id:number){
     const entry=trash.find(e=>e.task.id===id);
     if(!entry)return;
-    setTasks(prev=>prev.some(t=>t.id===id)?prev:[...prev,{...entry.task,order:nextOrder(prev)}]);
+    setTasks(prev=>restoredInto(prev,entry));
     removeFromTrash([id]);
   }
   const undoToastTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
@@ -3458,7 +3455,7 @@ export default function HomeworkPlanner() {
   // date instead of asking the remaining questions. With the due-date question
   // turned off, the task is added straight away.
   function startFromTemplate(tpl:TaskTemplate){
-    const task={title:tpl.name,subject:tpl.subject,dueDate:"",dueTime:"",estMins:tpl.estMins,recurrence:tpl.recurrence};
+    const task=taskFromTemplate(tpl);
     const dateStep=askQuestions.findIndex(q=>q.type==="date");
     if(dateStep<0){finishTask(task as Task,tpl.subtasks||null);return;}
     setAdding(true);
@@ -3528,9 +3525,9 @@ export default function HomeworkPlanner() {
     }
   }
   function finishTask(task:Task,tplSubtasks:{text:string}[]|null=templateSubtasks){
-    const subtasks=tplSubtasks?tplSubtasks.map(s=>({id:String(nextId()),text:s.text,done:false})):undefined;
+    const subtasks=freshSubtasks(tplSubtasks);
     captureTaskRects();
-    setTasks(prev=>[...prev,{...task,id:nextId(),done:false,order:nextOrder(prev),...(subtasks?{subtasks}:{})}]);
+    setTasks(prev=>withNewTask(prev,task,subtasks));
     setAdding(false);setStep(0);
     setUsingTemplate(false);setTemplateSubtasks(null);
   }
@@ -3670,7 +3667,7 @@ export default function HomeworkPlanner() {
     const removed=tasks.filter(t=>ids.includes(t.id));
     if(removed.length===0)return;
     captureTaskRects();
-    setTasks(prev=>prev.filter(t=>!ids.includes(t.id)));
+    setTasks(prev=>withoutTasks(prev,ids));
     addToTrash(removed);
     pushUndoable({type:"delete",tasks:removed},removed.length===1?`"${removed[0].title}" deleted`:`${removed.length} tasks deleted`);
   }
@@ -3698,16 +3695,16 @@ export default function HomeworkPlanner() {
   function skipOccurrence(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task||!task.recurrence||task.recurrence==="none")return;
-    const after={dueDate:advanceDate(task.dueDate||todayISO(),task.recurrence)};
-    changeTasks(prev=>prev.map(t=>t.id===id?{...t,...after}:t),`skip "${task.title}"`,
+    const after=skipPatch(task,todayISO());
+    changeTasks(prev=>patchTask(prev,id,after),`skip "${task.title}"`,
       `"${task.title}" skipped to ${formatDate(after.dueDate)}`);
   }
   function snoozeTask(id:number,kind:SnoozeKind){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
     const target=snoozeTarget(kind);
-    const after={dueDate:target.dueDate,dueTime:target.dueTime??task.dueTime};
-    changeTasks(prev=>prev.map(t=>t.id===id?{...t,...after}:t),`snooze "${task.title}"`,
+    const after=snoozePatch(task,target);
+    changeTasks(prev=>patchTask(prev,id,after),`snooze "${task.title}"`,
       `"${task.title}" snoozed to ${formatDate(after.dueDate)}${after.dueTime?` ${formatTime(after.dueTime,h24)}`:""}`);
   }
   // Each action type's reversal lives in its branch here.
@@ -3736,21 +3733,20 @@ export default function HomeworkPlanner() {
   const describeAction=(action:HistoryAction)=>action.type==="change"?action.label
     :`delete ${action.tasks.length===1?`"${action.tasks[0].title}"`:`${action.tasks.length} tasks`}`;
   function updateSubtasks(id:number,subtasks:Subtask[]){
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,subtasks}:t));
+    setTasks(prev=>patchTask(prev,id,{subtasks}));
   }
   function setPriorityOverride(id:number,override:Priority|null){
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,priorityOverride:override??undefined}:t));
+    setTasks(prev=>patchTask(prev,id,{priorityOverride:override??undefined}));
   }
   function setTaskTags(id:number,tags:string[]){
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,tags}:t));
+    setTasks(prev=>patchTask(prev,id,{tags}));
   }
   // A fresh copy: not done, no logged sessions, subtasks unchecked, and not
   // linked to the original's repeat chain.
   function duplicateTask(id:number):Task|null{
     const src=tasks.find(t=>t.id===id);
     if(!src)return null;
-    const copy:Task={...src,id:nextId(),done:false,completedAt:null,archived:false,spawnedNextId:null,sessions:[],
-      order:nextOrder(tasks),...(src.subtasks?{subtasks:src.subtasks.map(s=>({...s,id:String(nextId()),done:false}))}:{})};
+    const copy=duplicateOf(src,tasks);
     captureTaskRects();
     setTasks(prev=>[...prev,copy]);
     return copy;
@@ -3758,25 +3754,25 @@ export default function HomeworkPlanner() {
   function archiveTask(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
-    changeTasks(prev=>prev.map(t=>t.id===id?{...t,archived:true}:t),`archive "${task.title}"`,`"${task.title}" archived`);
+    changeTasks(prev=>patchTask(prev,id,{archived:true}),`archive "${task.title}"`,`"${task.title}" archived`);
   }
   function unarchiveTask(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
-    changeTasks(prev=>prev.map(t=>t.id===id?{...t,archived:false}:t),`restore "${task.title}"`,`"${task.title}" restored`);
+    changeTasks(prev=>patchTask(prev,id,{archived:false}),`restore "${task.title}"`,`"${task.title}" restored`);
   }
   // The task detail's Edit panel.
   function editTask(id:number,patch:Partial<Task>){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
-    changeTasks(prev=>prev.map(t=>t.id===id?{...t,...patch}:t),`edit "${task.title}"`,`"${patch.title??task.title}" updated`);
+    changeTasks(prev=>patchTask(prev,id,patch),`edit "${task.title}"`,`"${patch.title??task.title}" updated`);
   }
   function bulkMarkDone(ids:number[]){
     changeTasks(prev=>setDone(prev,ids,true),`complete ${plural(ids.length)}`,`${plural(ids.length)} completed`);
     exitSelectionMode();
   }
   function bulkArchive(ids:number[]){
-    changeTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,archived:true}:t),`archive ${plural(ids.length)}`,`${plural(ids.length)} archived`);
+    changeTasks(prev=>patchTasks(prev,ids,()=>({archived:true})),`archive ${plural(ids.length)}`,`${plural(ids.length)} archived`);
     exitSelectionMode();
   }
   function bulkDelete(ids:number[]){
@@ -3786,17 +3782,17 @@ export default function HomeworkPlanner() {
   function bulkSetDue(ids:number[],dueDate:string){
     // Keeps each task's own due time; clearing the date clears the time too
     // (a time with no date means nothing), same as the Edit panel.
-    changeTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,dueDate,dueTime:dueDate?t.dueTime:""}:t),
+    changeTasks(prev=>patchTasks(prev,ids,dueDatePatch(dueDate)),
       `set the due date of ${plural(ids.length)}`,dueDate?`${plural(ids.length)} due ${formatDate(dueDate)}`:`Due date cleared on ${plural(ids.length)}`);
     exitSelectionMode();
   }
   function bulkSetPriority(ids:number[],p:Priority|null){
-    changeTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,priorityOverride:p??undefined}:t),
+    changeTasks(prev=>patchTasks(prev,ids,()=>({priorityOverride:p??undefined})),
       `set the priority of ${plural(ids.length)}`,p?`${plural(ids.length)} set to ${p} priority`:`${plural(ids.length)} back to automatic priority`);
     exitSelectionMode();
   }
   function bulkSetSubject(ids:number[],subject:string){
-    changeTasks(prev=>prev.map(t=>ids.includes(t.id)?{...t,subject}:t),`move ${plural(ids.length)} to ${subject||"no subject"}`,`${plural(ids.length)} moved to ${subject||"no subject"}`);
+    changeTasks(prev=>patchTasks(prev,ids,()=>({subject})),`move ${plural(ids.length)} to ${subject||"no subject"}`,`${plural(ids.length)} moved to ${subject||"no subject"}`);
     exitSelectionMode();
   }
   function exportAllDataJSON(){
@@ -3895,14 +3891,11 @@ export default function HomeworkPlanner() {
   // place among the pending tasks, glides the cards like completing does, keeps
   // focus on the handle, and says where it landed.
   function moveTaskBy(id:number,delta:number){
-    const ids=allSorted.filter(t=>!t.done).map(t=>t.id);
-    const from=ids.indexOf(id), to=from+delta;
-    if(from===-1||to<0||to>=ids.length)return;
-    ids.splice(from,1); ids.splice(to,0,id);
-    const orderMap=new Map(ids.map((tid,idx)=>[tid,idx]));
+    const moved=movedOrder(allSorted.filter(t=>!t.done).map(t=>t.id),id,delta);
+    if(!moved)return;
     captureTaskRects("quick");
-    setTasks(prev=>prev.map(t=>orderMap.has(t.id)?{...t,order:orderMap.get(t.id)!}:t));
-    setSrMessage(`Moved to position ${to+1} of ${ids.length}`);
+    setTasks(prev=>withOrder(prev,moved.order));
+    setSrMessage(`Moved to position ${moved.position} of ${moved.count}`);
     requestAnimationFrame(()=>document.querySelector<HTMLElement>(`[data-task-id="${id}"] [data-reorder]`)?.focus());
   }
 

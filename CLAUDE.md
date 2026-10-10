@@ -300,7 +300,23 @@ local-only), most urgent first, `SIDEBAR_TASK_CAP` (8) of them until "Show all";
 `subjectFilter`, which narrows `filteredTasks` on Home on top of the filter chips. Picking it again,
 the Home row, or the subject's chip in the filter row clears it, as does a "Take me there" to the
 task list. Read it through `subjectFilterOn`, which ignores a filter whose subject no longer has a
-row (renamed, deleted, emptied). A nested task opens `TaskModal`; it has no checkbox there.
+row (renamed, deleted, emptied). A nested task has no checkbox; clicking it opens the task page.
+
+**Task page.** A task opened from the sidebar is a whole screen, not the sheet: `openTaskPage()` sets
+`selectedTask` and `activeTab` to `"task"`, and the same `taskDetail` element (`TaskModal`) is
+rendered inside `<main>` with `page` set instead of over the page. Everything that used to test
+`selectedTask!=null` for "a sheet is covering the page" (inert, pull to reload, the drawer swipe)
+tests `sheetTaskOpen` instead. In its `page` form `TaskModal` has no overlay, dialog role, focus
+trap, drag or scroll lock, and no Edit, Save, Cancel or close buttons: the title is a field in the
+heading and the edit form is always open. There's no draft to confirm, so `commitDraft()` saves a
+field when focus leaves it (the form's `onBlur`, the title's own) and a choice (subject, repeat, the
+"No due date/time" links) at once, and only when something really changed, so each save is one undo
+step rather than one per keystroke. The fields are refilled from the task whenever its saved values
+change (`taskSig`). Mark done and Archive keep the page open (the sheet closes); Delete goes Home.
+Leave the page through `navTo()`, which calls `leaveTaskPage()` to end and log a session running on
+it (both declared below `endSession`, for the React Compiler's forward-reference check); a tab
+change that bypasses it still clears `selectedTask` (the `lastTab` block), so the task can't
+reappear as a sheet. Tasks opened anywhere else (Home, Calendar, search) still open the sheet.
 
 **UI shape.** The sidebar's Home, Calendar (below) and Focus rows are the main screens; Focus opens the
 separate full-screen Focus Mode (`focusMode` state) with its Pomodoro timer (clock-based: it counts

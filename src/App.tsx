@@ -259,7 +259,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
-  { id:"sidebar", date:"2026-10-10", kind:"Navigation", headline:"A sidebar", where:"Tap dp at the top left, or swipe in from the left edge. On a computer it's always showing", go:"menu", description:"Everything now lives in one sidebar: your profile, Search, Home, Calendar, Focus, your subjects, Inbox, History, Import/Export and Settings. Tap the arrow beside a subject to see what is left to do in it, most urgent first, and tap a task to open it. Tap a subject's name to show only that subject on Home, and tap it again, or Home, to see everything. On a computer it stays open beside your tasks, and the button at its top right folds it away. On a phone, tap dp or swipe in from the left edge to open it. It replaces the three buttons that sat above your tasks and the menu under the DuePlanner name. While a timer is running, its time shows at the top of the screen, and tapping it opens Focus. The Desktop Layout setting is gone, since the sidebar does that job." },
+  { id:"sidebar", date:"2026-10-10", kind:"Navigation", headline:"A sidebar", where:"Tap dp at the top left, or swipe in from the left edge. On a computer it's always showing", go:"menu", description:"Everything now lives in one sidebar: your profile, Search, Home, Calendar, Focus, your subjects, Inbox, History, Import/Export and Settings. Tap the arrow beside a subject to see what is left to do in it, most urgent first. Tap a task there to open it as a full page, where its title, subject, due date, estimate and repeat can be changed right on the page, with no Edit button, and each change saves as you make it. Tap a subject's name to show only that subject on Home, and tap it again, or Home, to see everything. On a computer it stays open beside your tasks, and the button at its top right folds it away. On a phone, tap dp or swipe in from the left edge to open it. It replaces the three buttons that sat above your tasks and the menu under the DuePlanner name. While a timer is running, its time shows at the top of the screen, and tapping it opens Focus. The Desktop Layout setting is gone, since the sidebar does that job." },
   { id:"animation-two-step", date:"2026-10-04", kind:"Bug fix", headline:"No more double moves", where:"Search, a task's details, and cards that open from a row", description:"Some animations went to one spot and then shifted to another. The search bar now flies straight to where it ends up once the keyboard is open, a task's details settle back without overshooting, and cards that open from a row land exactly where they stay." },
   { id:"dropdowns-close", date:"2026-10-04", kind:"UI change", headline:"Dropdowns fold up when you leave", where:"Sidebar (tap dp) → Inbox, or Import/Export", go:"menu", description:"Like Settings, the dropdowns in the Inbox and Import/Export now close when you leave the screen, so each one opens folded up." },
   { id:"time-left-detail", date:"2026-10-04", kind:"New feature", headline:"Time left, in depth", where:"Tap Time left, top right, then tap any row", go:"tasks:time-left", description:"Every row in Time left now opens. Tap a due-date group or a subject to see its time left, how many tasks it has, how long you've already worked on them, and each task with when it's due and how long it should take. You can check tasks off or open them from there." },
@@ -514,7 +514,18 @@ function snoozeTarget(kind:SnoozeKind):{dueDate:string;dueTime?:string}{
 // stable across renders -- otherwise the session timer's once-a-second tick
 // would redefine this as a "new" component each time, forcing React to unmount
 // and remount the whole modal (replaying its entrance animation) every second.
-function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSkipOccurrence,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
+// What TaskModal's editable fields hold while being edited. The estimate is kept
+// as typed text (see the note at `draft` in TaskModal).
+type TaskDraft={title:string;subject:string;dueDate:string;dueTime:string;estH:string;estM:string;recurrence:Recurrence};
+function taskDraft(task:Task):TaskDraft{
+  return {title:task.title,subject:task.subject,dueDate:task.dueDate,dueTime:task.dueTime,
+    estH:task.estMins>=60?String(Math.floor(task.estMins/60)):"",estM:task.estMins%60?String(task.estMins%60):"",recurrence:task.recurrence||"none"};
+}
+// `page`: shown as a whole screen (a task opened from the sidebar) instead of a
+// bottom sheet. No overlay, focus trap or drag, and no Edit button: the fields
+// are always there and save as you go (see commitDraft).
+function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSkipOccurrence,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
+  page?:boolean;
   task:Task; T:ThemeObj; F:typeof FONT; subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number; h24:boolean;
   sessionActive:boolean; sessionSecs:number;
   allTags:string[];
@@ -545,11 +556,27 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   // repeat) -- previously these could only be set while adding a task.
   // The estimate is kept as the typed text (digits only, may be empty mid-edit)
   // and only turned into minutes on save; minutes past 59 roll into hours.
-  const [draft,setDraft]=useState<{title:string;subject:string;dueDate:string;dueTime:string;estH:string;estM:string;recurrence:Recurrence}|null>(null);
+  const [draft,setDraft]=useState<TaskDraft|null>(()=>page?taskDraft(task):null);
   const draftEstMins=draft?Math.min(LIMITS.estMins,(parseInt(draft.estH,10)||0)*60+(parseInt(draft.estM,10)||0)):0;
-  function startEdit(){
-    setDraft({title:task.title,subject:task.subject,dueDate:task.dueDate,dueTime:task.dueTime,
-      estH:task.estMins>=60?String(Math.floor(task.estMins/60)):"",estM:task.estMins%60?String(task.estMins%60):"",recurrence:task.recurrence||"none"});
+  function startEdit(){setDraft(taskDraft(task));}
+  // As a page the fields are always open, so they follow the task: whenever its
+  // saved values change (our own save, an undo, another device), the fields are
+  // refilled from it. Adjusted while rendering, React's pattern for state that
+  // tracks a changed value.
+  const taskSig=`${task.title}\n${task.subject}\n${task.dueDate}\n${task.dueTime}\n${task.estMins}\n${task.recurrence||"none"}`;
+  const [draftSig,setDraftSig]=useState(taskSig);
+  if(page&&taskSig!==draftSig){setDraftSig(taskSig);setDraft(taskDraft(task));}
+  // The page's way of saving: there's no Save button, so a field saves when you
+  // leave it (or at once, for a choice). Saves only a real change, so tabbing
+  // through the fields doesn't fill the undo history; with nothing to save the
+  // fields are reset to the task (an emptied title comes back).
+  function commitDraft(d:TaskDraft|null=draft){
+    if(!d)return;
+    const next={title:d.title.trim()||task.title,subject:d.subject,dueDate:d.dueDate,dueTime:d.dueDate?d.dueTime:"",
+      estMins:Math.min(LIMITS.estMins,(parseInt(d.estH,10)||0)*60+(parseInt(d.estM,10)||0)),recurrence:d.recurrence};
+    const same=next.title===task.title&&next.subject===task.subject&&next.dueDate===task.dueDate&&next.dueTime===(task.dueTime||"")
+      &&next.estMins===task.estMins&&next.recurrence===(task.recurrence||"none");
+    if(same)setDraft(taskDraft(task));else onUpdateTask(next);
   }
   function saveEdit(){
     if(!draft)return;
@@ -589,6 +616,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
   const openerRef=useRef<HTMLElement|null>(null);
   useLayoutEffect(()=>{if(!openerRef.current)openerRef.current=document.activeElement as HTMLElement|null;},[]);
   useEffect(()=>{
+    if(page)return; // a page isn't a dialog: nothing to trap or hand back
     const previouslyFocused=openerRef.current;
     const focusableSelector='button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
     panelRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus();
@@ -603,7 +631,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
     }
     document.addEventListener("keydown",handleKeyDown);
     return ()=>{document.removeEventListener("keydown",handleKeyDown);previouslyFocused?.focus();};
-  },[]);
+  },[page]);
   // Drag the top handle to move the sheet, like a native bottom sheet: it
   // follows the finger (with rubber-band resistance if pulled up), the backdrop
   // fades as it goes, and on release it springs back into place or -- if dragged
@@ -709,37 +737,9 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
       root.style.overflow=before;
     };
   },[]);
-  return(
-    <div ref={overlayRef} className="fade-in" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.53)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
-      {/* The drag offset lives on this wrapper, not the panel: the panel's "pop"
-          entrance animation (fill-mode forwards) would override its transform. */}
-      <div ref={sheetRef} style={{width:"100%",maxWidth:580}}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={task.title} className="pop" style={{background:T.bg,borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"90vh",overflowY:"auto",overscrollBehavior:"contain",border:`1px solid ${T.border}`,borderBottom:"none"}}>
-        {/* Handle -- drag down to close (not while a session is running) */}
-        {!sessionActive&&<div data-sheet-handle
-          onPointerDown={e=>{
-            cancelAnimationFrame(sheetAnim.current); // catch the sheet mid-spring
-            sheetDrag.current={startY:e.clientY-sheetY.current,samples:[{t:e.timeStamp,y:e.clientY}]};
-            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-          }}
-          onPointerMove={e=>{
-            const d=sheetDrag.current; if(!d)return;
-            d.samples.push({t:e.timeStamp,y:e.clientY}); if(d.samples.length>8)d.samples.shift();
-            const raw=e.clientY-d.startY;
-            setSheetY(raw>=0?raw:-rubberBand(-raw));
-          }}
-          onPointerUp={e=>{
-            const d=sheetDrag.current; if(!d)return; sheetDrag.current=null;
-            d.samples.push({t:e.timeStamp,y:e.clientY});
-            const v=releaseVelocity(d.samples);
-            releaseSheet(v,shouldDismiss(sheetY.current,v));
-          }}
-          onPointerCancel={()=>{sheetDrag.current=null;releaseSheet(0,false);}}
-          style={{display:"flex",justifyContent:"center",padding:"12px 0 8px",cursor:"grab",touchAction:"none"}}>
-          <div style={{width:36,height:4,borderRadius:999,background:T.border}}/>
-        </div>}
-        {sessionActive&&<div style={{height:20}}/>}
-        <div style={{padding:"12px 20px 32px"}}>
+  // The content, without the sheet around it, so the page can show it as is.
+  const content=(
+        <div style={{padding:page?"8px 0 32px":"12px 20px 32px"}}>
           {/* Task header */}
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
             <div style={{flex:1}}>
@@ -748,26 +748,31 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
                 {!task.done&&<span style={{background:priColor(pr,colorCodeUrgency)+"22",color:ink(priColor(pr,colorCodeUrgency),T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{pr[0].toUpperCase()+pr.slice(1)} priority{task.priorityOverride?" (set manually)":""}</span>}
                 {task.done&&<span style={{background:"#2ED57322",color:ink("#2ED573",T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>✓ Done</span>}
               </div>
-              <div style={{fontFamily:F.heading,fontSize:22,color:T.text,lineHeight:1.2}}>{task.title}</div>
+              {page&&draft
+                ?<input value={draft.title} maxLength={500} aria-label="Title" onChange={e=>setDraft({...draft,title:e.target.value})} onBlur={()=>commitDraft()} onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
+                  style={{display:"block",width:"100%",boxSizing:"border-box",background:"none",border:"none",borderBottom:`1px solid ${T.borderFaint}`,borderRadius:0,outline:"none",padding:"2px 0 6px",fontFamily:F.heading,fontSize:26,color:T.text,lineHeight:1.2}}/>
+                :<div style={{fontFamily:F.heading,fontSize:22,color:T.text,lineHeight:1.2}}>{task.title}</div>}
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+            {!page&&<div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
               {!draft&&<button data-tour="task-edit" onClick={startEdit} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:8,color:T.textMuted,fontSize:11,cursor:"pointer",padding:"5px 10px"}}>Edit</button>}
               {!sessionActive&&<button onClick={onClose} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",padding:"0 0 0 8px",lineHeight:1}}>×</button>}
-            </div>
+            </div>}
           </div>
 
-          {/* Edit panel */}
+          {/* Edit panel. On the page it's always open, and a field saves when you
+              leave it (the form's onBlur) or at once for a choice (change(...,true)). */}
           {draft&&(()=>{
             const field={background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"8px 10px",fontSize:12,outline:"none",width:"100%",boxSizing:"border-box" as const};
             const label={fontSize:10,color:T.textMuted,textTransform:"uppercase" as const,letterSpacing:"0.08em",marginBottom:4,display:"block"};
             const clear={background:"none",border:"none",padding:"6px 0 0",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11,textDecoration:"underline"};
             const subjectOptions=draft.subject&&!subjects.includes(draft.subject)?[...subjects,draft.subject]:subjects;
+            const change=(patch:Partial<TaskDraft>,saveNow?:boolean)=>{const d={...draft,...patch};setDraft(d);if(page&&saveNow)commitDraft(d);};
             return (
-            <form className="sec-body" onSubmit={e=>{e.preventDefault();saveEdit();}} style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.accent}44`,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
-              <label><span style={label}>Title</span>
-                <input className="edit-field" autoFocus value={draft.title} maxLength={500} onChange={e=>setDraft({...draft,title:e.target.value})} style={field}/></label>
+            <form className="sec-body" onSubmit={e=>{e.preventDefault();if(page)commitDraft();else saveEdit();}} onBlur={page?()=>commitDraft():undefined} style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${page?T.border:T.accent+"44"}`,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
+              {!page&&<label><span style={label}>Title</span>
+                <input className="edit-field" autoFocus value={draft.title} maxLength={500} onChange={e=>setDraft({...draft,title:e.target.value})} style={field}/></label>}
               <label><span style={label}>Subject</span>
-                <select className="edit-field" value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})} style={field}>
+                <select className="edit-field" value={draft.subject} onChange={e=>change({subject:e.target.value},true)} style={field}>
                   <option value="">No subject</option>
                   {subjectOptions.map(s=><option key={s} value={s}>{s}</option>)}
                 </select></label>
@@ -781,12 +786,12 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
                 <div style={{flex:"1 1 0",minWidth:0}}>
                   <label style={{display:"block"}}><span style={label}>Due date</span>
                     <input className="edit-field" type="date" value={draft.dueDate} onChange={e=>setDraft({...draft,dueDate:e.target.value})} style={field}/></label>
-                  {draft.dueDate&&<button type="button" onClick={()=>setDraft({...draft,dueDate:"",dueTime:""})} style={clear}>No due date</button>}
+                  {draft.dueDate&&<button type="button" onClick={()=>change({dueDate:"",dueTime:""},true)} style={clear}>No due date</button>}
                 </div>
                 <div style={{flex:"1 1 0",minWidth:0}}>
                   <label style={{display:"block"}}><span style={label}>Time</span>
                     <input className="edit-field" type="time" value={draft.dueTime} disabled={!draft.dueDate} onChange={e=>setDraft({...draft,dueTime:e.target.value})} style={{...field,opacity:draft.dueDate?1:0.5}}/></label>
-                  {draft.dueTime&&<button type="button" data-tour="no-due-time" onClick={()=>setDraft({...draft,dueTime:""})} style={clear}>No due time</button>}
+                  {draft.dueTime&&<button type="button" data-tour="no-due-time" onClick={()=>change({dueTime:""},true)} style={clear}>No due time</button>}
                 </div>
               </div>
               <div style={{display:"flex",gap:8}}>
@@ -800,13 +805,13 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
               </div>
               {(parseInt(draft.estM,10)||0)>=60&&<div style={{fontSize:10,color:T.textMuted,marginTop:-4}}>Saves as {formatDuration(draftEstMins)}</div>}
               <label><span style={label}>Repeats</span>
-                <select className="edit-field" value={draft.recurrence} onChange={e=>setDraft({...draft,recurrence:e.target.value as Recurrence})} style={field}>
+                <select className="edit-field" value={draft.recurrence} onChange={e=>change({recurrence:e.target.value as Recurrence},true)} style={field}>
                   <option value="none">Doesn't repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
                 </select></label>
-              <div style={{display:"flex",gap:8}}>
+              {!page&&<div style={{display:"flex",gap:8}}>
                 <button type="button" onClick={()=>setDraft(null)} style={{flex:1,background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px",color:T.textMuted,cursor:"pointer",fontSize:12}}>Cancel</button>
                 <button type="submit" style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px",cursor:"pointer",fontSize:12,fontWeight:500}}>Save</button>
-              </div>
+              </div>}
             </form>
             );
           })()}
@@ -829,7 +834,7 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
           </div>
 
           {/* Snooze */}
-          {!task.done&&!draft&&(
+          {!task.done&&(!draft||page)&&(
             <div data-tour="task-snooze" style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:-8,marginBottom:18}}>
               <span style={{fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginRight:2}}>Snooze</span>
               {([["later","In 3 hours"],["tomorrow","Tomorrow"],["week","Next week"]] as const).map(([k,l])=>(
@@ -983,6 +988,39 @@ function TaskModal({task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,ses
             <button type="button" onClick={()=>setTemplateName(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",color:T.textMuted,cursor:"pointer",fontSize:12}}>Cancel</button>
           </form>}
         </div>
+  );
+  if(page)return <div ref={panelRef}>{content}</div>;
+  return(
+    <div ref={overlayRef} className="fade-in" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.53)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 0 0 0"}} onClick={e=>{if(e.target===e.currentTarget&&!sessionActive)onClose();}}>
+      {/* The drag offset lives on this wrapper, not the panel: the panel's "pop"
+          entrance animation (fill-mode forwards) would override its transform. */}
+      <div ref={sheetRef} style={{width:"100%",maxWidth:580}}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={task.title} className="pop" style={{background:T.bg,borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"90vh",overflowY:"auto",overscrollBehavior:"contain",border:`1px solid ${T.border}`,borderBottom:"none"}}>
+        {/* Handle -- drag down to close (not while a session is running) */}
+        {!sessionActive&&<div data-sheet-handle
+          onPointerDown={e=>{
+            cancelAnimationFrame(sheetAnim.current); // catch the sheet mid-spring
+            sheetDrag.current={startY:e.clientY-sheetY.current,samples:[{t:e.timeStamp,y:e.clientY}]};
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={e=>{
+            const d=sheetDrag.current; if(!d)return;
+            d.samples.push({t:e.timeStamp,y:e.clientY}); if(d.samples.length>8)d.samples.shift();
+            const raw=e.clientY-d.startY;
+            setSheetY(raw>=0?raw:-rubberBand(-raw));
+          }}
+          onPointerUp={e=>{
+            const d=sheetDrag.current; if(!d)return; sheetDrag.current=null;
+            d.samples.push({t:e.timeStamp,y:e.clientY});
+            const v=releaseVelocity(d.samples);
+            releaseSheet(v,shouldDismiss(sheetY.current,v));
+          }}
+          onPointerCancel={()=>{sheetDrag.current=null;releaseSheet(0,false);}}
+          style={{display:"flex",justifyContent:"center",padding:"12px 0 8px",cursor:"grab",touchAction:"none"}}>
+          <div style={{width:36,height:4,borderRadius:999,background:T.border}}/>
+        </div>}
+        {sessionActive&&<div style={{height:20}}/>}
+        {content}
       </div>
       </div>
     </div>
@@ -1029,7 +1067,7 @@ const isWideScreen=()=>window.matchMedia("(min-width:900px)").matches;
 // index.html as a two-letter subset, so the mark looks the same on every device.
 const DP_MARK_FONT="'Bodoni Moda', 'Bodoni MT', Georgia, 'Times New Roman', serif";
 // The wide-screen header shows the current screen's name where a phone shows the mark.
-const SCREEN_TITLES:Record<string,string>={tasks:"Home",calendar:"Calendar",inbox:"Inbox",history:"History",import:"Import/Export",options:"Settings"};
+const SCREEN_TITLES:Record<string,string>={tasks:"Home",calendar:"Calendar",inbox:"Inbox",history:"History",import:"Import/Export",options:"Settings",task:"Task"};
 // One row of the sidebar. Styled by .sb-row in the runtime css; `current` marks
 // the screen being shown.
 function SidebarRow({icon,label,current,onClick,tour,children}:{icon:React.ReactNode;label:string;current?:boolean;onClick:()=>void;tour?:string;children?:React.ReactNode}){
@@ -1045,9 +1083,9 @@ function SidebarRow({icon,label,current,onClick,tour,children}:{icon:React.React
 // buttons, as in Notion: the arrow unfolds its open tasks underneath, the name
 // filters Home to that subject (`picked`; "" is the "No subject" group). An
 // unfolded subject shows SIDEBAR_TASK_CAP tasks until "Show all" is pressed.
-function SidebarSubjects({groups,open,onToggleOpen,picked,onPick,onOpenTask,subjectColors,today,T,F}:{
+function SidebarSubjects({groups,open,onToggleOpen,picked,onPick,onOpenTask,currentTaskId,subjectColors,today,T,F}:{
   groups:SubjectGroup<Task>[]; open:string[]; onToggleOpen:(name:string)=>void;
-  picked:string|null; onPick:(name:string)=>void; onOpenTask:(t:Task)=>void;
+  picked:string|null; onPick:(name:string)=>void; onOpenTask:(t:Task)=>void; currentTaskId:number|null;
   subjectColors:Record<string,string>; today:string; T:ThemeObj; F:typeof FONT;
 }){
   // Which unfolded subjects are showing every task. Not remembered.
@@ -1079,7 +1117,7 @@ function SidebarSubjects({groups,open,onToggleOpen,picked,onPick,onOpenTask,subj
               {shown.map(t=>{
                 const due=dueShort(t.dueDate,today);
                 return(
-                  <button key={t.id} className="sb-row sb-task" onClick={()=>onOpenTask(t)}>
+                  <button key={t.id} className="sb-row sb-task" onClick={()=>onOpenTask(t)} aria-current={t.id===currentTaskId?"page":undefined}>
                     <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
                     {due&&<span style={{fontSize:10,flexShrink:0,color:due==="Overdue"?ink("#FF4757",T.light):T.textMuted}}>{due}</span>}
                   </button>
@@ -3058,7 +3096,10 @@ export default function HomeworkPlanner() {
   // The floating search panel (SearchOverlay), and the field it flies out of.
   const [searchOpen,setSearchOpen]=useState(false);
   const searchTriggerRef=useRef<HTMLButtonElement>(null);
+  // "task" is a task opened from the sidebar, shown as a whole screen (the
+  // selectedTask, in TaskModal's page form) rather than as the sheet.
   const [activeTab,setActiveTab]=useState("tasks");
+  const sheetTaskOpen=selectedTask!=null&&activeTab!=="task";
   // The sidebar (profile, search, every screen). On wide screens it's always
   // there unless folded away (sidebarFolded, remembered on this device); on
   // narrow ones it's a drawer (drawerOpen) opened from the dp mark or a swipe
@@ -3069,7 +3110,6 @@ export default function HomeworkPlanner() {
   const sidebarOpenerRef=useRef<HTMLButtonElement>(null);
   function openSidebar(){if(isWideScreen())setSidebarFolded(false);else setDrawerOpen(true);}
   function closeSidebar(){if(isWideScreen())setSidebarFolded(true);else setDrawerOpen(false);}
-  function navTo(tab:string){setActiveTab(tab);setDrawerOpen(false);}
   // The sidebar's subjects: which are unfolded (remembered on this device), and
   // the one Home is filtered to, if any ("" is "No subject"; see subjectFilterOn).
   const [openSubjects,setOpenSubjects]=usePersistedState<string[]>("hw-sidebar-subjects-open",[]);
@@ -3121,6 +3161,8 @@ export default function HomeworkPlanner() {
     setLastTab(activeTab);
     if(lastTab==="options")setOpenSettings([]);
     if(lastTab==="inbox"||lastTab==="import")setOpenInbox([]);
+    // Left the task page some other way than navTo(): don't let its task pop up as the sheet.
+    if(lastTab==="task")setSelectedTask(null);
   }
   function toggleSettingsSection(id:string){setOpenSettings(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);}
   // Syllabus import: transient by design (a paste-and-review staging area, not
@@ -3239,12 +3281,12 @@ export default function HomeworkPlanner() {
   useEffect(()=>{try{localStorage.setItem("hw-bg",T.bg);}catch{/* storage unavailable */}},[T.bg]);
   // Pull down at the top of the page to reload, in the installed app (a browser
   // tab already has its own). Off while anything is open over the page.
-  usePullToReload(isStandalone()&&selectedTask==null&&!searchOpen&&openUpdate==null&&openTime==null&&!showProfile&&!drawerOpen,T.card,T.text,T.solidBorder);
+  usePullToReload(isStandalone()&&!sheetTaskOpen&&!searchOpen&&openUpdate==null&&openTime==null&&!showProfile&&!drawerOpen,T.card,T.text,T.solidBorder);
   // The drawer follows a sideways swipe: in from the left edge opens it, a
   // swipe left anywhere closes it. Only acts on release, and only when the
   // movement was clearly sideways, so it can't fight scrolling or the task
   // cards' own swipes (those start further in than the edge strip).
-  const drawerSwipeOff=selectedTask!=null||searchOpen||openUpdate!=null||openTime!=null||showProfile;
+  const drawerSwipeOff=sheetTaskOpen||searchOpen||openUpdate!=null||openTime!=null||showProfile;
   useEffect(()=>{
     if(drawerSwipeOff)return;
     let sx=0,sy=0,tracking=false;
@@ -4259,6 +4301,12 @@ export default function HomeworkPlanner() {
     setTasks(prev=>prev.map(t=>t.id===id?{...t,sessions:addSession(t.sessions,{mins,at:Date.now()})}:t));
     setSessionSecs(0);
   }
+  // Leaving the task page ends (and logs) a session running on it; the sheet
+  // doesn't need this, since it can't be closed mid-session. Declared below
+  // endSession on purpose (see the React Compiler note in CLAUDE.md).
+  function leaveTaskPage(){if(activeTab!=="task")return;if(sessionActive)endSession();setSelectedTask(null);}
+  function navTo(tab:string){leaveTaskPage();setActiveTab(tab);setDrawerOpen(false);}
+  function openTaskPage(t:Task){if(sessionActive&&selectedTask?.id!==t.id)endSession();setSelectedTask(t);setActiveTab("task");setDrawerOpen(false);}
 
   // If the open task disappears from under the detail panel -- deleted on
   // another device, or signed out -- close it (and stop any session on it,
@@ -4267,7 +4315,7 @@ export default function HomeworkPlanner() {
   useEffect(()=>{
     if(!selectedTask||tasks.some(t=>t.id===selectedTask.id))return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedTask(null);setSessionActive(false);setSessionSecs(0);
+    setSelectedTask(null);setSessionActive(false);setSessionSecs(0);setActiveTab(t=>t==="task"?"tasks":t);
   },[tasks,selectedTask]);
 
   // "Take me there" on an Inbox update (WhatsNewItem.go): opens the place
@@ -4661,13 +4709,51 @@ export default function HomeworkPlanner() {
     );
   }
 
+  // A task's details: the bottom sheet over the page, or (page) a whole screen
+  // for a task opened from the sidebar, which stays open after Mark done or
+  // Archive where the sheet closes.
+  const taskPage=activeTab==="task";
+  const taskDetail=selectedTask&&(
+      <ErrorBoundary fallback={()=>(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
+          <div style={{background:T.card,borderRadius:12,padding:24,maxWidth:320,textAlign:"center",display:"flex",flexDirection:"column",gap:12,border:`1px solid ${T.border}`}}>
+            <div style={{color:T.text,fontFamily:F.body,fontSize:14}}>This task couldn't be displayed.</div>
+            <button onClick={()=>{setSelectedTask(null);if(taskPage)setActiveTab("tasks");}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 16px",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>Close</button>
+          </div>
+        </div>
+      )}>
+        <TaskModal page={taskPage}
+          key={selectedTask.id}
+          h24={h24}
+          task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
+          T={T} F={F} subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency} now={now}
+          sessionActive={sessionActive} sessionSecs={sessionSecs}
+          allTags={allTags}
+          onClose={()=>{if(taskPage)navTo("tasks");else setSelectedTask(null);}}
+          onStartSession={startSession} onEndSession={endSession}
+          onToggleDone={()=>{if(sessionActive)endSession();toggleDone(selectedTask.id);if(!taskPage)setSelectedTask(null);}}
+          onDelete={()=>{if(sessionActive)endSession();deleteTask(selectedTask.id);setSelectedTask(null);if(taskPage)setActiveTab("tasks");}}
+          onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
+          onArchive={()=>{if(sessionActive)endSession();archiveTask(selectedTask.id);if(!taskPage)setSelectedTask(null);}}
+          onRestore={()=>unarchiveTask(selectedTask.id)}
+          onDuplicate={()=>{if(sessionActive)endSession();const copy=duplicateTask(selectedTask.id);if(copy)setSelectedTask(copy);}}
+          onUpdateTask={patch=>editTask(selectedTask.id,patch)}
+          onSnooze={kind=>snoozeTask(selectedTask.id,kind)}
+          onSkipOccurrence={()=>skipOccurrence(selectedTask.id)}
+          onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
+          onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
+          onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}
+        />
+      </ErrorBoundary>
+  );
+
   return (
     <div className={"app-shell"+(sidebarFolded?" sb-folded":"")+(drawerOpen?" sb-drawer":"")} style={{background:T.bg,fontFamily:F.body,color:T.text,transition:"background .2s ease-out,color .2s ease-out"}}>
       <style>{css}</style>
       <div className="sb-backdrop" aria-hidden="true" onClick={()=>setDrawerOpen(false)}/>
       {/* The sidebar: profile on top, then search and every screen. inert under
           the same overlays as the page (see .app-inner below). */}
-      <nav ref={sidebarRef} className="app-sidebar" aria-label="Main" inert={selectedTask!=null||searchOpen||openUpdate!=null||openTime!=null||undefined}>
+      <nav ref={sidebarRef} className="app-sidebar" aria-label="Main" inert={sheetTaskOpen||searchOpen||openUpdate!=null||openTime!=null||undefined}>
         <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:6}}>
           <button className="sb-row" data-tour="profile-row" onClick={()=>{setShowProfile(true);setDrawerOpen(false);}} style={{flex:1,minWidth:0,padding:"7px 8px"}}>
             {fbUser?.photoURL
@@ -4695,7 +4781,8 @@ export default function HomeworkPlanner() {
           onToggleOpen={name=>setOpenSubjects(o=>o.includes(name)?o.filter(n=>n!==name):[...o,name])}
           picked={activeTab==="tasks"?subjectFilterOn:null}
           onPick={name=>{if(activeTab==="tasks")captureTaskRects();setSubjectFilter(activeTab==="tasks"&&subjectFilterOn===name?null:name);navTo("tasks");}}
-          onOpenTask={t=>{setDrawerOpen(false);setSelectedTask(t);}}/>
+          currentTaskId={activeTab==="task"?selectedTask?.id??null:null}
+          onOpenTask={openTaskPage}/>
         <div className="sb-rule" aria-hidden="true"/>
         <SidebarRow icon={<IconBell/>} label="Inbox" current={activeTab==="inbox"} onClick={()=>navTo("inbox")}>
           {unreadRecaps.length>0&&<span aria-label={`${unreadRecaps.length} unread`} style={{background:T.accent,color:contrastColor(T.accent),borderRadius:999,padding:"1px 7px",fontSize:10,fontWeight:600}}>{unreadRecaps.length}</span>}
@@ -4712,7 +4799,7 @@ export default function HomeworkPlanner() {
       {/* inert while the task sheet is open, so screen readers and Tab stay in
           the dialog instead of wandering through the list behind it; and while
           the drawer covers it. */}
-      <div className="app-inner" inert={selectedTask!=null||searchOpen||openUpdate!=null||openTime!=null||drawerOpen||undefined}>
+      <div className="app-inner" inert={sheetTaskOpen||searchOpen||openUpdate!=null||openTime!=null||drawerOpen||undefined}>
         {/* Header */}
         <header style={{position:"relative",display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:5}}>
           {/* Hidden inline as well as by .sr-only, so it can never show as a
@@ -4774,7 +4861,7 @@ export default function HomeworkPlanner() {
                   </div>
                 </>}
                 {noEstimateCount>0&&(
-                  <button onClick={()=>{setFilter("noest");setActiveTab("tasks");setTimeMenuOpen(false);}} style={{display:"block",width:"100%",marginTop:12,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",fontFamily:F.body,fontSize:11,color:T.textMuted}}>
+                  <button onClick={()=>{setFilter("noest");navTo("tasks");setTimeMenuOpen(false);}} style={{display:"block",width:"100%",marginTop:12,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",fontFamily:F.body,fontSize:11,color:T.textMuted}}>
                     {noEstimateCount} {noEstimateCount===1?"task has":"tasks have"} no estimate, so the total is low. Show them ›
                   </button>
                 )}
@@ -4786,6 +4873,12 @@ export default function HomeworkPlanner() {
         <div aria-hidden="true" style={{height:1,background:T.accent,marginBottom:16}}/>
 
         <main className="app-main" style={selectionMode?{paddingBottom:130}:undefined}>
+
+        {/* A task opened from the sidebar: the whole screen, fields always editable. */}
+        {taskPage&&selectedTask&&<div className="sec-body" key={selectedTask.id}>
+          <ScreenHeader title="Task" onBack={()=>navTo("tasks")} T={T} F={F}/>
+          {taskDetail}
+        </div>}
 
         {/* TASKS TAB */}
         {/* .sec-body: the same short fade-and-settle the Calendar tab opens with. */}
@@ -5433,37 +5526,7 @@ export default function HomeworkPlanner() {
         origin={searchTriggerRef}
         onOpenTask={t=>{setSearchOpen(false);setSelectedTask(t);}}
         onClose={()=>{setSearchOpen(false);requestAnimationFrame(()=>searchTriggerRef.current?.focus());}}/>}
-      {selectedTask&&<ErrorBoundary fallback={()=>(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
-          <div style={{background:T.card,borderRadius:12,padding:24,maxWidth:320,textAlign:"center",display:"flex",flexDirection:"column",gap:12,border:`1px solid ${T.border}`}}>
-            <div style={{color:T.text,fontFamily:F.body,fontSize:14}}>This task couldn't be displayed.</div>
-            <button onClick={()=>{setSelectedTask(null);}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 16px",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>Close</button>
-          </div>
-        </div>
-      )}>
-        <TaskModal
-          key={selectedTask.id}
-          h24={h24}
-          task={tasks.find(t=>t.id===selectedTask.id)||selectedTask}
-          T={T} F={F} subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency} now={now}
-          sessionActive={sessionActive} sessionSecs={sessionSecs}
-          allTags={allTags}
-          onClose={()=>{setSelectedTask(null);}}
-          onStartSession={startSession} onEndSession={endSession}
-          onToggleDone={()=>{if(sessionActive)endSession();toggleDone(selectedTask.id);setSelectedTask(null);}}
-          onDelete={()=>{if(sessionActive)endSession();deleteTask(selectedTask.id);setSelectedTask(null);}}
-          onUpdateSubtasks={subtasks=>updateSubtasks(selectedTask.id,subtasks)}
-          onArchive={()=>{if(sessionActive)endSession();archiveTask(selectedTask.id);setSelectedTask(null);}}
-          onRestore={()=>unarchiveTask(selectedTask.id)}
-          onDuplicate={()=>{if(sessionActive)endSession();const copy=duplicateTask(selectedTask.id);if(copy)setSelectedTask(copy);}}
-          onUpdateTask={patch=>editTask(selectedTask.id,patch)}
-          onSnooze={kind=>snoozeTask(selectedTask.id,kind)}
-          onSkipOccurrence={()=>skipOccurrence(selectedTask.id)}
-          onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
-          onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
-          onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}
-        />
-      </ErrorBoundary>}
+      {!taskPage&&taskDetail}
       {showProfile&&<ProfileModal
         T={T} F={F}
         fbUser={fbUser} authPending={authPending} signInError={signInError} syncError={syncError} syncStatus={syncStatus}

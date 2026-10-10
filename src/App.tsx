@@ -17,6 +17,7 @@ import type { WhatsNewItem } from "./whatsNew";
 import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, dateInDays, snoozeTarget, setDone, nextOrder } from "./lib/tasks";
 import type { SnoozeKind } from "./lib/tasks";
 import { trashEntries, pruneTrash, localRecords } from "./lib/trash";
+import { heldOpen, isSettled, withHeldOpen, allTagsOf, sortTasks, filterTasks, groupTasks, prioritySplit, timeLeft, searchTasks, completionStats } from "./lib/taskViews";
 import { patchTask, patchTasks, withoutTasks, skipPatch, snoozePatch, dueDatePatch, duplicateOf, freshSubtasks, withNewTask, templateFromTask, taskFromTemplate, withTrashed, withoutTrashed, restoredInto, movedOrder, withOrder, subjectToAdd, subjectRename, renamedSubjects, recolouredSubjects, withoutSubjectColor, tasksRenamedSubject, trashRenamedSubject, templatesRenamedSubject } from "./lib/taskActions";
 import type { TrashEntry } from "./lib/trash";
 import { THEMES } from "./themes";
@@ -957,10 +958,7 @@ function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,onOpenTa
   const keyboardComing=window.matchMedia("(pointer:coarse)").matches&&view.h>window.innerHeight*0.8;
   const aimH=keyboardComing?view.h*0.58:view.h;
   const q=query.trim().toLowerCase();
-  const results=!q?[]:tasks
-    .filter(t=>!t.archived&&(t.title.toLowerCase().includes(q)||t.subject.toLowerCase().includes(q)||(t.tags||[]).some(g=>g.toLowerCase().includes(q))))
-    .sort((a,b)=>a.done!==b.done?(a.done?1:-1):a.order-b.order)
-    .slice(0,50);
+  const results=searchTasks(tasks,q);
   // Fly in from the field. A layout effect, so the first frame already shows
   // the bar at the field's spot, and focus lands inside the tap that opened
   // it (iOS only raises the keyboard for focus during a user gesture).
@@ -1875,10 +1873,7 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
   signInWithFirebase:()=>Promise<void>;
   signOutFirebase:()=>Promise<void>;
 }) {
-  const doneTasks=visibleTasks.filter(t=>t.done).length;
-  const totalTasks=visibleTasks.length;
-  const highPri=visibleTasks.filter(t=>!t.done&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high").length;
-  const pct=totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
+  const {done:doneTasks,total:totalTasks,urgent:highPri,pct}=completionStats(visibleTasks);
   const [installHint,setInstallHint]=useState<string|null>(null);
   const subjectCounts=subjects.map(s=>({name:s,count:visibleTasks.filter(t=>t.subject===s).length,color:subjectColors[s]})).filter(s=>s.count>0).sort((a,b)=>b.count-a.count);
 
@@ -3283,36 +3278,23 @@ export default function HomeworkPlanner() {
   const visibleTasks=tasks;
   // Every tag used on any task, deduplicated -- powers the "quick add" suggestion
   // chips in TaskModal's tag editor instead of retyping tags you've already used.
-  const allTags=[...new Set(tasks.flatMap(t=>t.tags||[]))].sort();
+  const allTags=allTagsOf(tasks);
   // Pending tasks sort by their manual drag order; done tasks always sink to the
   // bottom -- except ones in justDone, which stay put until they settle.
-  const allSorted=[...visibleTasks].sort((a,b)=>{
-    const ad=a.done&&!justDone.includes(a.id), bd=b.done&&!justDone.includes(b.id);
-    if(ad!==bd)return ad?1:-1;
-    return a.order-b.order;
-  });
+  const allSorted=sortTasks(visibleTasks,justDone);
   const sidebarGroups=useMemo(()=>subjectGroups(tasks,subjects),[tasks,subjects]);
   // The subject filter only counts while that subject is still in the sidebar
   // (it may have been renamed or deleted, or "No subject" emptied), so Home
   // can't get stuck filtered to something there's no row left to un-pick.
   const subjectFilterOn=subjectFilter!=null&&sidebarGroups.some(g=>g.name===subjectFilter)?subjectFilter:null;
-  const filteredTasks=allSorted.filter(t=>{
-    if(subjectFilterOn!=null&&(t.subject||"")!==subjectFilterOn)return false;
-    if(filter==="archived")return !!t.archived;
-    if(t.archived)return false; // archived tasks never show in all/pending/done, only the dedicated view
-    if(filter==="done")return t.done;
-    if(filter==="pending")return !t.done||justDone.includes(t.id);
-    if(filter==="noest")return !t.done&&!t.estMins; // from the "Time left" dropdown; not a chip
-    return showDone||!t.done||justDone.includes(t.id);
-  });
+  const filteredTasks=filterTasks(allSorted,{filter,subject:subjectFilterOn,showDone,justDone});
   const topTask=allSorted.find(t=>!t.done&&!t.archived);
   // The suggestion card above the list. A task just checked off still counts
   // as open for it until that task settles (justDone): otherwise the card
   // changed, appeared or vanished at the tick, moving the whole list once
   // then, and again when the completed card glides away.
-  const heldOpen=(t:Task)=>!t.done||justDone.includes(t.id);
-  const suggestionTask=allSorted.find(t=>heldOpen(t)&&!t.archived);
-  const suggestion=buildSuggestion(justDone.length?tasks.map(t=>justDone.includes(t.id)?{...t,done:false}:t):tasks);
+  const suggestionTask=allSorted.find(t=>heldOpen(t,justDone)&&!t.archived);
+  const suggestion=buildSuggestion(withHeldOpen(tasks,justDone));
   const focusTask=tasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
   useEffect(()=>{pomodoroTaskRef.current=focusTask?.id??null;});
   // What to do when a break ends: keep going on the task from the last session
@@ -3338,23 +3320,9 @@ export default function HomeworkPlanner() {
     document.addEventListener("visibilitychange",onVisible);
     return()=>{cancelled=true;document.removeEventListener("visibilitychange",onVisible);lock?.release().catch(()=>{});};
   },[focusMode]);
-  const openTasks=visibleTasks.filter(t=>!t.done&&!t.archived);
-  const totalMins=openTasks.reduce((s,t)=>s+(t.estMins||0),0);
-  // Per-subject split of totalMins for the header's "time left" popover, largest
-  // first; tasks with no subject are pooled under "" (shown as "No subject").
-  // `spent` is real time logged by the task timer on those same open tasks.
-  const timeBySubject=(()=>{
-    const m:Record<string,{mins:number;spent:number}>={};
-    openTasks.forEach(t=>{const e=m[t.subject||""]||={mins:0,spent:0};e.mins+=t.estMins||0;e.spent+=(t.sessions||[]).reduce((a,x)=>a+x.mins,0);});
-    return Object.entries(m).filter(([,e])=>e.mins>0).sort((a,b)=>b[1].mins-a[1].mins).map(([name,e])=>({name,...e,pct:totalMins?Math.round(e.mins/totalMins*100):0}));
-  })();
-  // Same open tasks split by when they're due (empty buckets dropped).
-  const timeByDue=(()=>{
-    const today=localDateStr(new Date(now));
-    return DUE_BUCKETS.map(b=>{const ts=openTasks.filter(t=>dueBucket(t.dueDate,today)===b.key);return {...b,count:ts.length,mins:ts.reduce((s,t)=>s+(t.estMins||0),0)};}).filter(b=>b.count>0);
-  })();
-  // Open tasks with no estimate count as 0 above, so the total reads low.
-  const noEstimateCount=openTasks.filter(t=>!t.estMins).length;
+  // The header's "Time left": totals for the open tasks, split by subject and
+  // by when they're due (src/lib/taskViews.ts).
+  const {totalMins,bySubject:timeBySubject,byDue:timeByDue,noEstimateCount}=timeLeft(visibleTasks,localDateStr(new Date(now)));
   const fmtMins=(m:number)=>formatDuration(m)||"0m";
   // One line for the title menu: where this device's changes stand.
   const syncStatus=!fbUser?null
@@ -4206,7 +4174,7 @@ export default function HomeworkPlanner() {
   function renderTasks(tasks:Task[]) {
     // Ranks ("do first", "next up") hold still while a completed task is in its
     // hold (justDone): it keeps its place in the ranking until it settles.
-    const pending=allSorted.filter(t=>!t.done||justDone.includes(t.id));
+    const pending=allSorted.filter(t=>heldOpen(t,justDone));
     // Shared props for the (module-scope) MiniCard -- spread at each call site
     // below instead of repeating this whole list three times.
     const miniCardProps={T,F,subjectColors,colorCodeUrgency,now,h24,dragTaskId,dragOffsetY,
@@ -4227,7 +4195,7 @@ export default function HomeworkPlanner() {
     // Use it too for anything that sets a card's size (a due label, a badge):
     // if that vanished at the tick, the card would shrink and its neighbours
     // shift once now and again when it moves.
-    const settled=(t:Task)=>t.done&&!justDone.includes(t.id);
+    const settled=(t:Task)=>isSettled(t,justDone);
     const dueText=(t:Task)=>countdown(t.dueDate,t.dueTime,now)??daysUntil(t.dueDate);
     const titleClass=(t:Task)=>"title-btn"+(t.done?(justDone.includes(t.id)?" strike strike-anim":" strike"):"");
     // The done-check pops as it fills, as the List's does (MiniCard).
@@ -4277,7 +4245,8 @@ export default function HomeworkPlanner() {
     if (layout==="kanban") {
       // No tasks: nothing but the "nothing here" line below, as in the other layouts (not four empty columns).
       if(tasks.length===0)return null;
-      const cols=[{key:"high",label:"Urgent",tasks:tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high")},{key:"medium",label:"Soon",tasks:tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium")},{key:"low",label:"Later",tasks:tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low")},{key:"done",label:"✓ Done",tasks:tasks.filter(settled)}];
+      const byPriority=prioritySplit(tasks,justDone);
+      const cols=[{key:"high",label:"Urgent",tasks:byPriority.high},{key:"medium",label:"Soon",tasks:byPriority.medium},{key:"low",label:"Later",tasks:byPriority.low},{key:"done",label:"✓ Done",tasks:byPriority.done}];
       return(
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
           {cols.map(col=>(
@@ -4337,10 +4306,11 @@ export default function HomeworkPlanner() {
     );
 
     if (layout==="pyramid") {
-      const highT=tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="high");
-      const medT=tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="medium");
-      const lowT=tasks.filter(t=>!settled(t)&&getPriority(t.dueDate,t.estMins,t.priorityOverride)==="low");
-      const doneT=tasks.filter(settled);
+      const byPriority=prioritySplit(tasks,justDone);
+      const highT=byPriority.high;
+      const medT=byPriority.medium;
+      const lowT=byPriority.low;
+      const doneT=byPriority.done;
       return(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {[{tasks:highT,color:ink(priColor("high",colorCodeUrgency),T.light),label:"High Priority",w:"100%"},{tasks:medT,color:ink(priColor("medium",colorCodeUrgency),T.light),label:"Medium Priority",w:"85%"},{tasks:lowT,color:ink(priColor("low",colorCodeUrgency),T.light),label:"Low Priority",w:"65%"},{tasks:doneT,color:T.textFaint,label:"✓ Done",w:"45%"}].map(tier=>(
@@ -4370,31 +4340,12 @@ export default function HomeworkPlanner() {
     // since the other layouts (kanban, progress, pyramid...) already
     // have their own built-in grouping and combining the two would conflict.
     if (groupBy!=="none") {
-      const groups=new Map<string,Task[]>();
-      const order:string[]=[];
-      const keyFor=(t:Task)=>{
-        if (groupBy==="subject") return t.subject||"No subject";
-        if (groupBy==="priority") return getPriority(t.dueDate,t.estMins,t.priorityOverride);
-        return t.dueDate||"Anytime"; // dueDate; undated tasks group as "Anytime"
-      };
-      for (const t of tasks) {
-        const k=keyFor(t);
-        if (!groups.has(k)) { groups.set(k,[]); order.push(k); }
-        groups.get(k)!.push(t);
-      }
-      if (groupBy==="priority") order.sort((a,b)=>({high:0,medium:1,low:2} as Record<string,number>)[a]-({high:0,medium:1,low:2} as Record<string,number>)[b]);
-      if (groupBy==="dueDate") order.sort((a,b)=>a==="Anytime"?1:b==="Anytime"?-1:a.localeCompare(b));
-      const labelFor=(k:string)=>{
-        if (groupBy==="priority") return k==="high"?"High priority":k==="medium"?"Medium priority":"Low priority";
-        if (groupBy==="dueDate") return k==="Anytime"?k:formatDate(k);
-        return k; // subject
-      };
       return <div style={{display:"flex",flexDirection:"column",gap:16}}>
-        {order.map(k=>(
-          <div key={k}>
-            <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{labelFor(k)} ({groups.get(k)!.length})</div>
-            <div role="list" aria-label={labelFor(k)} style={{display:"flex",flexDirection:"column",gap:10}}>
-              {groups.get(k)!.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} swipeable {...mc(t)}/>)}
+        {groupTasks(tasks,groupBy).map(g=>(
+          <div key={g.key}>
+            <div className="sl" style={{color:T.textMuted,paddingTop:0}}>{g.label} ({g.tasks.length})</div>
+            <div role="list" aria-label={g.label} style={{display:"flex",flexDirection:"column",gap:10}}>
+              {g.tasks.map(t=><MiniCard key={t.id} task={t} rank={pending.indexOf(t)} swipeable {...mc(t)}/>)}
             </div>
           </div>
         ))}

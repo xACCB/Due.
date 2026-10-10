@@ -261,6 +261,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"update-fade", date:"2026-10-10", kind:"UI change", headline:"Updates fade between each other", where:"Sidebar (top left button) → Inbox → tap any update, then Back or Next", go:"menu", description:"Pressing Back or Next on an open Inbox message now fades the new one in. It used to slide in from the side as well." },
   { id:"animation-two-step-2", date:"2026-10-10", kind:"Bug fix", headline:"Things land where they stay", where:"Checking off a task, a task's details, Inbox updates and search", description:"More animations that moved twice now move once. Checking off a task no longer nudges the list before the task glides down, in every layout, and the task sets down as it arrives instead of shrinking afterwards. A task's details spring all the way back when you drag them a little and let go, where they used to stop part of the way. On a computer, an Inbox update, a calendar day and a Time left card no longer snap wider after opening. The search bar no longer slides past its spot and back." },
   { id:"profile-housekeeping", date:"2026-10-10", kind:"New feature", headline:"Devices, storage and more in Profile", where:"Sidebar (top left button) → your name at the top", go:"profile:profile-devices", description:"Profile now shows every device signed in to your account, and lets you sign any of them out, or all the others at once. A device signs out the next time it has DuePlanner open and online. Below that you can see how much of your task storage is used, install the app, turn reminders on for this device, and send feedback." },
   { id:"layout-buttons-instant", date:"2026-10-10", kind:"UI change", headline:"Layout buttons switch instantly", where:"Sidebar (top left button) → Settings → Looks", go:"settings:layout", description:"Picking a layout in Settings no longer fades the button in. It now switches at once, the same as the Appearance buttons beside it." },
@@ -1384,9 +1385,10 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
     anim.finished.then(release,release);
     bodyRef.current?.animate([{opacity:0},{opacity:0,offset:0.4},{opacity:1}],{duration:400,easing:"ease-out"});
   },[]);
-  // Back/Next swap the content in place: it slides in from the side you're
-  // heading, and the card eases to the new height from the one measured just
-  // before the switch (see go()).
+  // Back/Next swap the content in place: it fades in (it used to slide in from
+  // the side too, which read as the headline moving twice; the user asked for
+  // a plain fade), and the card eases to the new height from the one measured
+  // just before the switch (see go()).
   const shown=useRef(index);
   const heightBefore=useRef<number|null>(null);
   function go(i:number){
@@ -1401,7 +1403,7 @@ function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing,onClos
     if(!dir||!card||closing.current||window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
     const to=card.getBoundingClientRect().height;
     if(from!=null&&Math.abs(from-to)>=1)card.animate([{height:`${from}px`},{height:`${to}px`}],{duration:280,easing:"cubic-bezier(.2,.8,.3,1)"});
-    bodyRef.current?.animate([{opacity:0,transform:`translateX(${dir*16}px)`},{opacity:1,transform:"none"}],{duration:260,easing:"cubic-bezier(.2,.8,.3,1)"});
+    bodyRef.current?.animate([{opacity:0},{opacity:1}],{duration:200,easing:"ease-out"});
   },[index]);
   // Back into the row -- or, when the row is gone (dismissed) or off screen, a fade.
   function close(dismissed=false){

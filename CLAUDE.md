@@ -482,7 +482,7 @@ needs a new `data-tour` for its entry. The card's "Take me there" button fades t
 `UpdateDetail` (module scope): the card grows from the row's box to a centered card over a blurred
 backdrop (pinned `position:fixed` while its left/top/width/height animate, then released back to
 `relative`) and shrinks back into the row on close, or fades if the row is gone. Back/Next step
-through the list in place (content slides, card eases to the new height; the grow-from-row
+through the list in place (content fades in, with no sideways slide, at the user's request; card eases to the new height; the grow-from-row
 animation runs once on open, from `openedFrom`, even though `origin` follows the shown update); Dismiss dismisses after the exit animation. It carries `data-keeps-menu`, which
 the title menu's outside-click/Escape handlers ignore (a leftover from when the Inbox lived in the
 menu; harmless now that it's a screen). The Inbox's two parts (Messages, Updates) are

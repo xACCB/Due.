@@ -13,6 +13,7 @@ export const LIMITS = {
   estMins: 100000,
   tasks: 5000,        // per account, via the counter doc in firestore.rules
   trash: 500,         // Recently deleted entries per account (the app keeps 200)
+  devices: 20,        // signed-in devices listed per account; the longest idle drop off
 } as const;
 
 const RECURRENCES = ["none", "daily", "weekly", "monthly"];

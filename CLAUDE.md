@@ -126,6 +126,8 @@ require rewriting a user's entire history:
   whole task plus `deletedAt`. Trash is a separate collection, not a flag on `tasks/` docs, so an
   older app version still open on another device sees a plain delete rather than the task
   reappearing. Emptying the trash / the 30-day cleanup deletes the doc for real.
+- `users/{uid}/meta/devices` — the devices signed in to the account, as one map
+  (`{ d: { deviceId: { name, createdAt, lastSeen } } }`), capped at 20 by the rules. See Devices below.
 - **Conflict handling** (`src/lib/sync.ts`, unit-tested): `baseRef` holds what we last knew the cloud
   held per task, `dirtyAtRef` when this device last changed a task it hasn't written yet. Incoming
   snapshots (both collections; merging waits until each has arrived once) are merged, not applied
@@ -202,10 +204,43 @@ require rewriting a user's entire history:
 - Account deletion (Options tab, "Danger Zone", gated on being signed in) batch-deletes every doc
   in the tasks and trash subcollections plus the profile doc, then calls Firebase Auth's `deleteUser`, then
   clears every `hw-*` localStorage key and reloads -- "delete my data" means all of it, not just
-  the cloud copy (except the task counter doc, which rules keep undeletable). Gated behind a
+  the cloud copy (except the task counter doc, which rules keep undeletable). The device list doc
+  is deleted too, which signs the account's other devices out. Gated behind a
   type-`DELETE`-to-confirm panel rather than a plain `window.confirm`, given it's irreversible.
   Deletes in chunks of 450 (Firestore's batch limit is 500; an account can hold ~5,500 docs), with
   the profile doc last so an interrupted run can be retried.
+
+**Devices (Profile → Devices).** Lists the devices signed in to the account and lets one sign the
+others out. There is no backend, and a web app can't cancel another device's Google sign-in, so
+this is cooperative: each device keeps an entry in `users/{uid}/meta/devices`, watches that doc, and
+signs itself out (`signOutFirebase`, then a message on the sign-in screen) when the server says its
+entry is gone. So a device signs out the next time it has the app open and online, and it is not a
+defence against a stolen session; the Profile note says both. Don't describe it as more than that.
+The logic is `deviceAction()` in `src/lib/devices.ts` (unit-tested), driven by the Devices effect in
+`HomeworkPlanner` (declared below `recaps`, since it holds `signOutFirebase` in a ref and the React
+Compiler rejects forward references). The safety rules, each of which exists to make a wrongful
+sign-out impossible:
+- Only a snapshot straight from the server counts (`!fromCache && !hasPendingWrites`).
+- `hw-device-registered` (the uid) is written only after the server has *accepted* this device's
+  entry (`setDoc(...).then`). Without it a missing entry means "add me", never "signed out". So a
+  first write that never arrived (offline, or the rules not deployed) can't sign anyone out.
+- If the doc can't be read, the listener's error handler does nothing: Profile says the list isn't
+  available and everything else carries on. The app is therefore safe to ship before the rules.
+- `signingOut` (a ref) is set while this device signs itself out, so removing its own entry isn't
+  read as another device doing it.
+- "Last active" is refreshed at most every 12h with `updateDoc` on `d.<id>.lastSeen`. If that races
+  a removal it can leave a stub with no `name`; a stub counts as removed.
+- Ids are 24 hex characters (`hw-device-id`, kept across sign-outs): a dot in a map key would be
+  read as a path. Registering past 20 devices drops the longest idle (`pruneDevices`).
+Sign-out removes this device's entry (best effort, capped at 2s); account deletion deletes the doc
+in its own try/catch so it can never block the deletion. `tests/firestore.rules.test.ts` covers the
+rules; the two-device flow was checked end to end against the Auth and Firestore emulators.
+
+**Profile housekeeping.** Below the stats, the signed-in Profile has three cards: Devices (above),
+Storage (`tasks.length` against `LIMITS.tasks` and `trash.length` against `LIMITS.trash`: the real
+counts on the device, not the cloud counter, which started at zero and reads low for older
+accounts), and This device (install the app via `requestInstall()`, reminders on or off for this
+device via `toggleNotifications`, the feedback form and the privacy policy).
 
 **Design-system constants** drive both the inline styles and the runtime stylesheet. `THEMES`
 (`src/themes.ts`) went from 26 color themes down to exactly two -- `stealth` (dark) and

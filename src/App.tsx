@@ -32,6 +32,8 @@ import type { TaskStates } from "./lib/history";
 import type { SyncRecord, CloudRecord } from "./lib/sync";
 import { downloadFile } from "./lib/download";
 import { LIMITS, addSession, sanitizeTask } from "./lib/limits";
+import { describeDevice, deviceAction, listDevices, newDeviceId, pruneDevices } from "./lib/devices";
+import type { DeviceEntry, DeviceMap } from "./lib/devices";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { usePullToReload } from "./hooks/usePullToReload";
 import { normalizeQuestionPrefs, moveQuestion } from "./lib/addQuestions";
@@ -259,6 +261,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"profile-housekeeping", date:"2026-10-10", kind:"New feature", headline:"Devices, storage and more in Profile", where:"Sidebar (top left button) → your name at the top", go:"profile:profile-devices", description:"Profile now shows every device signed in to your account, and lets you sign any of them out, or all the others at once. A device signs out the next time it has DuePlanner open and online. Below that you can see how much of your task storage is used, install the app, turn reminders on for this device, and send feedback." },
   { id:"layout-buttons-instant", date:"2026-10-10", kind:"UI change", headline:"Layout buttons switch instantly", where:"Sidebar (top left button) → Settings → Looks", go:"settings:layout", description:"Picking a layout in Settings no longer fades the button in. It now switches at once, the same as the Appearance buttons beside it." },
   { id:"sidebar", date:"2026-10-10", kind:"Navigation", headline:"A sidebar", where:"Tap the sidebar button at the top left, or swipe in from the left edge. On a computer it's always showing", go:"menu", description:"Everything now lives in one sidebar: your profile, Search, Home, Calendar, Focus, your subjects, Inbox, History, Import/Export and Settings. Tap the arrow beside a subject to see what is left to do in it, most urgent first. Tap a task there to open it as a full page, where its title, subject, due date, estimate and repeat can be changed right on the page, with no Edit button, and each change saves as you make it. Tap a subject's name to show only that subject on Home, and tap it again, or Home, to see everything. On a computer it stays open beside your tasks, and the button at its top right folds it away. On a phone, tap the button at the top left or swipe in from the left edge to open it. It replaces the three buttons that sat above your tasks and the menu under the DuePlanner name. While a timer is running, its time shows at the top of the screen, and tapping it opens Focus. The Desktop Layout setting is gone, since the sidebar does that job." },
   { id:"animation-two-step", date:"2026-10-04", kind:"Bug fix", headline:"No more double moves", where:"Search, a task's details, and cards that open from a row", description:"Some animations went to one spot and then shifted to another. The search bar now flies straight to where it ends up once the keyboard is open, a task's details settle back without overshooting, and cards that open from a row land exactly where they stay." },
@@ -2054,6 +2057,16 @@ let deferredInstallPrompt:InstallPromptEvent|null=null;
 if(typeof window!=="undefined"){
   window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e as InstallPromptEvent;});
 }
+// This browser's id in the account's device list (src/lib/devices.ts). Kept
+// across sign-outs, so signing back in reuses the same row.
+let fallbackDeviceId="";
+function thisDeviceId(){
+  try{
+    let id=localStorage.getItem("hw-device-id");
+    if(!id||!/^[0-9a-f]{24}$/.test(id)){ id=newDeviceId(); localStorage.setItem("hw-device-id",id); }
+    return id;
+  }catch{ return fallbackDeviceId||(fallbackDeviceId=newDeviceId()); }
+}
 // Installing the app: the browser's own prompt where it offers one, otherwise
 // instructions for this kind of device (handed to `setHint`).
 async function requestInstall(setHint:(hint:string|null)=>void){
@@ -2075,7 +2088,7 @@ function isStandalone(){
 // wipe out the text. newSubjectText/setNewSubjectText are lifted to the
 // parent specifically so they survive that; being hoisted now means this
 // component itself is no longer being recreated in the first place either.
-function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,taskCount,trashCount,notificationsEnabled,notificationNote,onToggleNotifications,setShowProfile,signInWithFirebase,signOutFirebase}:{
+function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,visibleTasks,totalMins,subjects,subjectColors,colorCodeUrgency,taskCount,trashCount,notificationsEnabled,notificationNote,onToggleNotifications,devices,onSignOutDevice,onSignOutOtherDevices,now,setShowProfile,signInWithFirebase,signOutFirebase}:{
   T:ThemeObj; F:typeof FONT;
   fbUser:User|null; authPending:boolean; signInError:string|null; syncError:string|null; syncStatus:string|null;
   visibleTasks:Task[]; totalMins:number;
@@ -2084,6 +2097,9 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
   // ones too, and Recently deleted), and reminders on this device.
   taskCount:number; trashCount:number;
   notificationsEnabled:boolean; notificationNote:string|null; onToggleNotifications:(next:boolean)=>void;
+  // The devices signed in to this account (listDevices()), or null while the
+  // list isn't available.
+  devices:{id:string;entry:DeviceEntry;current:boolean}[]|null; onSignOutDevice:(id:string)=>void; onSignOutOtherDevices:()=>void; now:number;
   setShowProfile:(v:boolean)=>void;
   signInWithFirebase:()=>Promise<void>;
   signOutFirebase:()=>Promise<void>;
@@ -2231,6 +2247,28 @@ function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncStatus,v
             ))}
           </div>
         )}
+
+        {/* Devices signed in to this account. Signing one out removes its entry;
+            that device then signs itself out when it next has the app open
+            and online (src/lib/devices.ts), which the note says plainly. */}
+        <div data-tour="profile-devices" style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`,marginBottom:14}}>
+          <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>Devices</div>
+          {!devices||devices.length===0
+            ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>{devices?"Getting this device ready…":"The device list isn't available right now."}</div>
+            :<>
+              {devices.map(d=>(
+                <div key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:10}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.entry.name}</div>
+                    <div style={{fontFamily:F.body,fontSize:10,color:d.current?ink("#2ED573",T.light):T.textFaint,marginTop:2}}>{d.current?"This device":`Active ${formatAgo(d.entry.lastSeen,now)}`}</div>
+                  </div>
+                  {!d.current&&<button onClick={()=>onSignOutDevice(d.id)} aria-label={`Sign out ${d.entry.name}`} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"6px 12px",color:T.text,fontFamily:F.body,fontSize:11,cursor:"pointer",flexShrink:0}}>Sign out</button>}
+                </div>
+              ))}
+              {devices.some(d=>!d.current)&&devices.some(d=>d.current)&&<button onClick={onSignOutOtherDevices} style={{width:"100%",background:"none",border:"1px solid #FF475744",borderRadius:9,padding:"9px",color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:12,cursor:"pointer",marginBottom:10}}>Sign out all other devices</button>}
+              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,lineHeight:1.5}}>A device signs out the next time it has DuePlanner open and online. If you think someone else can get into your Google account, change your Google password as well.</div>
+            </>}
+        </div>
 
         {/* Housekeeping. Storage: the real number of tasks on this device against
             the account's caps (LIMITS; the cloud's own counter started at zero
@@ -3071,12 +3109,25 @@ export default function HomeworkPlanner() {
       setSignInError("Your browser blocked the sign-in popup. Please allow popups for this site, then try again. That's more reliable here than the alternative full-page redirect method.");
     }
   }
+  // The account's device list, as last heard from the cloud (see the Devices
+  // effect further down). signingOut is set while this device signs itself
+  // out, so removing its own entry isn't mistaken for another device doing it.
+  const [deviceList,setDeviceList]=useState<{uid:string;map:DeviceMap}|null>(null);
+  const deviceRegistering=useRef(false);
+  const signingOut=useRef(false);
   async function signOutFirebase(){
+    signingOut.current=true;
     clearTimeout(tasksSaveTimer.current);
     // Capped: offline, a write only resolves once it reaches the server, and
     // Firestore keeps it queued anyway -- sign-out shouldn't hang on that.
     try{ await Promise.race([pendingTasksWrite.current?.(),new Promise(r=>setTimeout(r,3000))]); }catch{/* already surfaced via syncError */}
+    // Take this device off the account's device list. Best effort and capped
+    // like the flush above; it fails harmlessly if the device isn't listed.
+    if(fbUser){
+      try{ await Promise.race([updateDoc(doc(db,"users",fbUser.uid,"meta","devices"),{[`d.${thisDeviceId()}`]:deleteField()}),new Promise(r=>setTimeout(r,2000))]); }catch{/* not listed, or no list */}
+    }
     await fbSignOut(auth);
+    try{localStorage.removeItem("hw-device-registered");}catch{/* storage unavailable */}
     setFbUser(null);
     // Signed-out use is local-only, so don't leave this account's tasks and
     // subjects sitting on the device (possibly a shared one) after signing
@@ -3088,6 +3139,19 @@ export default function HomeworkPlanner() {
     setSubjectColors(DEFAULT_SUBJECT_COLORS);
     setTrash([]);
     setRecaps([]);setRecapsChecked(null);
+    setDeviceList(null);
+  }
+  // Profile -> Devices: sign one other device out, or all of them. Removing an
+  // entry is the whole mechanism (see src/lib/devices.ts).
+  function signOutDevice(id:string){
+    if(!fbUser||id===thisDeviceId())return;
+    updateDoc(doc(db,"users",fbUser.uid,"meta","devices"),{[`d.${id}`]:deleteField()}).catch(e=>console.error(e));
+  }
+  function signOutOtherDevices(){
+    if(!fbUser||deviceList?.uid!==fbUser.uid)return;
+    const id=thisDeviceId(), mine=deviceList.map[id];
+    if(!mine)return; // not confirmed in the list yet: nothing safe to keep
+    setDoc(doc(db,"users",fbUser.uid,"meta","devices"),{d:{[id]:mine}}).catch(e=>console.error(e));
   }
   const [showDeleteAccountConfirm,setShowDeleteAccountConfirm]=useState(false);
   const [deleteConfirmText,setDeleteConfirmText]=useState("");
@@ -3112,6 +3176,9 @@ export default function HomeworkPlanner() {
         refs.slice(i,i+450).forEach(r=>batch.delete(r));
         await batch.commit();
       }
+      // The device list too (other devices then sign themselves out). On its
+      // own and allowed to fail, so it can never block deleting the account.
+      try{ await writeBatch(db).delete(doc(db,"users",fbUser.uid,"meta","devices")).commit(); }catch{/* no list */}
       await writeBatch(db).delete(doc(db,"users",fbUser.uid)).commit();
       await deleteUser(fbUser);
       Object.keys(localStorage).filter(k=>k.startsWith("hw-")).forEach(k=>localStorage.removeItem(k));
@@ -3574,6 +3641,52 @@ export default function HomeworkPlanner() {
   // half-loaded list. Archived tasks count: archiving doesn't erase history.
   const [recaps,setRecaps]=usePersistedState<Recap[]>("hw-recaps",[]);
   const [recapsChecked,setRecapsChecked]=usePersistedState<string|null>("hw-recaps-checked",null);
+  // ---- Devices (Profile -> Devices). Each signed-in device keeps one entry in
+  // users/{uid}/meta/devices and watches that doc. deviceAction() decides what
+  // a server-confirmed snapshot means for this device; the rules for staying
+  // safe are all here:
+  // - Only a snapshot straight from the server counts (not the cache, not one
+  //   still holding our own unsaved write), so being offline can't sign anyone out.
+  // - "hw-device-registered" (this account's uid) is written only once the
+  //   server has accepted this device's entry. Without it a missing entry
+  //   means "add me", never "I was signed out" -- so a first write that never
+  //   arrived (offline, or these rules not deployed yet) can't sign anyone out.
+  // - If the list can't be read at all, nothing happens: there's simply no list.
+  // Declared down here, below everything signOutFirebase touches, for the React
+  // Compiler's forward-reference check (see CLAUDE.md).
+  const signOutRef=useRef(signOutFirebase);
+  useEffect(()=>{signOutRef.current=signOutFirebase;});
+  useEffect(()=>{
+    if(!fbUser)return;
+    signingOut.current=false;
+    const uid=fbUser.uid, id=thisDeviceId(), ref=doc(db,"users",uid,"meta","devices");
+    return onSnapshot(ref,{includeMetadataChanges:true},snap=>{
+      const map=(snap.data()?.d||{}) as DeviceMap;
+      setDeviceList({uid,map});
+      if(snap.metadata.fromCache||snap.metadata.hasPendingWrites||signingOut.current)return;
+      let registered=false;
+      try{registered=localStorage.getItem("hw-device-registered")===uid;}catch{/* storage unavailable: stays "add me" */}
+      const action=deviceAction(registered,map[id],Date.now());
+      if(action==="register"&&!deviceRegistering.current){
+        deviceRegistering.current=true;
+        const at=Date.now();
+        const d:Record<string,unknown>={[id]:{name:describeDevice(navigator.userAgent,navigator.maxTouchPoints||0,isStandalone()),createdAt:at,lastSeen:at} satisfies DeviceEntry};
+        for(const old of pruneDevices(map,id,LIMITS.devices))d[old]=deleteField();
+        // Resolves only when the server has accepted it; only then is this device "registered".
+        setDoc(ref,{d},{merge:true})
+          .then(()=>{if(auth.currentUser?.uid===uid)localStorage.setItem("hw-device-registered",uid);})
+          .catch(()=>{/* refused or storage unavailable: try again next time */})
+          .finally(()=>{deviceRegistering.current=false;});
+      }
+      if(action==="touch")updateDoc(ref,{[`d.${id}.lastSeen`]:Date.now()}).catch(()=>{/* best effort */});
+      if(action==="signOut"){
+        signingOut.current=true;
+        signOutRef.current()
+          .then(()=>{setSignInError("This device was signed out from another device. Sign in again to keep syncing.");setShowProfile(true);})
+          .catch(e=>console.error(e));
+      }
+    },()=>{/* the list can't be read (e.g. offline with nothing cached): no list, and nothing else changes */});
+  },[fbUser]);
   const todayStr=localDateStr(new Date(now));
   const tasksLoaded=!authPending&&(!fbUser||tasksSyncedForUid===fbUser.uid);
   useEffect(()=>{
@@ -5602,6 +5715,8 @@ export default function HomeworkPlanner() {
         subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         taskCount={tasks.length} trashCount={trash.length}
         notificationsEnabled={notificationsEnabled} notificationNote={notificationNote} onToggleNotifications={toggleNotifications}
+        devices={fbUser&&deviceList?.uid===fbUser.uid?listDevices(deviceList.map,thisDeviceId()):null}
+        onSignOutDevice={signOutDevice} onSignOutOtherDevices={signOutOtherDevices} now={now}
         setShowProfile={setShowProfile}
         signInWithFirebase={signInWithFirebase}
         signOutFirebase={signOutFirebase}

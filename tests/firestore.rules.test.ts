@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
-import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, updateDoc, deleteField } from "firebase/firestore";
 
 // Proves firestore.rules actually enforces what CLAUDE.md claims (shape
 // validation on top of ownership) instead of trusting it untested in
@@ -190,5 +190,57 @@ describe("size caps", () => {
     await assertFails(setDoc(ref, { subjectColors:Object.fromEntries(list(201, i => [`X${i}`, "#000000"])) }));
     await assertFails(setDoc(ref, { layout:"x".repeat(41) }, { merge:true }));
     await assertFails(setDoc(doc(db, "users/alice"), Object.fromEntries(list(41, i => [`f${i}`, true]))));
+  });
+});
+
+describe("device list (users/{uid}/meta/devices)", () => {
+  const device = (n = 1) => ({ name:`Chrome on Windows ${n}`, createdAt:1, lastSeen:2 });
+  const devices = (count: number) => Object.fromEntries(Array.from({ length:count }, (_, i) => [`dev${i}`, device(i)]));
+
+  it("lets an owner register a device, refresh it, and read the list", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/meta/devices");
+    await assertSucceeds(setDoc(ref, { d:{ abc123:device() } }, { merge:true }));
+    await assertSucceeds(setDoc(ref, { d:{ def456:device(2) } }, { merge:true }));
+    await assertSucceeds(updateDoc(ref, { "d.abc123.lastSeen":3 }));
+    await assertSucceeds(getDoc(ref));
+  });
+  it("lets an owner sign a device out (remove its entry), sign out all others, and delete the list", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/meta/devices");
+    await assertSucceeds(setDoc(ref, { d:devices(3) }));
+    await assertSucceeds(updateDoc(ref, { "d.dev1":deleteField() }));
+    await assertSucceeds(setDoc(ref, { d:{ dev0:device(0) } }));
+    await assertSucceeds(deleteDoc(ref));
+  });
+  it("caps the list at 20 devices, on a merge too", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/meta/devices");
+    await assertFails(setDoc(ref, { d:devices(21) }));
+    await assertSucceeds(setDoc(ref, { d:devices(20) }));
+    await assertFails(setDoc(ref, { d:{ onemore:device() } }, { merge:true }));
+  });
+  it("rejects anything but the one map", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/meta/devices");
+    await assertFails(setDoc(ref, { d:"abc" }));
+    await assertFails(setDoc(ref, { d:[device()] }));
+    await assertFails(setDoc(ref, { d:{}, extra:true }));
+    await assertFails(setDoc(ref, { other:{} }));
+  });
+  it("keeps another user, and a signed-out visitor, out", async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), "users/alice/meta/devices"), { d:devices(1) }); });
+    for (const db of [testEnv.authenticatedContext("bob").firestore(), testEnv.unauthenticatedContext().firestore()]) {
+      const ref = doc(db, "users/alice/meta/devices");
+      await assertFails(getDoc(ref));
+      await assertFails(setDoc(ref, { d:{} }));
+      await assertFails(updateDoc(ref, { "d.dev0":deleteField() }));
+      await assertFails(deleteDoc(ref));
+    }
+  });
+  it("doesn't open up any other doc under meta/", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(db, "users/alice/meta/other"), { d:{} }));
+    await assertFails(getDoc(doc(db, "users/alice/meta/other")));
   });
 });

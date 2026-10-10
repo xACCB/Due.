@@ -111,6 +111,18 @@ service cloud.firestore {
       return isValidTask(data) && data.deletedAt is number;
     }
 
+    // The device list (Profile -> Devices): the devices signed in to this
+    // account, as one map: { d: { deviceId: { name, createdAt, lastSeen } } }.
+    // One map in one doc, not a doc per device, so its size can be capped here
+    // (rules can't count a collection). Rules can't look inside each entry
+    // either, so entries are bounded only by the count and the 1 MiB document
+    // limit, like subjectColors. Removing a device's entry is how it gets
+    // signed out (client side: src/lib/devices.ts). Nothing else in these
+    // rules depends on this doc.
+    function isValidDevices(data) {
+      return data.keys().hasOnly(['d']) && data.d is map && data.d.size() <= 20;
+    }
+
     match /users/{userId} {
       allow read, delete: if isOwner(userId);
       allow create, update: if isOwner(userId) && isValidProfile(request.resource.data);
@@ -137,6 +149,11 @@ service cloud.firestore {
           && request.resource.data.last is string;
         allow update: if isOwner(userId) && isValidCountChange(userId);
         allow delete: if false;
+      }
+
+      match /meta/devices {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidDevices(request.resource.data);
       }
     }
 

@@ -516,22 +516,11 @@ Rather than each call site branching on the setting itself, they all go through
 swapping which color resolves. This is the same "single helper, many call sites" shape as
 `contrastColor()`.
 
-**Liquid Glass** (`liquidGlass` state, `hw-liquid-glass` localStorage key, "Liquid Glass" toggle in
-Options -> Looks, default off, local-only) swaps the theme's surface tokens (`card`/`cardAlt`/
-`surface`/`border`/`borderAccent`) for translucent `rgba()` values when building `T`, adds a fixed
-background glow (`.app-shell::before`), (the tab bar that carried its sheen and sliding "lens" pill is gone; the sidebar is plain).
-Card highlights/shadows and floating-element blur are applied from the runtime stylesheet via
-attribute selectors matching the glass border value in the browser-normalized inline `style`
-(e.g. `border: 1px solid rgba(255, 255, 255, 0.11)`), not by editing each inline style -- so
-changing those border values means the selectors follow automatically, but a new card that uses a
-different border won't pick up the effect. A pointer highlight follows the mouse, or a finger while it's touching the screen (touch
-events, since they keep firing during scroll; cleared 250ms after lift): an effect sets
-`--glass-x`/`--glass-y` on the glass card under the point (and glass cards containing it), relative to
-each card's own box, and a radial gradient keyed to `glassCardSel` draws it -- per-card rather than
-one `background-attachment:fixed` layer because task cards lift with a transform on hover, which
-breaks fixed backgrounds. Device tilt deliberately doesn't drive it. Since glass tokens aren't hex, never append a hex alpha
-suffix to them (`T.border+"33"`); use `T.borderFaint` for a lighter divider, and `T.solidBorder`
-wherever a real hex is required (e.g. `contrastColor()`).
+**Liquid Glass is gone.** The optional translucent look (`liquidGlass`, `hw-liquid-glass`, with its
+glow layer, attribute-selector card effects and pointer highlight) was removed at the user's request
+on 2026-10-10; the saved choice is cleared once on mount. Don't bring it back. Two tokens it
+introduced remain and are still the right ones to use: `T.solidBorder` wherever a real hex is
+required (e.g. `contrastColor()`), and `T.borderFaint` for a lighter divider (`T.border+"33"`).
 
 **Animation speed** (`animSpeed`, `hw-anim-speed`, a slider in Settings -> Looks, 0.5x to 2x,
 local-only) is applied globally by `src/lib/animSpeed.ts` instead of per call site: it wraps

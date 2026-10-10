@@ -261,6 +261,7 @@ function priColor(pr:Priority,colorCode:boolean):string{ return colorCode?PRIORI
 // `list` is only used by recap messages (src/lib/recaps.ts): the finished tasks.
 type WhatsNewItem={id:string; date:string; kind:string; headline:string; where?:string; go?:string; description:string; list?:string[]};
 const WHATS_NEW: WhatsNewItem[] = [
+  { id:"liquid-glass-removed", date:"2026-10-10", kind:"UI change", headline:"Liquid Glass is gone", where:"Sidebar (top left button) → Settings → Looks", go:"settings", description:"The Liquid Glass look has been removed. If you had it on, the app is back to its normal solid cards." },
   { id:"layouts-consistent", date:"2026-10-10", kind:"Improvement", headline:"Every layout moves the same way", where:"Sidebar (top left button) → Settings → Looks → Layout", go:"settings:layout", description:"All six layouts now behave alike. The check mark pops and the title fades the same way in each, a finished task keeps its labels until it starts to glide, and cards brighten smoothly under the mouse everywhere. The finished task now rises and glides in one motion. Cards that open from a row show their text in place as they grow, and the page no longer shifts sideways when a scrollbar comes or goes. Kanban with no tasks shows the usual empty message, and Settings says when grouping has no effect in your layout." },
   { id:"update-fade", date:"2026-10-10", kind:"UI change", headline:"Updates fade between each other", where:"Sidebar (top left button) → Inbox → tap any update, then Back or Next", go:"menu", description:"Pressing Back or Next on an open Inbox message now fades the new one in. It used to slide in from the side as well." },
   { id:"animation-two-step-2", date:"2026-10-10", kind:"Bug fix", headline:"Things land where they stay", where:"Checking off a task, a task's details, Inbox updates and search", description:"More animations that moved twice now move once. Checking off a task no longer nudges the list before the task glides down, in every layout, and the task sets down as it arrives instead of shrinking afterwards. A task's details spring all the way back when you drag them a little and let go, where they used to stop part of the way. On a computer, an Inbox update, a calendar day and a Time left card no longer snap wider after opening. The search bar no longer slides past its spot and back." },
@@ -336,7 +337,7 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"a11y-pass", date:"2026-09-22", kind:"Improvement", headline:"Keyboard and screen reader support", where:"Everywhere. Try Tab, Enter and the arrow keys", description:"Better for keyboard and screen reader users: open tasks from the keyboard, reorder with arrow keys, visible focus rings, clearer button names, and higher-contrast labels." },
   { id:"complete-anim", date:"2026-09-22", kind:"Improvement", headline:"A more satisfying check-off", where:"Tap the circle next to any task", description:"Completing a task feels better: the check draws in, the title strikes through, and the card settles down to your done tasks." },
   { id:"sheet-spring", date:"2026-09-22", kind:"Improvement", headline:"Springy task details", where:"Tap a task, then drag the handle at the top", go:"task", description:"Task details now follow your finger when you drag the handle, spring back when you let go, and fly away when you flick them down to close." },
-  { id:"glass-cursor", date:"2026-09-22", kind:"Improvement", headline:"Liquid Glass catches the light", where:"Sidebar (top left button) → Settings → Looks → Liquid Glass", go:"settings:liquid-glass", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
+  { id:"glass-cursor", date:"2026-09-22", kind:"Improvement", headline:"Liquid Glass catches the light", where:"This look has since been removed", description:"Liquid Glass now catches the light: cards glow softly under your mouse, or under your finger on a phone." },
   { id:"pomodoro-breaks", date:"2026-09-22", kind:"New feature", headline:"Pomodoro breaks", where:"Sidebar (top left button) → Settings → Focus timer; the timer is in the Focus tab", go:"settings:focus-timer", description:"The Pomodoro now has breaks. Set focus and break lengths in Settings → Focus timer, and when a break ends you get a suggestion for what to work on next, with one tap to start." },
   { id:"fixes-sep22", date:"2026-09-22", kind:"Bug fix", headline:"A batch of fixes", description:"Un-completing an archived task no longer makes it disappear; long titles and subject names are capped instead of failing to sync; swiping a finished task now says \"Mark not done\"; Empty in Recently deleted asks to confirm; 24-hour time now applies everywhere; and a few labels say what they actually do (\"In 3 hours\", \"Next 7 days\")." },
   { id:"settings-batch", date:"2026-09-22", kind:"New feature", headline:"Subject colors, Done today and more undo", where:"Sidebar (top left button) → Settings → Subjects, and Settings → Date & time; Done today is in the Inbox", go:"settings:subjects", description:"Rename subjects and change their colors (✎ in Settings -> Subjects); a \"Done today\" list in the Inbox; 24-hour time and a Monday week start in Settings -> Date & time; and completing, editing, archiving and bulk changes can now be undone." },
@@ -353,7 +354,7 @@ const WHATS_NEW: WhatsNewItem[] = [
   { id:"json-import", date:"2026-09-22", kind:"New feature", headline:"Import a backup", where:"Sidebar (top left button) → Import/Export → Import backup (JSON)", go:"import:import-backup", description:"Import backup (JSON) in the menu's Backup & export section restores an export. Tasks you already have are kept." },
   { id:"week-reminder", date:"2026-09-22", kind:"New feature", headline:"1-week reminders", where:"Sidebar (top left button) → Settings → Reminders → Remind me", go:"settings:reminders", description:"New \"1 week before\" reminder option in Settings." },
   { id:"focus-picker", date:"2026-09-22", kind:"New feature", headline:"Pick your focus task", where:"Focus tab → Change task", go:"focus:change-task", description:"Choose which task Focus Mode is about. Finished Pomodoros now count as work sessions, and the screen stays awake while you focus." },
-  { id:"liquid-glass", date:"2026-09-22", kind:"New feature", headline:"Liquid Glass", where:"Sidebar (top left button) → Settings → Looks → Liquid Glass", go:"settings:liquid-glass", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
+  { id:"liquid-glass", date:"2026-09-22", kind:"New feature", headline:"Liquid Glass", where:"This look has since been removed", description:"Liquid Glass: an optional translucent look for cards and the tab bar. Turn it on in Settings → Looks." },
   { id:"time-left-breakdown", date:"2026-09-22", kind:"New feature", headline:"Time left by subject", where:"Tap Time left, top right", go:"tasks:time-left", description:"Tap \"Time left\" in the header to see how much time each subject needs." },
   { id:"sync-more", date:"2026-09-22", kind:"New feature", headline:"More things sync", where:"Sidebar (top left button) → Profile, to sign in", go:"profile", description:"Subjects, subject colors, and Urgency Color Coding now sync across your devices." },
   { id:"subjects-in-settings", date:"2026-09-22", kind:"Navigation", headline:"Subjects in Settings", where:"Sidebar (top left button) → Settings → Subjects", go:"settings:subjects", description:"Subjects are now managed in Settings, and work without signing in." },
@@ -2620,7 +2621,9 @@ export default function HomeworkPlanner() {
   // Red/orange/green priority coloring, toggleable off in favor of one neutral
   // gray (NEUTRAL_PRIORITY_COLOR) everywhere urgency is shown -- default on.
   const [colorCodeUrgency,setColorCodeUrgency]=usePersistedState("hw-colorcode-urgency",true);
-  const [liquidGlass,setLiquidGlass]=usePersistedState("hw-liquid-glass",false);
+  // Liquid Glass (a translucent look, with a glow that followed the pointer) was
+  // removed at the user's request. Its saved choice is cleared once.
+  useEffect(()=>{localStorage.removeItem("hw-liquid-glass");},[]);
   // Animation speed (Settings -> Looks; local-only): 1 is normal. Applied app
   // wide by src/lib/animSpeed.ts.
   const [storedAnimSpeed,setAnimSpeed]=usePersistedState<number>("hw-anim-speed",1);
@@ -3433,17 +3436,10 @@ export default function HomeworkPlanner() {
   function exitSelectionMode(){ setSelectionMode(false); setSelectedIds([]); setBulkDate(null); }
 
   const base=THEMES[themeName];
-  // Liquid glass (optional, "Liquid Glass" toggle in Options -> Looks): every
-  // surface token becomes a translucent tint over the page's soft background
-  // glow (see .app-shell::before in the stylesheet) instead of an opaque gray,
-  // and borders become a faint rim. The css string below keys its glass
-  // selectors off these exact border values. Off = the original opaque theme.
-  const glass=!liquidGlass
-    ?{card:base.card as string,cardAlt:base.cardAlt as string,surface:base.surface as string,border:base.border as string,borderAccent:base.borderAccent as string}
-    :base.light
-    ?{card:"rgba(255,255,255,0.6)",cardAlt:"rgba(255,255,255,0.42)",surface:"rgba(255,255,255,0.5)",border:"rgba(0,0,0,0.08)",borderAccent:"rgba(0,0,0,0.12)"}
-    :{card:"rgba(255,255,255,0.045)",cardAlt:"rgba(255,255,255,0.08)",surface:"rgba(255,255,255,0.035)",border:"rgba(255,255,255,0.11)",borderAccent:"rgba(255,255,255,0.16)"};
-  const T:ThemeObj={...base,...glass,solidBorder:base.border,borderFaint:liquidGlass?glass.border:base.border+"33",accentGlow:base.accent+"44",gradientCard:`linear-gradient(135deg,${glass.cardAlt},${glass.card})`,accent:base.accent as typeof base.accent};
+  // solidBorder and borderFaint date from Liquid Glass (removed), when `border`
+  // could be an rgba() value: solidBorder is always a real hex, borderFaint a
+  // lighter divider. Still the ones to use for those two jobs.
+  const T:ThemeObj={...base,solidBorder:base.border,borderFaint:base.border+"33",accentGlow:base.accent+"44",gradientCard:`linear-gradient(135deg,${base.cardAlt},${base.card})`,accent:base.accent as typeof base.accent};
   // Mirrors just the resolved background color (not the whole theme) to its own
   // key, read synchronously by a tiny inline script in index.html before React
   // hydrates -- prevents a flash of the browser's default white background for
@@ -4112,7 +4108,7 @@ export default function HomeworkPlanner() {
     const data={
       exportedAt:new Date().toISOString(),
       tasks,subjects,subjectColors,templates,
-      settings:{themeMode,layout,groupBy,colorCodeUrgency,liquidGlass,showDone,showSuggestion,autoArchiveDays,notificationsEnabled,enabledOffsets,timeFormat,weekStart,pomodoroWorkMins,pomodoroBreakMins,autoStartBreaks},
+      settings:{themeMode,layout,groupBy,colorCodeUrgency,showDone,showSuggestion,autoArchiveDays,notificationsEnabled,enabledOffsets,timeFormat,weekStart,pomodoroWorkMins,pomodoroBreakMins,autoStartBreaks},
     };
     downloadFile(`dueplanner-export-${todayISO()}.json`,JSON.stringify(data,null,2),"application/json");
   }
@@ -4313,9 +4309,6 @@ export default function HomeworkPlanner() {
   // stylesheet string, injected via <style>{css}</style>, only gets rebuilt
   // (and reparsed by the browser) when the theme or font actually changes,
   // not on every task edit or other unrelated render.
-  // Glass cards that get the cursor highlight, matched by their inline border
-  // the same way as the other glass rules in the css below.
-  const glassCardSel=`[style*="border: 1px solid ${T.border.replace(/,/g,", ")}"][style*="border-radius"]:not([style*="gradient"])`;
   const css=useMemo(()=>`
     /* No @import for the fonts here: an @import holds back every rule in this
        stylesheet until it has loaded, so on a slow connection the app showed
@@ -4400,38 +4393,6 @@ export default function HomeworkPlanner() {
        sheet locks scrolling. */
     html{scrollbar-gutter:stable;}
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${T.border};border-radius:99px}
-    ${liquidGlass?`
-    /* Liquid glass. The page gets a soft, fixed glow layer behind everything
-       so the translucent surfaces have something to show through. Cards are
-       matched by their inline glass border (React serializes inline styles,
-       so the rgba() spacing below is the browser's normalized form) and get
-       a specular top-edge highlight plus a soft drop shadow; floating ones
-       (menus, toasts, bars) also get a real backdrop blur and a stronger
-       tint so text underneath them doesn't bleed through. Anything with its
-       own inline box-shadow keeps it. */
-    .app-shell{position:relative;isolation:isolate;}
-    .app-shell::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:${T.light
-      ?"radial-gradient(circle at 12% 8%,rgba(255,255,255,0.95),transparent 42%),radial-gradient(circle at 88% 30%,rgba(0,0,0,0.06),transparent 45%),radial-gradient(circle at 30% 85%,rgba(0,0,0,0.05),transparent 45%),radial-gradient(circle at 80% 95%,rgba(255,255,255,0.8),transparent 40%)"
-      :"radial-gradient(circle at 12% 8%,rgba(255,255,255,0.08),transparent 42%),radial-gradient(circle at 88% 30%,rgba(255,255,255,0.05),transparent 45%),radial-gradient(circle at 30% 85%,rgba(255,255,255,0.045),transparent 45%)"};}
-    [style*="border: 1px solid ${T.border.replace(/,/g,", ")}"][style*="border-radius"]{box-shadow:${T.light
-      ?"inset 0 1px 0 rgba(255,255,255,0.9),0 4px 18px rgba(0,0,0,0.06)"
-      :"inset 0 1px 0 rgba(255,255,255,0.07),0 6px 22px rgba(0,0,0,0.35)"};}
-    [style*="position: absolute"][style*="border: 1px solid ${T.border.replace(/,/g,", ")}"],
-    [style*="position: fixed"][style*="border: 1px solid ${T.border.replace(/,/g,", ")}"]{
-      background:${T.light?"rgba(255,255,255,0.72)":"rgba(30,30,30,0.66)"}!important;
-      backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
-    /* Pointer highlight: a soft glow (a faint sheen in light mode) on the glass
-       card under the mouse or finger (and any glass card containing it),
-       positioned by --glass-x/--glass-y, which the effect below sets on those
-       cards relative to their own box. Registered as non-inheriting so a nested
-       card never picks up its parent's position. Follows the mouse, or a finger
-       while it's on the screen -- never device tilt. Cards with their own
-       inline gradient keep it untouched. */
-    @property --glass-x{syntax:"<length>";inherits:false;initial-value:-9999px;}
-    @property --glass-y{syntax:"<length>";inherits:false;initial-value:-9999px;}
-    ${glassCardSel}{
-      background-image:radial-gradient(circle 220px at var(--glass-x,-9999px) var(--glass-y,-9999px),${T.light?"rgba(0,0,0,0.07)":"rgba(255,255,255,0.13)"},transparent 70%)!important;}
-    `:""}
     .pomo-ring{animation:ring 1s linear infinite;}
     @keyframes ring{from{stroke-dashoffset:0}to{stroke-dashoffset:283}}
     .app-inner{max-width:580px;margin:0 auto;padding:20px 14px;width:100%;box-sizing:border-box;}
@@ -4462,50 +4423,8 @@ export default function HomeworkPlanner() {
     @media (max-width:600px){
       input,textarea{font-size:16px!important;}
     }
-  `,[T.bg,T.card,T.cardAlt,T.border,T.borderFaint,T.solidBorder,T.text,T.textMuted,T.light,T.accent,liquidGlass,glassCardSel,F.body]);
+  `,[T.bg,T.card,T.cardAlt,T.border,T.borderFaint,T.solidBorder,T.text,T.textMuted,T.light,T.accent,F.body]);
 
-  // Feeds the Liquid Glass pointer highlight (see the css above): the mouse or
-  // finger position, relative to each glass card it's over, as CSS variables on
-  // those cards -- at most once per frame. The card is found from the point
-  // itself (not the event target, which stays fixed for the length of a touch).
-  // Mouse/pen use pointer events and clear when leaving the window; touch uses
-  // touch events, since those keep firing while the page scrolls under the
-  // finger (pointer events cancel), and clears shortly after the finger lifts.
-  useEffect(()=>{
-    if(!liquidGlass)return;
-    let lit:HTMLElement[]=[];
-    let raf=0,x=0,y=0,clearTimer=0;
-    const unlight=(els:HTMLElement[])=>els.forEach(el=>{el.style.removeProperty("--glass-x");el.style.removeProperty("--glass-y");});
-    const update=()=>{
-      raf=0;
-      const next:HTMLElement[]=[];
-      for(let el=document.elementFromPoint(x,y)?.closest<HTMLElement>(glassCardSel)??null;el;el=el.parentElement?.closest<HTMLElement>(glassCardSel)??null)next.push(el);
-      unlight(lit.filter(el=>!next.includes(el)));
-      for(const el of next){const r=el.getBoundingClientRect();el.style.setProperty("--glass-x",(x-r.left)+"px");el.style.setProperty("--glass-y",(y-r.top)+"px");}
-      lit=next;
-    };
-    const at=(cx:number,cy:number)=>{clearTimeout(clearTimer);x=cx;y=cy;if(!raf)raf=requestAnimationFrame(update);};
-    const clear=()=>{clearTimeout(clearTimer);cancelAnimationFrame(raf);raf=0;unlight(lit);lit=[];};
-    const move=(e:PointerEvent)=>{if(e.pointerType!=="touch")at(e.clientX,e.clientY);};
-    const touch=(e:TouchEvent)=>{const t=e.touches[0];if(t)at(t.clientX,t.clientY);};
-    // Scrolling moves cards under a finger that's holding still, so re-aim.
-    const scroll=()=>{if(lit.length&&!raf)raf=requestAnimationFrame(update);};
-    const leave=(e:PointerEvent)=>{if(e.pointerType!=="touch")clear();};
-    const lift=(e:TouchEvent)=>{if(e.touches.length)return;clearTimeout(clearTimer);clearTimer=window.setTimeout(clear,250);};
-    window.addEventListener("pointermove",move,{passive:true});
-    window.addEventListener("touchstart",touch,{passive:true});
-    window.addEventListener("touchmove",touch,{passive:true});
-    window.addEventListener("touchend",lift,{passive:true});
-    window.addEventListener("touchcancel",lift,{passive:true});
-    window.addEventListener("scroll",scroll,{passive:true});
-    document.documentElement.addEventListener("pointerleave",leave);
-    window.addEventListener("blur",clear);
-    return()=>{
-      window.removeEventListener("pointermove",move);window.removeEventListener("touchstart",touch);window.removeEventListener("touchmove",touch);
-      window.removeEventListener("touchend",lift);window.removeEventListener("touchcancel",lift);window.removeEventListener("scroll",scroll);
-      document.documentElement.removeEventListener("pointerleave",leave);window.removeEventListener("blur",clear);clear();
-    };
-  },[liquidGlass,glassCardSel]);
 
   // Session timer -- elapsed time from a fixed start, not a per-second
   // counter, so time worked while the tab is in the background or the screen
@@ -4564,7 +4483,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","liquid-glass":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -5514,11 +5433,6 @@ export default function HomeworkPlanner() {
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
                 <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Urgency Color Coding</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4}}>Red for urgent, green for not urgent</div></div>
                 <Toggle on={colorCodeUrgency} onChange={setColorCodeUrgency} T={T} label="Urgency Color Coding"/>
-              </div>
-              {/* Liquid glass */}
-              <div data-tour="liquid-glass" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Liquid Glass</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4}}>Translucent, glassy cards and tab bar</div></div>
-                <Toggle on={liquidGlass} onChange={setLiquidGlass} T={T} label="Liquid Glass"/>
               </div>
               {/* Animation speed */}
               <div data-tour="anim-speed">

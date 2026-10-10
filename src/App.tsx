@@ -14,9 +14,12 @@ import { LAYOUTS, GROUP_BY, DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, SUBJECT_CO
 import type { LayoutName } from "./constants";
 import { WHATS_NEW, kindRank, LEGACY_WHATSNEW_IDS } from "./whatsNew";
 import type { WhatsNewItem } from "./whatsNew";
-import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, dateInDays, snoozeTarget, setDone, nextOrder } from "./lib/tasks";
+import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, dateInDays, snoozeTarget, setDone } from "./lib/tasks";
 import type { SnoozeKind } from "./lib/tasks";
 import { trashEntries, pruneTrash, localRecords } from "./lib/trash";
+import { dailySummary, offsetReminders } from "./lib/reminders";
+import type { SentReminders } from "./lib/reminders";
+import { tasksCsv, readBackup, withImportedSubjects, withImportedColors, withImportedTemplates, withSyllabusTasks } from "./lib/backup";
 import { heldOpen, isSettled, withHeldOpen, allTagsOf, sortTasks, filterTasks, groupTasks, prioritySplit, timeLeft, searchTasks, completionStats } from "./lib/taskViews";
 import { patchTask, patchTasks, withoutTasks, skipPatch, snoozePatch, dueDatePatch, duplicateOf, freshSubtasks, withNewTask, templateFromTask, taskFromTemplate, withTrashed, withoutTrashed, restoredInto, movedOrder, withOrder, subjectToAdd, subjectRename, renamedSubjects, recolouredSubjects, withoutSubjectColor, tasksRenamedSubject, trashRenamedSubject, templatesRenamedSubject } from "./lib/taskActions";
 import type { TrashEntry } from "./lib/trash";
@@ -29,7 +32,7 @@ import { ANIM_SPEED, clampSpeed, setAnimationSpeed, animationRate, scaledMs } fr
 import { newRecaps, mergeRecaps, recapMessage } from "./lib/recaps";
 import type { Recap } from "./lib/recaps";
 import { parseSyllabus } from "./lib/syllabus";
-import { contrastColor, readableOn, getPriority, formatDate, csvField, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
+import { contrastColor, readableOn, getPriority, formatDate, formatTime, daysUntil, formatDuration, countdown, formatAgo } from "./lib/format";
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "./lib/timeLeft";
 import { SIDEBAR_TASK_CAP, dueShort, subjectGroups } from "./lib/sidebarSubjects";
 import type { SubjectGroup } from "./lib/sidebarSubjects";
@@ -40,7 +43,7 @@ import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
 import { diffTasks, applyTaskStates } from "./lib/history";
 import type { SyncRecord, CloudRecord } from "./lib/sync";
 import { downloadFile } from "./lib/download";
-import { LIMITS, addSession, sanitizeTask } from "./lib/limits";
+import { LIMITS, addSession } from "./lib/limits";
 import { describeDevice, deviceAction, listDevices, newDeviceId, pruneDevices } from "./lib/devices";
 import type { DeviceEntry, DeviceMap } from "./lib/devices";
 import { usePersistedState } from "./hooks/usePersistedState";
@@ -2249,54 +2252,21 @@ export default function HomeworkPlanner() {
     function checkDue(){
       if(document.hidden)return;
       const today=todayISO();
+      // What's owed is worked out in src/lib/reminders.ts; this effect only
+      // shows it and remembers what was sent.
       if(localStorage.getItem("hw-last-notified")!==today){
-        // Tasks with a due time get their own offset reminders below, so the
-        // daily summary only covers date-only tasks (unless offsets are all off).
-        const due=tasks.filter(t=>!t.done&&!t.archived&&t.dueDate&&t.dueDate<=today&&(!t.dueTime||enabledOffsets.length===0||t.dueDate<today));
-        if(due.length>0){
+        const summary=dailySummary(tasks,today,enabledOffsets);
+        if(summary){
           localStorage.setItem("hw-last-notified",today);
-          const title=due.length===1?`"${due[0].title}" is due`:`${due.length} tasks due or overdue`;
-          notify(title,{body:due.slice(0,3).map(t=>t.title).join(", ")});
+          notify(summary.title,{body:summary.body});
         }
       }
-      // Offset-based reminders, only for tasks with a specific due time --
-      // fires once per (task, offset, due-datetime) combo, tracked so
-      // editing a task's due date/time naturally resets which reminders
-      // are still owed for it.
       if(enabledOffsets.length===0)return;
-      let sent:Record<string,true>={};
+      let sent:SentReminders={};
       try{sent=JSON.parse(localStorage.getItem("hw-sent-reminders")||"{}");}catch{/* ignore */}
-      const now=Date.now();
-      let changed=false;
-      for(const t of tasks){
-        if(t.done||t.archived||!t.dueDate||!t.dueTime)continue;
-        const dueAt=new Date(`${t.dueDate}T${t.dueTime}`).getTime();
-        // Every enabled offset whose reminder time has arrived. Each stops at
-        // the due time, except "at due time" itself, which gets a 15-minute
-        // grace window -- otherwise its window (due time -> due time) is empty
-        // and it could never fire.
-        const eligible=REMINDER_OFFSETS.filter(o=>enabledOffsets.includes(o.key)&&now>=dueAt-o.mins*60000&&now<dueAt+(o.mins===0?15*60000:0));
-        if(eligible.length===0)continue;
-        // Only the closest one is actually sent; the earlier, now-stale ones are
-        // just marked as sent -- so opening the app 30 minutes before a deadline
-        // gives one reminder, not "1 day / 3 hours / 1 hour" all at once.
-        const sentKey=(o:typeof REMINDER_OFFSETS[number])=>`${t.id}-${o.key}-${t.dueDate}T${t.dueTime}`;
-        const closest=eligible.reduce((a,b)=>b.mins<a.mins?b:a);
-        if(!sent[sentKey(closest)]){
-          const minsLeft=Math.round((dueAt-now)/60000);
-          const daysLeft=Math.round(minsLeft/1440);
-          const when=minsLeft<=0?"now":minsLeft<60?`in ${minsLeft} min`:minsLeft<1440?`in ${formatDuration(minsLeft)}`:`in ${daysLeft} day${daysLeft===1?"":"s"}`;
-          notify(`"${t.title}" is due ${when}`,{body:`${formatDate(t.dueDate)} at ${formatTime(t.dueTime,h24)}`});
-        }
-        for(const o of eligible){ if(!sent[sentKey(o)]){ sent[sentKey(o)]=true; changed=true; } }
-      }
-      // Drop records for tasks that are finished, deleted, or rescheduled --
-      // they can never match again, and would otherwise pile up forever.
-      const live=tasks.filter(t=>!t.done&&!t.archived&&t.dueDate&&t.dueTime).map(t=>[`${t.id}-`,`-${t.dueDate}T${t.dueTime}`]);
-      for(const k of Object.keys(sent)){
-        if(!live.some(([pre,post])=>k.startsWith(pre)&&k.endsWith(post))){ delete sent[k]; changed=true; }
-      }
-      if(changed)localStorage.setItem("hw-sent-reminders",JSON.stringify(sent));
+      const owed=offsetReminders(tasks,enabledOffsets,sent,Date.now(),h24);
+      for(const note of owed.notes)notify(note.title,{body:note.body});
+      if(owed.changed)localStorage.setItem("hw-sent-reminders",JSON.stringify(owed.sent));
     }
     checkDue();
     document.addEventListener("visibilitychange",checkDue);
@@ -3047,10 +3017,7 @@ export default function HomeworkPlanner() {
     const subject=importSubjectEff;
     const toAdd=importPreview.filter(it=>it.checked);
     if(toAdd.length===0)return;
-    setTasks(prev=>[
-      ...prev,
-      ...toAdd.map((it,i):Task=>({id:nextId(),title:it.title,subject,dueDate:it.dueDate,dueTime:"",estMins:0,done:false,order:nextOrder(prev)+i})),
-    ]);
+    setTasks(prev=>withSyllabusTasks(prev,toAdd,subject));
     setImportedCount(toAdd.length);
     setImportText("");
     setImportPreview(null);
@@ -3779,48 +3746,23 @@ export default function HomeworkPlanner() {
   async function importBackupJSON(file:File){
     try{
       const data=JSON.parse(await file.text());
-      const raw:unknown[]=Array.isArray(data?.tasks)?data.tasks:[];
-      const incoming:Task[]=raw.filter((t):t is Task=>!!t&&typeof (t as Task).id==="number"&&typeof (t as Task).title==="string")
-        // Brought inside the limits firestore.rules enforces, or a hand-edited
-        // backup could save locally but never sync.
-        .map(t=>sanitizeTask(t as unknown as Record<string,unknown>) as unknown as Task);
-      if(incoming.length===0&&!Array.isArray(data?.subjects)){
+      const read=readBackup(data,tasks,subjects);
+      if(!read){
         setImportBackupNote("That file doesn't look like a DuePlanner export.");
         return;
       }
-      const have=new Set(tasks.map(t=>t.id));
-      const base=nextOrder(tasks);
-      const fresh=incoming.filter(t=>!have.has(t.id)).map((t,i)=>({...t,order:base+i}));
+      const {fresh,skipped,extraSubjects,colors,templates:importedTemplates}=read;
       if(fresh.length)setTasks(prev=>[...prev,...fresh]);
-      if(Array.isArray(data?.subjects)){
-        const extra=(data.subjects as unknown[]).filter((s):s is string=>typeof s==="string"&&!subjects.some(x=>x.toLowerCase()===s.toLowerCase()));
-        if(extra.length)setSubjects(prev=>[...prev,...extra.map(x=>x.slice(0,LIMITS.subject))].slice(0,LIMITS.subjects));
-      }
-      if(data?.subjectColors&&typeof data.subjectColors==="object"){
-        const cols=Object.fromEntries(Object.entries(data.subjectColors).filter(([,v])=>typeof v==="string")) as Record<string,string>;
-        // Existing colors win; the map stays within the profile doc's cap.
-        setSubjectColors(prev=>Object.fromEntries(Object.entries({...prev,...Object.fromEntries(Object.entries(cols).filter(([k])=>!(k in prev)))}).slice(0,LIMITS.subjects)));
-      }
-      if(Array.isArray(data?.templates)){
-        setTemplates(prev=>{
-          const ids=new Set(prev.map(t=>t.id));
-          return [...prev,...(data.templates as TaskTemplate[]).filter(t=>t&&typeof t.id==="string"&&typeof t.name==="string"&&!ids.has(t.id))];
-        });
-      }
-      const skipped=incoming.length-fresh.length;
+      if(extraSubjects?.length)setSubjects(prev=>withImportedSubjects(prev,extraSubjects));
+      if(colors)setSubjectColors(prev=>withImportedColors(prev,colors));
+      if(importedTemplates)setTemplates(prev=>withImportedTemplates(prev,importedTemplates));
       setImportBackupNote(`Imported ${fresh.length} task${fresh.length===1?"":"s"}${skipped?` (${skipped} already here)`:""}.`);
     }catch{
       setImportBackupNote("Couldn't read that file. Pick a .json file from \"Export all (JSON)\".");
     }
   }
   function exportTasksCSV(){
-    const headers=["title","subject","dueDate","dueTime","estMins","done","priority","tags","recurrence"];
-    const rows=tasks.map(t=>[
-      t.title,t.subject,t.dueDate,t.dueTime,t.estMins,t.done?"yes":"no",
-      getPriority(t.dueDate,t.estMins,t.priorityOverride),
-      (t.tags||[]).join("; "),t.recurrence||"none",
-    ].map(csvField).join(","));
-    downloadFile(`dueplanner-tasks-${todayISO()}.csv`,[headers.join(","),...rows].join("\n"),"text/csv");
+    downloadFile(`dueplanner-tasks-${todayISO()}.csv`,tasksCsv(tasks),"text/csv");
   }
 
   // Drag-to-reorder: pointer capture keeps move/up events on the handle even as

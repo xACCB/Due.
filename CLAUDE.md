@@ -303,8 +303,16 @@ that will reuse them; keep adding logic here, not in the component):
   `restoredInto`, `movedOrder`, the subject add/rename helpers, templates). The functions in
   `HomeworkPlanner` (`editTask`, `duplicateTask`, `moveTaskBy`...) are thin wrappers that add what
   belongs to the screen: the undo entry, the toast, `captureTaskRects`.
-Still inside `HomeworkPlanner`, to move later: the list calculations (sorting, filtering,
-grouping), the three timers, reminders, import/export, the storage calls, and the sync engine.
+- `src/lib/taskViews.ts`: which tasks a screen shows and in what order or groups: `sortTasks`,
+  `filterTasks`, `groupTasks`, `prioritySplit` (Kanban/Pyramid), `timeLeft`, `searchTasks`,
+  `completionStats`, and `heldOpen`/`isSettled` (the `justDone` hold).
+- `src/lib/reminders.ts`: `dailySummary` and `offsetReminders` decide what is owed; the effect in
+  `HomeworkPlanner` only shows the notifications and stores what was sent.
+- `src/lib/backup.ts`: `tasksCsv`, `readBackup` and the `withImported...` merges, `withSyllabusTasks`.
+Still inside `HomeworkPlanner`, to move later: the three timers, the storage calls, and the sync
+engine.
+When moving more, prove it the same way: build `main` and the branch side by side and compare what
+each shows (the page text per view, the saved data after each action) for identical output.
 
 **Domain logic as plain functions** (not hooks), all in `src/lib/` and unit-tested via `npm test`:
 - `dates.ts`: `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due

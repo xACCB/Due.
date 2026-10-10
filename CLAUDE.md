@@ -284,14 +284,16 @@ are `SidebarRow` (module scope, `.sb-row` in the runtime css, `aria-current="pag
 being shown). From 900px up it is fixed in place and the page is padded to make room (`--sb`, which
 also re-centers the viewport-centered toasts), unless folded away (`sidebarFolded`,
 `hw-sidebar-folded`, local-only, class `.sb-folded`). Below 900px it is a drawer (`drawerOpen`, class
-`.sb-drawer`, backdrop `.sb-backdrop`): the header's dp mark (`.sb-open-btn`) opens it, as does a
+`.sb-drawer`, backdrop `.sb-backdrop`): the header's sidebar button (`.sb-open-btn`, the `IconSidebar` icon) opens it, as does a
 swipe in from the left 16px of the screen; a swipe left, the backdrop, Escape or picking a row closes
 it. Closed, it is `visibility:hidden`, so it is out of the tab order with no extra code;
 `openSidebar()`/`closeSidebar()` pick fold vs. drawer with `isWideScreen()`, which must match the css
-breakpoint. Wide and unfolded, the css swaps the header's dp mark for the screen's name
-(`.screen-title`, `SCREEN_TITLES`) and hides `ScreenHeader` (`.screen-header`) and the header's timer
-pill (`.timer-pill`, a running Pomodoro/stopwatch that opens Focus), since the sidebar shows all
-three. The dp mark is live text in Bodoni Moda (`DP_MARK_FONT`), loaded in `index.html` as a
+breakpoint. The header always shows the screen's name (`SCREEN_TITLES`); it used to swap with a dp logo depending
+on whether the sidebar was showing, which the user disliked (2026-10-10), so don't put a logo back
+there. Wide and unfolded, the css hides the sidebar button, `ScreenHeader` (`.screen-header`, now
+only the "‹ Home" back button) and the header's timer pill (`.timer-pill`, a running
+Pomodoro/stopwatch that opens Focus), since the sidebar covers all three. The dp mark only appears
+at the sidebar's foot: live text in Bodoni Moda (`DP_MARK_FONT`), loaded in `index.html` as a
 two-letter subset (`&text=dp`). **Subjects in the sidebar** (`SidebarSubjects`, module scope; groups from `subjectGroups()` in
 `src/lib/sidebarSubjects.ts`, unit-tested): every subject in the user's order, even with nothing
 open, then subjects that only exist on tasks, then "No subject" (name `""`) when it has tasks. Each
@@ -327,7 +329,7 @@ on the sidebar's Focus row and the header pill; finishing chimes via `playChime(
 with a back button (shown where the sidebar isn't). The sidebar's lower rows are Profile (a modal, the top row), then Inbox (recap
 messages, What's New), History (undo/redo, Recently deleted), Import/Export (syllabus import,
 backups) and Settings, each a full screen (`activeTab` "inbox"/"history"/"import"/"options") with
-the shared `ScreenHeader` (‹ Home + title); tapping "Time left" in the header opens a
+the shared `ScreenHeader` (the ‹ Home back button); tapping "Time left" in the header opens a
 per-subject time breakdown. The sidebar's icons (`IconTasks`/`IconFocus`/
 `IconImport`/`IconSettings` etc., module scope, just above `FONT`) are
 small hand-built SVGs from plain primitives (line/circle/polyline) rather than Unicode glyphs or an
@@ -433,7 +435,7 @@ subject colors win, settings untouched.
 **What's New** (`WHATS_NEW`, the Inbox's Updates list) is hand-maintained, newest first -- add an
 entry whenever a user-facing change ships. Each entry has a `kind` (category: "New feature", "Bug
 fix"...), a `headline` (its short title), the `description`, and a `where` -- how to get to it,
-using the on-screen labels ("Sidebar (tap dp) → Settings → ..."), shown as "Where to find it"
+using the on-screen labels ("Sidebar (top left button) → Settings → ..."), shown as "Where to find it"
 in the update's card. Give every entry a `where` unless there's genuinely nowhere to point. Also give it a
 `go` when there's a screen to open: `"place"` or `"place:anchor"`, handled by `goTo()` in
 `HomeworkPlanner` (places: `settings`, `tasks`, `task` -- opens a real task, a repeating one for

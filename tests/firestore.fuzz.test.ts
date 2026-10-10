@@ -68,6 +68,14 @@ const breakers: [string, (t: Doc) => void][] = [
   ["archived is text", t => { t.archived = "no"; }], ["completedAt is text", t => { t.completedAt = "yesterday"; }],
   ["spawnedNextId is text", t => { t.spawnedNextId = "12"; }], ["updatedAt is text", t => { t.updatedAt = "now"; }],
   ["padded with extra fields", t => { for (let i = 0; i < 25; i++) t[`extra${i}`] = i; }],
+  // The stricter checks for new documents (isTightTask in firestore.rules).
+  ["id doesn't match the document", t => { t.id = (t.id as number) + 1; }],
+  ["date in the wrong format", t => { t.dueDate = pick(["10/10/2026", "2026-1-05", "tomorrow"]); }],
+  ["time in the wrong format", t => { t.dueTime = pick(["9:00", "9am", "0900"]); }],
+  ["estimate isn't a whole number", t => { t.estMins = int(1000) + 0.5; }],
+  ["too much tag text", t => { t.tags = list(30, () => "x".repeat(101)); }],
+  ["edited in the far future", t => { t.updatedAt = Date.now() + (3 + int(1000)) * 86400000; }],
+  ["completed in the far future", t => { t.completedAt = Date.now() + (3 + int(1000)) * 86400000; }],
 ];
 
 describe(`random tasks against the rules (seed ${SEED})`, () => {

@@ -14,6 +14,10 @@ describe("addSession", () => {
 
 describe("sanitizeTask", () => {
   const base = { id: 1, title: "Essay", subject: "English", dueDate: "2026-09-22", dueTime: "09:00", estMins: 30, done: false, order: 0 };
+  it("keeps tags that are text, each trimmed to the tag length", () => {
+    const out = sanitizeTask({ ...base, tags: ["ok", "x".repeat(500), 7, null] as unknown as string[] });
+    expect(out.tags).toEqual(["ok", "x".repeat(LIMITS.tag)]);
+  });
   it("leaves a normal task alone", () => {
     expect(sanitizeTask(base)).toEqual(base);
   });

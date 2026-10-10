@@ -190,6 +190,15 @@ require rewriting a user's entire history:
   1000, and JSON import runs `sanitizeTask()` -- because a write over a rules cap saves locally but is
   silently refused by the cloud. Change a limit in both places; `tests/firestore.rules.test.ts`
   checks the rules side.
+- **Stricter task checks** (`isTightTask` / `keepsOrTightens` in `firestore.rules`, 2026-10-10): a
+  new task or trash doc must have `id` equal to the doc name, real `dueDate`/`dueTime` formats, a
+  whole-number `estMins`, at most 3,000 characters of tag text, and no `updatedAt`/`completedAt`/
+  `deletedAt` more than two days ahead of the server (two days, not minutes, so a device with a wrong
+  clock or time zone still syncs). On an update each check applies only to a field the write
+  changes, and the `id` can't change: tightening must never make an existing doc uneditable, so
+  follow that create-strict / update-lenient split for any future check. Moving a task between
+  tasks/ and trash/ is a create, so it gets the strict checks. `tests/firestore.tight.test.ts`
+  covers both halves, seeding old-style docs with the rules off.
 - **Task counter / per-account cap.** Rules can't count a collection, so `users/{uid}/meta/counts`
   (`n` = docs in tasks/, `t` = docs in trash/, `last` = the task id the latest change was about)
   does. Every batch that creates, deletes or moves a task bumps it (`countDelta()` in

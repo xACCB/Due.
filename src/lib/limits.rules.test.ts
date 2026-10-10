@@ -23,6 +23,9 @@ const expected: [string, string, number][] = [
   ["subtasks per task", "data.subtasks.size()", LIMITS.subtasks],
   ["tags per task", "data.tags.size()", LIMITS.tags],
   ["sessions per task", "data.sessions.size()", LIMITS.sessions],
+  ["tag text per task", "data.tags.join('').size()", LIMITS.tags * LIMITS.tag],
+  ["subject text per account", "data.subjects.join('').size()", LIMITS.subjects * LIMITS.subject],
+  ["subject colour names per account", "data.subjectColors.keys().join('').size()", LIMITS.subjects * LIMITS.subject],
   ["a task's estimate", "data.estMins", LIMITS.estMins],
   ["subjects per account", "data.subjects.size()", LIMITS.subjects],
   ["subject colours per account", "data.subjectColors.size()", LIMITS.subjects],
@@ -42,7 +45,8 @@ describe("firestore.rules agrees with LIMITS", () => {
 
   it("covers every limit the app defines", () => {
     // A new entry in LIMITS needs a line in `expected` above (and a rule).
-    const covered = new Set(expected.map(([, , limit]) => limit));
+    // LIMITS.tag only appears multiplied (tags x tag), which the "tag text" row checks.
+    const covered = new Set([...expected.map(([, , limit]) => limit), LIMITS.tag]);
     for (const [name, value] of Object.entries(LIMITS)) expect(covered.has(value), `LIMITS.${name} isn't checked against the rules`).toBe(true);
   });
 });

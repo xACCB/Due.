@@ -34,6 +34,24 @@ for (const [phase, rules] of [["cap off (phase A)", baseRules], ["cap on (phase 
     const counts = async () => (await getDoc(doc(db, "users/alice/meta/counts"))).data();
     const seedCounts = (n:number, t:number) => env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "users/alice/meta/counts"), { n, t, last:"" }));
 
+    // The most a single write asks of the rules: a task with every field and 30
+    // tags, created, edited, moved to Recently deleted and back, each in one
+    // batch with the counter. Rules may evaluate 1,000 expressions per request,
+    // and this is the write that would run out first if a new check costs too
+    // much (it fails with "maximum of 1000 expressions").
+    it("the fullest task goes through every move", async () => {
+      const full = (tags:string[]) => ({ task:{ ...task(7), title:"t".repeat(500), subject:"s".repeat(200), dueDate:"2026-10-11", dueTime:"09:00", estMins:100000,
+        subtasks:Array.from({ length:100 }, (_, i) => ({ id:i, title:"Step", done:false })), tags, sessions:Array.from({ length:1000 }, (_, i) => ({ mins:25, at:i })),
+        recurrence:"weekly", priorityOverride:"high", archived:false, completedAt:null, spawnedNextId:null } });
+      const a = full(Array.from({ length:30 }, (_, i) => String(i % 10).repeat(100)));
+      const b = full(Array.from({ length:30 }, (_, i) => String((i + 1) % 10).repeat(100)));
+      await assertSucceeds(write(7, a as SyncRecord<Task>, undefined));
+      await assertSucceeds(write(7, b as SyncRecord<Task>, a as SyncRecord<Task>));
+      await assertSucceeds(write(7, { ...b, deletedAt:1 } as SyncRecord<Task>, b as SyncRecord<Task>));
+      await assertSucceeds(write(7, b as SyncRecord<Task>, { ...b, deletedAt:1 } as SyncRecord<Task>));
+      await assertSucceeds(write(7, undefined, b as SyncRecord<Task>));
+    });
+
     beforeAll(async () => {
       env = await initializeTestEnvironment({ projectId:`dueplanner-counter-${enforced ? "b" : "a"}`, firestore:{ rules } });
     });

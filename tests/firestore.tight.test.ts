@@ -121,6 +121,94 @@ describe("no timestamps from the far future", () => {
   });
 });
 
+// Added 2026-10-11. Same two halves as above: new data must be right, and
+// data that is already stored and isn't can still be used.
+describe("tags are text", () => {
+  it("refuses a new task with a tag that isn't text, wherever it is in the list", async () => {
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { tags: [5] })));
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { tags: ["a", { b: 1 }] })));
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { tags: [...Array.from({ length: 29 }, (_, i) => "t" + i), true] })));
+    await assertFails(setDoc(doc(db(), "users/alice/trash/1"), task(1, { tags: [null], deletedAt: 1 })));
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { tags: ["two\nlines"] })));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { tags: [] })));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/2"), task(2, { tags: Array.from({ length: 30 }, (_, i) => "t" + i) })));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/3"), task(3, { tags: ["", "5", "true", "a, b", "naïve café", "日本語", " spaced "] })));
+  });
+  it("an existing task's tags can't be changed to something that isn't text", async () => {
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { tags: ["exam"] })));
+    await assertFails(updateDoc(doc(db(), "users/alice/tasks/1"), { tags: ["exam", 7] }));
+    await assertSucceeds(updateDoc(doc(db(), "users/alice/tasks/1"), { tags: ["exam", "reading"] }));
+    await assertSucceeds(updateDoc(doc(db(), "users/alice/tasks/1"), { tags: deleteField() }));
+  });
+  it("an old task whose tags aren't text can still be edited, and its tags fixed", async () => {
+    await seed("users/alice/tasks/1", task(1, { tags: [1, 2] }));
+    await assertSucceeds(updateDoc(doc(db(), "users/alice/tasks/1"), { title: "Renamed", done: true }));
+    await assertFails(updateDoc(doc(db(), "users/alice/tasks/1"), { tags: [1, 2, 3] }));
+    await assertSucceeds(updateDoc(doc(db(), "users/alice/tasks/1"), { tags: ["one"] }));
+  });
+});
+
+describe("the device list's ids", () => {
+  const id = (n: number) => String(n).padStart(24, "0");
+  const entry = (extra: Record<string, unknown> = {}) => ({ name: "Chrome on Windows", createdAt: 1, lastSeen: 2, ...extra });
+  const ref = () => doc(db(), "users/alice/meta/devices");
+
+  it("a device id is 24 hex characters", async () => {
+    for (const bad of ["dev0", "A".repeat(24), "g".repeat(24), "0".repeat(23), "0".repeat(25), "0".repeat(24) + ","]) {
+      await assertFails(setDoc(ref(), { d: { [bad]: entry() } }));
+    }
+    await assertSucceeds(setDoc(ref(), { d: {} }));
+    await assertSucceeds(setDoc(ref(), { d: { "0123456789abcdef01234567": entry() } }));
+    await assertFails(setDoc(ref(), { d: { nothex: entry() } }, { merge: true }));
+    await assertSucceeds(setDoc(ref(), { d: { [id(2)]: entry() } }, { merge: true }));
+  });
+  it("what the app sends is accepted: register, last active, a stub, sign out", async () => {
+    await assertSucceeds(setDoc(ref(), { d: { [id(1)]: entry() } }, { merge: true }));
+    await assertSucceeds(setDoc(ref(), { d: { [id(2)]: entry(), [id(1)]: deleteField() } }, { merge: true }));
+    await assertSucceeds(updateDoc(ref(), { [`d.${id(2)}.lastSeen`]: 3 }));
+    // "Last active" for a device that was just removed leaves an entry with only lastSeen.
+    await assertSucceeds(updateDoc(ref(), { [`d.${id(3)}.lastSeen`]: 4 }));
+    await assertSucceeds(updateDoc(ref(), { [`d.${id(2)}`]: deleteField() }));
+  });
+  it("a list that already holds an odd id can still be used, but not added to", async () => {
+    await seed("users/alice/meta/devices", { d: { oldstyle: entry(), [id(1)]: entry(), [id(2)]: entry() } });
+    // Refreshing and removing work, including beside the odd ones.
+    await assertSucceeds(updateDoc(ref(), { [`d.${id(2)}.lastSeen`]: 9 }));
+    await assertSucceeds(updateDoc(ref(), { [`d.${id(2)}`]: deleteField() }));
+    // A new device can't join while an odd id is in the list.
+    await assertFails(setDoc(ref(), { d: { [id(3)]: entry() } }, { merge: true }));
+    // Removing the odd id puts the list right, and then a new device can join.
+    await assertSucceeds(updateDoc(ref(), { "d.oldstyle": deleteField() }));
+    await assertSucceeds(setDoc(ref(), { d: { [id(3)]: entry() } }, { merge: true }));
+    await assertSucceeds(updateDoc(ref(), { [`d.${id(1)}`]: deleteField() }));
+  });
+});
+
+describe("subject names are text", () => {
+  const ref = () => doc(db(), "users/alice");
+  it("refuses a subject list holding something that isn't text", async () => {
+    for (const bad of [["Math", 5], [true], [null, "Art"], [{ name: "Math" }], ["Art\nHistory"]]) await assertFails(setDoc(ref(), { subjects: bad }));
+    await assertSucceeds(setDoc(ref(), { subjects: [] }));
+    await assertSucceeds(setDoc(ref(), { subjects: ["Math", "English", "5", "Art & Design", "日本語"] }));
+    await assertFails(setDoc(ref(), { subjects: ["Math", 7] }, { merge: true }));
+    await assertSucceeds(setDoc(ref(), { subjects: ["Math", "Music"], layout: "board" }, { merge: true }));
+  });
+  it("a list that already holds one can still sync other settings, and be put right", async () => {
+    await seed("users/alice", { subjects: ["Math", 5], layout: "list" });
+    await assertSucceeds(setDoc(ref(), { subjects: ["Math", 5], layout: "board", weekStart: 1 }, { merge: true }));
+    await assertFails(setDoc(ref(), { subjects: ["Math", 5, "Art"] }, { merge: true }));
+    await assertSucceeds(setDoc(ref(), { subjects: ["Math", "Art"] }, { merge: true }));
+  });
+});
+
+describe("the counter starts small", () => {
+  it("refuses a new counter whose last id is long", async () => {
+    await assertFails(setDoc(doc(db(), "users/alice/meta/counts"), { n: 0, t: 0, last: "9".repeat(31) }));
+    await assertFails(setDoc(doc(db(), "users/alice/meta/counts"), { n: 0, t: 0, last: 5 }));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/meta/counts"), { n: 0, t: 0, last: "" }));
+  });
+});
+
 describe("subjects, colours, devices and the counter", () => {
   it("bounds the total text in the subject list and the colour map", async () => {
     const ref = doc(db(), "users/alice");

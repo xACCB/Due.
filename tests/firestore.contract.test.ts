@@ -68,7 +68,7 @@ describe("everything the app writes, at its limits, is accepted", () => {
     }));
   });
   it("a device list with the most devices", async () => {
-    await assertSucceeds(setDoc(doc(db(), "users/alice/meta/devices"), { d: Object.fromEntries(list(LIMITS.devices, i => [`dev${i}`, { name: "Chrome on Windows", createdAt: 1, lastSeen: 2 }])) }));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/meta/devices"), { d: Object.fromEntries(list(LIMITS.devices, i => [String(i).padStart(24, "0"), { name: "Chrome on Windows", createdAt: 1, lastSeen: 2 }])) }));
   });
 });
 
@@ -93,6 +93,6 @@ describe("one step over each limit is refused", () => {
     await assertFails(setDoc(doc(db(), "users/alice"), { subjectColors: Object.fromEntries(list(LIMITS.subjects + 1, i => [`S${i}`, "#000000"])) }));
   });
   it("devices", async () => {
-    await assertFails(setDoc(doc(db(), "users/alice/meta/devices"), { d: Object.fromEntries(list(LIMITS.devices + 1, i => [`dev${i}`, { name: "x", createdAt: 1, lastSeen: 2 }])) }));
+    await assertFails(setDoc(doc(db(), "users/alice/meta/devices"), { d: Object.fromEntries(list(LIMITS.devices + 1, i => [String(i).padStart(24, "0"), { name: "x", createdAt: 1, lastSeen: 2 }])) }));
   });
 });

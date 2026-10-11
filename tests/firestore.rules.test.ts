@@ -195,22 +195,24 @@ describe("size caps", () => {
 
 describe("device list (users/{uid}/meta/devices)", () => {
   const device = (n = 1) => ({ name:`Chrome on Windows ${n}`, createdAt:1, lastSeen:2 });
-  const devices = (count: number) => Object.fromEntries(Array.from({ length:count }, (_, i) => [`dev${i}`, device(i)]));
+  // Device ids are 24 hex characters (see newDeviceId).
+  const id = (n: number) => String(n).padStart(24, "0");
+  const devices = (count: number) => Object.fromEntries(Array.from({ length:count }, (_, i) => [id(i), device(i)]));
 
   it("lets an owner register a device, refresh it, and read the list", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
     const ref = doc(db, "users/alice/meta/devices");
-    await assertSucceeds(setDoc(ref, { d:{ abc123:device() } }, { merge:true }));
-    await assertSucceeds(setDoc(ref, { d:{ def456:device(2) } }, { merge:true }));
-    await assertSucceeds(updateDoc(ref, { "d.abc123.lastSeen":3 }));
+    await assertSucceeds(setDoc(ref, { d:{ [id(101)]:device() } }, { merge:true }));
+    await assertSucceeds(setDoc(ref, { d:{ [id(102)]:device(2) } }, { merge:true }));
+    await assertSucceeds(updateDoc(ref, { [`d.${id(101)}.lastSeen`]:3 }));
     await assertSucceeds(getDoc(ref));
   });
   it("lets an owner sign a device out (remove its entry), sign out all others, and delete the list", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
     const ref = doc(db, "users/alice/meta/devices");
     await assertSucceeds(setDoc(ref, { d:devices(3) }));
-    await assertSucceeds(updateDoc(ref, { "d.dev1":deleteField() }));
-    await assertSucceeds(setDoc(ref, { d:{ dev0:device(0) } }));
+    await assertSucceeds(updateDoc(ref, { [`d.${id(1)}`]:deleteField() }));
+    await assertSucceeds(setDoc(ref, { d:{ [id(0)]:device(0) } }));
     await assertSucceeds(deleteDoc(ref));
   });
   it("caps the list at 20 devices, on a merge too", async () => {
@@ -218,7 +220,7 @@ describe("device list (users/{uid}/meta/devices)", () => {
     const ref = doc(db, "users/alice/meta/devices");
     await assertFails(setDoc(ref, { d:devices(21) }));
     await assertSucceeds(setDoc(ref, { d:devices(20) }));
-    await assertFails(setDoc(ref, { d:{ onemore:device() } }, { merge:true }));
+    await assertFails(setDoc(ref, { d:{ [id(99)]:device() } }, { merge:true }));
   });
   it("rejects anything but the one map", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
@@ -234,7 +236,7 @@ describe("device list (users/{uid}/meta/devices)", () => {
       const ref = doc(db, "users/alice/meta/devices");
       await assertFails(getDoc(ref));
       await assertFails(setDoc(ref, { d:{} }));
-      await assertFails(updateDoc(ref, { "d.dev0":deleteField() }));
+      await assertFails(updateDoc(ref, { [`d.${id(0)}`]:deleteField() }));
       await assertFails(deleteDoc(ref));
     }
   });

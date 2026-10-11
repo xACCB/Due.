@@ -20,6 +20,15 @@ service cloud.firestore {
     // so a normal edit never trips them -- change both together. Rules can't
     // look inside list items, so item contents are bounded only by the list
     // length and the 1 MiB document limit.
+    // Every item of a list is text. Rules have no loops and can't look at each
+    // item, but joining the items with a line break and splitting the result
+    // again only gives back the same list if each one was text to begin with
+    // (a number or true comes back as "5" or "true", which isn't equal; a map
+    // or list can't be joined at all). So an item also can't contain a line
+    // break; the app's one-line fields can't produce one, and what it imports
+    // has them removed (sanitizeTask, withImportedSubjects).
+    function allText(l) { return l.size() == 0 || l.join('\n').split('\n') == l; }
+
     function isValidProfile(data) {
       return data.keys().size() <= 40
         && (!('layout' in data) || (data.layout is string && data.layout.size() <= 40))
@@ -28,7 +37,11 @@ service cloud.firestore {
               // Rules can't look at each item, but joining them bounds the total
               // text: 200 subjects of at most 200 characters. (It can't check
               // that every item is text: join() also accepts numbers.)
-              && data.subjects.join('').size() <= 40000))
+              && data.subjects.join('').size() <= 40000
+              // Subject names are text (added 2026-10-11): a number among them
+              // would reach every device as a subject. A list left exactly as
+              // it was is accepted as it is.
+              && (allText(data.subjects) || (resource != null && 'subjects' in resource.data && resource.data.subjects == data.subjects))))
         && (!('subjectColors' in data) || (data.subjectColors is map && data.subjectColors.size() <= 200
               && data.subjectColors.keys().join('').size() <= 40000
               && data.subjectColors.values().join('').size() <= 6400))
@@ -74,6 +87,9 @@ service cloud.firestore {
     function validDueTime(v) { return v.matches('^([0-9]{2}:[0-9]{2})?$'); }
     // 30 tags of at most 100 characters each (src/lib/limits.ts).
     function tagsBounded(data) { return !('tags' in data) || data.tags.join('').size() <= 3000; }
+    // Every tag is text (added 2026-10-11). join() above also accepts numbers
+    // and the like, so that alone doesn't say so; see allText().
+    function tagsAreText(data) { return !('tags' in data) || allText(data.tags); }
     // Timestamps come from the device's clock, and sync keeps the newest edit,
     // so a time from the far future would win every conflict forever. Two days
     // of slack, not minutes: a device whose clock or time zone is set wrong is
@@ -89,7 +105,7 @@ service cloud.firestore {
       return string(data.id) == taskId
         && validDueDate(data.dueDate) && validDueTime(data.dueTime)
         && data.estMins is int
-        && tagsBounded(data)
+        && tagsBounded(data) && tagsAreText(data)
         && timesNotFarFuture(data);
     }
     function keepsOrTightens(data, old) {
@@ -97,7 +113,7 @@ service cloud.firestore {
         && (data.dueDate == old.dueDate || validDueDate(data.dueDate))
         && (data.dueTime == old.dueTime || validDueTime(data.dueTime))
         && (data.estMins == old.estMins || data.estMins is int)
-        && (!('tags' in data) || ('tags' in old && data.tags == old.tags) || tagsBounded(data))
+        && (!('tags' in data) || ('tags' in old && data.tags == old.tags) || (tagsBounded(data) && tagsAreText(data)))
         && (!('updatedAt' in data) || ('updatedAt' in old && data.updatedAt == old.updatedAt) || notFarFuture(data.updatedAt))
         && (!('completedAt' in data) || data.completedAt == null || ('completedAt' in old && data.completedAt == old.completedAt) || notFarFuture(data.completedAt));
     }
@@ -167,10 +183,20 @@ service cloud.firestore {
     // limit, like subjectColors. Removing a device's entry is how it gets
     // signed out (client side: src/lib/devices.ts). Nothing else in these
     // rules depends on this doc.
-    function isValidDevices(data) {
+    //
+    // Added 2026-10-11: a device id is 24 hex characters (newDeviceId()).
+    // Either every id in the list is one, or the write adds no id (it only
+    // refreshes or removes), so a list that already held something else can
+    // still be used and put right. What an entry holds is not checked: rules
+    // have no loops, and checking each of 20 entries by position costs more
+    // than the 1,000 expressions one request may evaluate.
+    // `old` is the map stored before this write ({} when there was no doc).
+    function isValidDevices(data, old) {
       return data.keys().hasOnly(['d']) && data.d is map && data.d.size() <= 20
         // Device ids are 24 characters; this bounds what the map's keys can hold.
-        && data.d.keys().join('').size() <= 1280;
+        && data.d.keys().join('').size() <= 1280
+        && (data.d.size() == 0 || data.d.keys().join(',').matches('^[0-9a-f]{24}(,[0-9a-f]{24})*$')
+              || data.d.diff(old).addedKeys().size() == 0);
     }
 
     match /users/{userId} {
@@ -198,14 +224,14 @@ service cloud.firestore {
         allow create: if isOwner(userId)
           && request.resource.data.keys().hasOnly(['n','t','last'])
           && request.resource.data.n == 0 && request.resource.data.t == 0
-          && request.resource.data.last is string;
+          && request.resource.data.last is string && request.resource.data.last.size() <= 30;
         allow update: if isOwner(userId) && isValidCountChange(userId);
         allow delete: if false;
       }
 
       match /meta/devices {
         allow read, delete: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidDevices(request.resource.data);
+        allow create, update: if isOwner(userId) && isValidDevices(request.resource.data, resource == null ? {} : resource.data.d);
       }
     }
 

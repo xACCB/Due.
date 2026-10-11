@@ -20,6 +20,10 @@ export const LIMITS = {
 const RECURRENCES = ["none", "daily", "weekly", "monthly"];
 const PRIORITIES = ["high", "medium", "low"];
 
+// Text as a one-line field would hold it: line breaks become spaces. The rules
+// refuse a tag or subject name with a line break in it (see allText() there).
+export function oneLine(s: string): string { return s.replace(/[\r\n]+/g, " "); }
+
 // Appends a work session, keeping only the newest LIMITS.sessions.
 export function addSession<S>(sessions: S[] | undefined, s: S): S[] {
   return [...(sessions || []), s].slice(-LIMITS.sessions);
@@ -41,9 +45,10 @@ export function sanitizeTask<T extends Record<string, unknown>>(t: T): T {
   for (const [key, max] of [["subtasks", LIMITS.subtasks], ["tags", LIMITS.tags], ["sessions", LIMITS.sessions]] as const) {
     if (key in t) {
       const v = t[key];
-      // Tags are text, each within the length the tag field allows (the rules
-      // refuse a new task whose tags run too long in total).
-      if (Array.isArray(v) && key === "tags") out[key] = v.filter(g => typeof g === "string").slice(0, max).map(g => (g as string).slice(0, LIMITS.tag));
+      // Tags are text on one line, each within the length the tag field allows
+      // (the rules refuse a new task whose tags run too long in total, hold
+      // something that isn't text, or contain a line break).
+      if (Array.isArray(v) && key === "tags") out[key] = v.filter(g => typeof g === "string").slice(0, max).map(g => oneLine(g as string).slice(0, LIMITS.tag));
       else if (Array.isArray(v)) out[key] = key === "sessions" ? v.slice(-max) : v.slice(0, max);
       else delete out[key];
     }

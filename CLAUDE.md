@@ -12,7 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   helpers, syllabus parsing). Fast, no external services; this is what CI runs.
 - `npm run test:rules` — Firestore emulator + `@firebase/rules-unit-testing`, verifying
   `firestore.rules` actually rejects malformed writes and cross-user access. Needs Java (a JRE) for
-  the emulator; CI installs one and runs it. Run it locally before changing `firestore.rules`.
+  the emulator; CI installs one and runs it. Run it locally before changing `firestore.rules`
+  (no installed Java needed: unzip a Temurin JRE anywhere and put its `bin` first on `PATH` for the command).
 - `npm run test:rules` also runs `tests/firestore.contract.test.ts` (everything the app writes at
   its `LIMITS` is accepted, one step over is refused) and `tests/firestore.fuzz.test.ts` (450 seeded
   random tasks: valid ones accepted, broken ones refused), and afterwards writes
@@ -201,6 +202,18 @@ require rewriting a user's entire history:
   follow that create-strict / update-lenient split for any future check. Moving a task between
   tasks/ and trash/ is a create, so it gets the strict checks. `tests/firestore.tight.test.ts`
   covers both halves, seeding old-style docs with the rules off.
+- **Text lists and device ids** (2026-10-11): tags and subject names must be text. Rules can't loop
+  over a list, so `allText()` joins the items with a line break and splits again; only a list of
+  text comes back equal. That also refuses an item containing a line break, so anything that brings
+  text in from outside goes through `oneLine()` (`src/lib/limits.ts`; `sanitizeTask` and
+  `withImportedSubjects` do). Device ids must be 24 hex characters. Both are lenient the same way
+  as above (unchanged tags, an unchanged subject list, a device write that adds no id).
+- **Rules have a budget.** One request may evaluate 1,000 rule expressions, and a check "by
+  position" (`list[0]`, `list[1]`...) costs about ten each even when the position is empty: 30 of
+  them for tags left less than half the budget, and checking 20 device entries didn't fit at all
+  (which is why an entry's contents still aren't checked). Prefer one whole-list expression. The
+  "fullest task goes through every move" test in `tests/firestore.counter.test.ts` is the heaviest
+  write the app makes; it failing with "maximum of 1000 expressions" means a new check is too dear.
 - **Task counter / per-account cap.** Rules can't count a collection, so `users/{uid}/meta/counts`
   (`n` = docs in tasks/, `t` = docs in trash/, `last` = the task id the latest change was about)
   does. Every batch that creates, deletes or moves a task bumps it (`countDelta()` in

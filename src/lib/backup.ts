@@ -4,7 +4,7 @@
 import type { Task, TaskTemplate } from "../types";
 import { csvField, getPriority } from "./format";
 import { nextId } from "./id";
-import { LIMITS, sanitizeTask } from "./limits";
+import { LIMITS, oneLine, sanitizeTask } from "./limits";
 import { nextOrder } from "./tasks";
 
 // The CSV export: one row per task, with the priority the app would show.
@@ -42,9 +42,9 @@ export function readBackup(data: any, tasks: Task[], subjects: string[]): Backup
     : null;
   return { fresh, skipped: incoming.length - fresh.length, extraSubjects, colors, templates: Array.isArray(data?.templates) ? data.templates : null };
 }
-// Imported subjects go after the existing ones, names and list both kept within the limits.
+// Imported subjects go after the existing ones, names (one line each) and list both kept within the limits.
 export function withImportedSubjects(subjects: string[], extra: string[]): string[] {
-  return [...subjects, ...extra.map(x => x.slice(0, LIMITS.subject))].slice(0, LIMITS.subjects);
+  return [...subjects, ...extra.map(x => oneLine(x).slice(0, LIMITS.subject))].slice(0, LIMITS.subjects);
 }
 // Existing colours win; the map stays within the profile's cap.
 export function withImportedColors(colors: Record<string, string>, imported: Record<string, string>): Record<string, string> {

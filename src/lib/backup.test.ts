@@ -49,6 +49,9 @@ describe("readBackup", () => {
 });
 
 describe("merging a backup's subjects, colours and templates", () => {
+  it("puts an imported subject with a line break on one line", () => {
+    expect(withImportedSubjects(["Math"], ["Art\nHistory"])).toEqual(["Math", "Art History"]);
+  });
   it("adds subjects at the end, trimmed and capped", () => {
     expect(withImportedSubjects(["Math"], ["Music", "y".repeat(500)])).toEqual(["Math", "Music", "y".repeat(LIMITS.subject)]);
     const full = Array.from({ length: LIMITS.subjects }, (_, i) => `S${i}`);

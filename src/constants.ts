@@ -50,3 +50,6 @@ export const QUESTION_KEYS=QUESTIONS.map(q=>q.key);
 export function askedQuestions(saved:unknown){
   return normalizeQuestionPrefs(saved,QUESTION_KEYS).filter(p=>p.on).map(p=>QUESTIONS.find(q=>q.key===p.key)!);
 }
+
+// The header shows the current screen's name.
+export const SCREEN_TITLES:Record<string,string>={tasks:"Home",calendar:"Calendar",inbox:"Inbox",history:"History",import:"Import/Export",options:"Settings",task:"Task"};

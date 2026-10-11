@@ -99,3 +99,14 @@ export function formatAgo(at:number, now:number):string {
   if (h<24) return `${h}h ago`;
   return `${Math.floor(h/24)}d ago`;
 }
+
+// Colored text (subject names, urgency labels) adjusted to stay readable on the
+// theme -- those colors are picked for looks, and several fall well under
+// WCAG AA as text on the light theme's near-white cards.
+export function ink(color:string,light:boolean):string{ return readableOn(color,light?"#e6e6e6":"#1a1a1a"); }
+
+// A long date for an update's detail panel, e.g. "Saturday, September 26, 2026".
+export function longDate(iso:string):string{
+  const d=new Date(iso+"T00:00");
+  return isNaN(d.getTime())?iso:d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+}

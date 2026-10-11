@@ -60,8 +60,10 @@ and reusable outside React: `src/types.ts` (`Priority`/`Recurrence`), `src/theme
 palette data, importable by non-React scripts like the contrast auditor), `src/lib/` (`dates.ts`,
 `format.ts`, `syllabus.ts`, `id.ts`, `download.ts` — the module-level functions with unit tests in
 `npm test`), `src/hooks/usePersistedState.ts` (see below), and `src/components/ErrorBoundary.tsx`.
-Everything with real UI logic — tab bodies, pickers, `TaskModal` — is still defined inside
-`App.tsx`; splitting those out further is a deliberately deferred, larger effort (see below).
+The components that were already at module scope (`TaskModal`, `ProfileModal`, `CalendarView`...) each
+have a file in `src/components/` now (see "Where things live" below), so where this file says a
+component is "module scope" it means its own file. `HomeworkPlanner` itself (state, effects, sync,
+the tab bodies, `renderTasks`) is still all of `App.tsx`.
 `src/App.css` is intentionally empty (leftover from the Vite template, unused) and `src/index.css`
 is just a minimal box-sizing reset — all real styling comes from inline style objects plus one
 runtime-generated stylesheet string (`css`, built from the active theme/font inside the component)
@@ -90,8 +92,8 @@ writing `null`; `dismissedWhatsNew` — one-time migration from the old whole-fe
 key, see What's New below) are deliberately left as hand-written
 `useState`/`useEffect` pairs rather than forced into the generic hook.
 
-**Firebase.** The `firebaseConfig` (project `ai-homework-planner-92260`) is hardcoded directly in
-`App.tsx` — this is a public client web API key, not a secret; access is enforced by Firestore
+**Firebase.** The `firebaseConfig` (project `ai-homework-planner-92260`) is hardcoded in
+`src/firebase.ts` (with the rest of the Firebase setup; it exports `auth`, `db`, `googleProvider`) — this is a public client web API key, not a secret; access is enforced by Firestore
 security rules (`firestore.rules` at the repo root, deployed via `npx firebase-tools deploy
 --only firestore:rules` — requires `npx firebase-tools login` first), not by hiding the key. There
 is no backend beyond Firebase (Auth + Firestore).
@@ -304,8 +306,8 @@ a future theme might use. A few needed a conditional version since they only som
 solid `T.accent` fill (e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`,
 in most layouts -- only the branches that actually use `T.accent` as the fill needed the fix).
 `LAYOUTS` (6 task-list display modes, in `src/constants.ts`; Compact, Minimal, Sticky, Timeline, By Subject and Calendar -- replaced by the Calendar tab -- were removed -- a saved removed layout falls back to List via the derived `layout` const). `FONTS` went the same way
-as `THEMES` -- down from 16 selectable heading/body pairings to exactly one (`FONT`, still in
-`App.tsx`: the original DM Serif Display/DM Mono pairing), with the Font picker grid and its
+as `THEMES` -- down from 16 selectable heading/body pairings to exactly one (`FONT`, in
+`src/fonts.ts`: the original DM Serif Display/DM Mono pairing), with the Font picker grid and its
 `fontName`/`setFontName` state gone entirely. `F` is now just `FONT` directly rather than a keyed
 lookup. A one-time `localStorage.removeItem("hw-font")` on mount clears any stale per-user font
 choice already saved by existing users' browsers, mirroring the `hw-accent` cleanup above.
@@ -333,6 +335,18 @@ that will reuse them; keep adding logic here, not in the component):
 - `src/lib/timers.ts`: the timers' arithmetic (`secondsLeft`, `stopwatchTotal`,
   `pomodoroFinishMinutes`, `pomodoroCreditMinutes`, `sessionMinutes`, `withSession`). The state,
   refs and effects that run the Pomodoro, stopwatch and task session are still in the component.
+- Moved out 2026-10-11, verbatim (the web app only; the phone app will have its own screens):
+  `src/firebase.ts` (setup), `src/fonts.ts` (`FONT`), `src/styles.ts` (`buildCss`, the runtime
+  stylesheet; the `css` memo passes it the theme values it depends on one by one, so its deps stay
+  exact), `src/lib/dom.ts` (`activateOnKey`, `isWideScreen`, `flashTarget`, `pin`/`unpin`/
+  `freezeBox`, `notify`, `playChime`), `src/lib/thisDevice.ts` (`thisDeviceId`, `requestInstall`,
+  `isStandalone`), `ink`/`longDate` in `src/lib/format.ts`, `SCREEN_TITLES` in `src/constants.ts`,
+  and in `src/components/`: `icons.tsx` (the icons, `CheckMark`), `TaskModal.tsx`, `Sidebar.tsx`
+  (`SidebarRow`, `SidebarSubjects`, `ScreenHeader`), `SettingsSection.tsx` (and `Toggle`),
+  `SearchOverlay.tsx`, `UpdateDetail.tsx`, `GrowCard.tsx` (and `CardTaskRow`, `DayDetail`,
+  `TimeDetail`), `CalendarView.tsx` (and `DueDeck`), `MiniCard.tsx`, `ProfileModal.tsx`. A component
+  file exports only components (the react-refresh lint rule); helpers and constants go in `src/lib/`
+  or `src/constants.ts`.
 Still inside `HomeworkPlanner`, to move later, each a change of structure rather than a move: the
 timers as state machines (or a `useFocusTimer` hook), one wrapper for the storage calls, and the
 sync engine.
@@ -416,7 +430,7 @@ messages, What's New), History (undo/redo, Recently deleted), Import/Export (syl
 backups) and Settings, each a full screen (`activeTab` "inbox"/"history"/"import"/"options") with
 the shared `ScreenHeader` (the ‹ Home back button); tapping "Time left" in the header opens a
 per-subject time breakdown. The sidebar's icons (`IconTasks`/`IconFocus`/
-`IconImport`/`IconSettings` etc., module scope, just above `FONT`) are
+`IconImport`/`IconSettings` etc., in `src/components/icons.tsx`) are
 small hand-built SVGs from plain primitives (line/circle/polyline) rather than Unicode glyphs or an
 icon library dependency, styled with `stroke="currentColor"` so they pick up the button's active/
 inactive `color` automatically; `aria-label`/`title` on each button carry the accessible name now

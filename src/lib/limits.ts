@@ -9,6 +9,7 @@ export const LIMITS = {
   subjects: 200,      // subjects per account (profile doc)
   subtasks: 100,      // per task
   tags: 30,           // per task
+  tag: 100,           // characters in one tag (the rules cap the total: tags x tag)
   sessions: 1000,     // logged work sessions per task; oldest drop off
   estMins: 100000,
   tasks: 5000,        // per account, via the counter doc in firestore.rules
@@ -40,7 +41,10 @@ export function sanitizeTask<T extends Record<string, unknown>>(t: T): T {
   for (const [key, max] of [["subtasks", LIMITS.subtasks], ["tags", LIMITS.tags], ["sessions", LIMITS.sessions]] as const) {
     if (key in t) {
       const v = t[key];
-      if (Array.isArray(v)) out[key] = key === "sessions" ? v.slice(-max) : v.slice(0, max);
+      // Tags are text, each within the length the tag field allows (the rules
+      // refuse a new task whose tags run too long in total).
+      if (Array.isArray(v) && key === "tags") out[key] = v.filter(g => typeof g === "string").slice(0, max).map(g => (g as string).slice(0, LIMITS.tag));
+      else if (Array.isArray(v)) out[key] = key === "sessions" ? v.slice(-max) : v.slice(0, max);
       else delete out[key];
     }
   }

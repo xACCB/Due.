@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 // megabytes for these suites, so only the hit/miss per expression is kept.)
 // CI uploads the summary as the "firestore-rules-coverage" artifact.
 // Best effort: a missing report never fails the run.
-const PROJECTS = ["dueplanner-rules-test", "dueplanner-counter-a", "dueplanner-counter-b"];
+const PROJECTS = ["dueplanner-rules-test", "dueplanner-rules-tight", "dueplanner-counter-a", "dueplanner-counter-b"];
 
 type Node = { sourcePosition?: { line?: number; column?: number; endOffset?: number; currentOffset?: number }; values?: unknown[]; children?: Node[] };
 

@@ -24,8 +24,14 @@ service cloud.firestore {
       return data.keys().size() <= 40
         && (!('layout' in data) || (data.layout is string && data.layout.size() <= 40))
         && (!('colorCodeUrgency' in data) || data.colorCodeUrgency is bool)
-        && (!('subjects' in data) || (data.subjects is list && data.subjects.size() <= 200))
-        && (!('subjectColors' in data) || (data.subjectColors is map && data.subjectColors.size() <= 200))
+        && (!('subjects' in data) || (data.subjects is list && data.subjects.size() <= 200
+              // Rules can't look at each item, but joining them bounds the total
+              // text: 200 subjects of at most 200 characters. (It can't check
+              // that every item is text: join() also accepts numbers.)
+              && data.subjects.join('').size() <= 40000))
+        && (!('subjectColors' in data) || (data.subjectColors is map && data.subjectColors.size() <= 200
+              && data.subjectColors.keys().join('').size() <= 40000
+              && data.subjectColors.values().join('').size() <= 6400))
         && (!('timeFormat' in data) || data.timeFormat in ['12h','24h'])
         && (!('weekStart' in data) || data.weekStart in [0,1]);
     }
@@ -53,6 +59,47 @@ service cloud.firestore {
         && (!('spawnedNextId' in data) || data.spawnedNextId == null || data.spawnedNextId is number)
         // Sync metadata (see src/lib/sync.ts): when the edit happened.
         && (!('updatedAt' in data) || data.updatedAt is number);
+    }
+
+    // ---- Stricter task checks (added 2026-10-10). isValidTask() above is checked
+    // on every write, against the whole document as it will be stored. These
+    // go further, and are split in two so that tightening them can never lock
+    // anyone out of a task they already have:
+    // - a NEW document (isTightTask) must pass all of them;
+    // - an UPDATE (keepsOrTightens) must pass each one only for a field that
+    //   the write actually changes. A field left as it was is left alone, even
+    //   if an old version of the app, or an old import, stored something that
+    //   wouldn't be accepted today.
+    function validDueDate(v) { return v.matches('^([0-9]{4}-[0-9]{2}-[0-9]{2})?$'); }
+    function validDueTime(v) { return v.matches('^([0-9]{2}:[0-9]{2})?$'); }
+    // 30 tags of at most 100 characters each (src/lib/limits.ts).
+    function tagsBounded(data) { return !('tags' in data) || data.tags.join('').size() <= 3000; }
+    // Timestamps come from the device's clock, and sync keeps the newest edit,
+    // so a time from the far future would win every conflict forever. Two days
+    // of slack, not minutes: a device whose clock or time zone is set wrong is
+    // common, and must still be able to sync.
+    function notFarFuture(ms) { return ms <= request.time.toMillis() + 172800000; }
+    function timesNotFarFuture(data) {
+      return (!('updatedAt' in data) || notFarFuture(data.updatedAt))
+        && (!('completedAt' in data) || data.completedAt == null || notFarFuture(data.completedAt));
+    }
+    function isTightTask(data, taskId) {
+      // The id inside the task is the document's name (the app writes
+      // String(task.id)), so a task can't be stored under another's name.
+      return string(data.id) == taskId
+        && validDueDate(data.dueDate) && validDueTime(data.dueTime)
+        && data.estMins is int
+        && tagsBounded(data)
+        && timesNotFarFuture(data);
+    }
+    function keepsOrTightens(data, old) {
+      return data.id == old.id
+        && (data.dueDate == old.dueDate || validDueDate(data.dueDate))
+        && (data.dueTime == old.dueTime || validDueTime(data.dueTime))
+        && (data.estMins == old.estMins || data.estMins is int)
+        && (!('tags' in data) || ('tags' in old && data.tags == old.tags) || tagsBounded(data))
+        && (!('updatedAt' in data) || ('updatedAt' in old && data.updatedAt == old.updatedAt) || notFarFuture(data.updatedAt))
+        && (!('completedAt' in data) || data.completedAt == null || ('completedAt' in old && data.completedAt == old.completedAt) || notFarFuture(data.completedAt));
     }
 
     // ---- Task counter: a cap on how many tasks (and trash entries) one
@@ -90,7 +137,8 @@ service cloud.firestore {
       let dt = a.t - b.t;
       return a.keys().hasOnly(['n','t','last'])
         && a.n is int && a.t is int
-        && a.last is string && a.last.size() > 0 && a.last.size() <= 30
+        // A task id as text: what String(number) can produce, nothing else.
+        && a.last is string && a.last.size() > 0 && a.last.size() <= 30 && a.last.matches('^[0-9eE.+-]+$')
         && (dn != 0 || dt != 0)
         && dn == (inColl(userId, 'tasks', a.last, true) ? 1 : 0) - (inColl(userId, 'tasks', a.last, false) ? 1 : 0)
         && dt == (inColl(userId, 'trash', a.last, true) ? 1 : 0) - (inColl(userId, 'trash', a.last, false) ? 1 : 0)
@@ -120,7 +168,9 @@ service cloud.firestore {
     // signed out (client side: src/lib/devices.ts). Nothing else in these
     // rules depends on this doc.
     function isValidDevices(data) {
-      return data.keys().hasOnly(['d']) && data.d is map && data.d.size() <= 20;
+      return data.keys().hasOnly(['d']) && data.d is map && data.d.size() <= 20
+        // Device ids are 24 characters; this bounds what the map's keys can hold.
+        && data.d.keys().join('').size() <= 1280;
     }
 
     match /users/{userId} {
@@ -129,14 +179,16 @@ service cloud.firestore {
 
       match /tasks/{taskId} {
         allow read, delete: if isOwner(userId);
-        allow update: if isOwner(userId) && isValidTask(request.resource.data);
-        allow create: if isOwner(userId) && isValidTask(request.resource.data) && isCountedCreate(userId, taskId, 'n');
+        allow update: if isOwner(userId) && isValidTask(request.resource.data) && keepsOrTightens(request.resource.data, resource.data);
+        allow create: if isOwner(userId) && isValidTask(request.resource.data) && isTightTask(request.resource.data, taskId) && isCountedCreate(userId, taskId, 'n');
       }
 
       match /trash/{taskId} {
         allow read, delete: if isOwner(userId);
-        allow update: if isOwner(userId) && isValidTrashedTask(request.resource.data);
-        allow create: if isOwner(userId) && isValidTrashedTask(request.resource.data) && isCountedCreate(userId, taskId, 't');
+        allow update: if isOwner(userId) && isValidTrashedTask(request.resource.data) && keepsOrTightens(request.resource.data, resource.data)
+          && (request.resource.data.deletedAt == resource.data.deletedAt || notFarFuture(request.resource.data.deletedAt));
+        allow create: if isOwner(userId) && isValidTrashedTask(request.resource.data) && isTightTask(request.resource.data, taskId)
+          && notFarFuture(request.resource.data.deletedAt) && isCountedCreate(userId, taskId, 't');
       }
 
       match /meta/counts {

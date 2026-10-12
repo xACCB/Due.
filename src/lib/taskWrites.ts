@@ -4,23 +4,25 @@
 import { deleteField, increment } from "firebase/firestore";
 import type { DocumentReference, WriteBatch } from "firebase/firestore";
 import { changedFields, countDelta, homeOf } from "./sync";
+import { syncedChanges, syncedTask } from "./limits";
 import type { SyncRecord } from "./sync";
 
 export type TaskRefs = { task: DocumentReference; trash: DocumentReference; counts: DocumentReference };
 
 // The normal write: move/update the task's doc from where `B` (what we last
 // knew the cloud held) says it is to where `L` (local) says it should be. An
-// edit to an existing task only sends its changed fields (a merge). When
+// edit to an existing task only sends its changed fields (a merge). Only the
+// fields the rules know are sent (syncedTask in limits.ts). When
 // `counted`, the counts doc is bumped in the same batch (see firestore.rules).
 export function addTaskWrite<T extends object>(batch: WriteBatch, refs: TaskRefs, id: number,
   L: SyncRecord<T> | undefined, B: SyncRecord<T> | undefined, updatedAt: number, counted: boolean): void {
   if (!L) { batch.delete(refs.task); batch.delete(refs.trash); }
   else if (L.deletedAt !== undefined) {
-    batch.set(refs.trash, { ...L.task, deletedAt: L.deletedAt, updatedAt });
+    batch.set(refs.trash, { ...syncedTask(L.task), deletedAt: L.deletedAt, updatedAt });
     if (B?.deletedAt === undefined) batch.delete(refs.task);
   }
-  else if (!B || B.deletedAt !== undefined) { batch.set(refs.task, { ...L.task, updatedAt }); if (B) batch.delete(refs.trash); }
-  else batch.set(refs.task, { ...changedFields(B.task, L.task, deleteField()), updatedAt }, { merge: true });
+  else if (!B || B.deletedAt !== undefined) { batch.set(refs.task, { ...syncedTask(L.task), updatedAt }); if (B) batch.delete(refs.trash); }
+  else { const gone = deleteField(); batch.set(refs.task, { ...syncedChanges(changedFields(B.task, L.task, gone), gone), updatedAt }, { merge: true }); }
   if (counted) addCount(batch, refs, id, countDelta(homeOf(B), homeOf(L)));
 }
 
@@ -31,9 +33,9 @@ export function addTaskWrite<T extends object>(batch: WriteBatch, refs: TaskRefs
 export function addTaskWriteFromActual<T extends object>(batch: WriteBatch, refs: TaskRefs, id: number,
   L: SyncRecord<T> | undefined, has: { tasks: boolean; trash: boolean }, updatedAt: number, counted: boolean): void {
   const home = homeOf(L);
-  if (L && home === "tasks") batch.set(refs.task, { ...L.task, updatedAt });
+  if (L && home === "tasks") batch.set(refs.task, { ...syncedTask(L.task), updatedAt });
   else if (has.tasks) batch.delete(refs.task);
-  if (L && home === "trash") batch.set(refs.trash, { ...L.task, deletedAt: L.deletedAt, updatedAt });
+  if (L && home === "trash") batch.set(refs.trash, { ...syncedTask(L.task), deletedAt: L.deletedAt, updatedAt });
   else if (has.trash) batch.delete(refs.trash);
   if (counted) addCount(batch, refs, id, {
     n: (home === "tasks" ? 1 : 0) - (has.tasks ? 1 : 0),

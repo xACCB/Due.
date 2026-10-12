@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIMITS } from "./limits";
+import { LIMITS, PROFILE_FIELDS, TASK_FIELDS, TRASH_FIELDS } from "./limits";
 // The rules file as text (Vite's ?raw import), so this runs in plain `npm test`.
 import rules from "../../firestore.rules?raw";
 
@@ -48,5 +48,28 @@ describe("firestore.rules agrees with LIMITS", () => {
     // LIMITS.tag only appears multiplied (tags x tag), which the "tag text" row checks.
     const covered = new Set([...expected.map(([, , limit]) => limit), LIMITS.tag]);
     for (const [name, value] of Object.entries(LIMITS)) expect(covered.has(value), `LIMITS.${name} isn't checked against the rules`).toBe(true);
+  });
+});
+
+// The same for which fields a document may hold: the rules refuse any other,
+// so a field the app writes but the rules don't list would stop that task
+// syncing, and one the rules list but the app never writes is room to abuse.
+function fieldList(name: string): string[] {
+  const at = rules.indexOf(`function ${name}() { return [`);
+  expect(at, `no "function ${name}() { return [...] }" found in firestore.rules; was it renamed?`).toBeGreaterThan(-1);
+  const list = rules.slice(rules.indexOf("[", at) + 1, rules.indexOf("]", at));
+  return [...list.matchAll(/'([^']+)'/g)].map(m => m[1]);
+}
+
+describe("firestore.rules agrees on which fields are synced", () => {
+  it("a task's fields", () => {
+    expect(fieldList("taskFields").sort()).toEqual([...TASK_FIELDS].sort());
+  });
+  it("a trash entry is a task plus deletedAt", () => {
+    expect(rules).toContain("function trashFields() { return taskFields().concat(['deletedAt']); }");
+    expect([...TRASH_FIELDS].sort()).toEqual([...TASK_FIELDS, "deletedAt"].sort());
+  });
+  it("a profile's fields", () => {
+    expect(fieldList("profileFields").sort()).toEqual([...PROFILE_FIELDS].sort());
   });
 });

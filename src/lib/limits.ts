@@ -3,6 +3,8 @@
 // the change saves locally but is silently refused by the cloud and the
 // devices drift apart. Keep the numbers here and in firestore.rules in step
 // (tests/firestore.rules.test.ts checks the rules side at these values).
+import type { Task } from "../types";
+
 export const LIMITS = {
   title: 500,
   subject: 200,
@@ -16,6 +18,36 @@ export const LIMITS = {
   trash: 500,         // Recently deleted entries per account (the app keeps 200)
   devices: 20,        // signed-in devices listed per account; the longest idle drop off
 } as const;
+
+// The fields a synced document may hold. firestore.rules refuses a new task
+// or profile holding any other, and an edit that adds or changes any other
+// (taskFields() / profileFields() there; src/lib/limits.rules.test.ts checks
+// the two lists agree). A new synced field goes in both places, and the rules
+// are deployed before the app that writes it.
+// Written as a map from every key of Task so that adding a field to the type
+// without listing it here doesn't compile.
+const TASK_FIELD_MAP: Record<keyof Task, true> = {
+  id: true, title: true, subject: true, dueDate: true, dueTime: true, estMins: true, done: true, order: true,
+  subtasks: true, recurrence: true, archived: true, completedAt: true, tags: true, priorityOverride: true,
+  sessions: true, spawnedNextId: true,
+};
+// updatedAt is sync's own (when the edit happened); a trash entry adds deletedAt.
+export const TASK_FIELDS: readonly string[] = [...Object.keys(TASK_FIELD_MAP), "updatedAt"];
+export const TRASH_FIELDS: readonly string[] = [...TASK_FIELDS, "deletedAt"];
+export const PROFILE_FIELDS: readonly string[] = ["layout", "colorCodeUrgency", "subjects", "subjectColors", "timeFormat", "weekStart"];
+
+// A task as it is sent to the cloud: only the fields the rules accept. A task
+// kept on the device since an early version, or brought in from a backup, can
+// hold others (the first versions had `notes`); sent whole, the rules would
+// refuse it and it would stop syncing.
+export function syncedTask(task: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(task).filter(([k]) => TASK_FIELDS.includes(k)));
+}
+// The same for an edit's changed fields: a field the rules don't know may be
+// removed (`removed` is the caller's deleteField()), never set.
+export function syncedChanges(changes: Record<string, unknown>, removed: unknown): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(changes).filter(([k, v]) => v === removed || TASK_FIELDS.includes(k)));
+}
 
 const RECURRENCES = ["none", "daily", "weekly", "monthly"];
 const PRIORITIES = ["high", "medium", "low"];

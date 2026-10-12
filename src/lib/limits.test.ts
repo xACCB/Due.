@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LIMITS, addSession, sanitizeTask } from "./limits";
+import { LIMITS, addSession, sanitizeTask, syncedChanges, syncedTask } from "./limits";
 
 describe("addSession", () => {
   it("appends, keeping only the newest LIMITS.sessions", () => {
@@ -51,5 +51,27 @@ describe("sanitizeTask", () => {
     expect(out).not.toHaveProperty("priorityOverride");
     expect(out).not.toHaveProperty("tags");
     expect(sanitizeTask({ ...base, recurrence: "weekly", priorityOverride: "high" })).toMatchObject({ recurrence: "weekly", priorityOverride: "high" });
+  });
+});
+
+describe("syncedTask", () => {
+  const base = { id: 1, title: "Essay", subject: "English", dueDate: "2026-09-22", dueTime: "09:00", estMins: 30, done: false, order: 0 };
+  it("sends a task whole", () => {
+    const full = { ...base, subtasks: [{ id: "a", text: "x", done: false }], recurrence: "weekly", archived: false, completedAt: null,
+      tags: ["exam"], priorityOverride: "high", sessions: [{ mins: 25, at: 1 }], spawnedNextId: null };
+    expect(syncedTask(full)).toEqual(full);
+  });
+  it("leaves out a field the rules don't know", () => {
+    expect(syncedTask({ ...base, notes: "from the first version", junk: 1 })).toEqual(base);
+  });
+});
+
+describe("syncedChanges", () => {
+  const gone = Symbol("deleteField");
+  it("keeps changes to known fields and removals of anything", () => {
+    expect(syncedChanges({ title: "New", tags: gone, notes: gone }, gone)).toEqual({ title: "New", tags: gone, notes: gone });
+  });
+  it("drops a new value for a field the rules don't know", () => {
+    expect(syncedChanges({ title: "New", notes: "changed" }, gone)).toEqual({ title: "New" });
   });
 });

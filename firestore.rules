@@ -29,8 +29,32 @@ service cloud.firestore {
     // has them removed (sanitizeTask, withImportedSubjects).
     function allText(l) { return l.size() == 0 || l.join('\n').split('\n') == l; }
 
+    // ---- Known fields only (added 2026-10-12). A document used to be capped
+    // by how many fields it had, not which, so a scripted client could add
+    // fields of its own holding anything, up to Firestore's 1 MiB a document.
+    // A new document may hold only the fields listed; an update may add or
+    // change only those. A field from an older app version that is already
+    // stored (a task's `notes`, a profile's `scratchpad`) may stay as it is or
+    // be removed, so no document becomes uneditable.
+    // The lists are checked against src/lib/limits.ts (TASK_FIELDS,
+    // PROFILE_FIELDS) by src/lib/limits.rules.test.ts: a new field goes in
+    // both, and the rules are deployed BEFORE the app that writes it.
+    function taskFields() { return ['id','title','subject','dueDate','dueTime','estMins','done','order','subtasks','recurrence','archived','completedAt','tags','priorityOverride','sessions','spawnedNextId','updatedAt']; }
+    function trashFields() { return taskFields().concat(['deletedAt']); }
+    function profileFields() { return ['layout','colorCodeUrgency','subjects','subjectColors','timeFormat','weekStart']; }
+    function addsOnly(data, fields) {
+      return resource == null
+        ? data.keys().hasOnly(fields)
+        : data.diff(resource.data).addedKeys().union(data.diff(resource.data).changedKeys()).hasOnly(fields);
+    }
+    // A number the app can hold exactly: not NaN, not infinite (comparing
+    // either with anything is false). A task's order decides where it sorts on
+    // every device.
+    function finite(n) { return n >= -9007199254740991 && n <= 9007199254740991; }
+
     function isValidProfile(data) {
       return data.keys().size() <= 40
+        && addsOnly(data, profileFields())
         && (!('layout' in data) || (data.layout is string && data.layout.size() <= 40))
         && (!('colorCodeUrgency' in data) || data.colorCodeUrgency is bool)
         && (!('subjects' in data) || (data.subjects is list && data.subjects.size() <= 200
@@ -103,6 +127,7 @@ service cloud.firestore {
       // The id inside the task is the document's name (the app writes
       // String(task.id)), so a task can't be stored under another's name.
       return string(data.id) == taskId
+        && finite(data.id) && finite(data.order)
         && validDueDate(data.dueDate) && validDueTime(data.dueTime)
         && data.estMins is int
         && tagsBounded(data) && tagsAreText(data)
@@ -110,6 +135,7 @@ service cloud.firestore {
     }
     function keepsOrTightens(data, old) {
       return data.id == old.id
+        && (data.order == old.order || finite(data.order))
         && (data.dueDate == old.dueDate || validDueDate(data.dueDate))
         && (data.dueTime == old.dueTime || validDueTime(data.dueTime))
         && (data.estMins == old.estMins || data.estMins is int)
@@ -205,15 +231,15 @@ service cloud.firestore {
 
       match /tasks/{taskId} {
         allow read, delete: if isOwner(userId);
-        allow update: if isOwner(userId) && isValidTask(request.resource.data) && keepsOrTightens(request.resource.data, resource.data);
-        allow create: if isOwner(userId) && isValidTask(request.resource.data) && isTightTask(request.resource.data, taskId) && isCountedCreate(userId, taskId, 'n');
+        allow update: if isOwner(userId) && isValidTask(request.resource.data) && addsOnly(request.resource.data, taskFields()) && keepsOrTightens(request.resource.data, resource.data);
+        allow create: if isOwner(userId) && isValidTask(request.resource.data) && addsOnly(request.resource.data, taskFields()) && isTightTask(request.resource.data, taskId) && isCountedCreate(userId, taskId, 'n');
       }
 
       match /trash/{taskId} {
         allow read, delete: if isOwner(userId);
-        allow update: if isOwner(userId) && isValidTrashedTask(request.resource.data) && keepsOrTightens(request.resource.data, resource.data)
+        allow update: if isOwner(userId) && isValidTrashedTask(request.resource.data) && addsOnly(request.resource.data, trashFields()) && keepsOrTightens(request.resource.data, resource.data)
           && (request.resource.data.deletedAt == resource.data.deletedAt || notFarFuture(request.resource.data.deletedAt));
-        allow create: if isOwner(userId) && isValidTrashedTask(request.resource.data) && isTightTask(request.resource.data, taskId)
+        allow create: if isOwner(userId) && isValidTrashedTask(request.resource.data) && addsOnly(request.resource.data, trashFields()) && isTightTask(request.resource.data, taskId)
           && notFarFuture(request.resource.data.deletedAt) && isCountedCreate(userId, taskId, 't');
       }
 

@@ -208,6 +208,17 @@ require rewriting a user's entire history:
   text in from outside goes through `oneLine()` (`src/lib/limits.ts`; `sanitizeTask` and
   `withImportedSubjects` do). Device ids must be 24 hex characters. Both are lenient the same way
   as above (unchanged tags, an unchanged subject list, a device write that adds no id).
+- **Known fields only** (2026-10-12): a new task, trash entry or profile may hold only the fields
+  the app writes, and an update may add or change only those (`addsOnly()` with `taskFields()` /
+  `trashFields()` / `profileFields()` in `firestore.rules`); a field an older version stored (a
+  task's `notes`, a profile's `scratchpad`) may stay or be removed. The same lists are `TASK_FIELDS` /
+  `TRASH_FIELDS` / `PROFILE_FIELDS` in `src/lib/limits.ts` (`limits.rules.test.ts` compares them;
+  `TASK_FIELD_MAP` won't compile if `Task` gains a key it doesn't list), and `addTaskWrite` sends
+  tasks through `syncedTask()` so a task holding an old field on a device still syncs. **A new synced
+  field goes in both lists, and the rules are deployed before the app that writes it**, or its saves
+  are refused. A new task's `id` and `order` must also be ordinary numbers (`finite()`). Still open:
+  what each subtask or session holds (rules can't look inside a list of maps), so one task doc can
+  still be large; closing that means storing them differently.
 - **Rules have a budget.** One request may evaluate 1,000 rule expressions, and a check "by
   position" (`list[0]`, `list[1]`...) costs about ten each even when the position is empty: 30 of
   them for tags left less than half the budget, and checking 20 device entries didn't fit at all
@@ -833,5 +844,12 @@ auto-detected via Vercel's Vite preset; `vercel.json` holds the auth proxy rewri
 plus basic security response headers (`X-Frame-Options`, `X-Content-Type-Options`,
 `Referrer-Policy`, `Permissions-Policy`) applied to everything except the `/__/auth/**` proxy paths
 -- deliberately excluded so they can't interact with Firebase's own proxied auth handler content.
-No `Content-Security-Policy` is set; one was deliberately not added given the risk of silently
-breaking Google Sign-In/reCAPTCHA/Google Fonts without a live test cycle to verify against.
+A `Content-Security-Policy-Report-Only` header is set (2026-10-12): it blocks nothing, the browser
+only logs what an enforced policy would have refused (DevTools console, "[Report Only]"). It is
+report-only because a wrong policy would silently break Google Sign-In/reCAPTCHA/Google Fonts; rename
+it to `Content-Security-Policy` only after signing in, syncing and loading every screen on the live
+site shows no such lines. The inline scripts in `index.html` (and the font link's `onload`, via
+`'unsafe-hashes'`) are allowed by hash, and `src/lib/csp.test.ts` (in `npm test`) recomputes those
+hashes, so editing one of them fails the test with the hash to paste in. Styles need
+`'unsafe-inline'` (the app styles inline). A new outside script, font, image host or API needs
+adding to the policy.

@@ -238,3 +238,70 @@ describe("subjects, colours, devices and the counter", () => {
     await assertFails(create("7", "7; drop"));
   });
 });
+
+// Added 2026-10-12. A document holds only the fields the app knows
+// (taskFields() / trashFields() / profileFields() in firestore.rules), so it
+// can't be padded with fields of its own choosing. Same two halves again.
+describe("known fields only", () => {
+  it("refuses a new task or trash entry holding a field the app doesn't have", async () => {
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { notes: "x" })));
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { blob: "x".repeat(100000) })));
+    await assertFails(setDoc(doc(db(), "users/alice/trash/1"), task(1, { deletedAt: 1, junk: true })));
+    // deletedAt belongs to a trash entry, not to a live task.
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { deletedAt: 1 })));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/1"), task(1)));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/trash/2"), task(2, { deletedAt: 1, updatedAt: 1 })));
+  });
+  it("an edit can't add one", async () => {
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/1"), task(1)));
+    await assertFails(updateDoc(doc(db(), "users/alice/tasks/1"), { notes: "x" }));
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), { junk: 1, title: "Renamed" }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/1"), { title: "Renamed", tags: ["a"], updatedAt: Date.now() }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/trash/2"), task(2, { deletedAt: 1 })));
+    await assertFails(updateDoc(doc(db(), "users/alice/trash/2"), { junk: 1 }));
+  });
+  it("a field an older version stored stays, can be removed, and can't be changed or joined by another", async () => {
+    await seed("users/alice/tasks/1", task(1, { notes: "from the first version" }));
+    await seed("users/alice/trash/2", task(2, { deletedAt: 1, notes: "old" }));
+    const ref = doc(db(), "users/alice/tasks/1");
+    await assertSucceeds(updateDoc(ref, { title: "Still editable", done: true, completedAt: Date.now(), updatedAt: Date.now() }));
+    await assertFails(updateDoc(ref, { notes: "x".repeat(100000) }));
+    await assertFails(updateDoc(ref, { other: 1 }));
+    await assertSucceeds(updateDoc(doc(db(), "users/alice/trash/2"), { title: "Renamed in trash" }));
+    await assertSucceeds(updateDoc(ref, { notes: deleteField() }));
+    await assertFails(updateDoc(ref, { notes: "back again" }));
+  });
+  it("a profile holds only the settings that sync", async () => {
+    const ref = doc(db(), "users/alice");
+    await assertFails(setDoc(ref, { layout: "list", junk: "x".repeat(100000) }));
+    await assertFails(setDoc(ref, { themeName: "stealth" }, { merge: true }));
+    await assertSucceeds(setDoc(ref, { layout: "list", colorCodeUrgency: true, subjects: ["Math"], subjectColors: { Math: "#FF6B6B" }, timeFormat: "12h", weekStart: 0 }));
+    await assertFails(setDoc(ref, { junk: 1 }, { merge: true }));
+  });
+  it("a profile from an older version still syncs, and its old task list can be cleared", async () => {
+    await seed("users/alice", { layout: "list", scratchpad: "old notes", themeName: "ocean", tasks: [task(1)] });
+    const ref = doc(db(), "users/alice");
+    await assertSucceeds(setDoc(ref, { layout: "board", colorCodeUrgency: false, subjects: ["Math"], subjectColors: {}, timeFormat: "24h", weekStart: 1 }, { merge: true }));
+    await assertFails(setDoc(ref, { scratchpad: "x".repeat(100000) }, { merge: true }));
+    await assertSucceeds(updateDoc(ref, { tasks: deleteField() })); // the one-time move to tasks/
+  });
+});
+
+describe("a task's order and id are ordinary numbers", () => {
+  it("refuses a new task ordered at infinity or at not-a-number", async () => {
+    for (const bad of [Infinity, -Infinity, NaN, 1e300]) await assertFails(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { order: bad })));
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/Infinity"), task(Infinity)));
+    await assertFails(setDoc(doc(db(), "users/alice/tasks/NaN"), task(NaN)));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/1"), task(1, { order: -3 })));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/2"), task(2, { order: 2.5 })));
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/3"), task(3, { order: 1760000000123 })));
+  });
+  it("an existing task can't be moved there, and one already there can be edited and put right", async () => {
+    await assertSucceeds(setDoc(doc(db(), "users/alice/tasks/1"), task(1)));
+    await assertFails(updateDoc(doc(db(), "users/alice/tasks/1"), { order: Infinity }));
+    await assertSucceeds(updateDoc(doc(db(), "users/alice/tasks/1"), { order: 12 }));
+    await seed("users/alice/tasks/2", task(2, { order: Infinity }));
+    await assertSucceeds(updateDoc(doc(db(), "users/alice/tasks/2"), { title: "Still editable" }));
+    await assertSucceeds(updateDoc(doc(db(), "users/alice/tasks/2"), { order: 3 }));
+  });
+});

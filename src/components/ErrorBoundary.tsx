@@ -1,5 +1,6 @@
 import { Component } from "react";
 import type { ReactNode } from "react";
+import { fz } from "../lib/textSize";
 
 interface Props { children:ReactNode; fallback?:(reset:()=>void)=>ReactNode; }
 interface State { hasError:boolean; }
@@ -26,9 +27,9 @@ export class ErrorBoundary extends Component<Props,State> {
       if(this.props.fallback)return this.props.fallback(this.reset);
       return (
         <div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:24,fontFamily:"'DM Mono', monospace",textAlign:"center",background:"#0a0a0a",color:"#cccccc"}}>
-          <div style={{fontSize:18}}>Something went wrong.</div>
-          <div style={{fontSize:13,color:"#7c7c7c"}}>Your data is safe. Reloading should fix it.</div>
-          <button onClick={()=>window.location.reload()} style={{background:"#ffffff",color:"#000",border:"none",borderRadius:10,padding:"10px 20px",fontSize:14,fontFamily:"inherit",cursor:"pointer"}}>
+          <div style={{fontSize:fz(18)}}>Something went wrong.</div>
+          <div style={{fontSize:fz(13),color:"#7c7c7c"}}>Your data is safe. Reloading should fix it.</div>
+          <button onClick={()=>window.location.reload()} style={{background:"#ffffff",color:"#000",border:"none",borderRadius:10,padding:"10px 20px",fontSize:fz(14),fontFamily:"inherit",cursor:"pointer"}}>
             Reload
           </button>
         </div>

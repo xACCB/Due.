@@ -5,6 +5,7 @@ import { ink } from "../lib/format";
 import { SIDEBAR_TASK_CAP, dueShort } from "../lib/sidebarSubjects";
 import type { SubjectGroup } from "../lib/sidebarSubjects";
 import { FONT } from "../fonts";
+import { fz } from "../lib/textSize";
 
 // One row of the sidebar. Styled by .sb-row in the runtime css; `current` marks
 // the screen being shown.
@@ -32,7 +33,7 @@ export function SidebarSubjects({groups,open,onToggleOpen,picked,onPick,onOpenTa
   return(
     <div data-tour="sidebar-subjects">
       <div className="sb-rule" aria-hidden="true"/>
-      <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:".08em",padding:"4px 10px 6px"}}>Subjects</div>
+      <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:".08em",padding:"4px 10px 6px"}}>Subjects</div>
       {groups.map(g=>{
         const label=g.name||"No subject";
         const isOpen=open.includes(g.name), all=showAll.includes(g.name);
@@ -47,17 +48,17 @@ export function SidebarSubjects({groups,open,onToggleOpen,picked,onPick,onOpenTa
               <button className="sb-row" onClick={()=>onPick(g.name)} aria-pressed={picked===g.name} title={`Show only ${label} on Home`} style={{flex:1,minWidth:0,padding:"8px 10px 8px 6px",gap:8}}>
                 <span aria-hidden="true" style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>
                 <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
-                {g.tasks.length>0&&<span aria-label={`${g.tasks.length} to do`} style={{fontSize:11,color:T.textMuted,flexShrink:0}}>{g.tasks.length}</span>}
+                {g.tasks.length>0&&<span aria-label={`${g.tasks.length} to do`} style={{fontSize:fz(11),color:T.textMuted,flexShrink:0}}>{g.tasks.length}</span>}
               </button>
             </div>
             {isOpen&&<div className="sec-body" style={{display:"flex",flexDirection:"column",gap:1,margin:"0 0 4px 13px",paddingLeft:9,borderLeft:`1px solid ${T.borderFaint}`}}>
-              {g.tasks.length===0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,padding:"6px 10px"}}>Nothing to do</div>}
+              {g.tasks.length===0&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint,padding:"6px 10px"}}>Nothing to do</div>}
               {shown.map(t=>{
                 const due=dueShort(t.dueDate,today);
                 return(
                   <button key={t.id} className="sb-row sb-task" onClick={()=>onOpenTask(t)} aria-current={t.id===currentTaskId?"page":undefined}>
                     <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-                    {due&&<span style={{fontSize:10,flexShrink:0,color:due==="Overdue"?ink("#FF4757",T.light):T.textMuted}}>{due}</span>}
+                    {due&&<span style={{fontSize:fz(10),flexShrink:0,color:due==="Overdue"?ink("#FF4757",T.light):T.textMuted}}>{due}</span>}
                   </button>
                 );
               })}
@@ -75,7 +76,7 @@ export function SidebarSubjects({groups,open,onToggleOpen,picked,onPick,onOpenTa
 export function ScreenHeader({onBack,T}:{title:string;onBack:()=>void;T:ThemeObj;F:typeof FONT}){
   return(
     <div className="screen-header" style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-      <button onClick={onBack} aria-label="Back to Home" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.text,fontSize:12,cursor:"pointer",padding:"6px 12px",borderRadius:9}}>‹ Home</button>
+      <button onClick={onBack} aria-label="Back to Home" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.text,fontSize:fz(12),cursor:"pointer",padding:"6px 12px",borderRadius:9}}>‹ Home</button>
     </div>
   );
 }

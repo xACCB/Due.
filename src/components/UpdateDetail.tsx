@@ -4,6 +4,7 @@ import type { ThemeObj } from "../themes";
 import { contrastColor, longDate } from "../lib/format";
 import { FONT } from "../fonts";
 import { box, freezeBox, pin, unpin } from "../lib/dom";
+import { fz } from "../lib/textSize";
 
 // An Inbox update, opened: the row grows out of the menu into a card floating
 // in the middle of a blurred screen (its box animates from the row's box to
@@ -107,7 +108,7 @@ export function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing
     anim.finished.then(()=>onGo(dest),()=>onGo(dest));
   }
   if(!item)return null;
-  const btn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12};
+  const btn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(12)};
   return(
     <div role="dialog" aria-modal="true" aria-labelledby="update-detail-title" data-keeps-menu onKeyDown={e=>{if(e.key==="Escape"){e.stopPropagation();close();}}}
       style={{position:"fixed",inset:0,zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -115,29 +116,29 @@ export function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing
       <div ref={cardRef} style={{position:"relative",width:"min(460px,100%)",maxHeight:"100%",overflow:"hidden",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,boxShadow:T.light?"0 16px 48px rgba(0,0,0,0.16)":"0 16px 48px rgba(0,0,0,0.6)",display:"flex",flexDirection:"column"}}>
         <div ref={bodyRef} style={{padding:"20px 20px 16px",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-            <span style={{background:T.cardAlt,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>{item.kind}</span>
+            <span style={{background:T.cardAlt,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(10),textTransform:"uppercase",letterSpacing:"0.06em"}}>{item.kind}</span>
             <button ref={closeRef} onClick={()=>close()} aria-label="Close" className="hit" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:20,lineHeight:1,padding:"2px 4px"}}>×</button>
           </div>
           <div>
             <h2 id="update-detail-title" style={{margin:0,fontFamily:F.heading,fontWeight:400,fontSize:26,lineHeight:1.15,color:T.text}}>{item.headline}</h2>
-            <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:6}}>{longDate(item.date)}</div>
+            <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginTop:6}}>{longDate(item.date)}</div>
           </div>
-          <p style={{margin:0,fontFamily:F.body,fontSize:13,lineHeight:1.6,color:T.text}}>{item.description}</p>
+          <p style={{margin:0,fontFamily:F.body,fontSize:fz(13),lineHeight:1.6,color:T.text}}>{item.description}</p>
           {item.list&&<div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px"}}>
-            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Finished</div>
-            <ul style={{margin:0,paddingLeft:16,fontFamily:F.body,fontSize:12,lineHeight:1.6,color:T.text}}>
+            <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Finished</div>
+            <ul style={{margin:0,paddingLeft:16,fontFamily:F.body,fontSize:fz(12),lineHeight:1.6,color:T.text}}>
               {item.list.map((t,i)=><li key={i} style={{overflowWrap:"anywhere"}}>{t}</li>)}
             </ul>
           </div>}
           {item.where&&<div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px"}}>
-            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Where to find it</div>
-            <div style={{fontFamily:F.body,fontSize:12,lineHeight:1.5,color:T.text}}>{item.where}</div>
-            {item.go&&<button onClick={()=>goThere(item.go!)} style={{marginTop:10,background:"none",border:`1px solid ${T.accent}`,borderRadius:9,padding:"7px 12px",cursor:"pointer",color:T.accent,fontFamily:F.body,fontSize:12}}>Take me there →</button>}
+            <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Where to find it</div>
+            <div style={{fontFamily:F.body,fontSize:fz(12),lineHeight:1.5,color:T.text}}>{item.where}</div>
+            {item.go&&<button onClick={()=>goThere(item.go!)} style={{marginTop:10,background:"none",border:`1px solid ${T.accent}`,borderRadius:9,padding:"7px 12px",cursor:"pointer",color:T.accent,fontFamily:F.body,fontSize:fz(12)}}>Take me there →</button>}
           </div>}
           <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:4}}>
             <button onClick={()=>go(index-1)} disabled={index===0} aria-label="Back to the previous message" style={{...btn,opacity:index===0?0.4:1,cursor:index===0?"default":"pointer"}}>‹ Back</button>
             <button onClick={()=>go(index+1)} disabled={index===items.length-1} aria-label="Next message" style={{...btn,opacity:index===items.length-1?0.4:1,cursor:index===items.length-1?"default":"pointer"}}>Next ›</button>
-            <span style={{flex:1,textAlign:"center",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{index+1} of {items.length}</span>
+            <span style={{flex:1,textAlign:"center",fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>{index+1} of {items.length}</span>
             <button onClick={()=>close(true)} style={{...btn,background:T.accent,border:"none",color:contrastColor(T.accent)}}>Dismiss</button>
           </div>
         </div>

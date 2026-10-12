@@ -10,6 +10,7 @@ import { FONT } from "../fonts";
 import { CheckMark } from "./icons";
 import { activateOnKey } from "../lib/dom";
 import { DayDetail } from "./GrowCard";
+import { fz } from "../lib/textSize";
 
 // The Calendar tab: a month grid (6 fixed rows, so it doesn't jump between
 // months) where each day is dotted with its open tasks' subject colors, plus
@@ -76,19 +77,19 @@ export function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart
   const [openDay,setOpenDay]=useState<{iso:string;origin:HTMLElement}|null>(null);
   const openMins=dayTasks.filter(t=>!t.done).reduce((n,t)=>n+(t.estMins||0),0);
   const card={background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`};
-  const navBtn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,width:34,height:34,cursor:"pointer",color:T.text,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",padding:0};
+  const navBtn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,width:34,height:34,cursor:"pointer",color:T.text,fontSize:fz(16),display:"flex",alignItems:"center",justifyContent:"center",padding:0};
   const showToday=!(ym[0]===new Date(now).getFullYear()&&ym[1]===new Date(now).getMonth()&&selected===today);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
       <div style={card}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <h2 aria-live="polite" style={{flex:1,margin:0,fontFamily:F.heading,fontWeight:400,fontSize:20,color:T.text}}>{monthName}</h2>
-          {showToday&&<button onClick={()=>{setYm([new Date(now).getFullYear(),new Date(now).getMonth()]);setSelected(today);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,height:34,padding:"0 12px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Today</button>}
+          {showToday&&<button onClick={()=>{setYm([new Date(now).getFullYear(),new Date(now).getMonth()]);setSelected(today);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,height:34,padding:"0 12px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>Today</button>}
           <button onClick={()=>goMonth(-1)} aria-label="Previous month" style={navBtn}>‹</button>
           <button onClick={()=>goMonth(1)} aria-label="Next month" style={navBtn}>›</button>
         </div>
         <div aria-hidden="true" style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:4}}>
-          {weekdayLabels(weekStart).map(l=><div key={l} style={{textAlign:"center",fontFamily:F.body,fontSize:10,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.04em"}}>{l.slice(0,2)}</div>)}
+          {weekdayLabels(weekStart).map(l=><div key={l} style={{textAlign:"center",fontFamily:F.body,fontSize:fz(10),color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.04em"}}>{l.slice(0,2)}</div>)}
         </div>
         {/* The fixed height (48px rows, 4px gaps) eases when a month needs a
             different number of rows, so the panel below slides instead of jumping.
@@ -111,10 +112,10 @@ export function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart
               <button key={iso} data-day={iso} onClick={e=>{select(iso);setOpenDay({iso,origin:e.currentTarget});}} aria-haspopup="dialog" aria-label={label} aria-pressed={isSel} aria-current={isToday?"date":undefined} tabIndex={iso===tabStop?0:-1}
                 style={{position:"relative",height:48,borderRadius:10,cursor:"pointer",padding:"5px 0 0",display:"flex",flexDirection:"column",alignItems:"center",gap:4,
                   background:"transparent",border:`${isSel?2:1}px solid ${isSel?T.accent:isToday?T.textMuted:"transparent"}`,opacity:other?0.4:1,color:T.text}}>
-                <span style={{fontFamily:F.body,fontSize:13,lineHeight:1,fontWeight:isToday?600:400,color:overdue?ink(priColor("high",colorCodeUrgency),T.light):T.text}}>{Number(iso.slice(8))}</span>
+                <span style={{fontFamily:F.body,fontSize:fz(13),lineHeight:1,fontWeight:isToday?600:400,color:overdue?ink(priColor("high",colorCodeUrgency),T.light):T.text}}>{Number(iso.slice(8))}</span>
                 <span aria-hidden="true" style={{display:"flex",gap:3,alignItems:"center",height:6}}>
                   {open.slice(0,3).map(t=><span key={t.id} style={{width:5,height:5,borderRadius:"50%",background:subjectColors[t.subject]||T.textMuted}}/>)}
-                  {open.length>3&&<span style={{fontFamily:F.body,fontSize:8,lineHeight:1,color:T.textMuted}}>+</span>}
+                  {open.length>3&&<span style={{fontFamily:F.body,fontSize:fz(8),lineHeight:1,color:T.textMuted}}>+</span>}
                 </span>
               </button>
             );
@@ -124,11 +125,11 @@ export function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart
       </div>
       <div style={card}>
         <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:10,marginBottom:10}}>
-          <div style={{fontFamily:F.heading,fontSize:17,color:T.text}}>{selected===today?"Today":new Date(selected+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}</div>
-          {dayTasks.length>0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,flexShrink:0}}>{dayTasks.filter(t=>!t.done).length} due{openMins?` · ${formatDuration(openMins)}`:""}</div>}
+          <div style={{fontFamily:F.heading,fontSize:fz(17),color:T.text}}>{selected===today?"Today":new Date(selected+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}</div>
+          {dayTasks.length>0&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,flexShrink:0}}>{dayTasks.filter(t=>!t.done).length} due{openMins?` · ${formatDuration(openMins)}`:""}</div>}
         </div>
         {dayTasks.length===0
-          ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:10}}>Nothing due.</div>
+          ?<div style={{fontFamily:F.body,fontSize:fz(12),color:T.textFaint,marginBottom:10}}>Nothing due.</div>
           :<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
             {dayTasks.map(t=>{
               const sc=subjectColors[t.subject]||T.accent;
@@ -138,15 +139,15 @@ export function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart
                     className="hit" style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                     {t.done&&<CheckMark size={10}/>}
                   </button>
-                  <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-                  {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
-                  {t.dueTime&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatTime(t.dueTime,h24)}</span>}
-                  {!t.dueTime&&t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
+                  <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:fz(14),color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                  {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:fz(10),flexShrink:0}}>{t.subject}</span>}
+                  {t.dueTime&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,flexShrink:0}}>{formatTime(t.dueTime,h24)}</span>}
+                  {!t.dueTime&&t.estMins>0&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
                 </div>
               );
             })}
           </div>}
-        <button onClick={()=>onAddOn(selected)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12}}>
+        <button onClick={()=>onAddOn(selected)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(12)}}>
           + Add homework due {selected===today?"today":new Date(selected+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"})}
         </button>
       </div>
@@ -244,11 +245,11 @@ export function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone
     if(drag.current?.locked&&el){el.style.transition="";el.style.transform=depthTransform(0);}
     drag.current=null;
   }
-  const navBtn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,width:38,height:38,cursor:"pointer",color:T.text,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",padding:0};
+  const navBtn={background:"none",border:`1px solid ${T.border}`,borderRadius:9,width:38,height:38,cursor:"pointer",color:T.text,fontSize:fz(16),display:"flex",alignItems:"center",justifyContent:"center",padding:0};
   if(dates.length===0)return(
     <div style={{background:T.card,borderRadius:14,padding:"28px 16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
       <div style={{fontFamily:F.heading,fontSize:20,color:T.text,marginBottom:6}}>Nothing due</div>
-      <div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Tasks with a due date show up here, one card per day.</div>
+      <div style={{fontFamily:F.body,fontSize:fz(12),color:T.textFaint}}>Tasks with a due date show up here, one card per day.</div>
     </div>
   );
   const dayMs=(iso:string)=>new Date(iso+"T00:00:00").getTime();
@@ -274,13 +275,13 @@ export function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone
                 transition:"transform .28s cubic-bezier(.2,.8,.3,1)",touchAction:"pan-y",userSelect:"none",WebkitUserSelect:"none",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
                 <div style={{minWidth:0}}>
-                  <div style={{fontFamily:F.body,fontSize:12,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{d.toLocaleDateString(undefined,{weekday:"long"})}</div>
+                  <div style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{d.toLocaleDateString(undefined,{weekday:"long"})}</div>
                   <div style={{fontFamily:F.heading,fontSize:116,lineHeight:0.95,color:T.accent,fontVariantNumeric:"tabular-nums",margin:"4px 0 2px"}}>{d.getDate()}</div>
                   <div style={{fontFamily:F.heading,fontSize:22,color:T.text}}>{d.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</div>
                 </div>
                 <div style={{textAlign:"right",flexShrink:0,paddingTop:2}}>
-                  <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:late?ink("#FF4757",T.light):T.text}}>{rel}{late?", overdue":""}</div>
-                  <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:3}}>{open.length===0?"All done":`${open.length} due`}{mins?` · ${formatDuration(mins)}`:""}</div>
+                  <div style={{fontFamily:F.body,fontSize:fz(12),fontWeight:600,color:late?ink("#FF4757",T.light):T.text}}>{rel}{late?", overdue":""}</div>
+                  <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginTop:3}}>{open.length===0?"All done":`${open.length} due`}{mins?` · ${formatDuration(mins)}`:""}</div>
                 </div>
               </div>
               <div style={{height:1,background:T.border,margin:"14px 0 12px"}}/>
@@ -293,10 +294,10 @@ export function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone
                         className="hit" style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {t.done&&<CheckMark size={10}/>}
                       </button>
-                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:15,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-                      {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
-                      {t.dueTime&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatTime(t.dueTime,h24)}</span>}
-                      {!t.dueTime&&t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
+                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:fz(15),color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                      {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:fz(10),flexShrink:0}}>{t.subject}</span>}
+                      {t.dueTime&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,flexShrink:0}}>{formatTime(t.dueTime,h24)}</span>}
+                      {!t.dueTime&&t.estMins>0&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
                     </div>
                   );
                 })}
@@ -307,7 +308,7 @@ export function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <button onClick={()=>go(-1)} disabled={idx===0} aria-label="Earlier date" style={{...navBtn,opacity:idx===0?0.4:1,cursor:idx===0?"default":"pointer"}}>‹</button>
-        <span aria-live="polite" style={{flex:1,textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textFaint}}>{idx+1} of {dates.length}</span>
+        <span aria-live="polite" style={{flex:1,textAlign:"center",fontFamily:F.body,fontSize:fz(11),color:T.textFaint}}>{idx+1} of {dates.length}</span>
         <button onClick={()=>go(1)} disabled={idx===dates.length-1} aria-label="Later date" style={{...navBtn,opacity:idx===dates.length-1?0.4:1,cursor:idx===dates.length-1?"default":"pointer"}}>›</button>
       </div>
     </div>

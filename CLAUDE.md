@@ -619,6 +619,17 @@ on 2026-10-10; the saved choice is cleared once on mount. Don't bring it back. T
 introduced remain and are still the right ones to use: `T.solidBorder` wherever a real hex is
 required (e.g. `contrastColor()`), and `T.borderFaint` for a lighter divider (`T.border+"33"`).
 
+**Text size** (`textSize`, `hw-text-size`, three buttons in Settings -> Looks, local-only): Small
+(the sizes the app had until 2026-10-12), Default (small text about 15% larger) and Large (about
+30%). Every font size goes through `fz(px)` (`src/lib/textSize.ts`, unit-tested), in inline styles
+(`fontSize:fz(11)`) and in the runtime css (`font-size:${fz(12)}`): it returns
+`calc(11px + 11px * var(--ts, 0.15))`, and a layout effect sets `--ts` on `<html>`. Text of 12px
+and under takes the whole increase, larger text less, and from 20px up none (`fz` then returns the
+plain number), so labels grow and headings and the timers stay put. **Write `fz(n)` for any new
+font size under 20px**, never a bare number, or that text won't follow the setting. The sample
+"Aa" on the three buttons is deliberately fixed. Check a change at all three sizes at 360px wide:
+nothing cut off, and the tap areas (below) still clear of each other.
+
 **Animation speed** (`animSpeed`, `hw-anim-speed`, a slider in Settings -> Looks, 0.5x to 2x,
 local-only) is applied globally by `src/lib/animSpeed.ts` instead of per call site: it wraps
 `Element.prototype.animate` once and listens for `transitionrun`/`animationstart` on the

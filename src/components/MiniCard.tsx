@@ -5,6 +5,7 @@ import { contrastColor, getPriority, formatDate, formatTime, daysUntil, formatDu
 import { FONT } from "../fonts";
 import { CheckMark } from "./icons";
 import { activateOnKey } from "../lib/dom";
+import { fz } from "../lib/textSize";
 
 // ─── TASK CARD (base) ────────────────────────────────────────────────────────
 // Also module scope (see TaskModal above) -- MiniCard is rendered in a loop
@@ -64,7 +65,7 @@ export function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colo
             onPointerMove={onDragMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
-            style={{background:"none",border:"none",color:T.textFaint,cursor:isDragging?"grabbing":"grab",fontSize:14,lineHeight:1,marginTop:2,padding:"0 2px",touchAction:"none",flexShrink:0,fontFamily:"inherit"}}>
+            style={{background:"none",border:"none",color:T.textFaint,cursor:isDragging?"grabbing":"grab",fontSize:fz(14),lineHeight:1,marginTop:2,padding:"0 2px",touchAction:"none",flexShrink:0,fontFamily:"inherit"}}>
             <span aria-hidden="true">⠿</span>
           </div>
         )}
@@ -75,27 +76,27 @@ export function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colo
           <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
             {isTop&&<span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>}
             {isNext&&<span className="rb" style={{background:T.text+"11",color:T.text}}>next up</span>}
-            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(task.done?(justDone?" strike strike-anim":" strike"):"")} aria-haspopup={selectionMode?undefined:"dialog"} style={{fontFamily:F.heading,fontSize:15,color:task.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{task.title}</span>
-            {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:12}}>↻</span>}
-            {task.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{task.subject}</span>}
+            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(task.done?(justDone?" strike strike-anim":" strike"):"")} aria-haspopup={selectionMode?undefined:"dialog"} style={{fontFamily:F.heading,fontSize:fz(15),color:task.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{task.title}</span>
+            {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:fz(12)}}>↻</span>}
+            {task.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:fz(10)}}>{task.subject}</span>}
             {task.priorityOverride&&<span className="rb" title="Priority set manually" style={{background:priColor(task.priorityOverride,colorCodeUrgency)+"22",color:ink(priColor(task.priorityOverride,colorCodeUrgency),T.light)}}>{task.priorityOverride}</span>}
-            {task.tags?.map(tag=><span key={tag} style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>#{tag}</span>)}
+            {task.tags?.map(tag=><span key={tag} style={{color:T.textMuted,fontFamily:F.body,fontSize:fz(10)}}>#{tag}</span>)}
           </div>
           <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
-            {task.dueDate&&<span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime,h24)}`:""}</span>}
-            {task.estMins>0&&<span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{formatDuration(task.estMins)}</span>}
-            {live&&dm&&<span style={{fontFamily:F.body,fontSize:11,color:ink(priColor(pr,colorCodeUrgency),T.light),fontWeight:500}}>{dm}</span>}
+            {task.dueDate&&<span style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime,h24)}`:""}</span>}
+            {task.estMins>0&&<span style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>{formatDuration(task.estMins)}</span>}
+            {live&&dm&&<span style={{fontFamily:F.body,fontSize:fz(11),color:ink(priColor(pr,colorCodeUrgency),T.light),fontWeight:500}}>{dm}</span>}
           </div>
           {!!task.subtasks?.length&&(
             <div style={{display:"flex",alignItems:"center",gap:6,marginTop:5}}>
               <div style={{flex:1,maxWidth:80,height:4,background:T.border,borderRadius:999}}>
                 <div style={{width:`${Math.round(task.subtasks.filter(s=>s.done).length/task.subtasks.length*100)}%`,height:"100%",background:T.accent,borderRadius:999,transition:"width 0.3s"}}/>
               </div>
-              <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>{task.subtasks.filter(s=>s.done).length}/{task.subtasks.length}</span>
+              <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>{task.subtasks.filter(s=>s.done).length}/{task.subtasks.length}</span>
             </div>
           )}
         </div>
-        {!selectionMode&&<button className="hit" aria-label={`Delete ${task.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();onDelete(task.id);}}>×</button>}
+        {!selectionMode&&<button className="hit" aria-label={`Delete ${task.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(15),padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();onDelete(task.id);}}>×</button>}
       </div>
     </div>
   );

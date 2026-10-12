@@ -1,4 +1,5 @@
 import type { ThemeObj } from "./themes";
+import { fz } from "./lib/textSize";
 
 // The app's one stylesheet, built from the active theme and font and injected
 // via <style>{css}</style> (see the `css` memo in HomeworkPlanner, which
@@ -54,7 +55,7 @@ export function buildCss(T:CssTheme,F:{body:string}):string{
        an empty one from collapsing, and the value sits left like the rest. */
     .edit-field[type=date],.edit-field[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;min-height:calc(1.25em + 18px);}
     .edit-field::-webkit-date-and-time-value{text-align:left;margin:0;}
-    .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:12px;transition:all .2s ease-out;}
+    .chip{cursor:pointer;border:none;border-radius:999px;padding:7px 15px;font-family:'DM Mono',monospace;font-size:${fz(12)};transition:all .2s ease-out;}
     .chip:active{transform:scale(.97);}
     input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);}
     /* Keyboard focus ring. !important so it also beats the inline
@@ -94,9 +95,9 @@ export function buildCss(T:CssTheme,F:{body:string}):string{
     .hit-row{--hit:-5px -10px;}
     .hit-arrow{--hit:-2px -6px -2px -10px;}
     .hit-grip{--hit:-12px -3px -12px -12px;}
-    .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}
+    .rb{font-family:'DM Mono',monospace;font-size:${fz(10)};font-weight:500;border-radius:999px;padding:2px 8px;}
     .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background .2s ease-out;position:relative;flex-shrink:0;}
-    .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;}
+    .sl{font-family:'DM Mono',monospace;font-size:${fz(10)};letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;}
     /* Room for the page scrollbar is kept whether or not it shows, so the page
        doesn't shift sideways when a list gets long enough to scroll, or when a
        sheet locks scrolling. */
@@ -116,10 +117,10 @@ export function buildCss(T:CssTheme,F:{body:string}):string{
     .sb-backdrop{position:fixed;inset:0;z-index:299;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .2s ease-out;}
     .sb-drawer .sb-backdrop{opacity:1;pointer-events:auto;}
     .sb-row{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;background:none;border:none;border-radius:8px;padding:9px 10px;cursor:pointer;text-align:left;
-      color:${T.textMuted};font-family:${F.body};font-size:13px;transition:background .2s ease-out,color .2s ease-out;}
+      color:${T.textMuted};font-family:${F.body};font-size:${fz(13)};transition:background .2s ease-out,color .2s ease-out;}
     .sb-row[aria-current="page"]{background:${T.card};color:${T.text};}
     .sb-row[aria-pressed="true"]{background:${T.card};color:${T.text};}
-    .sb-task{padding:6px 10px;font-size:12px;gap:8px;}
+    .sb-task{padding:6px 10px;font-size:${fz(12)};gap:8px;}
     .sb-rule{height:1px;background:${T.borderFaint};margin:8px 10px;flex-shrink:0;}
     @media (hover:hover){.sb-row:hover{background:${T.cardAlt};color:${T.text};}}
     @media (min-width:900px){

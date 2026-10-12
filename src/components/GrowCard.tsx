@@ -5,6 +5,7 @@ import { formatDate, formatTime, formatDuration, countdown, ink } from "../lib/f
 import { FONT } from "../fonts";
 import { CheckMark } from "./icons";
 import { activateOnKey, box, freezeBox, pin, unpin } from "../lib/dom";
+import { fz } from "../lib/textSize";
 
 // A card that grows out of whatever was tapped (`origin`) into the middle of
 // a blurred screen, and shrinks back into it on close: the same motion an
@@ -98,9 +99,9 @@ export function CardTaskRow({t,T,F,subjectColors,note,onOpenTask,onToggleDone}:{
         className="hit" style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
         {t.done&&<CheckMark size={10}/>}
       </button>
-      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:15,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
-      {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
-      {note&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{note}</span>}
+      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:fz(15),color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+      {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:fz(10),flexShrink:0}}>{t.subject}</span>}
+      {note&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,flexShrink:0}}>{note}</span>}
     </div>
   );
 }
@@ -123,21 +124,21 @@ export function DayDetail({iso,today,list,origin,T,F,subjectColors,h24,onOpenTas
     <GrowCard origin={origin} labelledBy="day-detail-title" T={T} onClose={onClose}>
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,paddingRight:28}}>
         <div style={{minWidth:0}}>
-          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{d.toLocaleDateString(undefined,{weekday:"long"})}</div>
+          <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{d.toLocaleDateString(undefined,{weekday:"long"})}</div>
           <h2 id="day-detail-title" style={{margin:"4px 0 0",fontFamily:F.heading,fontWeight:400,fontSize:30,lineHeight:1.1,color:T.text}}>{d.toLocaleDateString(undefined,{month:"long",day:"numeric"})}</h2>
-          <div style={{fontFamily:F.body,fontSize:11,color:late?ink("#FF4757",T.light):T.textMuted,marginTop:6}}>
+          <div style={{fontFamily:F.body,fontSize:fz(11),color:late?ink("#FF4757",T.light):T.textMuted,marginTop:6}}>
             {rel}{late?", overdue":""}{list.length>0?` · ${open.length===0?"all done":`${open.length} due`}${mins?` · ${formatDuration(mins)}`:""}`:""}
           </div>
         </div>
       </div>
       <div style={{height:1,background:T.border,margin:"14px 0 12px",flexShrink:0}}/>
       {list.length===0
-        ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint,marginBottom:12}}>Nothing due.</div>
+        ?<div style={{fontFamily:F.body,fontSize:fz(12),color:T.textFaint,marginBottom:12}}>Nothing due.</div>
         :<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,overflowY:"auto",overscrollBehavior:"contain",minHeight:0}}>
           {list.map(t=><CardTaskRow key={t.id} t={t} T={T} F={F} subjectColors={subjectColors} onOpenTask={onOpenTask} onToggleDone={onToggleDone}
             note={t.dueTime?formatTime(t.dueTime,h24):formatDuration(t.estMins)}/>)}
         </div>}
-      <button onClick={()=>onAddOn(iso)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:12,flexShrink:0}}>
+      <button onClick={()=>onAddOn(iso)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(12),flexShrink:0}}>
         + Add homework due {diff===0?"today":d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
       </button>
     </GrowCard>
@@ -160,8 +161,8 @@ export function TimeDetail({title,kicker,color,list,origin,T,F,subjectColors,h24
   const sorted=list.slice().sort((a,b)=>a.done!==b.done?(a.done?1:-1):(a.dueDate||"9999").localeCompare(b.dueDate||"9999")||(a.dueTime||"99").localeCompare(b.dueTime||"99")||a.order-b.order);
   const stat=(label:string,value:string)=>(
     <div style={{flex:1,minWidth:0,background:T.card,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
-      <div style={{fontFamily:F.heading,fontSize:18,color:T.text,whiteSpace:"nowrap"}}>{value}</div>
-      <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginTop:2,textTransform:"uppercase",letterSpacing:"0.06em"}}>{label}</div>
+      <div style={{fontFamily:F.heading,fontSize:fz(18),color:T.text,whiteSpace:"nowrap"}}>{value}</div>
+      <div style={{fontFamily:F.body,fontSize:fz(9),color:T.textFaint,marginTop:2,textTransform:"uppercase",letterSpacing:"0.06em"}}>{label}</div>
     </div>
   );
   const noteFor=(t:Task)=>{
@@ -172,7 +173,7 @@ export function TimeDetail({title,kicker,color,list,origin,T,F,subjectColors,h24
     <GrowCard origin={origin} labelledBy="time-detail-title" T={T} onClose={onClose}>
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,paddingRight:28}}>
         <div style={{minWidth:0}}>
-          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{kicker}</div>
+          <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.12em"}}>{kicker}</div>
           <h2 id="time-detail-title" style={{margin:"4px 0 0",fontFamily:F.heading,fontWeight:400,fontSize:28,lineHeight:1.15,color:T.text,display:"flex",alignItems:"center",gap:10}}>
             {color&&<span aria-hidden="true" style={{width:12,height:12,borderRadius:"50%",background:color,flexShrink:0}}/>}
             <span style={{minWidth:0,overflow:"hidden",textOverflow:"ellipsis"}}>{title}</span>
@@ -184,10 +185,10 @@ export function TimeDetail({title,kicker,color,list,origin,T,F,subjectColors,h24
         {stat(open.length===1?"Task":"Tasks",String(open.length))}
         {stat("Worked",formatDuration(worked)||"0m")}
       </div>
-      {noEstimate>0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:10,flexShrink:0}}>{noEstimate} {noEstimate===1?"task has":"tasks have"} no estimate, so the time left reads low.</div>}
+      {noEstimate>0&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginTop:10,flexShrink:0}}>{noEstimate} {noEstimate===1?"task has":"tasks have"} no estimate, so the time left reads low.</div>}
       <div style={{height:1,background:T.border,margin:"14px 0 12px",flexShrink:0}}/>
       {sorted.length===0
-        ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Nothing left here.</div>
+        ?<div style={{fontFamily:F.body,fontSize:fz(12),color:T.textFaint}}>Nothing left here.</div>
         :<div style={{display:"flex",flexDirection:"column",gap:6,overflowY:"auto",overscrollBehavior:"contain",minHeight:0}}>
           {sorted.map(t=><CardTaskRow key={t.id} t={t} T={T} F={F} subjectColors={subjectColors} onOpenTask={onOpenTask} onToggleDone={onToggleDone} note={noteFor(t)}/>)}
         </div>}

@@ -1,6 +1,7 @@
 import type { ThemeObj } from "../themes";
 import { contrastColor, ink } from "../lib/format";
 import { FONT } from "../fonts";
+import { fz } from "../lib/textSize";
 
 // One Settings section as a dropdown: the whole header row toggles it, and
 // the body is only rendered while open. Which sections are open is
@@ -15,8 +16,8 @@ export function SettingsSection({id,title,open,onToggle,T,F,tour,danger,gap=0,ch
     <div data-tour={tour} style={{background:T.card,borderRadius:12,border:`1px solid ${danger?"#FF475744":T.border}`}}>
       <button onClick={()=>onToggle(id)} aria-expanded={open} aria-controls={`settings-${id}`}
         style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:"16px",borderRadius:12,WebkitTapHighlightColor:"transparent"}}>
-        <span style={{color,fontFamily:F.body,fontSize:10,letterSpacing:".08em",textTransform:"uppercase"}}>{title}</span>
-        <span aria-hidden="true" style={{color,fontSize:13,transform:open?"rotate(180deg)":"none",transition:"transform .2s ease-out",display:"inline-block"}}>⌄</span>
+        <span style={{color,fontFamily:F.body,fontSize:fz(10),letterSpacing:".08em",textTransform:"uppercase"}}>{title}</span>
+        <span aria-hidden="true" style={{color,fontSize:fz(13),transform:open?"rotate(180deg)":"none",transition:"transform .2s ease-out",display:"inline-block"}}>⌄</span>
       </button>
       {open&&<div id={`settings-${id}`} className="sec-body" style={{display:"flex",flexDirection:"column",gap,padding:"0 16px 16px"}}>{children}</div>}
     </div>

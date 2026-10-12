@@ -58,6 +58,8 @@ import { CalendarView, DueDeck } from "./components/CalendarView";
 import { MiniCard } from "./components/MiniCard";
 import { ProfileModal } from "./components/ProfileModal";
 import { buildCss } from "./styles";
+import { TEXT_SIZES, applyTextSize, fz, textSizeOf } from "./lib/textSize";
+import type { TextSize } from "./lib/textSize";
 
 // A tasks/ or trash/ doc as a cloud record. updatedAt/deletedAt are sync
 // metadata, not task fields, so they're split off here.
@@ -229,6 +231,11 @@ export default function HomeworkPlanner() {
   const [storedAnimSpeed,setAnimSpeed]=usePersistedState<number>("hw-anim-speed",1);
   const animSpeed=clampSpeed(storedAnimSpeed);
   useEffect(()=>{setAnimationSpeed(animSpeed);},[animSpeed]);
+  // Text size (Settings -> Looks; local-only). Every font size goes through
+  // fz() in src/lib/textSize.ts, which reads --ts; set before the first paint.
+  const [storedTextSize,setTextSize]=usePersistedState<string>("hw-text-size","default");
+  const textSize=textSizeOf(storedTextSize);
+  useLayoutEffect(()=>{applyTextSize(textSize);},[textSize]);
   // Pomodoro lengths (minutes) and whether a break starts on its own when a
   // focus session ends. Local-only, like the other Looks/Focus preferences.
   const [pomodoroWorkMins,setPomodoroWorkMins]=usePersistedState("hw-pomodoro-work",25);
@@ -1834,7 +1841,7 @@ export default function HomeworkPlanner() {
     const isRight=swipeX>0;
     const done=tasks.find(t=>t.id===id)?.done;
     return <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:isRight?"flex-start":"flex-end",padding:"0 20px",background:isRight?"#2ED57333":"#FF475733",pointerEvents:"none"}}>
-      <span style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:isRight?"#2ED573":"#FF4757"}}>{isRight?(done?"↩ Mark not done":"✓ Mark done"):"Delete"}</span>
+      <span style={{fontFamily:F.body,fontSize:fz(13),fontWeight:600,color:isRight?"#2ED573":"#FF4757"}}>{isRight?(done?"↩ Mark not done":"✓ Mark done"):"Delete"}</span>
     </div>;
   }
   const currentQ=step>=0?askQuestions[step]:null;
@@ -1906,7 +1913,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -1974,13 +1981,13 @@ export default function HomeworkPlanner() {
           <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:10}}>
             {renderSwipeReveal(t.id)}
             <div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.card,borderRadius:10,border:`1px solid ${T.border}`,cursor:"pointer",...swipeContentStyle(t.id)}}>
-              <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint,minWidth:18}}>{String(i+1).padStart(2,"0")}</span>
+              <span style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint,minWidth:18}}>{String(i+1).padStart(2,"0")}</span>
               <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{width:20,height:20,border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:4,background:chk(t).on?chk(t).color:"none",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}}>
                 {chk(t).on&&<CheckMark size={12} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
-              <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:13,flex:1,color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
-              {!settled(t)&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light)}}>{dueText(t)}</span>}
-              {!selectionMode&&<button className="hit" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
+              <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:fz(13),flex:1,color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
+              {!settled(t)&&<span style={{fontFamily:F.body,fontSize:fz(10),color:ink(priColor(pr,colorCodeUrgency),T.light)}}>{dueText(t)}</span>}
+              {!selectionMode&&<button className="hit" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(14),lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
           </div>
         );})}
@@ -1993,13 +2000,13 @@ export default function HomeworkPlanner() {
           <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:12,display:"flex"}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:12,padding:"13px",border:`1px solid ${T.border}`,position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",gap:7,cursor:"pointer",flex:1,minWidth:0,...swipeContentStyle(t.id)}}>
             <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:priColor(pr,colorCodeUrgency),borderRadius:"12px 12px 0 0"}}/>
             <div style={{display:"flex",justifyContent:"space-between"}}>
-              {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
-              {!selectionMode&&<button className="hit hit-sm" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:"auto"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
+              {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:fz(10)}}>{t.subject}</span>}
+              {!selectionMode&&<button className="hit hit-sm" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(13),lineHeight:1,marginLeft:"auto"}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
             </div>
-            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,lineHeight:1.3,transition:"color .2s ease-out"}}>{t.title}</span>
-            {t.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDate(t.dueDate)}{!settled(t)?<span style={{color:ink(priColor(pr,colorCodeUrgency),T.light)}}> · {dueText(t)}</span>:null}</div>}
+            <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:fz(14),color:t.done?T.textFaint:T.text,lineHeight:1.3,transition:"color .2s ease-out"}}>{t.title}</span>
+            {t.dueDate&&<div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted}}>{formatDate(t.dueDate)}{!settled(t)?<span style={{color:ink(priColor(pr,colorCodeUrgency),T.light)}}> · {dueText(t)}</span>:null}</div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"auto"}}>
-              {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
+              {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted}}>{formatDuration(t.estMins)}</span>}
               <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:17,height:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}}>
                 {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
               </button>
@@ -2018,18 +2025,18 @@ export default function HomeworkPlanner() {
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
           {cols.map(col=>(
             <div key={col.key} style={{background:T.surface,borderRadius:12,padding:"12px",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10,fontWeight:500}}>{col.label} ({col.tasks.length})</div>
+              <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:10,fontWeight:500}}>{col.label} ({col.tasks.length})</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {col.tasks.map(t=>(
                   <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:8}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:8,padding:"9px 10px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7,cursor:"pointer",...swipeContentStyle(t.id)}}>
                     <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:14,height:14,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s ease-out"}}>
                       {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                     </button>
-                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
-                    {!selectionMode&&<button className="hit" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:12,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
+                    <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:fz(12),flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
+                    {!selectionMode&&<button className="hit" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(12),lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
                   </div></div>
                 ))}
-                {col.tasks.length===0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,textAlign:"center",padding:"10px 0"}}>Empty</div>}
+                {col.tasks.length===0&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint,textAlign:"center",padding:"10px 0"}}>Empty</div>}
               </div>
             </div>
           ))}
@@ -2051,20 +2058,20 @@ export default function HomeworkPlanner() {
                   <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`2px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:18,height:18,cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s ease-out"}}>
                     {chk(t).on&&<CheckMark size={10} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                   </button>
-                  <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
+                  <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.heading,fontSize:fz(14),color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:10}}>{t.subject}</span>}
-                  {!selectionMode&&<button className="hit" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
+                  {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"1px 7px",fontFamily:F.body,fontSize:fz(10)}}>{t.subject}</span>}
+                  {!selectionMode&&<button className="hit" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(13),lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{flex:1,height:7,background:T.border,borderRadius:999}}>
                   <div style={{width:`${pct}%`,height:"100%",background:t.done?"#2ED573":priColor(pr,colorCodeUrgency),borderRadius:999,transition:"width 0.5s"}}/>
                 </div>
-                {(settled(t)||subs.length>0)&&<span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{settled(t)?"Done":`${doneSubs}/${subs.length}`}</span>}
-                {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
-                {!settled(t)&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{dueText(t)}</span>}
+                {(settled(t)||subs.length>0)&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,flexShrink:0}}>{settled(t)?"Done":`${doneSubs}/${subs.length}`}</span>}
+                {t.estMins>0&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,flexShrink:0}}>{formatDuration(t.estMins)}</span>}
+                {!settled(t)&&<span style={{fontFamily:F.body,fontSize:fz(10),color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{dueText(t)}</span>}
               </div>
             </div></div>
           );
@@ -2083,16 +2090,16 @@ export default function HomeworkPlanner() {
           {[{tasks:highT,color:ink(priColor("high",colorCodeUrgency),T.light),label:"High Priority",w:"100%"},{tasks:medT,color:ink(priColor("medium",colorCodeUrgency),T.light),label:"Medium Priority",w:"85%"},{tasks:lowT,color:ink(priColor("low",colorCodeUrgency),T.light),label:"Low Priority",w:"65%"},{tasks:doneT,color:T.textFaint,label:"✓ Done",w:"45%"}].map(tier=>(
             tier.tasks.length>0&&(
               <div key={tier.label} style={{margin:"0 auto",width:tier.w}}>
-                <div style={{fontFamily:F.body,fontSize:10,color:tier.color,marginBottom:5,textAlign:"center"}}>{tier.label}</div>
+                <div style={{fontFamily:F.body,fontSize:fz(10),color:tier.color,marginBottom:5,textAlign:"center"}}>{tier.label}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {tier.tasks.map(t=>(
                     <div key={t.id} data-task-id={t.id} style={{position:"relative",overflow:"hidden",borderRadius:9}}>{renderSwipeReveal(t.id)}<div className="tc" onClick={swipeClickGuard(()=>openOrSelect(t))} data-selected={selectionMode&&selectedIds.includes(t.id)||undefined} {...(selectionMode?{}:swipeHandlers(t.id))} style={{background:T.card,borderRadius:9,padding:"9px 12px",border:`1px solid ${tier.color}44`,display:"flex",alignItems:"center",gap:8,cursor:"pointer",...swipeContentStyle(t.id)}}>
                       <button className={chkPop(t)} aria-label={selectionMode?(selectedIds.includes(t.id)?`Deselect ${t.title}`:`Select ${t.title}`):t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode)toggleSelected(t.id);else toggleDone(t.id);}} style={{background:chk(t).on?chk(t).color:"none",border:`1.5px solid ${chk(t).on?chk(t).color:T.textFaint}`,borderRadius:"50%",width:15,height:15,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s ease-out"}}>
                         {chk(t).on&&<CheckMark size={9} color={selectionMode?contrastColor(T.accent):undefined} animate={!selectionMode&&justDone.includes(t.id)}/>}
                       </button>
-                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
-                      {t.subject&&<span style={{fontFamily:F.body,fontSize:10,color:T.textMuted,flexShrink:0}}>{t.subject}</span>}
-                      {!selectionMode&&<button className="hit" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
+                      <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={titleClass(t)} aria-haspopup="dialog" style={{fontFamily:F.body,fontSize:fz(12),flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{t.title}</span>
+                      {t.subject&&<span style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,flexShrink:0}}>{t.subject}</span>}
+                      {!selectionMode&&<button className="hit" aria-label={`Delete ${t.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(13),lineHeight:1}} onClick={e=>{e.stopPropagation();deleteTask(t.id);}}>×</button>}
                     </div></div>
                   ))}
                 </div>
@@ -2137,12 +2144,12 @@ export default function HomeworkPlanner() {
             <circle cx="50" cy="50" r="45" fill="none" stroke={onBreak?"#2ED573":T.accent} strokeWidth="6" strokeDasharray="283" strokeDashoffset={283*(1-pomPct)} strokeLinecap="round" style={{transition:"stroke-dashoffset 1s linear"}}/>
           </svg>
           <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
-            <div style={{fontFamily:F.body,fontSize:18,color:T.text,fontWeight:500}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</div>
+            <div style={{fontFamily:F.body,fontSize:fz(18),color:T.text,fontWeight:500}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</div>
           </div>
         </div>
         <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-          <button onClick={()=>{setPomodoroActive(a=>!a);setBreakEnded(false);}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{pomodoroActive?"Pause":onBreak?"Start break":"Start"}</button>
-          <button onClick={resetPomodoro} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{onBreak?"Skip break":"Reset"}</button>
+          <button onClick={()=>{setPomodoroActive(a=>!a);setBreakEnded(false);}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>{pomodoroActive?"Pause":onBreak?"Start break":"Start"}</button>
+          <button onClick={resetPomodoro} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>{onBreak?"Skip break":"Reset"}</button>
         </div>
       </div>
     );
@@ -2160,13 +2167,13 @@ export default function HomeworkPlanner() {
   }
   function renderStopwatchCard(){
     const running=swStartedAt!=null;
-    const ghost={background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"};
+    const ghost={background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:fz(12),cursor:"pointer"};
     return (
       <div data-tour="stopwatch" style={{background:T.card,borderRadius:12,padding:"16px",border:`1px solid ${T.border}`,textAlign:"center"}}>
         <div className="sl" style={{color:T.textMuted,textAlign:"left"}}>Stopwatch</div>
         <div role="timer" aria-label="Stopwatch" style={{fontFamily:F.body,fontSize:34,color:T.text,fontWeight:500,fontVariantNumeric:"tabular-nums",margin:"6px 0 14px"}}>{formatStopwatch(swElapsed)}</div>
         <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-          <button onClick={toggleStopwatch} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>{running?"Pause":swElapsed>0?"Resume":"Start"}</button>
+          <button onClick={toggleStopwatch} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>{running?"Pause":swElapsed>0?"Resume":"Start"}</button>
           {swElapsed>0&&<button onClick={resetStopwatch} style={ghost}>Reset</button>}
           {swElapsed>=30000&&focusTask&&<button onClick={saveStopwatch} style={ghost}>Log {formatDuration(stopwatchMinutes(swElapsed))} to task</button>}
         </div>
@@ -2180,16 +2187,16 @@ export default function HomeworkPlanner() {
     // Focus Mode it's a card above the task instead (renderBreakSuggestion).
     if(breakEnded&&!focusMode&&nextSuggestion) return (
       <div role="status" style={shell}>
-        <span style={{fontFamily:F.body,fontSize:12,color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Break's over, {suggestionIsContinue?"keep going on":"next up:"} {nextSuggestion.title}</span>
-        <button onClick={startSuggested} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Start</button>
-        <button onClick={()=>setBreakEnded(false)} aria-label="Dismiss" className="hit" style={{background:"none",border:"none",color:T.textMuted,fontSize:15,cursor:"pointer",flexShrink:0,padding:"0 4px"}}>×</button>
+        <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Break's over, {suggestionIsContinue?"keep going on":"next up:"} {nextSuggestion.title}</span>
+        <button onClick={startSuggested} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:fz(12),fontWeight:500,cursor:"pointer",flexShrink:0}}>Start</button>
+        <button onClick={()=>setBreakEnded(false)} aria-label="Dismiss" className="hit" style={{background:"none",border:"none",color:T.textMuted,fontSize:fz(15),cursor:"pointer",flexShrink:0,padding:"0 4px"}}>×</button>
       </div>
     );
     if(!pomodoroDone)return null;
     return (
       <div role="status" style={shell}>
-        <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{autoStartBreaks?`Pomodoro done. ${pomodoroBreakMins}-minute break started`:"Pomodoro done. Take a short break"}</span>
-        <button onClick={()=>setPomodoroDone(false)} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>OK</button>
+        <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>{autoStartBreaks?`Pomodoro done. ${pomodoroBreakMins}-minute break started`:"Pomodoro done. Take a short break"}</span>
+        <button onClick={()=>setPomodoroDone(false)} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:fz(12),fontWeight:500,cursor:"pointer",flexShrink:0}}>OK</button>
       </div>
     );
   }
@@ -2201,17 +2208,17 @@ export default function HomeworkPlanner() {
     return (
       <div className="pop" role="status" style={{background:T.card,borderRadius:14,padding:"14px 16px",border:"1px solid #2ED57355"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:nextSuggestion?8:0}}>
-          <span style={{fontFamily:F.body,fontSize:12,color:ink("#2ED573",T.light),fontWeight:500}}>Break's over</span>
-          <button onClick={()=>setBreakEnded(false)} aria-label="Dismiss" className="hit" style={{background:"none",border:"none",color:T.textMuted,fontSize:15,cursor:"pointer",padding:"0 2px",lineHeight:1}}>×</button>
+          <span style={{fontFamily:F.body,fontSize:fz(12),color:ink("#2ED573",T.light),fontWeight:500}}>Break's over</span>
+          <button onClick={()=>setBreakEnded(false)} aria-label="Dismiss" className="hit" style={{background:"none",border:"none",color:T.textMuted,fontSize:fz(15),cursor:"pointer",padding:"0 2px",lineHeight:1}}>×</button>
         </div>
         {nextSuggestion?<>
-          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:2}}>{suggestionIsContinue?"Keep going on":"Next up"}</div>
-          <div style={{fontFamily:F.heading,fontSize:17,color:T.text,marginBottom:12,overflowWrap:"anywhere"}}>{nextSuggestion.title}</div>
+          <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:2}}>{suggestionIsContinue?"Keep going on":"Next up"}</div>
+          <div style={{fontFamily:F.heading,fontSize:fz(17),color:T.text,marginBottom:12,overflowWrap:"anywhere"}}>{nextSuggestion.title}</div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={startSuggested} style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 12px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Start {pomodoroWorkMins} min</button>
-            <button onClick={()=>{setBreakEnded(false);setFocusPickerOpen(true);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Pick another</button>
+            <button onClick={startSuggested} style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 12px",fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>Start {pomodoroWorkMins} min</button>
+            <button onClick={()=>{setBreakEnded(false);setFocusPickerOpen(true);}} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",color:T.textMuted,fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>Pick another</button>
           </div>
-        </>:<div style={{fontFamily:F.body,fontSize:12,color:T.textMuted,marginTop:6}}>Nothing left on your list. Nice.</div>}
+        </>:<div style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted,marginTop:6}}>Nothing left on your list. Nice.</div>}
       </div>
     );
   }
@@ -2232,7 +2239,7 @@ export default function HomeworkPlanner() {
         <style>{css}</style>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <h1 style={{fontFamily:F.heading,fontSize:20,color:T.accent,margin:0,fontWeight:400}}>Focus Mode</h1>
-          <button onClick={()=>setFocusModeAnimated(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:12,cursor:"pointer"}}>Exit</button>
+          <button onClick={()=>setFocusModeAnimated(false)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>Exit</button>
         </div>
         <div className="sec-body" style={{flex:1,display:"flex",flexDirection:"column",gap:16,justifyContent:"center",maxWidth:420,margin:"0 auto",width:"100%"}}>
           {renderBreakSuggestion()}
@@ -2243,14 +2250,14 @@ export default function HomeworkPlanner() {
             <div className="pop" style={{background:T.gradientCard,borderRadius:16,padding:"20px",border:`1px solid ${T.accent}44`}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                 <span className="rb" style={{background:T.accent+"33",color:T.accent}}>{focusTask===topTask?"up next":"focusing on"}</span>
-                {focusTask.subject&&<span style={{background:(subjectColors[focusTask.subject]||T.accent)+"22",color:ink(subjectColors[focusTask.subject]||T.accent,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10}}>{focusTask.subject}</span>}
-                <button data-tour="change-task" onClick={()=>setFocusPickerOpen(o=>!o)} style={{marginLeft:"auto",background:"none",border:`1px solid ${T.border}`,borderRadius:999,padding:"2px 10px",color:T.textMuted,fontSize:10,cursor:"pointer"}}>{focusPickerOpen?"Close":"Change task"}</button>
+                {focusTask.subject&&<span style={{background:(subjectColors[focusTask.subject]||T.accent)+"22",color:ink(subjectColors[focusTask.subject]||T.accent,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:fz(10)}}>{focusTask.subject}</span>}
+                <button data-tour="change-task" onClick={()=>setFocusPickerOpen(o=>!o)} style={{marginLeft:"auto",background:"none",border:`1px solid ${T.border}`,borderRadius:999,padding:"2px 10px",color:T.textMuted,fontSize:fz(10),cursor:"pointer"}}>{focusPickerOpen?"Close":"Change task"}</button>
               </div>
               {focusPickerOpen&&(
                 <div className="sec-body" style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12,maxHeight:180,overflowY:"auto"}}>
                   {allSorted.filter(t=>!t.done&&!t.archived).map(t=>(
                     <button key={t.id} onClick={()=>{if(t.id!==focusTask.id)creditPomodoro(focusTask.id);setFocusTaskId(t.id);setFocusPickerOpen(false);}}
-                      style={{textAlign:"left",background:t.id===focusTask.id?T.accent+"22":T.surface,border:`1px solid ${t.id===focusTask.id?T.accent:T.border}`,borderRadius:8,padding:"7px 10px",color:T.text,fontSize:12,cursor:"pointer"}}>
+                      style={{textAlign:"left",background:t.id===focusTask.id?T.accent+"22":T.surface,border:`1px solid ${t.id===focusTask.id?T.accent:T.border}`,borderRadius:8,padding:"7px 10px",color:T.text,fontSize:fz(12),cursor:"pointer"}}>
                       {t.title}{t.subject&&<span style={{color:T.textFaint}}> · {t.subject}</span>}
                     </button>
                   ))}
@@ -2258,13 +2265,13 @@ export default function HomeworkPlanner() {
               )}
               <div style={{fontFamily:F.heading,fontSize:22,color:T.text,marginBottom:8}}>{focusTask.title}</div>
               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                {focusTask.dueDate&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(focusTask.dueDate)}{focusTask.dueTime?` ${formatTime(focusTask.dueTime,h24)}`:""}</span>}
-                {focusTask.estMins>0&&<span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDuration(focusTask.estMins)}</span>}
+                {focusTask.dueDate&&<span style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted}}>{formatDate(focusTask.dueDate)}{focusTask.dueTime?` ${formatTime(focusTask.dueTime,h24)}`:""}</span>}
+                {focusTask.estMins>0&&<span style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted}}>{formatDuration(focusTask.estMins)}</span>}
               </div>
-              <button onClick={()=>{toggleDone(focusTask.id);creditPomodoro(focusTask.id);}} style={{marginTop:14,background:"#2ED57322",color:ink("#2ED573",T.light),border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:13,cursor:"pointer",width:"100%"}}>Mark done</button>
+              <button onClick={()=>{toggleDone(focusTask.id);creditPomodoro(focusTask.id);}} style={{marginTop:14,background:"#2ED57322",color:ink("#2ED573",T.light),border:"1px solid #2ED57344",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:fz(13),cursor:"pointer",width:"100%"}}>Mark done</button>
             </div>
           ):(
-            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:13}}>Nothing left to focus on</div>
+            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:fz(13)}}>Nothing left to focus on</div>
           )}
           {showsStopwatch(focusShow)&&renderStopwatchCard()}
         </div>
@@ -2281,8 +2288,8 @@ export default function HomeworkPlanner() {
       <ErrorBoundary fallback={()=>(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
           <div style={{background:T.card,borderRadius:12,padding:24,maxWidth:320,textAlign:"center",display:"flex",flexDirection:"column",gap:12,border:`1px solid ${T.border}`}}>
-            <div style={{color:T.text,fontFamily:F.body,fontSize:14}}>This task couldn't be displayed.</div>
-            <button onClick={()=>{setSelectedTask(null);if(taskPage)setActiveTab("tasks");}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 16px",fontFamily:F.body,fontSize:13,cursor:"pointer"}}>Close</button>
+            <div style={{color:T.text,fontFamily:F.body,fontSize:fz(14)}}>This task couldn't be displayed.</div>
+            <button onClick={()=>{setSelectedTask(null);if(taskPage)setActiveTab("tasks");}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 16px",fontFamily:F.body,fontSize:fz(13),cursor:"pointer"}}>Close</button>
           </div>
         </div>
       )}>
@@ -2327,7 +2334,7 @@ export default function HomeworkPlanner() {
               </span>}
             <span style={{flex:1,minWidth:0}}>
               <span style={{display:"block",color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?(fbUser.displayName||"Your account"):"Sign in"}</span>
-              <span style={{display:"block",fontSize:10,marginTop:1,color:syncError?ink("#FF4757",T.light):T.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{!fbUser?"Sync across devices":syncError?"Sync issue":syncStatus}</span>
+              <span style={{display:"block",fontSize:fz(10),marginTop:1,color:syncError?ink("#FF4757",T.light):T.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{!fbUser?"Sync across devices":syncError?"Sync issue":syncStatus}</span>
             </span>
           </button>
           <button onClick={closeSidebar} aria-label="Close sidebar" title="Close sidebar" className="hit hit-sm" style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",padding:8,borderRadius:8,display:"flex",flexShrink:0}}><IconSidebar/></button>
@@ -2337,7 +2344,7 @@ export default function HomeworkPlanner() {
         <SidebarRow icon={<IconTasks/>} label="Home" tour="tab-tasks" current={activeTab==="tasks"&&subjectFilterOn==null} onClick={()=>{if(activeTab==="tasks"&&subjectFilterOn!=null)captureTaskRects();setSubjectFilter(null);navTo("tasks");}}/>
         <SidebarRow icon={<IconCalendar/>} label="Calendar" tour="tab-calendar" current={activeTab==="calendar"} onClick={()=>navTo("calendar")}/>
         <SidebarRow icon={<IconFocus/>} label="Focus" tour="tab-focus" onClick={()=>{setDrawerOpen(false);setFocusModeAnimated(true);}}>
-          {runningTimer&&<span style={{fontSize:11,color:T.text,fontVariantNumeric:"tabular-nums"}}>{runningTimer}</span>}
+          {runningTimer&&<span style={{fontSize:fz(11),color:T.text,fontVariantNumeric:"tabular-nums"}}>{runningTimer}</span>}
         </SidebarRow>
         {/* Subjects, each unfolding to its open tasks. Picking a name filters Home
             to it (picking it again, or Home, shows everything); a task opens its sheet. */}
@@ -2349,13 +2356,13 @@ export default function HomeworkPlanner() {
           onOpenTask={openTaskPage}/>
         <div className="sb-rule" aria-hidden="true"/>
         <SidebarRow icon={<IconBell/>} label="Inbox" current={activeTab==="inbox"} onClick={()=>navTo("inbox")}>
-          {unreadRecaps.length>0&&<span aria-label={`${unreadRecaps.length} unread`} style={{background:T.accent,color:contrastColor(T.accent),borderRadius:999,padding:"1px 7px",fontSize:10,fontWeight:600}}>{unreadRecaps.length}</span>}
+          {unreadRecaps.length>0&&<span aria-label={`${unreadRecaps.length} unread`} style={{background:T.accent,color:contrastColor(T.accent),borderRadius:999,padding:"1px 7px",fontSize:fz(10),fontWeight:600}}>{unreadRecaps.length}</span>}
         </SidebarRow>
         <SidebarRow icon={<IconHistory/>} label="History" current={activeTab==="history"} onClick={()=>navTo("history")}/>
         <SidebarRow icon={<IconImport/>} label="Import/Export" current={activeTab==="import"} onClick={()=>navTo("import")}/>
         <SidebarRow icon={<IconSettings/>} label="Settings" current={activeTab==="options"} onClick={()=>navTo("options")}/>
         <div style={{flex:1}}/>
-        <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,padding:"10px 10px 2px"}}>DuePlanner, by due. studios</div>
+        <div style={{fontFamily:F.body,fontSize:fz(9),color:T.textFaint,padding:"10px 10px 2px"}}>DuePlanner, by due. studios</div>
       </nav>
       {/* inert while the task sheet is open, so screen readers and Tab stay in
           the dialog instead of wandering through the list behind it; and while
@@ -2376,59 +2383,59 @@ export default function HomeworkPlanner() {
             </button>
             <div style={{minWidth:0}}>
               <h2 style={{fontFamily:F.heading,fontSize:26,lineHeight:1,color:T.text,margin:0,fontWeight:400}}>{SCREEN_TITLES[activeTab]||"Home"}</h2>
-              {fbUser&&!online&&<div title="Offline. Changes will sync when you're back online" style={{fontFamily:F.body,fontSize:9,color:ink("#FFA502",T.light),marginTop:3}}>offline</div>}
+              {fbUser&&!online&&<div title="Offline. Changes will sync when you're back online" style={{fontFamily:F.body,fontSize:fz(9),color:ink("#FFA502",T.light),marginTop:3}}>offline</div>}
             </div>
           </div>
           <div style={{display:"flex",alignItems:"flex-end",gap:12}}>
           {/* A running Pomodoro or stopwatch, in view on every screen now that
               there's no tab bar to show it; opens Focus. */}
-          {runningTimer&&<button className="timer-pill fade-in" onClick={()=>setFocusModeAnimated(true)} aria-label={`Timer running, ${runningTimer}. Open Focus`} style={{display:"flex",alignItems:"center",gap:6,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 10px",color:T.text,cursor:"pointer",fontFamily:F.body,fontSize:11,fontVariantNumeric:"tabular-nums",marginBottom:2}}>
+          {runningTimer&&<button className="timer-pill fade-in" onClick={()=>setFocusModeAnimated(true)} aria-label={`Timer running, ${runningTimer}. Open Focus`} style={{display:"flex",alignItems:"center",gap:6,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 10px",color:T.text,cursor:"pointer",fontFamily:F.body,fontSize:fz(11),fontVariantNumeric:"tabular-nums",marginBottom:2}}>
             <IconFocus/>{runningTimer}
           </button>}
           <div ref={timeMenuRef} style={{position:"relative"}}>
             <button data-tour="time-left" onClick={()=>setTimeMenuOpen(o=>!o)} aria-haspopup="dialog" aria-expanded={timeMenuOpen} aria-label="Time left breakdown" style={{background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"right",display:"block"}}>
-              <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>Time left</div>
+              <div style={{fontFamily:F.body,fontSize:fz(9),color:T.textFaint}}>Time left</div>
               <div style={{fontFamily:F.heading,fontSize:20,color:effectiveThemeMode==="dark"?"#fff":"#000"}}>{fmtMins(totalMins)}</div>
             </button>
             {timeMenuOpen&&(
               <div role="dialog" aria-label="Time left breakdown" className="sec-body" style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,width:250,maxWidth:"calc(100vw - 28px)",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,boxShadow:"0 10px 34px rgba(0,0,0,0.4)",padding:"12px 14px"}}>
-                <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By due date</div>
+                <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By due date</div>
                 {timeByDue.length===0
-                  ?<div style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>Nothing left to do</div>
+                  ?<div style={{fontFamily:F.body,fontSize:fz(12),color:T.textFaint}}>Nothing left to do</div>
                   :<div style={{display:"flex",flexDirection:"column",gap:7}}>
                     {/* Each row opens that group in depth (TimeDetail), growing out of the row. */}
                     {timeByDue.map(b=>(
                       <button key={b.key} onClick={e=>setOpenTime({kind:"due",key:b.key,origin:e.currentTarget})} aria-haspopup="dialog" style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left"}}>
-                        <span style={{fontFamily:F.body,fontSize:12,color:b.key==="overdue"?"#FF4757":T.text,flex:1}}>{b.label}</span>
-                        <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted}}>{b.count} {b.count===1?"task":"tasks"}</span>
-                        <span style={{fontFamily:F.body,fontSize:12,color:T.text,width:52,textAlign:"right"}}>{fmtMins(b.mins)}</span>
-                        <span aria-hidden="true" style={{fontFamily:F.body,fontSize:12,color:T.textFaint}}>›</span>
+                        <span style={{fontFamily:F.body,fontSize:fz(12),color:b.key==="overdue"?"#FF4757":T.text,flex:1}}>{b.label}</span>
+                        <span style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>{b.count} {b.count===1?"task":"tasks"}</span>
+                        <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text,width:52,textAlign:"right"}}>{fmtMins(b.mins)}</span>
+                        <span aria-hidden="true" style={{fontFamily:F.body,fontSize:fz(12),color:T.textFaint}}>›</span>
                       </button>
                     ))}
                   </div>}
                 {timeBySubject.length>0&&<>
                   <div style={{height:1,background:T.borderFaint,margin:"12px 0"}}/>
-                  <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By subject</div>
+                  <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>By subject</div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
                     {timeBySubject.map(r=>{const c=r.name?(subjectColors[r.name]||T.accent):T.textMuted;return(
                       <button key={r.name} onClick={e=>setOpenTime({kind:"subject",key:r.name,origin:e.currentTarget})} aria-haspopup="dialog" style={{display:"block",width:"100%",background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left"}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           <span style={{width:8,height:8,borderRadius:"50%",background:c,flexShrink:0}}/>
-                          <span style={{fontFamily:F.body,fontSize:12,color:r.name?T.text:T.textMuted,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name||"No subject"}</span>
-                          <span style={{fontFamily:F.body,fontSize:12,color:T.text,flexShrink:0}}>{fmtMins(r.mins)}</span>
-                          <span style={{fontFamily:F.body,fontSize:11,color:T.textMuted,width:34,textAlign:"right",flexShrink:0}}>{r.pct}%</span>
-                          <span aria-hidden="true" style={{fontFamily:F.body,fontSize:12,color:T.textFaint,flexShrink:0}}>›</span>
+                          <span style={{fontFamily:F.body,fontSize:fz(12),color:r.name?T.text:T.textMuted,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name||"No subject"}</span>
+                          <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text,flexShrink:0}}>{fmtMins(r.mins)}</span>
+                          <span style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,width:34,textAlign:"right",flexShrink:0}}>{r.pct}%</span>
+                          <span aria-hidden="true" style={{fontFamily:F.body,fontSize:fz(12),color:T.textFaint,flexShrink:0}}>›</span>
                         </div>
                         <div style={{height:3,borderRadius:99,background:T.cardAlt,marginTop:5,marginLeft:16,overflow:"hidden"}}>
                           <div style={{height:"100%",width:`${r.pct}%`,background:c,borderRadius:99}}/>
                         </div>
-                        {r.spent>0&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:4,marginLeft:16}}>{fmtMins(r.spent)} worked of {fmtMins(r.mins)} planned</div>}
+                        {r.spent>0&&<div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:4,marginLeft:16}}>{fmtMins(r.spent)} worked of {fmtMins(r.mins)} planned</div>}
                       </button>
                     );})}
                   </div>
                 </>}
                 {noEstimateCount>0&&(
-                  <button onClick={()=>{setFilter("noest");navTo("tasks");setTimeMenuOpen(false);}} style={{display:"block",width:"100%",marginTop:12,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",fontFamily:F.body,fontSize:11,color:T.textMuted}}>
+                  <button onClick={()=>{setFilter("noest");navTo("tasks");setTimeMenuOpen(false);}} style={{display:"block",width:"100%",marginTop:12,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>
                     {noEstimateCount} {noEstimateCount===1?"task has":"tasks have"} no estimate, so the total is low. Show them ›
                   </button>
                 )}
@@ -2457,10 +2464,10 @@ export default function HomeworkPlanner() {
             <div style={{background:T.gradientCard,borderRadius:12,padding:"10px 12px",marginBottom:16,border:`1px solid ${T.accent}33`,position:"relative",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:7,minWidth:0}}>
-                  <span aria-hidden="true" style={{fontSize:12,marginTop:1}}>✦</span>
-                  <span style={{fontFamily:F.body,fontSize:12,color:T.text,lineHeight:1.4,whiteSpace:"pre-line"}}>{suggestion}</span>
+                  <span aria-hidden="true" style={{fontSize:fz(12),marginTop:1}}>✦</span>
+                  <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text,lineHeight:1.4,whiteSpace:"pre-line"}}>{suggestion}</span>
                 </div>
-                <button onClick={()=>setHiddenSuggestionFor(suggestionTask.id)} className="hit" aria-label="Hide this suggestion" title="Hide for now. It comes back when another task becomes most urgent" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
+                <button onClick={()=>setHiddenSuggestionFor(suggestionTask.id)} className="hit" aria-label="Hide this suggestion" title="Hide for now. It comes back when another task becomes most urgent" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(16),lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
               </div>
             </div>
           ):null)}
@@ -2469,38 +2476,38 @@ export default function HomeworkPlanner() {
           {/* Opens the floating search panel (SearchOverlay); hidden while it's
               open, so the bar looks like it lifted off from here. */}
           <button ref={searchTriggerRef} data-tour="search" onClick={()=>setSearchOpen(true)} aria-haspopup="dialog" aria-expanded={searchOpen}
-            style={{display:"flex",alignItems:"center",gap:9,width:"100%",marginBottom:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.textFaint,padding:"0 13px",height:42,fontFamily:F.body,fontSize:13,cursor:"text",textAlign:"left",visibility:searchOpen?"hidden":undefined}}>
+            style={{display:"flex",alignItems:"center",gap:9,width:"100%",marginBottom:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.textFaint,padding:"0 13px",height:42,fontFamily:F.body,fontSize:fz(13),cursor:"text",textAlign:"left",visibility:searchOpen?"hidden":undefined}}>
             <IconSearch/>Search tasks...
           </button>
 
           {/* Filters + layout picker */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
-            {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>{if(f!==filter)captureTaskRects();setFilter(f);}} aria-pressed={filter===f} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{f[0].toUpperCase()+f.slice(1)}</button>)}
-            {filter==="noest"&&<button onClick={()=>{captureTaskRects();setFilter("all");}} aria-label="Clear no-estimate filter" style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>No estimate ×</button>}
-            {subjectFilterOn!=null&&<button onClick={()=>{captureTaskRects();setSubjectFilter(null);}} aria-label={`Stop showing only ${subjectFilterOn||"No subject"}`} style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{subjectFilterOn||"No subject"} ×</button>}
+            {["all","pending","done","archived"].map(f=><button key={f} onClick={()=>{if(f!==filter)captureTaskRects();setFilter(f);}} aria-pressed={filter===f} style={{background:filter===f?T.accent:"none",color:filter===f?contrastColor(T.accent):T.textMuted,border:`1px solid ${filter===f?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>{f[0].toUpperCase()+f.slice(1)}</button>)}
+            {filter==="noest"&&<button onClick={()=>{captureTaskRects();setFilter("all");}} aria-label="Clear no-estimate filter" style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>No estimate ×</button>}
+            {subjectFilterOn!=null&&<button onClick={()=>{captureTaskRects();setSubjectFilter(null);}} aria-label={`Stop showing only ${subjectFilterOn||"No subject"}`} style={{background:T.accent,color:contrastColor(T.accent),border:`1px solid ${T.accent}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{subjectFilterOn||"No subject"} ×</button>}
             {selectionMode&&(()=>{
               const ids=filteredTasks.map(t=>t.id), all=ids.length>0&&ids.every(id=>selectedIds.includes(id));
-              return <button onClick={()=>setSelectedIds(all?[]:ids)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{all?"Select none":`Select all (${ids.length})`}</button>;
+              return <button onClick={()=>setSelectedIds(all?[]:ids)} style={{background:"none",border:`1px solid ${T.border}`,color:T.textMuted,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>{all?"Select none":`Select all (${ids.length})`}</button>;
             })()}
             {/* The "Select" button that used to start selection mode was removed at
                 the user's request; nothing turns selectionMode on now, so the bulk
                 bar below is dormant until it gets another way in. */}
-            {selectionMode&&<button onClick={exitSelectionMode} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Cancel</button>}
-            <div style={{marginLeft:"auto",fontFamily:F.body,fontSize:10,color:T.textFaint}}>{visibleTasks.filter(t=>!t.done&&!t.archived).length} pending</div>
+            {selectionMode&&<button onClick={exitSelectionMode} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>Cancel</button>}
+            <div style={{marginLeft:"auto",fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>{visibleTasks.filter(t=>!t.done&&!t.archived).length} pending</div>
           </div>
 
           {renderTasks(filteredTasks)}
-          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"32px 0"}}>{filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending. Nice work!":filter==="noest"?"Every open task has an estimate":"Nothing here yet"}</div>}
+          {filteredTasks.length===0&&<div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:fz(12),padding:"32px 0"}}>{filter==="archived"?"No archived tasks":filter==="done"?"No completed tasks yet":filter==="pending"?"Nothing pending. Nice work!":filter==="noest"?"Every open task has an estimate":"Nothing here yet"}</div>}
           <div style={{marginTop:14}}>
             {!adding?(
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,paddingTop:10}}>
-                <button data-tour="add" onClick={startAdding} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:14,padding:"13px 28px",fontFamily:F.heading,fontSize:17,cursor:"pointer",boxShadow:`0 4px 20px ${T.accentGlow}`,transition:"all .2s ease-out"}}>+ Add homework</button>
-                {templates.length>0&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.08em"}}>or start from a template</div>}
+                <button data-tour="add" onClick={startAdding} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:14,padding:"13px 28px",fontFamily:F.heading,fontSize:fz(17),cursor:"pointer",boxShadow:`0 4px 20px ${T.accentGlow}`,transition:"all .2s ease-out"}}>+ Add homework</button>
+                {templates.length>0&&<div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,textTransform:"uppercase",letterSpacing:"0.08em"}}>or start from a template</div>}
                 {templates.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center",maxWidth:340}}>
                   {templates.map(tpl=>(
                     <span key={tpl.id} style={{display:"inline-flex",alignItems:"center",background:T.card,border:`1px solid ${T.border}`,borderRadius:999}}>
-                      <button onClick={()=>startFromTemplate(tpl)} title={`New task from template "${tpl.name}"`} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",padding:"7px 4px 7px 14px",fontSize:12}}>{tpl.name}</button>
-                      <button onClick={()=>setTemplates(prev=>prev.filter(x=>x.id!==tpl.id))} aria-label={`Delete template "${tpl.name}"`} title="Delete template" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",padding:"7px 12px 7px 4px",fontSize:13,lineHeight:1}}>×</button>
+                      <button onClick={()=>startFromTemplate(tpl)} title={`New task from template "${tpl.name}"`} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",padding:"7px 4px 7px 14px",fontSize:fz(12)}}>{tpl.name}</button>
+                      <button onClick={()=>setTemplates(prev=>prev.filter(x=>x.id!==tpl.id))} aria-label={`Delete template "${tpl.name}"`} title="Delete template" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",padding:"7px 12px 7px 4px",fontSize:fz(13),lineHeight:1}}>×</button>
                     </span>
                   ))}
                 </div>}
@@ -2514,35 +2521,35 @@ export default function HomeworkPlanner() {
                 <div>
                   {step===-1?(
                     <div>
-                      <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>What's the assignment?</div>
+                      <div style={{fontFamily:F.heading,fontSize:fz(17),marginBottom:12,color:T.accent}}>What's the assignment?</div>
                       <form onSubmit={handleTitleSubmit} style={{display:"flex",gap:8}}>
-                        <input ref={inputRef} aria-label="What's the assignment?" defaultValue={newTask.title||""} maxLength={500} placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:13,flex:1,outline:"none"}}/>
+                        <input ref={inputRef} aria-label="What's the assignment?" defaultValue={newTask.title||""} maxLength={500} placeholder="e.g. Chapter 3 reading..." autoFocus style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"10px 13px",fontFamily:F.body,fontSize:fz(13),flex:1,outline:"none"}}/>
                         <button type="submit" aria-label="Next" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer"}}>→</button>
                       </form>
                     </div>
                   ):currentQ?(
                     <div>
-                      <div style={{fontFamily:F.heading,fontSize:17,marginBottom:12,color:T.accent}}>{currentQ.label}</div>
+                      <div style={{fontFamily:F.heading,fontSize:fz(17),marginBottom:12,color:T.accent}}>{currentQ.label}</div>
                       {currentQ.type==="select"&&<div style={{display:"flex",flexWrap:"wrap",gap:7}}>{subjects.map(opt=><button key={opt} className="chip" style={{background:subjectColors[opt]?subjectColors[opt]+"22":T.cardAlt,color:subjectColors[opt]||T.text,border:`1px solid ${subjectColors[opt]||T.border}`}} onClick={()=>handleAnswer(opt)}>{opt}</button>)}</div>}
                       {currentQ.type==="date"&&(pendingDueDate===null?(
                         <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
                           {[{l:"Today",d:0},{l:"Tomorrow",d:1},{l:"3 days",d:3},{l:"Next week",d:7}].map(({l,d})=>{const dt=new Date();dt.setDate(dt.getDate()+d);return<button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>handleDateInput(localDateStr(dt))}>{l}</button>;})}
-                          <input ref={inputRef} aria-label={currentQ?.label} type="date" defaultValue="" onChange={e=>{inputValRef.current=e.target.value;}} onKeyDown={e=>e.key==="Enter"&&inputRef.current?.value&&handleDateInput(inputRef.current.value)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:12,flex:1,minWidth:120,outline:"none"}}/>
+                          <input ref={inputRef} aria-label={currentQ?.label} type="date" defaultValue="" onChange={e=>{inputValRef.current=e.target.value;}} onKeyDown={e=>e.key==="Enter"&&inputRef.current?.value&&handleDateInput(inputRef.current.value)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:fz(12),flex:1,minWidth:120,outline:"none"}}/>
                           <button style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"7px 13px",cursor:"pointer"}} onClick={()=>inputRef.current?.value&&handleDateInput(inputRef.current.value)}>→</button>
                         </div>
                       ):(
                         <div>
-                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:10}}>Due {formatDate(pendingDueDate)}. What time?</div>
+                          <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:10}}>Due {formatDate(pendingDueDate)}. What time?</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:12}}>
                             {[{l:"Any time",v:""},{l:formatTime("09:00",h24),v:"09:00"},{l:formatTime("15:00",h24),v:"15:00"},{l:formatTime("23:59",h24),v:"23:59"}].map(({l,v})=>(
                               <button key={l} className="chip" style={{background:T.cardAlt,color:T.text,border:`1px solid ${T.border}`}} onClick={()=>confirmDueTime(v)}>{l}</button>
                             ))}
                           </div>
                           <div style={{display:"flex",gap:7}}>
-                            <input ref={inputRef} aria-label={currentQ?.label} type="time" defaultValue="" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:12,flex:1,outline:"none"}}/>
+                            <input ref={inputRef} aria-label={currentQ?.label} type="time" defaultValue="" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:10,color:T.text,padding:"7px 11px",fontFamily:F.body,fontSize:fz(12),flex:1,outline:"none"}}/>
                             <button style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"7px 13px",cursor:"pointer"}} onClick={()=>confirmDueTime(inputRef.current?.value||"")}>→</button>
                           </div>
-                          <button onClick={()=>setPendingDueDate(null)} style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:11,cursor:"pointer",marginTop:10,padding:0}}>‹ Back to date</button>
+                          <button onClick={()=>setPendingDueDate(null)} style={{background:"none",border:"none",color:T.textFaint,fontFamily:F.body,fontSize:fz(11),cursor:"pointer",marginTop:10,padding:0}}>‹ Back to date</button>
                         </div>
                       ))}
                       {currentQ.type==="time"&&(
@@ -2556,31 +2563,31 @@ export default function HomeworkPlanner() {
                           </div>
                           {/* Custom time picker */}
                           <div style={{background:T.surface,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
-                            <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>Custom time</div>
+                            <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>Custom time</div>
                             <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
                               {/* Hours */}
                               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                                <button onClick={()=>setTimeHours(h=>Math.min(23,h+1))} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:14}}>▲</button>
+                                <button onClick={()=>setTimeHours(h=>Math.min(23,h+1))} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:fz(14)}}>▲</button>
                                 <div style={{fontFamily:F.heading,fontSize:28,color:T.text,minWidth:44,textAlign:"center",lineHeight:1}}>{String(timeHours).padStart(2,"0")}</div>
-                                <button onClick={()=>setTimeHours(h=>Math.max(0,h-1))} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:14}}>▼</button>
-                                <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>hrs</div>
+                                <button onClick={()=>setTimeHours(h=>Math.max(0,h-1))} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:fz(14)}}>▼</button>
+                                <div style={{fontFamily:F.body,fontSize:fz(9),color:T.textFaint}}>hrs</div>
                               </div>
                               <div style={{fontFamily:F.heading,fontSize:28,color:T.textMuted,marginBottom:16}}>:</div>
                               {/* Minutes */}
                               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                                <button onClick={()=>setTimeMins(m=>m>=55?0:m+5)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:14}}>▲</button>
+                                <button onClick={()=>setTimeMins(m=>m>=55?0:m+5)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:fz(14)}}>▲</button>
                                 <div style={{fontFamily:F.heading,fontSize:28,color:T.text,minWidth:44,textAlign:"center",lineHeight:1}}>{String(timeMins).padStart(2,"0")}</div>
-                                <button onClick={()=>setTimeMins(m=>m<=0?55:m-5)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:14}}>▼</button>
-                                <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint}}>min</div>
+                                <button onClick={()=>setTimeMins(m=>m<=0?55:m-5)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:7,width:36,height:28,cursor:"pointer",color:T.text,fontSize:fz(14)}}>▼</button>
+                                <div style={{fontFamily:F.body,fontSize:fz(9),color:T.textFaint}}>min</div>
                               </div>
                             </div>
                             {/* Preview + confirm */}
                             <div style={{marginTop:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                              <div style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>
+                              <div style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted}}>
                                 {formatDuration(timeHours*60+timeMins)||"Pick a duration"}
                               </div>
                               <button onClick={()=>handleAnswer(String(timeHours*60+timeMins))} disabled={timeHours*60+timeMins===0}
-                                style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:12,cursor:timeHours*60+timeMins===0?"default":"pointer",opacity:timeHours*60+timeMins===0?0.4:1,fontWeight:500}}>
+                                style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:fz(12),cursor:timeHours*60+timeMins===0?"default":"pointer",opacity:timeHours*60+timeMins===0?0.4:1,fontWeight:500}}>
                                 Set time →
                               </button>
                             </div>
@@ -2595,18 +2602,18 @@ export default function HomeworkPlanner() {
                     </div>
                   ):null}
                   {newTask.title&&<div style={{marginTop:12,padding:"9px 13px",background:T.bg,borderRadius:10,border:`1px solid ${T.border}`}}>
-                    <div style={{fontFamily:F.body,fontSize:9,color:T.textFaint,marginBottom:2}}>Adding</div>
-                    <div style={{fontFamily:F.heading,fontSize:14,color:T.text}}>{newTask.title}</div>
+                    <div style={{fontFamily:F.body,fontSize:fz(9),color:T.textFaint,marginBottom:2}}>Adding</div>
+                    <div style={{fontFamily:F.heading,fontSize:fz(14),color:T.text}}>{newTask.title}</div>
                     <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
-                      {newTask.subject&&<span style={{color:ink(subjectColors[newTask.subject]||T.accent,T.light),fontFamily:F.body,fontSize:10}}>{newTask.subject}</span>}
-                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>{formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime,h24)}`:""}</span>}
-                      {newTask.recurrence&&newTask.recurrence!=="none"&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:10}}>↻ {newTask.recurrence}</span>}
+                      {newTask.subject&&<span style={{color:ink(subjectColors[newTask.subject]||T.accent,T.light),fontFamily:F.body,fontSize:fz(10)}}>{newTask.subject}</span>}
+                      {newTask.dueDate&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:fz(10)}}>{formatDate(newTask.dueDate)}{newTask.dueTime?` at ${formatTime(newTask.dueTime,h24)}`:""}</span>}
+                      {newTask.recurrence&&newTask.recurrence!=="none"&&<span style={{color:T.textMuted,fontFamily:F.body,fontSize:fz(10)}}>↻ {newTask.recurrence}</span>}
                     </div>
                   </div>}
                 </div>
                 {step>-1&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:16}}>
-                  <button onClick={goBackStep} aria-label="Go back" title="Go back" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.textMuted,fontSize:15,cursor:"pointer",padding:"7px 16px",borderRadius:10}}>‹ Back</button>
-                  <button onClick={goForwardStep} aria-label="Skip" title="Skip" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.textMuted,fontSize:15,cursor:"pointer",padding:"7px 16px",borderRadius:10}}>Skip ›</button>
+                  <button onClick={goBackStep} aria-label="Go back" title="Go back" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.textMuted,fontSize:fz(15),cursor:"pointer",padding:"7px 16px",borderRadius:10}}>‹ Back</button>
+                  <button onClick={goForwardStep} aria-label="Skip" title="Skip" style={{background:T.cardAlt,border:`1px solid ${T.border}`,color:T.textMuted,fontSize:fz(15),cursor:"pointer",padding:"7px 16px",borderRadius:10}}>Skip ›</button>
                 </div>}
               </div>
             )}
@@ -2619,7 +2626,7 @@ export default function HomeworkPlanner() {
           {/* Month grid, or the deck of due dates (DueDeck). */}
           <div style={{display:"flex",gap:6,marginBottom:10}}>
             {([["month","Month"],["deck","Deck"]] as const).map(([k,l])=>(
-              <button key={k} data-tour={k==="deck"?"calendar-deck":undefined} onClick={()=>setCalendarView(k)} aria-pressed={calendarView===k} style={{background:calendarView===k?T.accent:"none",color:calendarView===k?contrastColor(T.accent):T.textMuted,border:`1px solid ${calendarView===k?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{l}</button>
+              <button key={k} data-tour={k==="deck"?"calendar-deck":undefined} onClick={()=>setCalendarView(k)} aria-pressed={calendarView===k} style={{background:calendarView===k?T.accent:"none",color:calendarView===k?contrastColor(T.accent):T.textMuted,border:`1px solid ${calendarView===k?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>{l}</button>
             ))}
           </div>
           {calendarView==="deck"
@@ -2637,7 +2644,7 @@ export default function HomeworkPlanner() {
             <SettingsSection {...inboxSec("inbox-messages")} title={`Messages${recapItems.length?` (${recapItems.length})`:""}`}>
                       <div style={{display:"flex",flexDirection:"column",gap:12}}>
                         {recapItems.length===0
-                          ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,lineHeight:1.5}}>No messages yet. A recap arrives here when a day, week, month or year ends, if you finished or worked on something in it.</div>
+                          ? <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint,lineHeight:1.5}}>No messages yet. A recap arrives here when a day, week, month or year ends, if you finished or worked on something in it.</div>
                           : recapItems.map(item=>{
                           const unread=unreadRecaps.includes(item.id);
                           return (
@@ -2645,16 +2652,16 @@ export default function HomeworkPlanner() {
                             <button data-update-id={item.id} onClick={e=>openMessage(item.id,e.currentTarget)} aria-haspopup="dialog" aria-label={`${unread?"Unread: ":""}${item.headline}, ${formatDate(item.date)}`}
                               style={{flex:1,minWidth:0,background:"none",border:"none",borderRadius:8,padding:"4px 6px",margin:"-4px -6px",cursor:"pointer",textAlign:"left",color:"inherit",visibility:openUpdate?.id===item.id&&!openUpdate.closing?"hidden":undefined}}>
                               <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
-                                <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>
+                                <span style={{fontFamily:F.body,fontSize:fz(12),fontWeight:600,color:T.accent}}>
                                   {unread&&<span aria-hidden="true" style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:T.accent,marginRight:7,verticalAlign:"middle"}}/>}
                                   {item.headline}
                                 </span>
-                                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
+                                <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
                               </div>
-                              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{item.kind}</div>
-                              <div className="clamp2" style={{fontFamily:F.body,fontSize:11,color:unread?T.text:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
+                              <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>{item.kind}</div>
+                              <div className="clamp2" style={{fontFamily:F.body,fontSize:fz(11),color:unread?T.text:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
                             </button>
-                            <button onClick={()=>dismissMessage(item.id)} aria-label={`Dismiss ${item.headline}`} title="Dismiss" className="hit" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
+                            <button onClick={()=>dismissMessage(item.id)} aria-label={`Dismiss ${item.headline}`} title="Dismiss" className="hit" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(14),lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
                           </div>
                           );})}
                       </div>
@@ -2662,11 +2669,11 @@ export default function HomeworkPlanner() {
             <SettingsSection {...inboxSec("inbox-updates")} title={`Updates${whatsNew.length?` (${whatsNew.length})`:""}`}>
                       {/* Filter by the update's kind, same chips as the Tasks tab's filters */}
                       {updateKinds.length>1&&<div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-                        {["all",...updateKinds].map(k=><button key={k} onClick={()=>setUpdateKind(k)} aria-pressed={activeKind===k} style={{background:activeKind===k?T.accent:"none",color:activeKind===k?contrastColor(T.accent):T.textMuted,border:`1px solid ${activeKind===k?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>{k==="all"?"All":k}</button>)}
+                        {["all",...updateKinds].map(k=><button key={k} onClick={()=>setUpdateKind(k)} aria-pressed={activeKind===k} style={{background:activeKind===k?T.accent:"none",color:activeKind===k?contrastColor(T.accent):T.textMuted,border:`1px solid ${activeKind===k?T.accent:T.border}`,borderRadius:999,padding:"4px 12px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>{k==="all"?"All":k}</button>)}
                       </div>}
                       <div style={{display:"flex",flexDirection:"column",gap:12}}>
                         {shownUpdates.length===0
-                          ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here</div>
+                          ? <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint}}>Nothing here</div>
                           : shownUpdates.map(item=>(
                           <div key={item.id} style={{display:"flex",gap:4,alignItems:"flex-start"}}>
                             {/* Opens the update in a floating panel (UpdateDetail); hidden
@@ -2674,13 +2681,13 @@ export default function HomeworkPlanner() {
                             <button data-update-id={item.id} onClick={e=>setOpenUpdate({id:item.id,origin:e.currentTarget})} aria-haspopup="dialog"
                               style={{flex:1,minWidth:0,background:"none",border:"none",borderRadius:8,padding:"4px 6px",margin:"-4px -6px",cursor:"pointer",textAlign:"left",color:"inherit",visibility:openUpdate?.id===item.id&&!openUpdate.closing?"hidden":undefined}}>
                               <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
-                                <span style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:T.accent}}>{item.headline}</span>
-                                <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
+                                <span style={{fontFamily:F.body,fontSize:fz(12),fontWeight:600,color:T.accent}}>{item.headline}</span>
+                                <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,flexShrink:0}}>{formatDate(item.date)}</span>
                               </div>
-                              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{item.kind}</div>
-                              <div className="clamp2" style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
+                              <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>{item.kind}</div>
+                              <div className="clamp2" style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginTop:2,lineHeight:1.4}}>{item.description}</div>
                             </button>
-                            <button onClick={()=>dismissWhatsNew(item.id)} aria-label={`Dismiss ${item.headline}`} title="Dismiss" className="hit" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:14,lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
+                            <button onClick={()=>dismissWhatsNew(item.id)} aria-label={`Dismiss ${item.headline}`} title="Dismiss" className="hit" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(14),lineHeight:1,padding:"0 0 0 2px",flexShrink:0}}>×</button>
                           </div>
                         ))}
                       </div>
@@ -2692,11 +2699,11 @@ export default function HomeworkPlanner() {
             <ScreenHeader title="History" onBack={()=>setActiveTab("tasks")} T={T} F={F}/>
             <div data-tour="undo-redo" style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
                       <div style={{display:"flex",gap:8}}>
-                        <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: ${describeAction(undoStack[undoStack.length-1])}`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                        <button onClick={undo} disabled={undoStack.length===0} title={undoStack.length?`Undo: ${describeAction(undoStack[undoStack.length-1])}`:"Nothing to undo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:undoStack.length?"pointer":"default",opacity:undoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:fz(12)}}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
                           Undo
                         </button>
-                        <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: ${describeAction(redoStack[redoStack.length-1])}`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:12}}>
+                        <button onClick={redo} disabled={redoStack.length===0} title={redoStack.length?`Redo: ${describeAction(redoStack[redoStack.length-1])}`:"Nothing to redo"} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 0",cursor:redoStack.length?"pointer":"default",opacity:redoStack.length?1:0.4,color:T.text,fontFamily:F.body,fontSize:fz(12)}}>
                           Redo
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
                         </button>
@@ -2704,19 +2711,19 @@ export default function HomeworkPlanner() {
             </div>
             <div style={{background:T.card,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`}}>
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                        <span data-tour="trash" style={{fontFamily:F.body,fontSize:11,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recently deleted{trash.length?` (${trash.length})`:""}</span>
-                        {trash.length>0&&<button onClick={()=>{if(confirmEmptyTrash){setTrash([]);setConfirmEmptyTrash(false);}else setConfirmEmptyTrash(true);}} onBlur={()=>setConfirmEmptyTrash(false)} title={confirmEmptyTrash?"Tap again to delete these for good":"Delete everything here for good"} style={{background:confirmEmptyTrash?"#FF475722":"none",border:"none",borderRadius:6,color:confirmEmptyTrash?"#FF4757":T.textFaint,fontSize:11,cursor:"pointer",padding:confirmEmptyTrash?"2px 8px":0}}>{confirmEmptyTrash?"Delete for good?":"Empty"}</button>}
+                        <span data-tour="trash" style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recently deleted{trash.length?` (${trash.length})`:""}</span>
+                        {trash.length>0&&<button onClick={()=>{if(confirmEmptyTrash){setTrash([]);setConfirmEmptyTrash(false);}else setConfirmEmptyTrash(true);}} onBlur={()=>setConfirmEmptyTrash(false)} title={confirmEmptyTrash?"Tap again to delete these for good":"Delete everything here for good"} style={{background:confirmEmptyTrash?"#FF475722":"none",border:"none",borderRadius:6,color:confirmEmptyTrash?"#FF4757":T.textFaint,fontSize:fz(11),cursor:"pointer",padding:confirmEmptyTrash?"2px 8px":0}}>{confirmEmptyTrash?"Delete for good?":"Empty"}</button>}
                       </div>
                       {trash.length===0
-                        ? <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>Nothing here. Deleted tasks stay for 30 days.</div>
+                        ? <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint}}>Nothing here. Deleted tasks stay for 30 days.</div>
                         : <div style={{display:"flex",flexDirection:"column",gap:4}}>
                           {trash.map(e=>(
                             <div key={e.task.id} style={{display:"flex",alignItems:"center",gap:8,background:T.surface,borderRadius:8,padding:"6px 8px"}}>
                               <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.task.title}</div>
-                                <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>Deleted {formatDate(localDateStr(new Date(e.deletedAt)))}</div>
+                                <div style={{fontFamily:F.body,fontSize:fz(12),color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.task.title}</div>
+                                <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>Deleted {formatDate(localDateStr(new Date(e.deletedAt)))}</div>
                               </div>
-                              <button onClick={()=>restoreFromTrash(e.task.id)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontSize:11,cursor:"pointer",padding:"4px 10px",flexShrink:0}}>Restore</button>
+                              <button onClick={()=>restoreFromTrash(e.task.id)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontSize:fz(11),cursor:"pointer",padding:"4px 10px",flexShrink:0}}>Restore</button>
                             </div>
                           ))}
                         </div>}
@@ -2732,10 +2739,10 @@ export default function HomeworkPlanner() {
                         value={importText}
                         onChange={e=>{setImportText(e.target.value);setImportPreview(null);setImportedCount(null);}}
                         placeholder="Paste your syllabus text here..."
-                        style={{width:"100%",minHeight:100,maxHeight:200,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:13,outline:"none",resize:"vertical",overflowY:"auto",marginBottom:10}}
+                        style={{width:"100%",minHeight:100,maxHeight:200,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"10px 12px",fontFamily:F.body,fontSize:fz(13),outline:"none",resize:"vertical",overflowY:"auto",marginBottom:10}}
                       />
                       <div style={{marginBottom:10}}>
-                        <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Add as subject</div>
+                        <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Add as subject</div>
                         <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
                           {subjects.map(s=>{
                             const active=importSubjectEff===s;
@@ -2743,32 +2750,32 @@ export default function HomeworkPlanner() {
                           })}
                         </div>
                       </div>
-                      <button onClick={scanSyllabus} disabled={!importText.trim()} style={{width:"100%",background:importText.trim()?T.accent:T.surface,color:importText.trim()?contrastColor(T.accent):T.textFaint,border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:importText.trim()?"pointer":"default"}}>
+                      <button onClick={scanSyllabus} disabled={!importText.trim()} style={{width:"100%",background:importText.trim()?T.accent:T.surface,color:importText.trim()?contrastColor(T.accent):T.textFaint,border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:fz(13),fontWeight:500,cursor:importText.trim()?"pointer":"default"}}>
                         Scan for assignments
                       </button>
-                      {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:12,color:ink("#2ED573",T.light),marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
+                      {importedCount!==null&&<div style={{fontFamily:F.body,fontSize:fz(12),color:ink("#2ED573",T.light),marginTop:10,textAlign:"center"}}>✓ Added {importedCount} task{importedCount===1?"":"s"}</div>}
                       {importPreview&&(
                         <div className="sec-body" style={{marginTop:12}}>
-                          <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8}}>
+                          <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:8}}>
                             Found {importPreview.length} assignment{importPreview.length===1?"":"s"}
                           </div>
                           {importPreview.length===0?(
-                            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:12,padding:"16px 0"}}>No dated lines found. Try a different format.</div>
+                            <div style={{textAlign:"center",color:T.textFaint,fontFamily:F.body,fontSize:fz(12),padding:"16px 0"}}>No dated lines found. Try a different format.</div>
                           ):(<>
                             <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,maxHeight:200,overflowY:"auto"}}>
                               {importPreview.map((it,i)=>(
                                 <div key={i} role="checkbox" aria-checked={it.checked} tabIndex={0} onClick={()=>toggleImportItem(i)} onKeyDown={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();toggleImportItem(i);}}} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:T.surface,borderRadius:9,cursor:"pointer",opacity:it.checked?1:0.45}}>
                                   <div style={{width:18,height:18,border:`2px solid ${it.checked?T.accent:T.textFaint}`,borderRadius:5,background:it.checked?T.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                                    {it.checked&&<span style={{color:contrastColor(T.accent),fontSize:11,fontWeight:"bold"}}>✓</span>}
+                                    {it.checked&&<span style={{color:contrastColor(T.accent),fontSize:fz(11),fontWeight:"bold"}}>✓</span>}
                                   </div>
                                   <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontFamily:F.body,fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.title}</div>
-                                    {it.dueDate&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>{formatDate(it.dueDate)}</div>}
+                                    <div style={{fontFamily:F.body,fontSize:fz(12),color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.title}</div>
+                                    {it.dueDate&&<div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>{formatDate(it.dueDate)}</div>}
                                   </div>
                                 </div>
                               ))}
                             </div>
-                            <button onClick={commitImport} disabled={!importPreview.some(it=>it.checked)} style={{width:"100%",background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:13,fontWeight:500,cursor:"pointer"}}>
+                            <button onClick={commitImport} disabled={!importPreview.some(it=>it.checked)} style={{width:"100%",background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:10,padding:"11px",fontFamily:F.body,fontSize:fz(13),fontWeight:500,cursor:"pointer"}}>
                               + Add {importPreview.filter(it=>it.checked).length} task{importPreview.filter(it=>it.checked).length===1?"":"s"}
                             </button>
                           </>)}
@@ -2777,12 +2784,12 @@ export default function HomeworkPlanner() {
             </SettingsSection>
             <SettingsSection {...inboxSec("import-backup")} title="Backup & export">
                       <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-                        <button data-tour="import-backup" onClick={()=>importFileRef.current?.click()} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Import backup (JSON)</button>
+                        <button data-tour="import-backup" onClick={()=>importFileRef.current?.click()} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>Import backup (JSON)</button>
                         <input ref={importFileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)importBackupJSON(f);e.target.value="";}}/>
-                        <button onClick={exportAllDataJSON} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export all (JSON)</button>
-                        <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Export tasks (CSV)</button>
+                        <button onClick={exportAllDataJSON} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>Export all (JSON)</button>
+                        <button onClick={exportTasksCSV} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>Export tasks (CSV)</button>
                       </div>
-                      {importBackupNote&&<div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginTop:8}}>{importBackupNote}</div>}
+                      {importBackupNote&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginTop:8}}>{importBackupNote}</div>}
             </SettingsSection>
           </div>
         )}
@@ -2800,13 +2807,26 @@ export default function HomeworkPlanner() {
                 <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Appearance</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
                   {([{k:"light",l:"Light",e:"○"},{k:"dark",l:"Dark",e:"●"},{k:"auto",l:"System",e:"◐"}] as const).map(({k,l,e})=>(
-                    <button key={k} onClick={()=>setThemeMode(k)} aria-pressed={themeMode===k} style={{background:themeMode===k?T.accent+"22":T.surface,border:`1.5px solid ${themeMode===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:themeMode===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                      <span style={{fontSize:15}}>{e}</span>
+                    <button key={k} onClick={()=>setThemeMode(k)} aria-pressed={themeMode===k} style={{background:themeMode===k?T.accent+"22":T.surface,border:`1.5px solid ${themeMode===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:themeMode===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11),display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                      <span style={{fontSize:fz(15)}}>{e}</span>
                       <span style={{fontWeight:500}}>{l}</span>
                     </button>
                   ))}
                 </div>
-                {themeMode==="auto"&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8,textAlign:"center"}}>Following your device, currently {effectiveThemeMode}</div>}
+                {themeMode==="auto"&&<div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:8,textAlign:"center"}}>Following your device, currently {effectiveThemeMode}</div>}
+              </div>
+              {/* Text size. The sample letters are fixed sizes, so each button
+                  shows what it gives whichever one is chosen. */}
+              <div data-tour="text-size">
+                <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Text size</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+                  {(Object.keys(TEXT_SIZES) as TextSize[]).map((k,i)=>(
+                    <button key={k} onClick={()=>setTextSize(k)} aria-pressed={textSize===k} style={{background:textSize===k?T.accent+"22":T.surface,border:`1.5px solid ${textSize===k?T.accent:T.border}`,borderRadius:9,padding:"9px 8px",cursor:"pointer",color:textSize===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",gap:2}}>
+                      <span aria-hidden="true" style={{fontSize:[13,16,19][i],lineHeight:"20px"}}>Aa</span>
+                      <span style={{fontWeight:500}}>{TEXT_SIZES[k].name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               {/* Layouts */}
               <div data-tour="layout">
@@ -2826,10 +2846,10 @@ export default function HomeworkPlanner() {
                     };
                     return(
                       <button key={key} aria-pressed={active} onClick={()=>setLayout(key)}
-                        style={{background:active?T.accent+"22":"none",border:`1.5px solid ${active?T.accent:T.border}`,borderRadius:11,padding:"10px 7px",cursor:"pointer",color:active?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                        style={{background:active?T.accent+"22":"none",border:`1.5px solid ${active?T.accent:T.border}`,borderRadius:11,padding:"10px 7px",cursor:"pointer",color:active?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11),display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
                         {icons[key]}
-                        <span style={{fontWeight:500,fontSize:10}}>{l.name}</span>
-                        <span style={{fontSize:9,opacity:0.6}}>{l.desc}</span>
+                        <span style={{fontWeight:500,fontSize:fz(10)}}>{l.name}</span>
+                        <span style={{fontSize:fz(9),opacity:0.6}}>{l.desc}</span>
                       </button>
                     );
                   })}
@@ -2837,43 +2857,43 @@ export default function HomeworkPlanner() {
               </div>
               {/* Urgency color coding */}
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Urgency Color Coding</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:-4}}>Red for urgent, green for not urgent</div></div>
+                <div><div className="sl" style={{color:T.textMuted,paddingTop:0}}>Urgency Color Coding</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:-4}}>Red for urgent, green for not urgent</div></div>
                 <Toggle on={colorCodeUrgency} onChange={setColorCodeUrgency} T={T} label="Urgency Color Coding"/>
               </div>
               {/* Animation speed */}
               <div data-tour="anim-speed">
                 <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:10}}>
                   <label htmlFor="anim-speed" className="sl" style={{color:T.textMuted,paddingTop:0}}>Animation speed</label>
-                  <span style={{fontFamily:F.body,fontSize:11,color:T.text}}>{animSpeed}×{animSpeed===1?" (normal)":""}</span>
+                  <span style={{fontFamily:F.body,fontSize:fz(11),color:T.text}}>{animSpeed}×{animSpeed===1?" (normal)":""}</span>
                 </div>
                 <input id="anim-speed" className="range" type="range" min={ANIM_SPEED.min} max={ANIM_SPEED.max} step={ANIM_SPEED.step} value={animSpeed}
                   onChange={e=>setAnimSpeed(clampSpeed(e.target.value))} aria-valuetext={`${animSpeed} times normal speed`}
                   style={{width:"100%",margin:"2px 0 4px",cursor:"pointer"}}/>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",fontFamily:F.body,fontSize:10,color:T.textFaint}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>
                   <span>Slower</span>
-                  {animSpeed!==1&&<button onClick={()=>setAnimSpeed(1)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:F.body,fontSize:10,color:T.textMuted,textDecoration:"underline"}}>Reset</button>}
+                  {animSpeed!==1&&<button onClick={()=>setAnimSpeed(1)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textDecoration:"underline"}}>Reset</button>}
                   <span>Faster</span>
                 </div>
               </div>
             </SettingsSection>
             {/* Date & time */}
             <SettingsSection title="Date & time" tour="date-time" {...sec("datetime")}>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Time format</div>
+              <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:6}}>Time format</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>
                 {([["12h","12-hour (3:05 PM)"],["24h","24-hour (15:05)"]] as const).map(([k,l])=>(
-                  <button key={k} onClick={()=>setTimeFormat(k)} aria-pressed={timeFormat===k} style={{background:timeFormat===k?T.accent+"22":T.surface,border:`1.5px solid ${timeFormat===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:timeFormat===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                  <button key={k} onClick={()=>setTimeFormat(k)} aria-pressed={timeFormat===k} style={{background:timeFormat===k?T.accent+"22":T.surface,border:`1.5px solid ${timeFormat===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:timeFormat===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>{l}</button>
                 ))}
               </div>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Week starts on</div>
+              <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:6}}>Week starts on</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
                 {([[0,"Sunday"],[1,"Monday"]] as const).map(([k,l])=>(
-                  <button key={k} onClick={()=>setWeekStart(k)} aria-pressed={weekStart===k} style={{background:weekStart===k?T.accent+"22":T.surface,border:`1.5px solid ${weekStart===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:weekStart===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                  <button key={k} onClick={()=>setWeekStart(k)} aria-pressed={weekStart===k} style={{background:weekStart===k?T.accent+"22":T.surface,border:`1.5px solid ${weekStart===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:weekStart===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>{l}</button>
                 ))}
               </div>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,margin:"12px 0 6px"}}>Calendar shows</div>
+              <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,margin:"12px 0 6px"}}>Calendar shows</div>
               <div data-tour="calendar-days" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
                 {([[true,"This month only"],[false,"Six full weeks"]] as const).map(([k,l])=>(
-                  <button key={l} onClick={()=>setCalendarMonthOnly(k)} aria-pressed={calendarMonthOnly===k} style={{background:calendarMonthOnly===k?T.accent+"22":T.surface,border:`1.5px solid ${calendarMonthOnly===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:calendarMonthOnly===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                  <button key={l} onClick={()=>setCalendarMonthOnly(k)} aria-pressed={calendarMonthOnly===k} style={{background:calendarMonthOnly===k?T.accent+"22":T.surface,border:`1.5px solid ${calendarMonthOnly===k?T.accent:T.border}`,borderRadius:9,padding:"8px 6px",cursor:"pointer",color:calendarMonthOnly===k?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>{l}</button>
                 ))}
               </div>
             </SettingsSection>
@@ -2881,51 +2901,51 @@ export default function HomeworkPlanner() {
             <SettingsSection title="Focus timer" tour="focus-timer" {...sec("focus")}>
               <div data-tour="focus-show" style={{display:"flex",flexDirection:"column",gap:12,marginBottom:14}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                  <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Pomodoro timer</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Show it in Focus, above the task</div></div>
+                  <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Pomodoro timer</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>Show it in Focus, above the task</div></div>
                   <Toggle on={showsPomodoro(focusShow)} onChange={v=>setFocusShow(focusShowFor(v,showsStopwatch(focusShow)))} T={T} label="Pomodoro timer"/>
                 </div>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                  <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Stopwatch</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Show it in Focus, below the task</div></div>
+                  <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Stopwatch</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>Show it in Focus, below the task</div></div>
                   <Toggle on={showsStopwatch(focusShow)} onChange={v=>setFocusShow(focusShowFor(showsPomodoro(focusShow),v))} T={T} label="Stopwatch"/>
                 </div>
               </div>
               {showsPomodoro(focusShow)&&<>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Focus length</div>
+              <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:6}}>Focus length</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:12}}>
                 {[15,25,45,60].map(v=>(
-                  <button key={v} onClick={()=>changePomodoroLength("work",v)} aria-pressed={pomodoroWorkMins===v} style={{background:pomodoroWorkMins===v?T.accent+"22":T.surface,border:`1.5px solid ${pomodoroWorkMins===v?T.accent:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:pomodoroWorkMins===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{v} min</button>
+                  <button key={v} onClick={()=>changePomodoroLength("work",v)} aria-pressed={pomodoroWorkMins===v} style={{background:pomodoroWorkMins===v?T.accent+"22":T.surface,border:`1.5px solid ${pomodoroWorkMins===v?T.accent:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:pomodoroWorkMins===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>{v} min</button>
                 ))}
               </div>
-              <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:6}}>Break length</div>
+              <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:6}}>Break length</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:12}}>
                 {[5,10,15,20].map(v=>(
-                  <button key={v} onClick={()=>changePomodoroLength("break",v)} aria-pressed={pomodoroBreakMins===v} style={{background:pomodoroBreakMins===v?T.accent+"22":T.surface,border:`1.5px solid ${pomodoroBreakMins===v?T.accent:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:pomodoroBreakMins===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{v} min</button>
+                  <button key={v} onClick={()=>changePomodoroLength("break",v)} aria-pressed={pomodoroBreakMins===v} style={{background:pomodoroBreakMins===v?T.accent+"22":T.surface,border:`1.5px solid ${pomodoroBreakMins===v?T.accent:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:pomodoroBreakMins===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>{v} min</button>
                 ))}
               </div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Start breaks automatically</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>When a focus session ends. After a break, you get a suggestion for what to work on next.</div></div>
+                <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Start breaks automatically</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>When a focus session ends. After a break, you get a suggestion for what to work on next.</div></div>
                 <Toggle on={autoStartBreaks} onChange={setAutoStartBreaks} T={T} label="Start breaks automatically"/>
               </div>
               </>}
             </SettingsSection>
             {/* New task questions: which add-task questions are asked, in what order */}
             <SettingsSection title="New task questions" tour="new-task-questions" {...sec("questions")}>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginBottom:10}}>Asked in this order after the title. Anything you turn off can still be filled in later with Edit.</div>
+              <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginBottom:10}}>Asked in this order after the title. Anything you turn off can still be filled in later with Edit.</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:T.surface,borderRadius:9,border:`1px solid ${T.border}`}}>
-                  <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,minWidth:14}}>1</span>
-                  <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted,flex:1}}>Title</span>
-                  <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint}}>Always asked</span>
+                  <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,minWidth:14}}>1</span>
+                  <span style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted,flex:1}}>Title</span>
+                  <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>Always asked</span>
                 </div>
                 {addQuestionPrefs.map((p,i)=>{
                   const q=QUESTIONS.find(x=>x.key===p.key)!;
                   const pos=p.on?addQuestionPrefs.slice(0,i).filter(x=>x.on).length+2:null;
                   const first=i===0, last=i===addQuestionPrefs.length-1;
-                  const arrow={background:"none",border:`1px solid ${T.border}`,borderRadius:7,width:28,height:28,color:T.textMuted,fontSize:12,padding:0,display:"flex",alignItems:"center",justifyContent:"center"};
+                  const arrow={background:"none",border:`1px solid ${T.border}`,borderRadius:7,width:28,height:28,color:T.textMuted,fontSize:fz(12),padding:0,display:"flex",alignItems:"center",justifyContent:"center"};
                   return(
                     <div key={p.key} data-question={p.key} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 8px 6px 10px",background:T.surface,borderRadius:9,border:`1px solid ${T.border}`,opacity:p.on?1:0.6}}>
-                      <span style={{fontFamily:F.body,fontSize:10,color:T.textFaint,minWidth:14}}>{pos??"–"}</span>
-                      <span style={{fontFamily:F.body,fontSize:12,color:p.on?T.text:T.textMuted,flex:1}}>{q.name}</span>
+                      <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,minWidth:14}}>{pos??"–"}</span>
+                      <span style={{fontFamily:F.body,fontSize:fz(12),color:p.on?T.text:T.textMuted,flex:1}}>{q.name}</span>
                       <button onClick={()=>setSavedAddQuestions(moveQuestion(addQuestionPrefs,i,-1))} disabled={first} aria-label={`Move ${q.name} earlier`} style={{...arrow,opacity:first?0.35:1,cursor:first?"default":"pointer"}}>↑</button>
                       <button onClick={()=>setSavedAddQuestions(moveQuestion(addQuestionPrefs,i,1))} disabled={last} aria-label={`Move ${q.name} later`} style={{...arrow,opacity:last?0.35:1,cursor:last?"default":"pointer"}}>↓</button>
                       <Toggle on={p.on} onChange={on=>setSavedAddQuestions(addQuestionPrefs.map(x=>x.key===p.key?{...x,on}:x))} T={T} label={`Ask ${q.name}`}/>
@@ -2942,36 +2962,36 @@ export default function HomeworkPlanner() {
                   if(editingSubject?.old===s) return (
                     <form key={s} onSubmit={e=>{e.preventDefault();if(updateSubject(s,editingSubject.name,editingSubject.color))setEditingSubject(null);}} style={{display:"flex",flexDirection:"column",gap:8,background:T.surface,borderRadius:9,padding:"10px 12px"}}>
                       <input autoFocus value={editingSubject.name} onChange={e=>setEditingSubject({...editingSubject,name:e.target.value})} aria-label="Subject name" maxLength={200}
-                        style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontSize:12,outline:"none"}}/>
+                        style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontSize:fz(12),outline:"none"}}/>
                       <div role="radiogroup" aria-label="Subject color" style={{display:"flex",flexWrap:"wrap",gap:6}}>
                         {SUBJECT_COLOR_PALETTE.map(c=>(
                           <button key={c} type="button" role="radio" aria-checked={editingSubject.color===c} aria-label={c} onClick={()=>setEditingSubject({...editingSubject,color:c})}
                             style={{width:22,height:22,borderRadius:"50%",background:c,border:editingSubject.color===c?`2px solid ${T.text}`:"2px solid transparent",cursor:"pointer",padding:0}}/>
                         ))}
                       </div>
-                      {subjects.some(x=>x!==s&&x.toLowerCase()===editingSubject.name.trim().toLowerCase())&&<div style={{fontFamily:F.body,fontSize:10,color:ink("#FF4757",T.light)}}>There's already a subject with that name</div>}
+                      {subjects.some(x=>x!==s&&x.toLowerCase()===editingSubject.name.trim().toLowerCase())&&<div style={{fontFamily:F.body,fontSize:fz(10),color:ink("#FF4757",T.light)}}>There's already a subject with that name</div>}
                       <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
-                        <button type="button" onClick={()=>setEditingSubject(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:8,color:T.textMuted,fontSize:11,cursor:"pointer",padding:"5px 12px"}}>Cancel</button>
-                        <button type="submit" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,fontSize:11,cursor:"pointer",padding:"5px 12px"}}>Save</button>
+                        <button type="button" onClick={()=>setEditingSubject(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:8,color:T.textMuted,fontSize:fz(11),cursor:"pointer",padding:"5px 12px"}}>Cancel</button>
+                        <button type="submit" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,fontSize:fz(11),cursor:"pointer",padding:"5px 12px"}}>Save</button>
                       </div>
                     </form>
                   );
                   return (
                     <div key={s} style={{display:"flex",alignItems:"center",gap:10,background:T.surface,borderRadius:9,padding:"9px 12px"}}>
                       <div style={{width:10,height:10,borderRadius:"50%",background:subjectColors[s]||T.accent,flexShrink:0}}/>
-                      <span style={{flex:1,fontFamily:F.body,fontSize:12,color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s}</span>
+                      <span style={{flex:1,fontFamily:F.body,fontSize:fz(12),color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s}</span>
                       <button onClick={()=>{setPendingSubjectDelete(null);setEditingSubject({old:s,name:s,color:subjectColors[s]||SUBJECT_COLOR_PALETTE[0]});}} aria-label={`Edit ${s}`} title="Rename or change color"
-                        style={{background:"none",border:"none",color:T.textFaint,fontSize:13,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>✎</button>
+                        style={{background:"none",border:"none",color:T.textFaint,fontSize:fz(13),cursor:"pointer",lineHeight:1,padding:"0 4px"}}>✎</button>
                       {/* Two-tap delete instead of a browser confirm() dialog */}
                       <button onClick={()=>{if(confirming){removeSubject(s);setPendingSubjectDelete(null);}else setPendingSubjectDelete(s);}} aria-label={confirming?`Confirm deleting ${s}`:`Delete ${s}`} title={confirming?"Tap again to delete (tasks keep their subject)":"Delete subject"}
-                        style={{background:confirming?"#FF475722":"none",border:"none",borderRadius:6,color:confirming?"#FF4757":T.textFaint,fontSize:confirming?11:15,cursor:"pointer",lineHeight:1,padding:confirming?"4px 8px":"0 4px"}}>{confirming?"Delete?":"×"}</button>
+                        style={{background:confirming?"#FF475722":"none",border:"none",borderRadius:6,color:confirming?"#FF4757":T.textFaint,fontSize:fz(confirming?11:15),cursor:"pointer",lineHeight:1,padding:confirming?"4px 8px":"0 4px"}}>{confirming?"Delete?":"×"}</button>
                     </div>
                   );
                 })}
               </div>
               <form onSubmit={e=>{e.preventDefault();addSubject(newSubjectText);setNewSubjectText("");}} style={{display:"flex",gap:8,marginTop:8}}>
-                <input value={newSubjectText} maxLength={200} onChange={e=>setNewSubjectText(e.target.value)} placeholder={subjects.length>=LIMITS.subjects?`Limit of ${LIMITS.subjects} subjects reached`:"Add a subject..."} disabled={subjects.length>=LIMITS.subjects} style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:12,outline:"none"}}/>
-                <button type="submit" disabled={!newSubjectText.trim()} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:newSubjectText.trim()?"pointer":"default",opacity:newSubjectText.trim()?1:0.5,fontSize:12,fontWeight:500}}>Add</button>
+                <input value={newSubjectText} maxLength={200} onChange={e=>setNewSubjectText(e.target.value)} placeholder={subjects.length>=LIMITS.subjects?`Limit of ${LIMITS.subjects} subjects reached`:"Add a subject..."} disabled={subjects.length>=LIMITS.subjects} style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:fz(12),outline:"none"}}/>
+                <button type="submit" disabled={!newSubjectText.trim()} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:newSubjectText.trim()?"pointer":"default",opacity:newSubjectText.trim()?1:0.5,fontSize:fz(12),fontWeight:500}}>Add</button>
               </form>
             </SettingsSection>
             {/* Task list: grouping, what shows, auto-archive */}
@@ -2981,18 +3001,18 @@ export default function HomeworkPlanner() {
               <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Group Tasks By</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
                 {Object.entries(GROUP_BY).map(([key,g])=>(
-                  <button key={key} onClick={()=>setGroupBy(key)} aria-pressed={groupBy===key} style={{background:groupBy===key?T.accent+"22":T.surface,border:`1.5px solid ${groupBy===key?T.accent:T.border}`,borderRadius:9,padding:"9px 11px",cursor:"pointer",color:groupBy===key?T.accent:T.textMuted,fontFamily:F.body,fontSize:11,display:"flex",alignItems:"center",gap:7}}>{g.name}</button>
+                  <button key={key} onClick={()=>setGroupBy(key)} aria-pressed={groupBy===key} style={{background:groupBy===key?T.accent+"22":T.surface,border:`1.5px solid ${groupBy===key?T.accent:T.border}`,borderRadius:9,padding:"9px 11px",cursor:"pointer",color:groupBy===key?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11),display:"flex",alignItems:"center",gap:7}}>{g.name}</button>
                 ))}
               </div>
-              {layout!=="list"&&groupBy!=="none"&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>Grouping only shows in the List layout. You're using {LAYOUTS[layout].name}.</div>}
+              {layout!=="list"&&groupBy!=="none"&&<div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:8}}>Grouping only shows in the List layout. You're using {LAYOUTS[layout].name}.</div>}
             </div>
             {/* Toggles */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-              <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show smart suggestion</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Your most urgent task, at the top of the list</div></div>
+              <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Show smart suggestion</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>Your most urgent task, at the top of the list</div></div>
               <Toggle on={showSuggestion} onChange={setShowSuggestion} T={T} label="Show smart suggestion"/>
             </div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-              <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Show completed tasks</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Keep done tasks visible</div></div>
+              <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Show completed tasks</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>Keep done tasks visible</div></div>
               <Toggle on={showDone} onChange={setShowDone} T={T} label="Show completed tasks"/>
             </div>
             {/* Auto-archive */}
@@ -3000,10 +3020,10 @@ export default function HomeworkPlanner() {
               <div className="sl" style={{color:T.textMuted,paddingTop:0}}>Auto-Archive Completed Tasks</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:7}}>
                 {[{l:"Never",v:0},{l:"1 day",v:1},{l:"7 days",v:7},{l:"30 days",v:30}].map(({l,v})=>(
-                  <button key={l} onClick={()=>setAutoArchiveDays(v)} aria-pressed={autoArchiveDays===v} style={{background:autoArchiveDays===v?T.accent+"22":T.surface,border:`1.5px solid ${autoArchiveDays===v?T.accent:T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:autoArchiveDays===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:11}}>{l}</button>
+                  <button key={l} onClick={()=>setAutoArchiveDays(v)} aria-pressed={autoArchiveDays===v} style={{background:autoArchiveDays===v?T.accent+"22":T.surface,border:`1.5px solid ${autoArchiveDays===v?T.accent:T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:autoArchiveDays===v?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>{l}</button>
                 ))}
               </div>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>
+              <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:8}}>
                 Done tasks move to Archived after this long. You can still archive any task manually from its detail view.
               </div>
             </div>
@@ -3011,53 +3031,53 @@ export default function HomeworkPlanner() {
             {/* Reminders */}
             <SettingsSection title="Reminders" tour="reminders" {...sec("reminders")}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                <div><div style={{fontFamily:F.body,fontSize:12,color:T.text}}>Due date reminders</div><div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:1}}>Notify for tasks due today or overdue</div></div>
+                <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Due date reminders</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>Notify for tasks due today or overdue</div></div>
                 <Toggle on={notificationsEnabled} onChange={toggleNotifications} T={T} label="Due date reminders"/>
               </div>
-              {notificationNote&&<div style={{fontFamily:F.body,fontSize:10,color:ink("#FF4757",T.light),marginTop:8}}>{notificationNote}</div>}
-              {notificationsEnabled&&<div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>Only fires while this tab is open or when you reopen it, not true background push.</div>}
+              {notificationNote&&<div style={{fontFamily:F.body,fontSize:fz(10),color:ink("#FF4757",T.light),marginTop:8}}>{notificationNote}</div>}
+              {notificationsEnabled&&<div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:8}}>Only fires while this tab is open or when you reopen it, not true background push.</div>}
               {notificationsEnabled&&(
                 <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${T.border}`}}>
-                  <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Remind me</div>
+                  <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Remind me</div>
                   <div style={{display:"flex",flexDirection:"column",gap:6}}>
                     {REMINDER_OFFSETS.map(o=>(
                       <button key={o.key} onClick={()=>toggleOffset(o.key)} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left"}}>
                         <div style={{width:16,height:16,border:`2px solid ${enabledOffsets.includes(o.key)?T.accent:T.textFaint}`,borderRadius:4,background:enabledOffsets.includes(o.key)?T.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                          {enabledOffsets.includes(o.key)&&<span style={{color:contrastColor(T.accent),fontSize:10,fontWeight:"bold"}}>✓</span>}
+                          {enabledOffsets.includes(o.key)&&<span style={{color:contrastColor(T.accent),fontSize:fz(10),fontWeight:"bold"}}>✓</span>}
                         </div>
-                        <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>{o.label}</span>
+                        <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>{o.label}</span>
                       </button>
                     ))}
                   </div>
-                  <div style={{fontFamily:F.body,fontSize:10,color:T.textFaint,marginTop:8}}>
+                  <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:8}}>
                     Only applies to tasks with a specific due time set (not just a date).
                   </div>
                 </div>
               )}
             </SettingsSection>
-            <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>
+            <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:fz(11),padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>
             {(()=>{const n=tasks.filter(t=>t.done&&!t.archived).length;return(
-            <button disabled={n===0} onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived. You can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:n?"pointer":"default",opacity:n?1:0.45,width:"100%"}}>{n?`Clear ${plural(n)} completed`:"No completed tasks to clear"}</button>);})()}
+            <button disabled={n===0} onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived. You can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:fz(11),padding:"9px 14px",cursor:n?"pointer":"default",opacity:n?1:0.45,width:"100%"}}>{n?`Clear ${plural(n)} completed`:"No completed tasks to clear"}</button>);})()}
             {fbUser&&(
               <SettingsSection title="Danger Zone" danger {...sec("danger")}>
                 {!showDeleteAccountConfirm ? (
-                  <button onClick={()=>{setShowDeleteAccountConfirm(true);setDeleteConfirmText("");setDeleteAccountError(null);}} style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:11,padding:"9px 14px",cursor:"pointer",width:"100%"}}>Delete my account & all data</button>
+                  <button onClick={()=>{setShowDeleteAccountConfirm(true);setDeleteConfirmText("");setDeleteAccountError(null);}} style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:fz(11),padding:"9px 14px",cursor:"pointer",width:"100%"}}>Delete my account & all data</button>
                 ) : (
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,lineHeight:1.5}}>
+                    <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,lineHeight:1.5}}>
                       This permanently deletes your account, every task, and all settings, on this device and in the cloud. This can't be undone. Type <b>DELETE</b> to confirm.
                     </div>
-                    <input value={deleteConfirmText} onChange={e=>setDeleteConfirmText(e.target.value)} placeholder="DELETE" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontFamily:F.body,fontSize:13,outline:"none"}}/>
-                    {deleteAccountError&&<div style={{fontFamily:F.body,fontSize:11,color:ink("#FF4757",T.light)}}>{deleteAccountError}</div>}
+                    <input value={deleteConfirmText} onChange={e=>setDeleteConfirmText(e.target.value)} placeholder="DELETE" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontFamily:F.body,fontSize:fz(13),outline:"none"}}/>
+                    {deleteAccountError&&<div style={{fontFamily:F.body,fontSize:fz(11),color:ink("#FF4757",T.light)}}>{deleteAccountError}</div>}
                     <div style={{display:"flex",gap:7}}>
-                      <button onClick={()=>setShowDeleteAccountConfirm(false)} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11}}>Cancel</button>
-                      <button disabled={deleteConfirmText!=="DELETE"||deleteAccountBusy} onClick={deleteAccountForever} style={{flex:1,background:deleteConfirmText==="DELETE"?"#FF4757":T.surface,border:"none",borderRadius:9,padding:"9px 4px",cursor:deleteConfirmText==="DELETE"?"pointer":"not-allowed",color:deleteConfirmText==="DELETE"?"#fff":T.textFaint,fontFamily:F.body,fontSize:11,opacity:deleteAccountBusy?0.6:1}}>{deleteAccountBusy?"Deleting…":"Delete forever"}</button>
+                      <button onClick={()=>setShowDeleteAccountConfirm(false)} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 4px",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>Cancel</button>
+                      <button disabled={deleteConfirmText!=="DELETE"||deleteAccountBusy} onClick={deleteAccountForever} style={{flex:1,background:deleteConfirmText==="DELETE"?"#FF4757":T.surface,border:"none",borderRadius:9,padding:"9px 4px",cursor:deleteConfirmText==="DELETE"?"pointer":"not-allowed",color:deleteConfirmText==="DELETE"?"#fff":T.textFaint,fontFamily:F.body,fontSize:fz(11),opacity:deleteAccountBusy?0.6:1}}>{deleteAccountBusy?"Deleting…":"Delete forever"}</button>
                     </div>
                   </div>
                 )}
               </SettingsSection>
             )}
-            <div style={{textAlign:"center",fontFamily:F.body,fontSize:9,color:T.textFaint,paddingTop:4}}>DuePlanner v{__APP_VERSION__} · <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{color:T.textFaint}}>Privacy policy</a></div>
+            <div style={{textAlign:"center",fontFamily:F.body,fontSize:fz(9),color:T.textFaint,paddingTop:4}}>DuePlanner v{__APP_VERSION__} · <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{color:T.textFaint}}>Privacy policy</a></div>
           </div>
         )}
         </main>
@@ -3108,29 +3128,29 @@ export default function HomeworkPlanner() {
           bulk-action bar when that's showing. */}
       {undoToast!=null&&(
         <div role="status" className="fade-in" style={{position:"fixed",left:"calc(50% + var(--sb, 0px) / 2)",bottom:selectionMode&&selectedIds.length>0?130:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"10px 10px 10px 16px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",maxWidth:"calc(100vw - 32px)"}}>
-          <span style={{fontFamily:F.body,fontSize:12,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:200}}>{undoToast}</span>
-          <button onClick={undo} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:12,fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
+          <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:200}}>{undoToast}</span>
+          <button onClick={undo} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontFamily:F.body,fontSize:fz(12),fontWeight:500,cursor:"pointer",flexShrink:0}}>Undo</button>
         </div>
       )}
       {/* Bulk action bar -- only reachable via the "Select" toggle (any layout).
           Two rows so it stays short on a phone: the count and one-tap
           actions, then the three "set a field" menus side by side. */}
       {selectionMode&&selectedIds.length>0&&(()=>{
-        const pill:React.CSSProperties={background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 8px",fontFamily:F.body,fontSize:11,cursor:"pointer",minWidth:0,width:"100%"};
+        const pill:React.CSSProperties={background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 8px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer",minWidth:0,width:"100%"};
         return (
         <div role="toolbar" aria-label="Bulk actions" style={{position:"fixed",left:"calc(50% + var(--sb, 0px) / 2)",bottom:20,transform:"translateX(-50%)",zIndex:1500,display:"flex",flexDirection:"column",gap:8,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:"10px 12px",boxShadow:"0 6px 24px rgba(0,0,0,0.3)",width:"min(520px, calc(100vw - 32px))",boxSizing:"border-box"}}>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <span style={{fontFamily:F.body,fontSize:12,color:T.text,fontWeight:500,marginRight:"auto",whiteSpace:"nowrap"}}>{selectedIds.length} selected</span>
-            <button onClick={()=>bulkMarkDone(selectedIds)} style={{background:"#2ED57322",color:ink("#2ED573",T.light),border:"1px solid #2ED57344",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>✓ Done</button>
-            <button onClick={()=>bulkArchive(selectedIds)} style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Archive</button>
-            <button onClick={()=>bulkDelete(selectedIds)} style={{background:"#FF475711",color:ink("#FF4757",T.light),border:"1px solid #FF475733",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:11,cursor:"pointer"}}>Delete</button>
+            <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text,fontWeight:500,marginRight:"auto",whiteSpace:"nowrap"}}>{selectedIds.length} selected</span>
+            <button onClick={()=>bulkMarkDone(selectedIds)} style={{background:"#2ED57322",color:ink("#2ED573",T.light),border:"1px solid #2ED57344",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>✓ Done</button>
+            <button onClick={()=>bulkArchive(selectedIds)} style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>Archive</button>
+            <button onClick={()=>bulkDelete(selectedIds)} style={{background:"#FF475711",color:ink("#FF4757",T.light),border:"1px solid #FF475733",borderRadius:9,padding:"7px 10px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>Delete</button>
           </div>
           {bulkDate!=null
             ? <form onSubmit={e=>{e.preventDefault();if(bulkDate)bulkSetDue(selectedIds,bulkDate);}} style={{display:"flex",gap:6,alignItems:"center"}}>
                 <input type="date" autoFocus aria-label="New due date" value={bulkDate} onChange={e=>setBulkDate(e.target.value)} onKeyDown={e=>{if(e.key==="Escape")setBulkDate(null);}}
                   style={{...pill,color:T.text,flex:1,padding:"6px 8px"}}/>
-                <button type="submit" disabled={!bulkDate} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"7px 12px",fontFamily:F.body,fontSize:11,cursor:bulkDate?"pointer":"default",opacity:bulkDate?1:0.5}}>Set</button>
-                <button type="button" onClick={()=>setBulkDate(null)} aria-label="Cancel picking a date" className="hit" style={{background:"none",border:"none",color:T.textMuted,fontSize:15,cursor:"pointer",padding:"0 4px"}}>×</button>
+                <button type="submit" disabled={!bulkDate} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"7px 12px",fontFamily:F.body,fontSize:fz(11),cursor:bulkDate?"pointer":"default",opacity:bulkDate?1:0.5}}>Set</button>
+                <button type="button" onClick={()=>setBulkDate(null)} aria-label="Cancel picking a date" className="hit" style={{background:"none",border:"none",color:T.textMuted,fontSize:fz(15),cursor:"pointer",padding:"0 4px"}}>×</button>
               </form>
             : <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:6}}>
                 <select value="" aria-label="Set subject" onChange={e=>{if(e.target.value)bulkSetSubject(selectedIds,e.target.value);}} style={pill}>

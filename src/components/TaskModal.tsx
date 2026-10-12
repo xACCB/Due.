@@ -10,6 +10,7 @@ import { contrastColor, getPriority, formatDate, formatTime, formatDuration, cou
 import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "../lib/spring";
 import { LIMITS } from "../lib/limits";
 import { FONT } from "../fonts";
+import { fz } from "../lib/textSize";
 
 // ─── TASK SESSION MODAL ───────────────────────────────────────────────────────
 // Defined at module scope (not nested in HomeworkPlanner) so its identity stays
@@ -249,9 +250,9 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
             <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
-                {task.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{task.subject}</span>}
-                {!task.done&&<span style={{background:priColor(pr,colorCodeUrgency)+"22",color:ink(priColor(pr,colorCodeUrgency),T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>{pr[0].toUpperCase()+pr.slice(1)} priority{task.priorityOverride?" (set manually)":""}</span>}
-                {task.done&&<span style={{background:"#2ED57322",color:ink("#2ED573",T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:11}}>✓ Done</span>}
+                {task.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(11)}}>{task.subject}</span>}
+                {!task.done&&<span style={{background:priColor(pr,colorCodeUrgency)+"22",color:ink(priColor(pr,colorCodeUrgency),T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(11)}}>{pr[0].toUpperCase()+pr.slice(1)} priority{task.priorityOverride?" (set manually)":""}</span>}
+                {task.done&&<span style={{background:"#2ED57322",color:ink("#2ED573",T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(11)}}>✓ Done</span>}
               </div>
               {page&&draft
                 ?<input value={draft.title} maxLength={500} aria-label="Title" onChange={e=>setDraft({...draft,title:e.target.value})} onBlur={()=>commitDraft()} onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
@@ -259,7 +260,7 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
                 :<div style={{fontFamily:F.heading,fontSize:22,color:T.text,lineHeight:1.2}}>{task.title}</div>}
             </div>
             {!page&&<div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-              {!draft&&<button data-tour="task-edit" onClick={startEdit} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:8,color:T.textMuted,fontSize:11,cursor:"pointer",padding:"5px 10px"}}>Edit</button>}
+              {!draft&&<button data-tour="task-edit" onClick={startEdit} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:8,color:T.textMuted,fontSize:fz(11),cursor:"pointer",padding:"5px 10px"}}>Edit</button>}
               {!sessionActive&&<button onClick={onClose} aria-label="Close" className="hit hit-sm" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",padding:"0 0 0 8px",lineHeight:1}}>×</button>}
             </div>}
           </div>
@@ -267,9 +268,9 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
           {/* Edit panel. On the page it's always open, and a field saves when you
               leave it (the form's onBlur) or at once for a choice (change(...,true)). */}
           {draft&&(()=>{
-            const field={background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"8px 10px",fontSize:12,outline:"none",width:"100%",boxSizing:"border-box" as const};
-            const label={fontSize:10,color:T.textMuted,textTransform:"uppercase" as const,letterSpacing:"0.08em",marginBottom:4,display:"block"};
-            const clear={background:"none",border:"none",padding:"6px 0 0",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:11,textDecoration:"underline"};
+            const field={background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"8px 10px",fontSize:fz(12),outline:"none",width:"100%",boxSizing:"border-box" as const};
+            const label={fontSize:fz(10),color:T.textMuted,textTransform:"uppercase" as const,letterSpacing:"0.08em",marginBottom:4,display:"block"};
+            const clear={background:"none",border:"none",padding:"6px 0 0",cursor:"pointer",color:T.textMuted,fontFamily:F.body,fontSize:fz(11),textDecoration:"underline"};
             const subjectOptions=draft.subject&&!subjects.includes(draft.subject)?[...subjects,draft.subject]:subjects;
             const change=(patch:Partial<TaskDraft>,saveNow?:boolean)=>{const d={...draft,...patch};setDraft(d);if(page&&saveNow)commitDraft(d);};
             return (
@@ -308,14 +309,14 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
                 <label style={{flex:1}}><span style={label}>Minutes</span>
                   <input className="edit-field" inputMode="numeric" placeholder="0" value={draft.estM} onFocus={e=>e.currentTarget.select()} onChange={e=>setDraft({...draft,estM:e.target.value.replace(/\D/g,"").slice(0,4)})} style={field}/></label>
               </div>
-              {(parseInt(draft.estM,10)||0)>=60&&<div style={{fontSize:10,color:T.textMuted,marginTop:-4}}>Saves as {formatDuration(draftEstMins)}</div>}
+              {(parseInt(draft.estM,10)||0)>=60&&<div style={{fontSize:fz(10),color:T.textMuted,marginTop:-4}}>Saves as {formatDuration(draftEstMins)}</div>}
               <label><span style={label}>Repeats</span>
                 <select className="edit-field" value={draft.recurrence} onChange={e=>change({recurrence:e.target.value as Recurrence},true)} style={field}>
                   <option value="none">Doesn't repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
                 </select></label>
               {!page&&<div style={{display:"flex",gap:8}}>
-                <button type="button" onClick={()=>setDraft(null)} style={{flex:1,background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px",color:T.textMuted,cursor:"pointer",fontSize:12}}>Cancel</button>
-                <button type="submit" style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px",cursor:"pointer",fontSize:12,fontWeight:500}}>Save</button>
+                <button type="button" onClick={()=>setDraft(null)} style={{flex:1,background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px",color:T.textMuted,cursor:"pointer",fontSize:fz(12)}}>Cancel</button>
+                <button type="submit" style={{flex:1,background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px",cursor:"pointer",fontSize:fz(12),fontWeight:500}}>Save</button>
               </div>}
             </form>
             );
@@ -324,17 +325,17 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
           {/* Info row */}
           <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
             {task.dueDate&&<div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` at ${formatTime(task.dueTime,h24)}`:""}</span>
-              {!task.done&&countdown(task.dueDate,task.dueTime,now)&&<span style={{fontFamily:F.body,fontSize:12,color:ink(priColor(pr,colorCodeUrgency),T.light),fontWeight:500}}>· {countdown(task.dueDate,task.dueTime,now)}</span>}
+              <span style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` at ${formatTime(task.dueTime,h24)}`:""}</span>
+              {!task.done&&countdown(task.dueDate,task.dueTime,now)&&<span style={{fontFamily:F.body,fontSize:fz(12),color:ink(priColor(pr,colorCodeUrgency),T.light),fontWeight:500}}>· {countdown(task.dueDate,task.dueTime,now)}</span>}
             </div>}
             {task.estMins>0&&<div style={{background:T.card,borderRadius:10,padding:"8px 14px",border:`1px solid ${T.accent}44`,display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontFamily:F.body,fontSize:12,color:T.accent,fontWeight:500}}>
+              <span style={{fontFamily:F.body,fontSize:fz(12),color:T.accent,fontWeight:500}}>
                 {formatDuration(task.estMins)} estimated
               </span>
             </div>}
             {totalSessionMins>0&&<div style={{background:"#2ED57322",borderRadius:10,padding:"8px 14px",border:"1px solid #2ED57344",display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:14}}>✓</span>
-              <span style={{fontFamily:F.body,fontSize:12,color:ink("#2ED573",T.light)}}>{formatDuration(totalSessionMins)} spent today</span>
+              <span style={{fontSize:fz(14)}}>✓</span>
+              <span style={{fontFamily:F.body,fontSize:fz(12),color:ink("#2ED573",T.light)}}>{formatDuration(totalSessionMins)} spent today</span>
             </div>}
           </div>
 
@@ -342,26 +343,26 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
           {/* Not on the task page (removed at the user's request): the date field is right there. */}
           {!task.done&&!draft&&!page&&(
             <div data-tour="task-snooze" style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:-8,marginBottom:18}}>
-              <span style={{fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginRight:2}}>Snooze</span>
+              <span style={{fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginRight:2}}>Snooze</span>
               {([["later","In 3 hours"],["tomorrow","Tomorrow"],["week","Next week"]] as const).map(([k,l])=>(
-                <button key={k} onClick={()=>onSnooze(k)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:11}}>{l}</button>
+                <button key={k} onClick={()=>onSnooze(k)} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:fz(11)}}>{l}</button>
               ))}
               {task.recurrence&&task.recurrence!=="none"&&(
-                <button data-tour="task-skip" onClick={onSkipOccurrence} title="Move this repeating task to its next occurrence without completing it" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:11}}>Skip this one ↻</button>
+                <button data-tour="task-skip" onClick={onSkipOccurrence} title="Move this repeating task to its next occurrence without completing it" style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 12px",color:T.text,cursor:"pointer",fontSize:fz(11)}}>Skip this one ↻</button>
               )}
             </div>
           )}
 
           {/* Priority override */}
           <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
-            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Priority</div>
+            <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Priority</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
               {([null,"low","medium","high"] as const).map(p=>{
                 const active=p===null?!task.priorityOverride:task.priorityOverride===p;
                 const label=p===null?"Auto":p[0].toUpperCase()+p.slice(1);
                 const color=p===null?T.accent:priColor(p,colorCodeUrgency);
                 return <button key={p??"auto"} aria-pressed={active} onClick={()=>onSetPriorityOverride(p)}
-                  style={{background:active?color+"22":T.surface,border:`1.5px solid ${active?color:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:active?color:T.textMuted,fontFamily:F.body,fontSize:11}}>
+                  style={{background:active?color+"22":T.surface,border:`1.5px solid ${active?color:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:active?color:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>
                   {label}
                 </button>;
               })}
@@ -371,44 +372,44 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
           {/* Subtasks */}
           <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:subtasks.length?10:0}}>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"}}>Subtasks</div>
-              {subtasks.length>0&&<div style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>{subtasks.filter(s=>s.done).length}/{subtasks.length}</div>}
+              <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"}}>Subtasks</div>
+              {subtasks.length>0&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint}}>{subtasks.filter(s=>s.done).length}/{subtasks.length}</div>}
             </div>
             {subtasks.length>0&&<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
               {subtasks.map(s=>(
                 <div key={s.id} style={{display:"flex",alignItems:"center",gap:8}}>
                   <button onClick={()=>onUpdateSubtasks(subtasks.map(x=>x.id===s.id?{...x,done:!x.done}:x))} aria-label={s.done?`Uncheck ${s.text}`:`Check off ${s.text}`} className="hit hit-row" style={{background:s.done?"#2ED573":"none",border:`1.5px solid ${s.done?"#2ED573":T.textFaint}`,borderRadius:"50%",width:16,height:16,cursor:"pointer",flexShrink:0,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    {s.done&&<span style={{color:"#111",fontSize:9,fontWeight:"bold"}}>✓</span>}
+                    {s.done&&<span style={{color:"#111",fontSize:fz(9),fontWeight:"bold"}}>✓</span>}
                   </button>
-                  <span style={{flex:1,fontFamily:F.body,fontSize:12,color:s.done?T.textFaint:T.text,textDecoration:s.done?"line-through":"none"}}>{s.text}</span>
-                  <button onClick={()=>onUpdateSubtasks(subtasks.filter(x=>x.id!==s.id))} aria-label={`Delete subtask ${s.text}`} className="hit hit-row" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 2px"}}>×</button>
+                  <span style={{flex:1,fontFamily:F.body,fontSize:fz(12),color:s.done?T.textFaint:T.text,textDecoration:s.done?"line-through":"none"}}>{s.text}</span>
+                  <button onClick={()=>onUpdateSubtasks(subtasks.filter(x=>x.id!==s.id))} aria-label={`Delete subtask ${s.text}`} className="hit hit-row" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(13),lineHeight:1,padding:"0 2px"}}>×</button>
                 </div>
               ))}
             </div>}
             <div style={{display:"flex",gap:6}}>
-              <input value={newSubtaskText} onChange={e=>setNewSubtaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSubtask()} placeholder={subtasks.length>=LIMITS.subtasks?`Limit of ${LIMITS.subtasks} subtasks reached`:"Add a subtask..."} disabled={subtasks.length>=LIMITS.subtasks} maxLength={500} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
-              <button onClick={addSubtask} aria-label="Add subtask" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:12,fontWeight:500}}>+</button>
+              <input value={newSubtaskText} onChange={e=>setNewSubtaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSubtask()} placeholder={subtasks.length>=LIMITS.subtasks?`Limit of ${LIMITS.subtasks} subtasks reached`:"Add a subtask..."} disabled={subtasks.length>=LIMITS.subtasks} maxLength={500} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:fz(12),outline:"none"}}/>
+              <button onClick={addSubtask} aria-label="Add subtask" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:fz(12),fontWeight:500}}>+</button>
             </div>
           </div>
 
           {/* Tags */}
           <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
-            <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:tags.length?10:0}}>Tags</div>
+            <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:tags.length?10:0}}>Tags</div>
             {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
               {tags.map(tag=>(
-                <span key={tag} style={{display:"flex",alignItems:"center",gap:4,background:T.accent+"22",color:T.accent,borderRadius:999,padding:"3px 4px 3px 10px",fontFamily:F.body,fontSize:11}}>
+                <span key={tag} style={{display:"flex",alignItems:"center",gap:4,background:T.accent+"22",color:T.accent,borderRadius:999,padding:"3px 4px 3px 10px",fontFamily:F.body,fontSize:fz(11)}}>
                   {tag}
-                  <button onClick={()=>onSetTags(tags.filter(x=>x!==tag))} aria-label={`Remove tag ${tag}`} className="hit hit-sm" style={{background:"none",border:"none",color:T.accent,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 4px"}}>×</button>
+                  <button onClick={()=>onSetTags(tags.filter(x=>x!==tag))} aria-label={`Remove tag ${tag}`} className="hit hit-sm" style={{background:"none",border:"none",color:T.accent,cursor:"pointer",fontSize:fz(13),lineHeight:1,padding:"0 4px"}}>×</button>
                 </span>
               ))}
             </div>}
             <div style={{display:"flex",gap:6}}>
-              <input value={newTagText} onChange={e=>setNewTagText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTag()} placeholder={tags.length>=LIMITS.tags?`Limit of ${LIMITS.tags} tags reached`:"Add a tag..."} disabled={tags.length>=LIMITS.tags} maxLength={100} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:12,outline:"none"}}/>
-              <button onClick={addTag} aria-label="Add tag" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:12,fontWeight:500}}>+</button>
+              <input value={newTagText} onChange={e=>setNewTagText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTag()} placeholder={tags.length>=LIMITS.tags?`Limit of ${LIMITS.tags} tags reached`:"Add a tag..."} disabled={tags.length>=LIMITS.tags} maxLength={100} style={{flex:1,background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontFamily:F.body,fontSize:fz(12),outline:"none"}}/>
+              <button onClick={addTag} aria-label="Add tag" style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:F.body,fontSize:fz(12),fontWeight:500}}>+</button>
             </div>
             {tags.length<LIMITS.tags&&allTags.filter(t=>!tags.includes(t)).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>
               {allTags.filter(t=>!tags.includes(t)).slice(0,8).map(t=>(
-                <button key={t} onClick={()=>onSetTags([...tags,t])} style={{background:"none",border:`1px dashed ${T.border}`,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:10,color:T.textFaint,cursor:"pointer"}}>+{t}</button>
+                <button key={t} onClick={()=>onSetTags([...tags,t])} style={{background:"none",border:`1px dashed ${T.border}`,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(10),color:T.textFaint,cursor:"pointer"}}>+{t}</button>
               ))}
             </div>}
           </div>
@@ -417,20 +418,20 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
           <div style={{background:T.card,borderRadius:16,padding:"20px",border:`1px solid ${sessionActive?T.accent+"66":T.border}`,marginBottom:16,textAlign:"center",transition:"border-color .2s ease-out"}}>
             {sessionActive?(
               <>
-                <div style={{fontFamily:F.body,fontSize:11,color:T.accent,marginBottom:8,letterSpacing:"0.1em",textTransform:"uppercase"}}>Session in progress</div>
+                <div style={{fontFamily:F.body,fontSize:fz(11),color:T.accent,marginBottom:8,letterSpacing:"0.1em",textTransform:"uppercase"}}>Session in progress</div>
                 <div style={{fontFamily:F.heading,fontSize:52,color:T.text,lineHeight:1,marginBottom:4}}>
                   {sh>0?`${sh}:`:""}{String(sm).padStart(2,"0")}:{String(ss).padStart(2,"0")}
                 </div>
-                <div style={{fontFamily:F.body,fontSize:11,color:T.textFaint,marginBottom:18}}>Keep going!</div>
-                <button onClick={onEndSession} style={{background:"#FF4757",color:"#fff",border:"none",borderRadius:12,padding:"13px 32px",fontFamily:F.heading,fontSize:17,cursor:"pointer",width:"100%",boxShadow:"0 4px 20px #FF475744"}}>
+                <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint,marginBottom:18}}>Keep going!</div>
+                <button onClick={onEndSession} style={{background:"#FF4757",color:"#fff",border:"none",borderRadius:12,padding:"13px 32px",fontFamily:F.heading,fontSize:fz(17),cursor:"pointer",width:"100%",boxShadow:"0 4px 20px #FF475744"}}>
                   End Session
                 </button>
               </>
             ):(
               <>
-                <div style={{fontFamily:F.body,fontSize:11,color:T.textMuted,marginBottom:8,letterSpacing:"0.1em",textTransform:"uppercase"}}>Ready to work?</div>
+                <div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:8,letterSpacing:"0.1em",textTransform:"uppercase"}}>Ready to work?</div>
                 <div style={{fontFamily:F.heading,fontSize:52,color:T.textFaint,lineHeight:1,marginBottom:18}}>00:00</div>
-                <button onClick={onStartSession} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:12,padding:"13px 32px",fontFamily:F.heading,fontSize:17,cursor:"pointer",width:"100%",boxShadow:`0 4px 20px ${T.accentGlow}`}}>
+                <button onClick={onStartSession} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:12,padding:"13px 32px",fontFamily:F.heading,fontSize:fz(17),cursor:"pointer",width:"100%",boxShadow:`0 4px 20px ${T.accentGlow}`}}>
                   Start Session
                 </button>
               </>
@@ -440,19 +441,19 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
           {/* Session history */}
           {sessionHistory.length>0&&(
             <div style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,marginBottom:16}}>
-              <div style={{fontFamily:F.body,fontSize:10,color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Sessions today</div>
+              <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Sessions today</div>
               {sessionHistory.map((s,i)=>(
                 <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<sessionHistory.length-1?`1px solid ${T.borderFaint}`:"none"}}>
-                  <span style={{fontFamily:F.body,fontSize:12,color:T.text}}>Session {i+1}</span>
+                  <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Session {i+1}</span>
                   <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                    <span style={{fontFamily:F.body,fontSize:11,color:T.textFaint}}>{s.date}</span>
-                    <span style={{fontFamily:F.body,fontSize:12,color:T.accent,fontWeight:500}}>{formatDuration(s.mins)}</span>
+                    <span style={{fontFamily:F.body,fontSize:fz(11),color:T.textFaint}}>{s.date}</span>
+                    <span style={{fontFamily:F.body,fontSize:fz(12),color:T.accent,fontWeight:500}}>{formatDuration(s.mins)}</span>
                   </div>
                 </div>
               ))}
               <div style={{display:"flex",justifyContent:"space-between",marginTop:8,paddingTop:8,borderTop:`1px solid ${T.border}`}}>
-                <span style={{fontFamily:F.body,fontSize:12,color:T.textMuted}}>Total</span>
-                <span style={{fontFamily:F.heading,fontSize:16,color:T.accent}}>{formatDuration(totalSessionMins)}</span>
+                <span style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted}}>Total</span>
+                <span style={{fontFamily:F.heading,fontSize:fz(16),color:T.accent}}>{formatDuration(totalSessionMins)}</span>
               </div>
             </div>
           )}
@@ -460,38 +461,38 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
           {/* Action buttons */}
           <div style={{display:"grid",gridTemplateColumns:task.done?"1fr 1fr 1fr":"1fr 1fr",gap:8}}>
             <button onClick={onToggleDone}
-              style={{background:task.done?"#FF475722":"#2ED57322",color:ink(task.done?"#FF4757":"#2ED573",T.light),border:`1px solid ${task.done?"#FF475744":"#2ED57344"}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
+              style={{background:task.done?"#FF475722":"#2ED57322",color:ink(task.done?"#FF4757":"#2ED573",T.light),border:`1px solid ${task.done?"#FF475744":"#2ED57344"}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>
               {task.done?"↩ Mark undone":"✓ Mark done"}
             </button>
             {task.done&&!task.archived&&(
               <button onClick={onArchive}
-                style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
+                style={{background:T.surface,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>
                 Archive
               </button>
             )}
             {task.archived&&(
               <button onClick={onRestore}
-                style={{background:T.surface,color:T.text,border:`1px solid ${T.border}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
+                style={{background:T.surface,color:T.text,border:`1px solid ${T.border}`,borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>
                 Restore
               </button>
             )}
             <button onClick={onDelete}
-              style={{background:"#FF475711",color:ink("#FF4757",T.light),border:"1px solid #FF475733",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:12,cursor:"pointer"}}>
+              style={{background:"#FF475711",color:ink("#FF4757",T.light),border:"1px solid #FF475733",borderRadius:11,padding:"11px",fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>
               Delete task
             </button>
           </div>
           <button data-tour="task-duplicate" onClick={onDuplicate}
-            style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
+            style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>
             Duplicate task
           </button>
           {templateName===null&&<button onClick={()=>{setTemplateSaved(false);setTemplateName(task.title);}}
-            style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:11,cursor:"pointer"}}>
+            style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>
             {templateSaved?"✓ Saved. Find it under \"+ Add homework\"":"Save as template"}
           </button>}
           {templateName!==null&&<form onSubmit={e=>{e.preventDefault();if(templateName.trim()){onSaveAsTemplate(templateName.trim());setTemplateName(null);setTemplateSaved(true);}}} style={{display:"flex",gap:6,marginTop:8}}>
-            <input autoFocus value={templateName} onChange={e=>setTemplateName(e.target.value)} placeholder="Template name" aria-label="Template name" style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:12,outline:"none"}}/>
-            <button type="submit" disabled={!templateName.trim()} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:"pointer",fontSize:12,fontWeight:500,opacity:templateName.trim()?1:0.5}}>Save</button>
-            <button type="button" onClick={()=>setTemplateName(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",color:T.textMuted,cursor:"pointer",fontSize:12}}>Cancel</button>
+            <input autoFocus value={templateName} onChange={e=>setTemplateName(e.target.value)} placeholder="Template name" aria-label="Template name" style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:fz(12),outline:"none"}}/>
+            <button type="submit" disabled={!templateName.trim()} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:"pointer",fontSize:fz(12),fontWeight:500,opacity:templateName.trim()?1:0.5}}>Save</button>
+            <button type="button" onClick={()=>setTemplateName(null)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 12px",color:T.textMuted,cursor:"pointer",fontSize:fz(12)}}>Cancel</button>
           </form>}
         </div>
   );

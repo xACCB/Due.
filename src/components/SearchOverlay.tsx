@@ -6,6 +6,7 @@ import type { ThemeObj } from "../themes";
 import { getPriority, daysUntil, ink } from "../lib/format";
 import { FONT } from "../fonts";
 import { IconSearch } from "./icons";
+import { fz } from "../lib/textSize";
 
 // Search as a floating panel: the search field lifts off the Tasks tab and
 // floats up the middle of a blurred screen, and matching tasks (title, subject
@@ -107,8 +108,8 @@ export function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,o
           <IconSearch/>
           <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tasks..." aria-label="Search tasks" enterKeyHint="search"
             onKeyDown={e=>{if(e.key==="Enter"&&results[0]){e.preventDefault();onOpenTask(results[0]);}}}
-            style={{flex:1,minWidth:0,background:"none",border:"none",color:T.text,padding:"9px 0",fontFamily:F.body,fontSize:16,outline:"none"}}/>
-          <button onClick={close} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",fontFamily:F.body,fontSize:11,padding:"6px 7px"}}>Cancel</button>
+            style={{flex:1,minWidth:0,background:"none",border:"none",color:T.text,padding:"9px 0",fontFamily:F.body,fontSize:fz(16),outline:"none"}}/>
+          <button onClick={close} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",fontFamily:F.body,fontSize:fz(11),padding:"6px 7px"}}>Cancel</button>
         </div>
         <div ref={resultsRef} style={{display:"flex",flexDirection:"column",gap:6,overflowY:"auto",overscrollBehavior:"contain",minHeight:0,paddingBottom:8}}>
           {results.map((t,i)=>{
@@ -118,13 +119,13 @@ export function SearchOverlay({tasks,T,F,subjectColors,colorCodeUrgency,origin,o
               <button key={t.id} data-result onClick={()=>onOpenTask(t)} className="search-pop"
                 style={{animationDelay:`${Math.min(i,8)*35}ms`,display:"flex",alignItems:"center",gap:10,width:"100%",textAlign:"left",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 13px",cursor:"pointer",color:T.text}}>
                 <span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:t.done?T.textFaint:priColor(pr,colorCodeUrgency),flexShrink:0}}/>
-                <span style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none"}}>{highlight(t.title)}</span>
-                {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:10,flexShrink:0}}>{t.subject}</span>}
-                {!t.done&&t.dueDate&&<span style={{fontFamily:F.body,fontSize:10,color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{daysUntil(t.dueDate)}</span>}
+                <span style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:fz(14),overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.done?T.textFaint:T.text,textDecoration:t.done?"line-through":"none"}}>{highlight(t.title)}</span>
+                {t.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:fz(10),flexShrink:0}}>{t.subject}</span>}
+                {!t.done&&t.dueDate&&<span style={{fontFamily:F.body,fontSize:fz(10),color:ink(priColor(pr,colorCodeUrgency),T.light),flexShrink:0}}>{daysUntil(t.dueDate)}</span>}
               </button>
             );
           })}
-          <div aria-live="polite" style={{textAlign:"center",fontFamily:F.body,fontSize:11,color:T.textMuted,padding:"6px 0"}}>
+          <div aria-live="polite" style={{textAlign:"center",fontFamily:F.body,fontSize:fz(11),color:T.textMuted,padding:"6px 0"}}>
             {!q?"Type a title, subject or tag":results.length===0?`No tasks match "${query.trim()}"`:<span className="sr-only">{results.length} {results.length===1?"task":"tasks"} found</span>}
           </div>
         </div>

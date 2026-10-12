@@ -28,7 +28,7 @@ export function SettingsSection({id,title,open,onToggle,T,F,tour,danger,gap=0,ch
 // matters so it isn't torn down and recreated on every unrelated re-render.
 export function Toggle({on,onChange,T,label}:{on:boolean;onChange:(v:boolean)=>void;T:ThemeObj;label:string}){
   const trackColor=on?T.accent:T.solidBorder;
-  return <button className="tog" role="switch" aria-checked={on} aria-label={label} onClick={()=>onChange(!on)} style={{background:trackColor}}>
+  return <button className="tog hit hit-tog" role="switch" aria-checked={on} aria-label={label} onClick={()=>onChange(!on)} style={{background:trackColor}}>
     <span style={{position:"absolute",top:3,left:on?21:3,width:14,height:14,borderRadius:"50%",background:contrastColor(trackColor),boxShadow:"0 1px 3px rgba(0,0,0,0.4)",transition:"left .2s ease-out",display:"block"}}/>
   </button>;
 }

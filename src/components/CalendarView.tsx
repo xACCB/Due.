@@ -135,7 +135,7 @@ export function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart
               return(
                 <div key={t.id} onClick={()=>onOpenTask(t)} style={{display:"flex",alignItems:"center",gap:10,background:T.surface,borderRadius:10,padding:"9px 11px",cursor:"pointer"}}>
                   <button aria-label={t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();onToggleDone(t.id);}}
-                    style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    className="hit" style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                     {t.done&&<CheckMark size={10}/>}
                   </button>
                   <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:14,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
@@ -290,7 +290,7 @@ export function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone
                   return(
                     <div key={t.id} onClick={()=>{if(moved.current){moved.current=false;return;}onOpenTask(t);}} style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:10,padding:"10px 11px",cursor:"pointer",flexShrink:0}}>
                       <button aria-label={t.done?`Mark ${t.title} not done`:`Mark ${t.title} done`} onClick={e=>{e.stopPropagation();onToggleDone(t.id);}}
-                        style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        className="hit" style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${t.done?"#2ED573":T.textFaint}`,background:t.done?"#2ED573":"none",cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         {t.done&&<CheckMark size={10}/>}
                       </button>
                       <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(t.done?" strike":"")} aria-haspopup="dialog" style={{flex:1,minWidth:0,fontFamily:F.heading,fontSize:15,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>

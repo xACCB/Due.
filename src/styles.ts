@@ -81,6 +81,19 @@ export function buildCss(T:CssTheme,F:{body:string}):string{
     .strike-anim{animation:strikeDraw .42s .19s cubic-bezier(.65,0,.35,1) both;}
     @keyframes strikeDraw{from{background-size:0% 1.5px}}
     @media (prefers-reduced-motion:reduce){.check-draw polyline{animation:none;stroke-dashoffset:0;}.check-pop,.strike-anim,.search-pop,.sec-body,.pop,.fade-in{animation:none;}}
+    /* Small controls (a check, a x, an arrow, a switch) were only as easy to
+       press as they are big, so a tap had to land exactly on them. .hit keeps
+       the control's size and look and adds an invisible margin that also
+       counts as pressing it: --hit is how far it reaches past each edge (an
+       inset, so negative). The second class narrows it where a neighbour is
+       close, so the margin never covers another control. */
+    .hit{position:relative;}
+    .hit::after{content:"";position:absolute;inset:var(--hit,-10px);}
+    .hit-sm{--hit:-6px;}
+    .hit-tog{--hit:-8px -6px;}
+    .hit-row{--hit:-5px -10px;}
+    .hit-arrow{--hit:-2px -6px -2px -10px;}
+    .hit-grip{--hit:-12px -3px -12px -12px;}
     .rb{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;border-radius:999px;padding:2px 8px;}
     .tog{width:38px;height:20px;border-radius:999px;border:none;cursor:pointer;transition:background .2s ease-out;position:relative;flex-shrink:0;}
     .sl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:10px 0 6px;}

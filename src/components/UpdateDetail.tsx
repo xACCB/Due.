@@ -116,7 +116,7 @@ export function UpdateDetail({items,index,T,F,origin,onIndex,onDismiss,onClosing
         <div ref={bodyRef} style={{padding:"20px 20px 16px",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
             <span style={{background:T.cardAlt,color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>{item.kind}</span>
-            <button ref={closeRef} onClick={()=>close()} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:20,lineHeight:1,padding:"2px 4px"}}>×</button>
+            <button ref={closeRef} onClick={()=>close()} aria-label="Close" className="hit" style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:20,lineHeight:1,padding:"2px 4px"}}>×</button>
           </div>
           <div>
             <h2 id="update-detail-title" style={{margin:0,fontFamily:F.heading,fontWeight:400,fontSize:26,lineHeight:1.15,color:T.text}}>{item.headline}</h2>

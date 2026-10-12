@@ -41,7 +41,7 @@ export function SidebarSubjects({groups,open,onToggleOpen,picked,onPick,onOpenTa
         return(
           <div key={g.name}>
             <div style={{display:"flex",alignItems:"center"}}>
-              <button onClick={()=>onToggleOpen(g.name)} aria-expanded={isOpen} aria-label={`${isOpen?"Hide":"Show"} ${label} tasks`} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",padding:"8px 4px 8px 8px",borderRadius:8,display:"flex",flexShrink:0}}>
+              <button className="hit hit-arrow" onClick={()=>onToggleOpen(g.name)} aria-expanded={isOpen} aria-label={`${isOpen?"Hide":"Show"} ${label} tasks`} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",padding:"8px 4px 8px 8px",borderRadius:8,display:"flex",flexShrink:0}}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{transform:isOpen?"rotate(90deg)":"none",transition:"transform .2s ease-out"}}><polyline points="9,5 16,12 9,19"/></svg>
               </button>
               <button className="sb-row" onClick={()=>onPick(g.name)} aria-pressed={picked===g.name} title={`Show only ${label} on Home`} style={{flex:1,minWidth:0,padding:"8px 10px 8px 6px",gap:8}}>

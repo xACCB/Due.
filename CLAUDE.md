@@ -763,6 +763,15 @@ Chrome accessibility tree):
   `<main className="app-main">`; Focus Mode's root is `<main>`. Selected-option buttons use
   `aria-pressed`, disclosures `aria-expanded`. The sidebar's opener is a disclosure button (`aria-expanded`), not
   an ARIA menu.
+- **Tap areas** (2026-10-12): a small control (a check, a ×, the sidebar buttons, a subject's
+  arrow, a `Toggle`, the reorder handle) carries the `.hit` class, which adds an invisible `::after`
+  margin that also counts as pressing it (`--hit`, an inset, 10px by default), without changing its
+  size or look. Give any new small control `.hit`. Where a neighbour is close, add the narrower
+  `.hit-sm` / `.hit-row` / `.hit-tog` / `.hit-arrow` / `.hit-grip`: the margin must never cover part
+  of another control (in a stacked list, at most half the gap between rows; the subtask rows were
+  spaced out to 10px for this). The template chips' × is deliberately left alone, since its
+  neighbour is the template itself and deleting one can't be undone. Check a change by sampling
+  points on every other control with `elementFromPoint` and seeing none resolve to a `.hit`.
 - Keyboard focus ring: a global `:focus-visible` rule with `!important` (beats inline
   `outline:none`).
 - Colored text goes through `ink(color, T.light)` (module scope, wraps `readableOn()` in

@@ -46,7 +46,7 @@ export function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncS
       <div style={{maxWidth:560,margin:"0 auto",padding:"20px 16px 40px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
           <div style={{fontFamily:F.heading,fontSize:22,color:T.accent}}>Profile</div>
-          <button onClick={()=>setShowProfile(false)} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+          <button onClick={()=>setShowProfile(false)} aria-label="Close" className="hit" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
         </div>
         <div role="status" style={{textAlign:"center",fontFamily:F.body,fontSize:12,color:T.textFaint,marginTop:48}}>Loading your profile…</div>
       </div>
@@ -56,7 +56,7 @@ export function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncS
   if (!fbUser) return (
     // ── SIGN IN SCREEN (monkeytype-style) ─────────────────────────────────────
     <div className="sec-body" style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px"}}>
-      <button onClick={()=>setShowProfile(false)} aria-label="Close" style={{position:"absolute",top:20,right:20,background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+      <button onClick={()=>setShowProfile(false)} aria-label="Close" className="hit" style={{position:"absolute",top:20,right:20,background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
       {/* Logo */}
       <div style={{marginBottom:40,textAlign:"center"}}>
         <div style={{fontFamily:F.heading,fontSize:42,color:T.accent,lineHeight:1}}>Due<span style={{color:T.text}}>Planner</span></div>
@@ -99,7 +99,7 @@ export function ProfileModal({T,F,fbUser,authPending,signInError,syncError,syncS
         {/* Header */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
           <div style={{fontFamily:F.heading,fontSize:22,color:T.accent}}>Profile</div>
-          <button onClick={()=>setShowProfile(false)} aria-label="Close" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+          <button onClick={()=>setShowProfile(false)} aria-label="Close" className="hit" style={{background:"none",border:"none",color:T.textFaint,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
         </div>
 
         {/* Avatar + name */}

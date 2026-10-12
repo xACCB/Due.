@@ -57,7 +57,7 @@ export function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colo
         {reorderable&&live&&!selectionMode&&(
           // Drag handle, and the keyboard way to reorder: focus it and use the
           // arrow keys. A div, not a <button> -- see activateOnKey.
-          <div role="button" tabIndex={0} data-reorder aria-label={`Reorder ${task.title}`} title="Drag, or use the arrow keys"
+          <div role="button" tabIndex={0} className="hit hit-grip" data-reorder aria-label={`Reorder ${task.title}`} title="Drag, or use the arrow keys"
             onClick={e=>e.stopPropagation()}
             onKeyDown={e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();e.stopPropagation();onMoveBy?.(task.id,e.key==="ArrowUp"?-1:1);}}}
             onPointerDown={e=>{e.stopPropagation();startDrag(task.id,e);}}
@@ -68,7 +68,7 @@ export function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colo
             <span aria-hidden="true">⠿</span>
           </div>
         )}
-        <button aria-label={selectionMode?(isSelected?`Deselect ${task.title}`:`Select ${task.title}`):task.done?`Mark ${task.title} not done`:`Mark ${task.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode){onToggleSelect?.(task.id);}else{onToggleDone(task.id);}}} style={{background:selectionMode?(isSelected?T.accent:"none"):task.done?"#2ED573":"none",border:`2px solid ${selectionMode?(isSelected?T.accent:T.textFaint):task.done?"#2ED573":T.textFaint}`,borderRadius:selectionMode?4:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}} className={justDone&&!selectionMode?"check-pop":undefined}>
+        <button aria-label={selectionMode?(isSelected?`Deselect ${task.title}`:`Select ${task.title}`):task.done?`Mark ${task.title} not done`:`Mark ${task.title} done`} onClick={e=>{e.stopPropagation();if(selectionMode){onToggleSelect?.(task.id);}else{onToggleDone(task.id);}}} style={{background:selectionMode?(isSelected?T.accent:"none"):task.done?"#2ED573":"none",border:`2px solid ${selectionMode?(isSelected?T.accent:T.textFaint):task.done?"#2ED573":T.textFaint}`,borderRadius:selectionMode?4:"50%",width:19,height:19,cursor:"pointer",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all .2s ease-out"}} className={justDone&&!selectionMode?"hit check-pop":"hit"}>
           {(selectionMode?isSelected:task.done)&&<CheckMark size={11} color={selectionMode?contrastColor(T.accent):"#111"} animate={justDone&&!selectionMode}/>}
         </button>
         <div style={{flex:1,minWidth:0}}>
@@ -95,7 +95,7 @@ export function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colo
             </div>
           )}
         </div>
-        {!selectionMode&&<button aria-label={`Delete ${task.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();onDelete(task.id);}}>×</button>}
+        {!selectionMode&&<button className="hit" aria-label={`Delete ${task.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:15,padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();onDelete(task.id);}}>×</button>}
       </div>
     </div>
   );

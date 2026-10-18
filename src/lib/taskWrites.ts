@@ -6,6 +6,7 @@ import type { DocumentReference, WriteBatch } from "firebase/firestore";
 import { changedFields, countDelta, homeOf } from "./sync";
 import { syncedChanges, syncedTask } from "./limits";
 import type { SyncRecord } from "./sync";
+import { SCHEMA_VERSION } from "./migrations";
 
 export type TaskRefs = { task: DocumentReference; trash: DocumentReference; counts: DocumentReference };
 
@@ -18,11 +19,11 @@ export function addTaskWrite<T extends object>(batch: WriteBatch, refs: TaskRefs
   L: SyncRecord<T> | undefined, B: SyncRecord<T> | undefined, updatedAt: number, counted: boolean): void {
   if (!L) { batch.delete(refs.task); batch.delete(refs.trash); }
   else if (L.deletedAt !== undefined) {
-    batch.set(refs.trash, { ...syncedTask(L.task), deletedAt: L.deletedAt, updatedAt });
+    batch.set(refs.trash, { ...syncedTask(L.task), deletedAt: L.deletedAt, ...stamp(updatedAt) });
     if (B?.deletedAt === undefined) batch.delete(refs.task);
   }
-  else if (!B || B.deletedAt !== undefined) { batch.set(refs.task, { ...syncedTask(L.task), updatedAt }); if (B) batch.delete(refs.trash); }
-  else { const gone = deleteField(); batch.set(refs.task, { ...syncedChanges(changedFields(B.task, L.task, gone), gone), updatedAt }, { merge: true }); }
+  else if (!B || B.deletedAt !== undefined) { batch.set(refs.task, { ...syncedTask(L.task), ...stamp(updatedAt) }); if (B) batch.delete(refs.trash); }
+  else { const gone = deleteField(); batch.set(refs.task, { ...syncedChanges(changedFields(B.task, L.task, gone), gone), ...stamp(updatedAt) }, { merge: true }); }
   if (counted) addCount(batch, refs, id, countDelta(homeOf(B), homeOf(L)));
 }
 
@@ -33,15 +34,19 @@ export function addTaskWrite<T extends object>(batch: WriteBatch, refs: TaskRefs
 export function addTaskWriteFromActual<T extends object>(batch: WriteBatch, refs: TaskRefs, id: number,
   L: SyncRecord<T> | undefined, has: { tasks: boolean; trash: boolean }, updatedAt: number, counted: boolean): void {
   const home = homeOf(L);
-  if (L && home === "tasks") batch.set(refs.task, { ...syncedTask(L.task), updatedAt });
+  if (L && home === "tasks") batch.set(refs.task, { ...syncedTask(L.task), ...stamp(updatedAt) });
   else if (has.tasks) batch.delete(refs.task);
-  if (L && home === "trash") batch.set(refs.trash, { ...syncedTask(L.task), deletedAt: L.deletedAt, updatedAt });
+  if (L && home === "trash") batch.set(refs.trash, { ...syncedTask(L.task), deletedAt: L.deletedAt, ...stamp(updatedAt) });
   else if (has.trash) batch.delete(refs.trash);
   if (counted) addCount(batch, refs, id, {
     n: (home === "tasks" ? 1 : 0) - (has.tasks ? 1 : 0),
     t: (home === "trash" ? 1 : 0) - (has.trash ? 1 : 0),
   });
 }
+
+// Sync metadata on every doc written: when the edit happened, and which shape
+// of task it holds (src/lib/migrations.ts).
+function stamp(updatedAt: number) { return { updatedAt, schemaVersion: SCHEMA_VERSION }; }
 
 function addCount(batch: WriteBatch, refs: TaskRefs, id: number, d: { n: number; t: number }) {
   if (d.n || d.t) batch.update(refs.counts, { n: increment(d.n), t: increment(d.t), last: String(id) });

@@ -39,9 +39,9 @@ service cloud.firestore {
     // The lists are checked against src/lib/limits.ts (TASK_FIELDS,
     // PROFILE_FIELDS) by src/lib/limits.rules.test.ts: a new field goes in
     // both, and the rules are deployed BEFORE the app that writes it.
-    function taskFields() { return ['id','title','subject','dueDate','dueTime','estMins','done','order','subtasks','recurrence','archived','completedAt','tags','priorityOverride','sessions','spawnedNextId','updatedAt']; }
+    function taskFields() { return ['id','title','subject','dueDate','dueTime','estMins','done','order','subtasks','recurrence','archived','completedAt','tags','priorityOverride','sessions','spawnedNextId','updatedAt','schemaVersion']; }
     function trashFields() { return taskFields().concat(['deletedAt']); }
-    function profileFields() { return ['layout','colorCodeUrgency','subjects','subjectColors','timeFormat','weekStart']; }
+    function profileFields() { return ['layout','colorCodeUrgency','subjects','subjectColors','timeFormat','weekStart','schemaVersion']; }
     function addsOnly(data, fields) {
       return resource == null
         ? data.keys().hasOnly(fields)
@@ -51,6 +51,12 @@ service cloud.firestore {
     // either with anything is false). A task's order decides where it sorts on
     // every device.
     function finite(n) { return n >= -9007199254740991 && n <= 9007199254740991; }
+    // Which shape of data a doc holds (added 2026-10-18; src/lib/migrations.ts).
+    // Sync metadata, like updatedAt: a whole number, never required, so docs
+    // written before it existed (or by an older app) stay valid.
+    function validVersion(data) {
+      return !('schemaVersion' in data) || (data.schemaVersion is int && data.schemaVersion >= 0 && data.schemaVersion <= 1000);
+    }
 
     function isValidProfile(data) {
       return data.keys().size() <= 40
@@ -70,7 +76,8 @@ service cloud.firestore {
               && data.subjectColors.keys().join('').size() <= 40000
               && data.subjectColors.values().join('').size() <= 6400))
         && (!('timeFormat' in data) || data.timeFormat in ['12h','24h'])
-        && (!('weekStart' in data) || data.weekStart in [0,1]);
+        && (!('weekStart' in data) || data.weekStart in [0,1])
+        && validVersion(data);
     }
 
     function isValidTask(data) {
@@ -95,7 +102,8 @@ service cloud.firestore {
         && (!('completedAt' in data) || data.completedAt == null || data.completedAt is number)
         && (!('spawnedNextId' in data) || data.spawnedNextId == null || data.spawnedNextId is number)
         // Sync metadata (see src/lib/sync.ts): when the edit happened.
-        && (!('updatedAt' in data) || data.updatedAt is number);
+        && (!('updatedAt' in data) || data.updatedAt is number)
+        && validVersion(data);
     }
 
     // ---- Stricter task checks (added 2026-10-10). isValidTask() above is checked

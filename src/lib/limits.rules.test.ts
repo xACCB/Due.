@@ -32,6 +32,7 @@ const expected: [string, string, number][] = [
   ["tasks per account", "a.n", LIMITS.tasks],
   ["Recently deleted entries per account", "a.t", LIMITS.trash],
   ["devices per account", "data.d.size()", LIMITS.devices],
+  ["a doc's data version", "data.schemaVersion", LIMITS.schemaVersion],
 ];
 
 describe("firestore.rules agrees with LIMITS", () => {

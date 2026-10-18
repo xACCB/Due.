@@ -129,6 +129,22 @@ describe("task sync metadata", () => {
     await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), validTask));
     await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), { title: "Essay v2", updatedAt: 6 }, { merge: true }));
   });
+  it("accepts a whole-number schemaVersion from 0 to 1000 on tasks, trash and the profile", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), { ...validTask, schemaVersion: 1 }));
+    await assertSucceeds(setDoc(doc(db, "users/alice/trash/2"), { ...validTask, id: 2, deletedAt: 5, schemaVersion: 1000 }));
+    await assertSucceeds(setDoc(doc(db, "users/alice"), { layout: "list", schemaVersion: 1 }, { merge: true }));
+    for (const bad of [1.5, -1, 1001, "1", null]) {
+      await assertFails(setDoc(doc(db, "users/alice/tasks/3"), { ...validTask, id: 3, schemaVersion: bad }));
+      await assertFails(setDoc(doc(db, "users/alice"), { schemaVersion: bad }, { merge: true }));
+    }
+  });
+  it("lets a task stored without a schemaVersion be edited, and gain one", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), validTask));
+    await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), { title: "Essay v2" }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db, "users/alice/tasks/1"), { done: true, updatedAt: 7, schemaVersion: 1 }, { merge: true }));
+  });
 });
 
 // Mirrors src/lib/limits.ts -- the app stays inside these, the rules enforce them.

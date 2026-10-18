@@ -17,6 +17,7 @@ export const LIMITS = {
   tasks: 5000,        // per account, via the counter doc in firestore.rules
   trash: 500,         // Recently deleted entries per account (the app keeps 200)
   devices: 20,        // signed-in devices listed per account; the longest idle drop off
+  schemaVersion: 1000, // highest data version a doc may claim (src/lib/migrations.ts)
 } as const;
 
 // The fields a synced document may hold. firestore.rules refuses a new task
@@ -31,10 +32,11 @@ const TASK_FIELD_MAP: Record<keyof Task, true> = {
   subtasks: true, recurrence: true, archived: true, completedAt: true, tags: true, priorityOverride: true,
   sessions: true, spawnedNextId: true,
 };
-// updatedAt is sync's own (when the edit happened); a trash entry adds deletedAt.
-export const TASK_FIELDS: readonly string[] = [...Object.keys(TASK_FIELD_MAP), "updatedAt"];
+// updatedAt and schemaVersion are sync's own (when the edit happened, which
+// shape the doc holds: src/lib/migrations.ts); a trash entry adds deletedAt.
+export const TASK_FIELDS: readonly string[] = [...Object.keys(TASK_FIELD_MAP), "updatedAt", "schemaVersion"];
 export const TRASH_FIELDS: readonly string[] = [...TASK_FIELDS, "deletedAt"];
-export const PROFILE_FIELDS: readonly string[] = ["layout", "colorCodeUrgency", "subjects", "subjectColors", "timeFormat", "weekStart"];
+export const PROFILE_FIELDS: readonly string[] = ["layout", "colorCodeUrgency", "subjects", "subjectColors", "timeFormat", "weekStart", "schemaVersion"];
 
 // A task as it is sent to the cloud: only the fields the rules accept. A task
 // kept on the device since an early version, or brought in from a backup, can

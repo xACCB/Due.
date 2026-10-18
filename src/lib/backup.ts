@@ -6,6 +6,7 @@ import { csvField, getPriority } from "./format";
 import { nextId } from "./id";
 import { LIMITS, oneLine, sanitizeTask } from "./limits";
 import { nextOrder } from "./tasks";
+import { migrateTask } from "./migrations";
 
 // The CSV export: one row per task, with the priority the app would show.
 export function tasksCsv(tasks: Task[]): string {
@@ -29,7 +30,9 @@ export type BackupContents = { fresh: Task[]; skipped: number; extraSubjects: st
 export function readBackup(data: any, tasks: Task[], subjects: string[]): BackupContents | null {
   const raw: unknown[] = Array.isArray(data?.tasks) ? data.tasks : [];
   const incoming: Task[] = raw.filter((t): t is Task => !!t && typeof (t as Task).id === "number" && typeof (t as Task).title === "string")
-    .map(t => sanitizeTask(t as unknown as Record<string, unknown>) as unknown as Task);
+    // A file from an older version is brought up to date first (an export
+    // records its schemaVersion; one from before that counts as 0).
+    .map(t => sanitizeTask(migrateTask(t as unknown as Record<string, unknown>, data?.schemaVersion) as unknown as Record<string, unknown>) as unknown as Task);
   if (incoming.length === 0 && !Array.isArray(data?.subjects)) return null;
   const have = new Set(tasks.map(t => t.id));
   const base = nextOrder(tasks);

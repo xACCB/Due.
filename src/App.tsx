@@ -37,6 +37,7 @@ import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
 import { diffTasks, applyTaskStates } from "./lib/history";
 import { downloadFile } from "./lib/download";
 import { LIMITS } from "./lib/limits";
+import { SCHEMA_VERSION, isFromNewerApp, migrateProfile, migrateTask, migrateTasks } from "./lib/migrations";
 import { describeDevice, deviceAction, listDevices, pruneDevices } from "./lib/devices";
 import type { DeviceEntry, DeviceMap } from "./lib/devices";
 import { usePersistedState } from "./hooks/usePersistedState";
@@ -61,12 +62,15 @@ import { buildCss } from "./styles";
 import { TEXT_SIZES, applyTextSize, fz, textSizeOf } from "./lib/textSize";
 import type { TextSize } from "./lib/textSize";
 
-// A tasks/ or trash/ doc as a cloud record. updatedAt/deletedAt are sync
-// metadata, not task fields, so they're split off here.
-function cloudRecord(d:QueryDocumentSnapshot,deleted:boolean):CloudRecord<Task>|null{
-  const {updatedAt,deletedAt,...task}=d.data();
-  if(typeof task.id!=="number"||typeof task.title!=="string")return null; // shape guard, see profile sync
-  const rec:CloudRecord<Task>={task:task as Task,updatedAt:typeof updatedAt==="number"?updatedAt:0};
+// A tasks/ or trash/ doc as a cloud record. updatedAt/deletedAt/schemaVersion
+// are sync metadata, not task fields, so they're split off here, and a doc of
+// an older shape is brought up to date (src/lib/migrations.ts). A doc written
+// by a newer app than this one goes into `newer`, so it isn't written back.
+function cloudRecord(d:QueryDocumentSnapshot,deleted:boolean,newer:Set<number>):CloudRecord<Task>|null{
+  const {updatedAt,deletedAt,schemaVersion,...raw}=d.data();
+  if(typeof raw.id!=="number"||typeof raw.title!=="string")return null; // shape guard, see profile sync
+  if(isFromNewerApp(schemaVersion))newer.add(raw.id);
+  const rec:CloudRecord<Task>={task:migrateTask(raw,schemaVersion),updatedAt:typeof updatedAt==="number"?updatedAt:0};
   if(deleted)rec.deletedAt=typeof deletedAt==="number"?deletedAt:0;
   return rec;
 }
@@ -82,14 +86,18 @@ export default function HomeworkPlanner() {
   const [tasks,setTasks]=useState<Task[]>(()=>{
     try{
       const s=localStorage.getItem("hw-tasks");
+      // hw-schema: the data version the tasks on this device were saved at
+      // (missing = from before versions; src/lib/migrations.ts).
+      const version=Number(localStorage.getItem("hw-schema")??0);
       let loaded:Task[]=s?JSON.parse(s):[];
       // One-time: drop the old example tasks if they're still as seeded.
       if(!localStorage.getItem("hw-examples-removed")){
         loaded=loaded.filter(t=>!isUntouchedExample(t));
         localStorage.setItem("hw-examples-removed","1");
       }
-      // Backfill order for tasks saved before drag-to-reorder existed.
-      return loaded.map((t,i)=>t.order===undefined?{...t,order:i}:t);
+      const migrated=migrateTasks(loaded as unknown as Record<string,unknown>[],version);
+      if(!isFromNewerApp(version))localStorage.setItem("hw-schema",String(SCHEMA_VERSION));
+      return migrated;
     }catch{return [];}
   });
   // Latest tasks, readable from long-lived callbacks (the Firestore listener)
@@ -339,6 +347,14 @@ export default function HomeworkPlanner() {
   // for the user to know their data wasn't actually syncing.
   const [syncError,setSyncError]=useState<string|null>(null);
   const isSyncingProfile=useRef(false);
+  // Data saved by a newer version of the app than this one (a doc whose
+  // schemaVersion is above SCHEMA_VERSION): ids per collection, and whether
+  // the profile is. None of it is written back from here, so fields this
+  // version doesn't know can't be stripped; the sync note asks for a reload.
+  const newerIdsRef=useRef<{tasks:Set<number>;trash:Set<number>}>({tasks:new Set(),trash:new Set()});
+  const newerProfileRef=useRef(false);
+  const [newerData,setNewerData]=useState({tasks:false,profile:false});
+  const shownSyncError=syncError??(newerData.tasks||newerData.profile?"A newer version of DuePlanner saved some of your data on another device. Reload this page to update. Until then, changes to that data stay on this device.":null);
   // Sync status, for the "Synced 2m ago" line and the offline indicator.
   const [lastSyncedAt,setLastSyncedAt]=useState<number|null>(null);
   const [hasPendingWrites,setHasPendingWrites]=useState(false);
@@ -510,8 +526,11 @@ export default function HomeworkPlanner() {
     if(!fbUser||readyForUid!==fbUser.uid)return;
     const ref=doc(db,"users",fbUser.uid);
     const unsub=onSnapshot(ref,snap=>{
+      const newer=snap.exists()&&isFromNewerApp(snap.data().schemaVersion);
+      newerProfileRef.current=newer;
+      setNewerData(n=>n.profile===newer?n:{...n,profile:newer});
       if(snap.exists()&&!isSyncingProfile.current){
-        const data=snap.data();
+        const data=migrateProfile(snap.data(),snap.data().schemaVersion);
         // Firestore data is untyped (DocumentData) -- a malformed or legacy
         // document (e.g. from an older buggy version, or a manual edit in the
         // console) could otherwise inject a wrong-shaped value straight into
@@ -537,9 +556,10 @@ export default function HomeworkPlanner() {
   // can't fire before we know what's actually in the user's cloud doc.
   useEffect(()=>{
     if(!fbUser||profileSyncedForUid!==fbUser.uid)return;
+    if(newerProfileRef.current)return; // saved by a newer app: leave it be (see newerIdsRef)
     isSyncingProfile.current=true;
     const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart},{merge:true})
+    setDoc(ref,{layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart,schemaVersion:SCHEMA_VERSION},{merge:true})
       .then(()=>setSyncError(null))
       .catch(err=>{
         console.error(err);
@@ -553,7 +573,7 @@ export default function HomeworkPlanner() {
     if(!fbUser||readyForUid!==fbUser.uid)return;
     const uid=fbUser.uid;
     // A different account than the one baseRef/dirtyAtRef describe: start clean.
-    if(syncUidRef.current!==uid){ baseRef.current=new Map(); dirtyAtRef.current=new Map(); prevLocalRef.current=new Map(); inFlightRef.current=new Map(); syncUidRef.current=uid; }
+    if(syncUidRef.current!==uid){ baseRef.current=new Map(); dirtyAtRef.current=new Map(); prevLocalRef.current=new Map(); inFlightRef.current=new Map(); newerIdsRef.current={tasks:new Set(),trash:new Set()}; syncUidRef.current=uid; }
     cloudTasksRef.current=null; cloudTrashRef.current=null;
     const apply=()=>{
       const cloudTasks=cloudTasksRef.current, cloudTrash=cloudTrashRef.current;
@@ -605,7 +625,11 @@ export default function HomeworkPlanner() {
     };
     const toMap=(docs:QueryDocumentSnapshot[],deleted:boolean)=>{
       const m=new Map<number,CloudRecord<Task>>();
-      for(const d of docs){const r=cloudRecord(d,deleted);if(r)m.set(r.task.id,r);}
+      const newer=new Set<number>();
+      for(const d of docs){const r=cloudRecord(d,deleted,newer);if(r)m.set(r.task.id,r);}
+      newerIdsRef.current={...newerIdsRef.current,[deleted?"trash":"tasks"]:newer};
+      const any=newerIdsRef.current.tasks.size>0||newerIdsRef.current.trash.size>0;
+      setNewerData(n=>n.tasks===any?n:{...n,tasks:any});
       return m;
     };
     // includeMetadataChanges: also hear when pending writes reach the server
@@ -664,6 +688,7 @@ export default function HomeworkPlanner() {
       for(const id of new Set([...local.keys(),...base.keys()])){
         const L=local.get(id), B=base.get(id);
         if(same(L,B))continue;
+        if(newerIdsRef.current.tasks.has(id)||newerIdsRef.current.trash.has(id))continue; // a newer app's data, see newerIdsRef
         const updatedAt=dirtyAtRef.current.get(id)??Date.now();
         const refs={task:doc(db,"users",uid,"tasks",String(id)),trash:doc(db,"users",uid,"trash",String(id)),counts:doc(db,"users",uid,"meta","counts")};
         const counted=true; // the rules require the task counter on every create (firestore.rules)
@@ -1679,6 +1704,7 @@ export default function HomeworkPlanner() {
   function exportAllDataJSON(){
     const data={
       exportedAt:new Date().toISOString(),
+      schemaVersion:SCHEMA_VERSION,
       tasks,subjects,subjectColors,templates,
       settings:{themeMode,layout,groupBy,colorCodeUrgency,showDone,showSuggestion,autoArchiveDays,notificationsEnabled,enabledOffsets,timeFormat,weekStart,pomodoroWorkMins,pomodoroBreakMins,autoStartBreaks},
     };
@@ -2334,7 +2360,7 @@ export default function HomeworkPlanner() {
               </span>}
             <span style={{flex:1,minWidth:0}}>
               <span style={{display:"block",color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fbUser?(fbUser.displayName||"Your account"):"Sign in"}</span>
-              <span style={{display:"block",fontSize:fz(10),marginTop:1,color:syncError?ink("#FF4757",T.light):T.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{!fbUser?"Sync across devices":syncError?"Sync issue":syncStatus}</span>
+              <span style={{display:"block",fontSize:fz(10),marginTop:1,color:shownSyncError?ink("#FF4757",T.light):T.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{!fbUser?"Sync across devices":shownSyncError?"Sync issue":syncStatus}</span>
             </span>
           </button>
           <button onClick={closeSidebar} aria-label="Close sidebar" title="Close sidebar" className="hit hit-sm" style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",padding:8,borderRadius:8,display:"flex",flexShrink:0}}><IconSidebar/></button>
@@ -3112,7 +3138,7 @@ export default function HomeworkPlanner() {
       {!taskPage&&taskDetail}
       {showProfile&&<ProfileModal
         T={T} F={F}
-        fbUser={fbUser} authPending={authPending} signInError={signInError} syncError={syncError} syncStatus={syncStatus}
+        fbUser={fbUser} authPending={authPending} signInError={signInError} syncError={shownSyncError} syncStatus={syncStatus}
         visibleTasks={visibleTasks.filter(t=>!t.archived)} totalMins={totalMins}
         subjects={subjects} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         taskCount={tasks.length} trashCount={trash.length}

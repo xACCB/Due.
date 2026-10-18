@@ -17,7 +17,7 @@
 <body>
 
 <h1>Privacy Policy</h1>
-<div class="updated">Last updated: October 2026</div>
+<div class="updated">Last updated: October 18, 2026</div>
 
 <p>This policy explains what information <strong>DuePlanner</strong> (the "app," hosted at dueplanner.vercel.app) collects, how it's used, and your choices. DuePlanner is a personal task/homework planner built by Due Studios.</p>
 
@@ -26,7 +26,7 @@
 <p>If you choose to sign in with Google, we collect:</p>
 <ul>
   <li>Your name, email address, and profile photo, provided by Google as part of sign-in.</li>
-  <li>The content you create in the app: tasks (titles, due dates, subjects, tags, subtasks, and logged work sessions), your subjects and their colors, and a few display preferences (task layout and urgency color coding).</li>
+  <li>The content you create in the app: tasks (titles, due dates, subjects, tags, subtasks, and logged work sessions), your subjects and their colors, and a few display preferences (task layout, urgency color coding, 12 or 24 hour time, and the first day of the week).</li>
   <li>A list of the devices you are signed in on. For each one we store the browser and system it reports (for example "Chrome on Windows") and when it was first and last active, so that you can see your devices in your Profile and sign them out.</li>
 </ul>
 <p>Signing in is optional and only used to sync your data across your own devices.</p>
@@ -42,12 +42,16 @@
   <li><strong>Google reCAPTCHA Enterprise</strong> (via Firebase App Check) — helps verify that requests to our systems come from the real app rather than automated abuse. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a>.</li>
   <li><strong>Firebase Analytics</strong> (Google Analytics) — collects basic, aggregated usage data such as page views and how long the app is used, to help us understand which features are actually used. This does not include the content of your tasks. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a>.</li>
   <li><strong>Firebase Performance Monitoring</strong> — measures page load time and network request speed so we can find and fix slowness. It collects technical data (like device type and timings), not the content of your tasks. See <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase's privacy policy</a>.</li>
+  <li><strong>Sentry</strong>: when something goes wrong in the app (a crash, or your tasks failing to sync), an error report is sent so we can fix it. A report holds the technical error, which part of the app it happened in, the app version, and your browser and system. It does not include your tasks, your name, your email address, or what you typed. See <a href="https://sentry.io/privacy/" target="_blank" rel="noopener">Sentry's privacy policy</a>.</li>
+  <li><strong>Firebase Remote Config</strong>: lets us switch a feature on or off without releasing a new version. The app asks for the current settings; this uses a random installation identifier, not your account. See <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase's privacy policy</a>.</li>
   <li><strong>Vercel</strong> — hosts the app itself. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's privacy policy</a>.</li>
 </ul>
 <p>We do not use any advertising networks, and we do not sell or share your data for marketing purposes.</p>
 
 <h2>Data retention and deletion</h2>
-<p>If you sign in, your data is retained until you delete it. You can delete your account and all associated data yourself at any time from the app: open <strong>Settings</strong>, then <strong>Danger Zone</strong>, then <strong>Delete my account &amp; all data</strong>. This removes your cloud data and the data stored on that device. You can also request deletion by contacting us at the email below.</p>
+<p>If you sign in, your data is retained until you delete it. We do not currently delete accounts for being inactive; if that changes, this page will say so, and we will email you before an inactive account is removed.</p>
+<p>A task you delete goes to <strong>Recently deleted</strong> (in History), where it stays for 30 days so you can restore it, and is then removed for good. You can also empty Recently deleted yourself at any time.</p>
+<p>You can delete your account and all associated data yourself at any time from the app: open <strong>Settings</strong>, then <strong>Danger Zone</strong>, then <strong>Delete my account &amp; all data</strong>. This removes your cloud data (tasks, Recently deleted, settings and your device list) and the data stored on that device. One small record stays behind: a counter of how many tasks the account holds, kept so that the per account task limit can't be reset by deleting and recreating an account. It holds only numbers, nothing you wrote. Error reports (see Sentry above) are kept by Sentry for up to 90 days. You can also request deletion by contacting us at the email below.</p>
 
 <h2>Children's privacy</h2>
 <p>This app is not directed at children under 13, and we do not knowingly collect personal information from children under 13. If you believe a child has provided us with personal information, please contact us and we will delete it.</p>

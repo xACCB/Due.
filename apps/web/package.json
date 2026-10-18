@@ -13,11 +13,11 @@
     "@dueplanner/core": "*",
     "@sentry/browser": "^11.8.0",
     "firebase": "^12.13.0",
-    "react": "^19.2.6",
+    "react": "^19.3.1",
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "vite": "^8.0.12",

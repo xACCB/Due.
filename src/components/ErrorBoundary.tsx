@@ -1,6 +1,7 @@
 import { Component } from "react";
 import type { ReactNode } from "react";
 import { fz } from "../lib/textSize";
+import { reportError } from "../lib/report";
 
 interface Props { children:ReactNode; fallback?:(reset:()=>void)=>ReactNode; }
 interface State { hasError:boolean; }
@@ -20,6 +21,7 @@ export class ErrorBoundary extends Component<Props,State> {
   }
   componentDidCatch(error:unknown){
     console.error(error);
+    reportError(error,"render");
   }
   reset=()=>{this.setState({hasError:false});};
   render(){

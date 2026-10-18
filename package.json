@@ -17,6 +17,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@sentry/browser": "^11.8.0",
     "firebase": "^12.13.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
@@ -42,5 +43,8 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": "eslint --fix"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6"
   }
 }

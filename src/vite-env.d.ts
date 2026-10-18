@@ -6,6 +6,9 @@ interface ImportMetaEnv {
   // (verified server-side by Google), so it's fine to set directly in
   // Vercel's project env vars without marking it sensitive.
   readonly VITE_RECAPTCHA_SITE_KEY?: string;
+  // Sentry DSN for error reports (src/lib/report.ts). Optional: nothing is
+  // loaded or sent without it. Not a secret (it only allows sending events).
+  readonly VITE_SENTRY_DSN?: string;
 }
 
 interface ImportMeta {

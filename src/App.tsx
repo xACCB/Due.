@@ -37,6 +37,7 @@ import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
 import { diffTasks, applyTaskStates } from "./lib/history";
 import { downloadFile } from "./lib/download";
 import { LIMITS } from "./lib/limits";
+import { reportError } from "./lib/report";
 import { SCHEMA_VERSION, isFromNewerApp, migrateProfile, migrateTask, migrateTasks } from "./lib/migrations";
 import { describeDevice, deviceAction, listDevices, pruneDevices } from "./lib/devices";
 import type { DeviceEntry, DeviceMap } from "./lib/devices";
@@ -511,7 +512,7 @@ export default function HomeworkPlanner() {
         }
         if(!cancelled) setIsNewAccountForUid(isNew?fbUser.uid:null);
       }catch(err){
-        console.error(err);
+        console.error(err); reportError(err,"sync-prepare");
         if(!cancelled) setSyncError("Couldn't prepare cloud sync. Please try again.");
       }finally{
         if(!cancelled) setReadyForUid(fbUser.uid);
@@ -545,7 +546,7 @@ export default function HomeworkPlanner() {
       setProfileSyncedForUid(fbUser.uid);
       setSyncError(null);
     },err=>{
-      console.error(err);
+      console.error(err); reportError(err,"sync-profile-read");
       setSyncError("Couldn't sync with the cloud. Your changes are saved on this device, but may not reach your other devices until this is resolved.");
     });
     return unsub;
@@ -562,7 +563,7 @@ export default function HomeworkPlanner() {
     setDoc(ref,{layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart,schemaVersion:SCHEMA_VERSION},{merge:true})
       .then(()=>setSyncError(null))
       .catch(err=>{
-        console.error(err);
+        console.error(err); reportError(err,"sync-profile-save");
         setSyncError("Couldn't save to the cloud. Your changes are safe on this device, but won't reach your other devices until this is resolved.");
       })
       .finally(()=>{isSyncingProfile.current=false;});
@@ -620,7 +621,7 @@ export default function HomeworkPlanner() {
       if(!pending&&!tasksMeta.fromCache&&!trashMeta.fromCache) setLastSyncedAt(Date.now());
     };
     const onErr=(err:unknown)=>{
-      console.error(err);
+      console.error(err); reportError(err,"sync-tasks-read");
       setSyncError("Couldn't sync with the cloud. Your changes are saved on this device, but may not reach your other devices until this is resolved.");
     };
     const toMap=(docs:QueryDocumentSnapshot[],deleted:boolean)=>{
@@ -724,7 +725,7 @@ export default function HomeworkPlanner() {
       return Promise.all(commits)
         .then(()=>setSyncError(null))
         .catch(err=>{
-          console.error(err);
+          console.error(err); reportError(err,"sync-tasks-save");
           setSyncError(prev=>prev?.startsWith("You've reached the limit")?prev:"Couldn't save to the cloud. Your changes are safe on this device, but won't reach your other devices until this is resolved.");
         });
     };
@@ -814,13 +815,13 @@ export default function HomeworkPlanner() {
   // entry is the whole mechanism (see src/lib/devices.ts).
   function signOutDevice(id:string){
     if(!fbUser||id===thisDeviceId())return;
-    updateDoc(doc(db,"users",fbUser.uid,"meta","devices"),{[`d.${id}`]:deleteField()}).catch(e=>console.error(e));
+    updateDoc(doc(db,"users",fbUser.uid,"meta","devices"),{[`d.${id}`]:deleteField()}).catch(e=>{console.error(e); reportError(e,"device-remove");});
   }
   function signOutOtherDevices(){
     if(!fbUser||deviceList?.uid!==fbUser.uid)return;
     const id=thisDeviceId(), mine=deviceList.map[id];
     if(!mine)return; // not confirmed in the list yet: nothing safe to keep
-    setDoc(doc(db,"users",fbUser.uid,"meta","devices"),{d:{[id]:mine}}).catch(e=>console.error(e));
+    setDoc(doc(db,"users",fbUser.uid,"meta","devices"),{d:{[id]:mine}}).catch(e=>{console.error(e); reportError(e,"device-signout-others");});
   }
   const [showDeleteAccountConfirm,setShowDeleteAccountConfirm]=useState(false);
   const [deleteConfirmText,setDeleteConfirmText]=useState("");
@@ -1319,7 +1320,7 @@ export default function HomeworkPlanner() {
         signingOut.current=true;
         signOutRef.current()
           .then(()=>{setSignInError("This device was signed out from another device. Sign in again to keep syncing.");setShowProfile(true);})
-          .catch(e=>console.error(e));
+          .catch(e=>{console.error(e); reportError(e,"device-register");});
       }
     },()=>{/* the list can't be read (e.g. offline with nothing cached): no list, and nothing else changes */});
   },[fbUser]);

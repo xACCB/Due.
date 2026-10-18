@@ -1,0 +1,14 @@
+{
+  "name": "@dueplanner/core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "DuePlanner's shared logic: plain TypeScript with no browser, React Native or Firebase dependency, used by the web and phone apps.",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  }
+}

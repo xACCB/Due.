@@ -1,8 +1,8 @@
-import type { Task } from "../types";
-import { priColor } from "../constants";
-import type { ThemeObj } from "../themes";
-import { contrastColor, getPriority, formatDate, formatTime, daysUntil, formatDuration, countdown, ink } from "../lib/format";
-import { FONT } from "../fonts";
+import type { Task } from "@dueplanner/core/types";
+import { priColor } from "@dueplanner/core/constants";
+import type { ThemeObj } from "@dueplanner/core/themes";
+import { contrastColor, getPriority, formatDate, formatTime, daysUntil, formatDuration, countdown, ink } from "@dueplanner/core/lib/format";
+import { FONT } from "@dueplanner/core/fonts";
 import { CheckMark } from "./icons";
 import { activateOnKey } from "../lib/dom";
 import { fz } from "../lib/textSize";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 // Both files as text (Vite's ?raw import), so this runs in plain `npm test`.
 import html from "../../index.html?raw";
-import vercel from "../../vercel.json?raw";
+import vercel from "../../../../vercel.json?raw";
 
 // The Content Security Policy in vercel.json allows the inline scripts in
 // index.html by the hash of their text, so changing one of those scripts

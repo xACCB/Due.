@@ -4,9 +4,9 @@ import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { collection, doc, getDoc, getDocs, setDoc, writeBatch } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
-import { addTaskWrite } from "../../src/lib/taskWrites";
-import type { SyncRecord } from "../../src/lib/sync";
-import { LIMITS } from "../../src/lib/limits";
+import { addTaskWrite } from "../../apps/web/src/lib/taskWrites";
+import type { SyncRecord } from "@dueplanner/core/lib/sync";
+import { LIMITS } from "@dueplanner/core/lib/limits";
 
 // One account filled to the task cap, with the real rules (counter enforced)
 // and the app's own write builder: how long it takes to write and to read

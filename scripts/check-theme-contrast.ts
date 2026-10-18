@@ -1,11 +1,11 @@
-// Audits every theme in src/themes.ts for WCAG contrast failures. Diagnostic
+// Audits every theme in packages/core/src/themes.ts for WCAG contrast failures. Diagnostic
 // only -- reports findings, doesn't fix anything or fail the build. With 26
 // independently-defined themes, it's entirely plausible one dark theme's
 // accent-on-background contrast quietly fails accessibility guidelines and
 // nobody's checked.
 //
 // Run with: node --experimental-strip-types scripts/check-theme-contrast.ts
-import { THEMES } from "../src/themes.ts";
+import { THEMES } from "../packages/core/src/themes.ts";
 
 function relativeLuminance(hex:string):number {
   const c=hex.replace("#","");

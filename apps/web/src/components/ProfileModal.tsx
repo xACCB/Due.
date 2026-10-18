@@ -1,13 +1,13 @@
 import { useState } from "react";
 import type { User } from "firebase/auth";
-import type { Task } from "../types";
-import { priColor } from "../constants";
-import { completionStats } from "../lib/taskViews";
-import type { ThemeObj } from "../themes";
-import { formatDuration, formatAgo, ink } from "../lib/format";
-import { LIMITS } from "../lib/limits";
-import type { DeviceEntry } from "../lib/devices";
-import { FONT } from "../fonts";
+import type { Task } from "@dueplanner/core/types";
+import { priColor } from "@dueplanner/core/constants";
+import { completionStats } from "@dueplanner/core/lib/taskViews";
+import type { ThemeObj } from "@dueplanner/core/themes";
+import { formatDuration, formatAgo, ink } from "@dueplanner/core/lib/format";
+import { LIMITS } from "@dueplanner/core/lib/limits";
+import type { DeviceEntry } from "@dueplanner/core/lib/devices";
+import { FONT } from "@dueplanner/core/fonts";
 import { requestInstall, isStandalone } from "../lib/thisDevice";
 import { fz } from "../lib/textSize";
 

@@ -1,6 +1,6 @@
-import type { ThemeObj } from "../themes";
-import { contrastColor, ink } from "../lib/format";
-import { FONT } from "../fonts";
+import type { ThemeObj } from "@dueplanner/core/themes";
+import { contrastColor, ink } from "@dueplanner/core/lib/format";
+import { FONT } from "@dueplanner/core/fonts";
 import { fz } from "../lib/textSize";
 
 // One Settings section as a dropdown: the whole header row toggles it, and

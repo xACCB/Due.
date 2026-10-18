@@ -4,8 +4,8 @@ import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
 import { deleteDoc, doc, getDoc, setDoc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
-import { addTaskWrite, addTaskWriteFromActual } from "../src/lib/taskWrites";
-import type { SyncRecord } from "../src/lib/sync";
+import { addTaskWrite, addTaskWriteFromActual } from "../apps/web/src/lib/taskWrites";
+import type { SyncRecord } from "@dueplanner/core/lib/sync";
 
 // The task counter (users/{uid}/meta/counts) against the real rules, using the
 // same batch builder the app uses. Runs once with the counter requirement off

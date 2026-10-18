@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['**/dist', 'coverage']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -17,6 +17,14 @@ export default defineConfig([
     ],
     languageOptions: {
       globals: globals.browser,
+    },
+  },
+  {
+    // Shared with the phone app: no browser globals (packages/core/tsconfig.json
+    // has no DOM types either), and no React.
+    files: ['packages/core/**/*.ts'],
+    languageOptions: {
+      globals: globals.es2024,
     },
   },
 ])

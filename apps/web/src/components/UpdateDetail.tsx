@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
-import type { WhatsNewItem } from "../whatsNew";
-import type { ThemeObj } from "../themes";
-import { contrastColor, longDate } from "../lib/format";
-import { FONT } from "../fonts";
+import type { WhatsNewItem } from "@dueplanner/core/whatsNew";
+import type { ThemeObj } from "@dueplanner/core/themes";
+import { contrastColor, longDate } from "@dueplanner/core/lib/format";
+import { FONT } from "@dueplanner/core/fonts";
 import { box, freezeBox, pin, unpin } from "../lib/dom";
 import { fz } from "../lib/textSize";
 

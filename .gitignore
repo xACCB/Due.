@@ -25,3 +25,6 @@ dist-ssr
 
 # Test reports (rules coverage)
 coverage
+
+# TypeScript incremental build info
+*.tsbuildinfo

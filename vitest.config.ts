@@ -1,12 +1,10 @@
-import { defineConfig, mergeConfig } from "vitest/config";
-import viteConfig from "./vite.config.ts";
+import { defineConfig } from "vitest/config";
 
-// The default `npm test` run -- fast, no external services. The Firestore
-// rules tests live in tests/ and need the emulator running, so they're
-// excluded here and run separately via `npm run test:rules`
-// (see vitest.rules.config.ts).
-export default mergeConfig(viteConfig, defineConfig({
+// The default `npm test` run: the unit tests of the shared core and the web
+// app, fast, no external services. The Firestore rules tests in tests/ need
+// the emulator and run separately (`npm run test:rules`, vitest.rules.config.ts).
+export default defineConfig({
   test: {
-    exclude: ["**/node_modules/**", "**/dist/**", "**/.{idea,git,cache,output,temp}/**", "tests/**"],
+    projects: ["packages/core", "apps/web"],
   },
-}));
+});

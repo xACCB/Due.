@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LIMITS, PROFILE_FIELDS, TASK_FIELDS, TRASH_FIELDS } from "./limits";
 // The rules file as text (Vite's ?raw import), so this runs in plain `npm test`.
-import rules from "../../firestore.rules?raw";
+import rules from "../../../../firestore.rules?raw";
 
 // The limits live in two places: src/lib/limits.ts (what the app stays inside)
 // and firestore.rules (what the cloud enforces). If they drift apart, a save

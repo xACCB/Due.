@@ -1,6 +1,6 @@
 # DuePlanner mobile app: plan
 
-Status: planning (2026-10-18). Nothing below is built yet. Decided so far:
+Status: M1 (the monorepo) done 2026-10-18; M2 onward not started. Decided so far:
 
 - **React Native with Expo**, a natively built app. Not Capacitor or any other web-view wrapper.
 - **One repo (monorepo):** the web app and the phone app share one `packages/core`.
@@ -24,6 +24,11 @@ DuePlanner/
 ```
 
 ## M1. Restructure into the monorepo (one PR, no behaviour change)
+
+Done 2026-10-18, as below with two differences: the web app's `vercel.json` stayed at the repo
+root (it builds from the root and serves `apps/web/dist`, so Vercel's Root Directory didn't need
+changing), and the `animSpeed`/`textSize` splits are left for M2, where the phone app first needs
+them. Side-by-side check against `main`: every screen's text and the saved data identical.
 
 1. Root `package.json` gets `"workspaces": ["packages/*", "apps/*"]`. CI keeps running from the root
    (`npm ci`, `npm run build`, `npm test`, `npm run test:rules`, `npm run test:e2e`).

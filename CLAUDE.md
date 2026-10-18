@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` — type-check (`tsc -b`) then production-build (`vite build`) into `dist/`.
 - `npm run lint` — run ESLint over the whole project.
 - `npm run preview` — serve the built `dist/` output locally.
-- `npm test` — Vitest, unit tests for the pure functions in `src/lib/` (dates, priority/format
+- `npm test` — Vitest, unit tests for the pure functions in `packages/core/src/lib/` (dates, priority/format
   helpers, syllabus parsing). Fast, no external services; this is what CI runs.
 - `npm run test:rules` — Firestore emulator + `@firebase/rules-unit-testing`, verifying
   `firestore.rules` actually rejects malformed writes and cross-user access. Needs Java (a JRE) for
@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   random tasks: valid ones accepted, broken ones refused), and afterwards writes
   `coverage/rules/summary.txt`: which lines of `firestore.rules` no test evaluated
   (`tests/rulesCoverage.ts`; the emulator's own HTML report runs to hundreds of MB, so only hit or
-  miss per line is kept). `src/lib/limits.rules.test.ts` (in plain `npm test`) reads the numbers
+  miss per line is kept). `packages/core/src/lib/limits.rules.test.ts` (in plain `npm test`) reads the numbers
   out of `firestore.rules` and checks them against `LIMITS`.
 - `npm run test:e2e` -- two headless Chromes as two devices on one account, against the Auth and
   Firestore emulators and the dev server in emulator mode (`tests/e2e/`, no extra dependency: it
@@ -35,7 +35,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `VITE_FIREBASE_EMULATORS=1 npm run dev` -- the app talks to the local Auth/Firestore emulators
   (fake Google sign-in, throwaway data) instead of production. Dev server only; never in a build.
 - `npm run audit:contrast` — diagnostic script (`scripts/check-theme-contrast.ts`, run via `node
-  --experimental-strip-types`) that checks every theme in `src/themes.ts` against WCAG AA contrast
+  --experimental-strip-types`) that checks every theme in `packages/core/src/themes.ts` against WCAG AA contrast
   ratios and prints failures. Reports only; doesn't fix anything, since adjusting a theme's hex
   values is a design call on a live, user-facing palette.
 - A pre-commit hook (husky + lint-staged, `.husky/pre-commit`) runs `eslint --fix` on staged
@@ -54,27 +54,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
+**Monorepo (since 2026-10-18).** npm workspaces, so one `npm install` at the root sets up everything
+and every command above still runs from the root:
+- `packages/core` (`@dueplanner/core`): the shared plain TypeScript, imported as
+  `@dueplanner/core/lib/sync`, `@dueplanner/core/types` etc. (its `exports` map points at the `.ts`
+  sources; there is no build step, the web app's Vite and later the phone app's Metro compile it). Its
+  `tsconfig.json` has **no DOM lib and no ambient types**, and ESLint gives it no browser globals, so
+  `window`/`document`/`localStorage` there fail the build: anything browser-specific belongs in
+  `apps/web`. The one platform API it uses, `crypto.getRandomValues`, is declared in `src/globals.d.ts`
+  of core. No Firebase import either: `lib/taskWrites.ts` is `makeTaskWrites({deleteField, increment})`,
+  and `apps/web/src/lib/taskWrites.ts` binds it to the JS SDK (the rules tests in `tests/` import that
+  binding, so they still test the app's real writes).
+- `apps/web` (`@dueplanner/web`): the Vite app. `vercel.json` stays at the repo root and tells Vercel
+  to build from the root (`npm run build`) and serve `apps/web/dist`, so the Vercel project's settings
+  didn't change.
+- `apps/mobile`: the Expo app, not started yet (`docs/mobile-plan.md`).
+- At the root: `firestore.rules`, `firebase.json`, `tests/` (rules, contract, fuzz, e2e, stress),
+  `scripts/`, the ESLint config and `vitest.config.ts` (runs both workspaces' unit tests as projects).
+- `npm run build` type-checks core on its own (`tsc -p packages/core`), then builds the web app.
+New shared logic goes in core; when moving more, prove it the same way M1 was: build `main` and the
+branch, serve both, and compare each screen's text and the saved data (identical on 2026-10-18).
+
 **Mostly-single-file app.** The bulk of the app (component tree, all state, all Firebase wiring)
-still lives in `src/App.tsx`, exported as `HomeworkPlanner` and rendered into `#root` by
-`src/main.tsx`. Pure, dependency-free pieces have been split out so they're independently testable
-and reusable outside React: `src/types.ts` (`Priority`/`Recurrence`), `src/themes.ts` (the `THEMES`
-palette data, importable by non-React scripts like the contrast auditor), `src/lib/` (`dates.ts`,
-`format.ts`, `syllabus.ts`, `id.ts`, `download.ts` — the module-level functions with unit tests in
-`npm test`), `src/hooks/usePersistedState.ts` (see below), and `src/components/ErrorBoundary.tsx`.
+still lives in `apps/web/src/App.tsx`, exported as `HomeworkPlanner` and rendered into `#root` by
+`apps/web/src/main.tsx`. Pure, dependency-free pieces have been split out so they're independently testable
+and reusable outside React: `packages/core/src/types.ts` (`Priority`/`Recurrence`), `packages/core/src/themes.ts` (the `THEMES`
+palette data, importable by non-React scripts like the contrast auditor), `packages/core/src/lib/` (`dates.ts`,
+`format.ts`, `syllabus.ts`, `id.ts` — the module-level functions with unit tests in
+`npm test`), `apps/web/src/hooks/usePersistedState.ts` (see below), and `apps/web/src/components/ErrorBoundary.tsx`.
 The components that were already at module scope (`TaskModal`, `ProfileModal`, `CalendarView`...) each
-have a file in `src/components/` now (see "Where things live" below), so where this file says a
+have a file in `apps/web/src/components/` now (see "Where things live" below), so where this file says a
 component is "module scope" it means its own file. `HomeworkPlanner` itself (state, effects, sync,
 the tab bodies, `renderTasks`) is still all of `App.tsx`.
-`src/App.css` is intentionally empty (leftover from the Vite template, unused) and `src/index.css`
+`apps/web/src/App.css` is intentionally empty (leftover from the Vite template, unused) and `apps/web/src/index.css`
 is just a minimal box-sizing reset — all real styling comes from inline style objects plus one
 runtime-generated stylesheet string (`css`, built from the active theme/font inside the component)
 injected via `<style>{css}</style>` in both the main view and Focus Mode. There's no CSS modules,
-styled-components, or Tailwind. The fonts are loaded by non-blocking `<link>`s in `index.html`, never by an `@import`
+styled-components, or Tailwind. The fonts are loaded by non-blocking `<link>`s in `apps/web/index.html`, never by an `@import`
 in that runtime stylesheet: an `@import` holds back the whole stylesheet until it loads, which showed
 the app unstyled for a moment on slow connections (the visually hidden `<h1>` appearing as a second
-title, the layout stretched). `index.html` also holds the launch screen (`#splash`: the dp mark on black, plain HTML
+title, the layout stretched). `apps/web/index.html` also holds the launch screen (`#splash`: the dp mark on black, plain HTML
 plus a small script that fades it out once `#root` has content, after at least 600ms, with a 4s
-safety timeout). A tiny inline script in `index.html` reads a `hw-bg` localStorage
+safety timeout). A tiny inline script in `apps/web/index.html` reads a `hw-bg` localStorage
 key (kept in sync with the active theme's background by `App.tsx`) and paints it on `<html>`
 before React mounts, to avoid a flash of the default background for returning dark-theme users.
 
@@ -83,7 +104,7 @@ prefs, etc.) lives in `HomeworkPlanner`, persisted to `localStorage` under `hw-*
 `localStorage` is the source of truth for signed-out/offline use; Firestore (when signed in with
 Google via Firebase Auth) is a sync layer on top of it. Most simple fields (no extra
 validation/merge logic on read) use `usePersistedState(key, initial)` — a small hook
-(`src/hooks/usePersistedState.ts`) replacing the repeated `useState` + localStorage `useEffect`
+(`apps/web/src/hooks/usePersistedState.ts`) replacing the repeated `useState` + localStorage `useEffect`
 pair. It JSON-serializes on write, and on read falls back to the raw string if `JSON.parse` throws
 — several fields predate the hook and stored plain unquoted strings (e.g. `"list"`, not
 `'"list"'`), and this keeps those intact on the first load after adopting the hook rather than
@@ -94,7 +115,7 @@ key, see What's New below) are deliberately left as hand-written
 `useState`/`useEffect` pairs rather than forced into the generic hook.
 
 **Firebase.** The `firebaseConfig` (project `ai-homework-planner-92260`) is hardcoded in
-`src/firebase.ts` (with the rest of the Firebase setup; it exports `auth`, `db`, `googleProvider`) — this is a public client web API key, not a secret; access is enforced by Firestore
+`apps/web/src/firebase.ts` (with the rest of the Firebase setup; it exports `auth`, `db`, `googleProvider`) — this is a public client web API key, not a secret; access is enforced by Firestore
 security rules (`firestore.rules` at the repo root, deployed via `npx firebase-tools deploy
 --only firestore:rules` — requires `npx firebase-tools login` first), not by hiding the key. There
 is no backend beyond Firebase (Auth + Firestore).
@@ -133,10 +154,10 @@ browser APIs are unavailable somewhere.
 **Analytics.** `getAnalytics(fbApp)` (basic page views/session/engagement tracking, free on Spark)
 is gated behind `isSupported()` rather than just try/catch, since the underlying `gtag.js` script
 commonly gets silently blocked by ad/privacy-blocker extensions (AdGuard, uBlock, etc.) rather than
-throwing -- `isSupported()` checks that explicitly instead of half-initializing. `public/privacy.html`
+throwing -- `isSupported()` checks that explicitly instead of half-initializing. `apps/web/public/privacy.html`
 discloses this; keep that page in sync if what's collected here changes.
 
-**Error reports (Sentry).** `src/lib/report.ts`: `reportError(err, where)` (`where` a short fixed
+**Error reports (Sentry).** `apps/web/src/lib/report.ts`: `reportError(err, where)` (`where` a short fixed
 label such as `"sync-tasks-save"`) is called from the render `ErrorBoundary`, global error/rejection
 handlers, every place that sets `syncError`, device list writes and account deletion. Inert unless
 Vercel's `VITE_SENTRY_DSN` is set, never in emulator mode; the SDK (`@sentry/browser`) is
@@ -144,19 +165,19 @@ dynamically imported when the app is idle, so it is its own chunk. Sends only th
 the app version and the browser: default integrations off (no breadcrumbs, no global handlers of its
 own), `dataCollection` all off but the User-Agent header, and `scrubEvent()` (unit-tested) strips
 user/extra/breadcrumbs/request data whatever the SDK attaches. Never pass task text as `where`.
-`public/privacy.html` describes this; keep it in step. CSP `connect-src` allows `*.ingest.sentry.io`
+`apps/web/public/privacy.html` describes this; keep it in step. CSP `connect-src` allows `*.ingest.sentry.io`
 (plus the `us`/`de` regions).
 
-**Feature flags (Remote Config).** `src/lib/flags.ts`: `FLAG_DEFAULTS` in code is what every load
+**Feature flags (Remote Config).** `apps/web/src/lib/flags.ts`: `FLAG_DEFAULTS` in code is what every load
 starts from (and all it ever uses offline, in emulator mode, or until a parameter exists in the
-console); `startFlags()` (from `src/firebase.ts`) fetches when idle, at most hourly, and only values
-whose source is `"remote"` override a default. Read with `useFlags()` (`src/hooks/useFlags.ts`,
+console); `startFlags()` (from `apps/web/src/firebase.ts`) fetches when idle, at most hourly, and only values
+whose source is `"remote"` override a default. Read with `useFlags()` (`apps/web/src/hooks/useFlags.ts`,
 `useSyncExternalStore`) or `getFlags()`. To add one: a default here, then optionally a parameter of
 the same name in Firebase console -> Remote Config. `devicesAutoSignOut` (default true) gates only
 the Devices effect's "my entry is gone, sign out" branch: setting it to false in the console stops
 that without a deploy.
 
-**Data versions (`schemaVersion`).** `src/lib/migrations.ts`: `SCHEMA_VERSION` and one step per
+**Data versions (`schemaVersion`).** `packages/core/src/lib/migrations.ts`: `SCHEMA_VERSION` and one step per
 version for tasks (`TASK_STEPS`) and the profile (`PROFILE_STEPS`). `schemaVersion` is sync
 metadata like `updatedAt`, never a `Task` field: `taskWrites.ts` stamps it on every task/trash doc
 written (`stamp()`), the profile save writes it, and `cloudRecord()` splits it off and runs
@@ -185,7 +206,7 @@ require rewriting a user's entire history:
   reappearing. Emptying the trash / the 30-day cleanup deletes the doc for real.
 - `users/{uid}/meta/devices` — the devices signed in to the account, as one map
   (`{ d: { deviceId: { name, createdAt, lastSeen } } }`), capped at 20 by the rules. See Devices below.
-- **Conflict handling** (`src/lib/sync.ts`, unit-tested): `baseRef` holds what we last knew the cloud
+- **Conflict handling** (`packages/core/src/lib/sync.ts`, unit-tested): `baseRef` holds what we last knew the cloud
   held per task, `dirtyAtRef` when this device last changed a task it hasn't written yet. Incoming
   snapshots (both collections; merging waits until each has arrived once) are merged, not applied
   wholesale: an untouched task takes the cloud version; one changed on both sides is merged field
@@ -221,7 +242,7 @@ require rewriting a user's entire history:
   from the cloud on the next sign-in), since signed-out use is local-only.
 - `firestore.rules` validates the shape of profile/task writes (required fields present, correct
   types, enums, capped string lengths, capped list/map sizes and field counts), not just who's making
-  them. The size limits live in `src/lib/limits.ts` (`LIMITS`, unit-tested) and the app stays inside
+  them. The size limits live in `packages/core/src/lib/limits.ts` (`LIMITS`, unit-tested) and the app stays inside
   them -- subtask/tag/subject inputs stop at the cap, `addSession()` drops the oldest session past
   1000, and JSON import runs `sanitizeTask()` -- because a write over a rules cap saves locally but is
   silently refused by the cloud. Change a limit in both places; `tests/firestore.rules.test.ts`
@@ -238,14 +259,14 @@ require rewriting a user's entire history:
 - **Text lists and device ids** (2026-10-11): tags and subject names must be text. Rules can't loop
   over a list, so `allText()` joins the items with a line break and splits again; only a list of
   text comes back equal. That also refuses an item containing a line break, so anything that brings
-  text in from outside goes through `oneLine()` (`src/lib/limits.ts`; `sanitizeTask` and
+  text in from outside goes through `oneLine()` (`packages/core/src/lib/limits.ts`; `sanitizeTask` and
   `withImportedSubjects` do). Device ids must be 24 hex characters. Both are lenient the same way
   as above (unchanged tags, an unchanged subject list, a device write that adds no id).
 - **Known fields only** (2026-10-12): a new task, trash entry or profile may hold only the fields
   the app writes, and an update may add or change only those (`addsOnly()` with `taskFields()` /
   `trashFields()` / `profileFields()` in `firestore.rules`); a field an older version stored (a
   task's `notes`, a profile's `scratchpad`) may stay or be removed. The same lists are `TASK_FIELDS` /
-  `TRASH_FIELDS` / `PROFILE_FIELDS` in `src/lib/limits.ts` (`limits.rules.test.ts` compares them;
+  `TRASH_FIELDS` / `PROFILE_FIELDS` in `packages/core/src/lib/limits.ts` (`limits.rules.test.ts` compares them;
   `TASK_FIELD_MAP` won't compile if `Task` gains a key it doesn't list), and `addTaskWrite` sends
   tasks through `syncedTask()` so a task holding an old field on a device still syncs. **A new synced
   field goes in both lists, and the rules are deployed before the app that writes it**, or its saves
@@ -261,7 +282,7 @@ require rewriting a user's entire history:
 - **Task counter / per-account cap.** Rules can't count a collection, so `users/{uid}/meta/counts`
   (`n` = docs in tasks/, `t` = docs in trash/, `last` = the task id the latest change was about)
   does. Every batch that creates, deletes or moves a task bumps it (`countDelta()` in
-  `src/lib/sync.ts`; batches are built by `addTaskWrite()` in `src/lib/taskWrites.ts`, shared with
+  `packages/core/src/lib/sync.ts`; batches are built by `addTaskWrite()` in `packages/core/src/lib/taskWrites.ts`, shared with
   `tests/firestore.counter.test.ts` so the rules are tested against the app's real writes). The
   rules check each change against which docs actually exist before/after the batch, cap creates at
   5000 tasks / 500 trash entries, never block deletes, start the doc at zero (pre-existing tasks
@@ -305,7 +326,7 @@ this is cooperative: each device keeps an entry in `users/{uid}/meta/devices`, w
 signs itself out (`signOutFirebase`, then a message on the sign-in screen) when the server says its
 entry is gone. So a device signs out the next time it has the app open and online, and it is not a
 defence against a stolen session; the Profile note says both. Don't describe it as more than that.
-The logic is `deviceAction()` in `src/lib/devices.ts` (unit-tested), driven by the Devices effect in
+The logic is `deviceAction()` in `packages/core/src/lib/devices.ts` (unit-tested), driven by the Devices effect in
 `HomeworkPlanner` (declared below `recaps`, since it holds `signOutFirebase` in a ref and the React
 Compiler rejects forward references). The safety rules, each of which exists to make a wrongful
 sign-out impossible:
@@ -332,7 +353,7 @@ accounts), and This device (install the app via `requestInstall()`, reminders on
 device via `toggleNotifications`, the feedback form and the privacy policy).
 
 **Design-system constants** drive both the inline styles and the runtime stylesheet. `THEMES`
-(`src/themes.ts`) went from 26 color themes down to exactly two -- `stealth` (dark) and
+(`packages/core/src/themes.ts`) went from 26 color themes down to exactly two -- `stealth` (dark) and
 `stealthLight`, a literal per-channel RGB inversion of `stealth`'s achromatic grays (near-white bg
 instead of near-black, pure black accent instead of pure white; `textMuted` needed a small manual
 nudge afterward, since a naive hex inversion doesn't perfectly preserve WCAG contrast ratios -- sRGB
@@ -366,60 +387,60 @@ across the file style buttons/checkmarks as `background:T.accent, color:"#000"` 
 black text -- true for every one of the other 25 (now deleted) colorful themes, but broken by
 `stealthLight`'s pure-black accent (would've rendered black-on-black with no border to even show
 the button's shape). All of those now use the existing `contrastColor(T.accent)` helper
-(`src/lib/format.ts` -- WCAG-luminance-based black/white text picker, already used elsewhere e.g.
+(`packages/core/src/lib/format.ts` -- WCAG-luminance-based black/white text picker, already used elsewhere e.g.
 the `Toggle` switch thumb) instead of a hardcoded color, so they stay correct under any accent color
 a future theme might use. A few needed a conditional version since they only sometimes render on a
 solid `T.accent` fill (e.g. task-done checkmarks default to a fixed green `#2ED573`, not `T.accent`,
 in most layouts -- only the branches that actually use `T.accent` as the fill needed the fix).
-`LAYOUTS` (6 task-list display modes, in `src/constants.ts`; Compact, Minimal, Sticky, Timeline, By Subject and Calendar -- replaced by the Calendar tab -- were removed -- a saved removed layout falls back to List via the derived `layout` const). `FONTS` went the same way
+`LAYOUTS` (6 task-list display modes, in `packages/core/src/constants.ts`; Compact, Minimal, Sticky, Timeline, By Subject and Calendar -- replaced by the Calendar tab -- were removed -- a saved removed layout falls back to List via the derived `layout` const). `FONTS` went the same way
 as `THEMES` -- down from 16 selectable heading/body pairings to exactly one (`FONT`, in
-`src/fonts.ts`: the original DM Serif Display/DM Mono pairing), with the Font picker grid and its
+`packages/core/src/fonts.ts`: the original DM Serif Display/DM Mono pairing), with the Font picker grid and its
 `fontName`/`setFontName` state gone entirely. `F` is now just `FONT` directly rather than a keyed
 lookup. A one-time `localStorage.removeItem("hw-font")` on mount clears any stale per-user font
 choice already saved by existing users' browsers, mirroring the `hw-accent` cleanup above.
 
 **Where things live outside `App.tsx`** (moved out 2026-10-10, ahead of a React Native phone app
 that will reuse them; keep adding logic here, not in the component):
-- `src/types.ts`: `Task`, `Subtask`, `TaskTemplate`, `HistoryAction`, `Priority`, `Recurrence`.
-- `src/constants.ts`: `LAYOUTS`, `GROUP_BY`, the default subjects and colours, `PRIORITY_COLORS`/
+- `packages/core/src/types.ts`: `Task`, `Subtask`, `TaskTemplate`, `HistoryAction`, `Priority`, `Recurrence`.
+- `packages/core/src/constants.ts`: `LAYOUTS`, `GROUP_BY`, the default subjects and colours, `PRIORITY_COLORS`/
   `priColor`, `REMINDER_OFFSETS`, `QUESTIONS`/`askedQuestions`.
-- `src/whatsNew.ts`: `WHATS_NEW` (add new entries here), `UPDATE_KIND_ORDER`, `LEGACY_WHATSNEW_IDS`.
-- `src/lib/tasks.ts`: `setDone` (completing, the repeat copy, un-completing), `nextOrder`,
+- `packages/core/src/whatsNew.ts`: `WHATS_NEW` (add new entries here), `UPDATE_KIND_ORDER`, `LEGACY_WHATSNEW_IDS`.
+- `packages/core/src/lib/tasks.ts`: `setDone` (completing, the repeat copy, un-completing), `nextOrder`,
   `buildSuggestion`, `snoozeTarget`, `dateInDays`, `isUntouchedExample`.
-- `src/lib/trash.ts`: `TrashEntry`, `trashEntries`, `pruneTrash`, `localRecords`.
-- `src/lib/taskActions.ts`: what each task action does to the data, as plain `list in, list out`
+- `packages/core/src/lib/trash.ts`: `TrashEntry`, `trashEntries`, `pruneTrash`, `localRecords`.
+- `packages/core/src/lib/taskActions.ts`: what each task action does to the data, as plain `list in, list out`
   functions (`patchTask`, `patchTasks`, `duplicateOf`, `withNewTask`, `withTrashed`,
   `restoredInto`, `movedOrder`, the subject add/rename helpers, templates). The functions in
   `HomeworkPlanner` (`editTask`, `duplicateTask`, `moveTaskBy`...) are thin wrappers that add what
   belongs to the screen: the undo entry, the toast, `captureTaskRects`.
-- `src/lib/taskViews.ts`: which tasks a screen shows and in what order or groups: `sortTasks`,
+- `packages/core/src/lib/taskViews.ts`: which tasks a screen shows and in what order or groups: `sortTasks`,
   `filterTasks`, `groupTasks`, `prioritySplit` (Kanban/Pyramid), `timeLeft`, `searchTasks`,
   `completionStats`, and `heldOpen`/`isSettled` (the `justDone` hold).
-- `src/lib/reminders.ts`: `dailySummary` and `offsetReminders` decide what is owed; the effect in
+- `packages/core/src/lib/reminders.ts`: `dailySummary` and `offsetReminders` decide what is owed; the effect in
   `HomeworkPlanner` only shows the notifications and stores what was sent.
-- `src/lib/backup.ts`: `tasksCsv`, `readBackup` and the `withImported...` merges, `withSyllabusTasks`.
-- `src/lib/timers.ts`: the timers' arithmetic (`secondsLeft`, `stopwatchTotal`,
+- `packages/core/src/lib/backup.ts`: `tasksCsv`, `readBackup` and the `withImported...` merges, `withSyllabusTasks`.
+- `packages/core/src/lib/timers.ts`: the timers' arithmetic (`secondsLeft`, `stopwatchTotal`,
   `pomodoroFinishMinutes`, `pomodoroCreditMinutes`, `sessionMinutes`, `withSession`). The state,
   refs and effects that run the Pomodoro, stopwatch and task session are still in the component.
 - Moved out 2026-10-11, verbatim (the web app only; the phone app will have its own screens):
-  `src/firebase.ts` (setup), `src/fonts.ts` (`FONT`), `src/styles.ts` (`buildCss`, the runtime
+  `apps/web/src/firebase.ts` (setup), `packages/core/src/fonts.ts` (`FONT`), `apps/web/src/styles.ts` (`buildCss`, the runtime
   stylesheet; the `css` memo passes it the theme values it depends on one by one, so its deps stay
-  exact), `src/lib/dom.ts` (`activateOnKey`, `isWideScreen`, `flashTarget`, `pin`/`unpin`/
-  `freezeBox`, `notify`, `playChime`), `src/lib/thisDevice.ts` (`thisDeviceId`, `requestInstall`,
-  `isStandalone`), `ink`/`longDate` in `src/lib/format.ts`, `SCREEN_TITLES` in `src/constants.ts`,
-  and in `src/components/`: `icons.tsx` (the icons, `CheckMark`), `TaskModal.tsx`, `Sidebar.tsx`
+  exact), `apps/web/src/lib/dom.ts` (`activateOnKey`, `isWideScreen`, `flashTarget`, `pin`/`unpin`/
+  `freezeBox`, `notify`, `playChime`), `apps/web/src/lib/thisDevice.ts` (`thisDeviceId`, `requestInstall`,
+  `isStandalone`), `ink`/`longDate` in `packages/core/src/lib/format.ts`, `SCREEN_TITLES` in `packages/core/src/constants.ts`,
+  and in `apps/web/src/components/`: `icons.tsx` (the icons, `CheckMark`), `TaskModal.tsx`, `Sidebar.tsx`
   (`SidebarRow`, `SidebarSubjects`, `ScreenHeader`), `SettingsSection.tsx` (and `Toggle`),
   `SearchOverlay.tsx`, `UpdateDetail.tsx`, `GrowCard.tsx` (and `CardTaskRow`, `DayDetail`,
   `TimeDetail`), `CalendarView.tsx` (and `DueDeck`), `MiniCard.tsx`, `ProfileModal.tsx`. A component
-  file exports only components (the react-refresh lint rule); helpers and constants go in `src/lib/`
-  or `src/constants.ts`.
+  file exports only components (the react-refresh lint rule); helpers and constants go in `packages/core/src/lib/`
+  or `packages/core/src/constants.ts`.
 Still inside `HomeworkPlanner`, to move later, each a change of structure rather than a move: the
 timers as state machines (or a `useFocusTimer` hook), one wrapper for the storage calls, and the
 sync engine.
 When moving more, prove it the same way: build `main` and the branch side by side and compare what
 each shows (the page text per view, the saved data after each action) for identical output.
 
-**Domain logic as plain functions** (not hooks), all in `src/lib/` and unit-tested via `npm test`:
+**Domain logic as plain functions** (not hooks), all in `packages/core/src/lib/` and unit-tested via `npm test`:
 - `dates.ts`: `localDateStr` / `todayISO` / `advanceDate` — local-timezone date handling for due
   dates. Deliberately not `toISOString()`/UTC, since a day should roll over at the user's local
   midnight, not UTC midnight.
@@ -460,7 +481,7 @@ only the "‹ Home" back button) and the header's timer pill (`.timer-pill`, a r
 Pomodoro/stopwatch that opens Focus), since the sidebar covers all three. The dp mark isn't in the app at
 all now (also removed from the sidebar's foot at the user's request); it remains the favicon and the
 launch screen. **Subjects in the sidebar** (`SidebarSubjects`, module scope; groups from `subjectGroups()` in
-`src/lib/sidebarSubjects.ts`, unit-tested): every subject in the user's order, even with nothing
+`packages/core/src/lib/sidebarSubjects.ts`, unit-tested): every subject in the user's order, even with nothing
 open, then subjects that only exist on tasks, then "No subject" (name `""`) when it has tasks. Each
 is two buttons: the arrow unfolds its open tasks (`openSubjects`, `hw-sidebar-subjects-open`,
 local-only), most urgent first, `SIDEBAR_TASK_CAP` (8) of them until "Show all"; the name sets
@@ -496,7 +517,7 @@ messages, What's New), History (undo/redo, Recently deleted), Import/Export (syl
 backups) and Settings, each a full screen (`activeTab` "inbox"/"history"/"import"/"options") with
 the shared `ScreenHeader` (the ‹ Home back button); tapping "Time left" in the header opens a
 per-subject time breakdown. The sidebar's icons (`IconTasks`/`IconFocus`/
-`IconImport`/`IconSettings` etc., in `src/components/icons.tsx`) are
+`IconImport`/`IconSettings` etc., in `apps/web/src/components/icons.tsx`) are
 small hand-built SVGs from plain primitives (line/circle/polyline) rather than Unicode glyphs or an
 icon library dependency, styled with `stroke="currentColor"` so they pick up the button's active/
 inactive `color` automatically; `aria-label`/`title` on each button carry the accessible name now
@@ -512,10 +533,10 @@ while its content is scrolled to the top (native touch listeners with a non-pass
 the page behind can't scroll instead; the page is also scroll-locked while it's open), and with a
 mouse, its top handle (pointer events, `data-sheet-handle`). It
 (follows the finger, rubber-bands upward, backdrop fades) and on release it springs back or flies
-off and closes, carrying the finger's velocity (`src/lib/spring.ts`, unit-tested; driven through refs
+off and closes, carrying the finger's velocity (`packages/core/src/lib/spring.ts`, unit-tested; driven through refs
 and direct style writes, not state, so a drag doesn't re-render the modal per frame; reduced motion
 snaps/closes instantly). `TaskModal`'s render site in
-`HomeworkPlanner` is wrapped in `<ErrorBoundary>` (`src/components/ErrorBoundary.tsx`, also reused
+`HomeworkPlanner` is wrapped in `<ErrorBoundary>` (`apps/web/src/components/ErrorBoundary.tsx`, also reused
 by `main.tsx` for the app-wide boundary) with a small inline fallback, so a malformed task object
 only closes the modal instead of blanking the whole app -- narrower than the app-wide boundary,
 which still exists as the outer safety net for anything else.
@@ -531,13 +552,13 @@ which still exists as the outer safety net for anything else.
   task so "Sessions today" survives closing the modal, and the Inbox's "Time spent" sums these
   (real time) rather than estimates.
 - `spawnedNextId?: number|null` — set on a recurring task when completing it spawns the next
-  occurrence (see `setDone()` in `src/lib/tasks.ts`), so un-completing removes that copy instead of leaving a
+  occurrence (see `setDone()` in `packages/core/src/lib/tasks.ts`), so un-completing removes that copy instead of leaving a
   duplicate. The copy gets unchecked subtasks and keeps no due date if the original had none.
 - `estMins` can be 0 (estimate step skipped); every display goes through `formatDuration()`
-  (`src/lib/format.ts`), which returns "" for 0 so the label is hidden rather than showing "0m".
+  (`packages/core/src/lib/format.ts`), which returns "" for 0 so the label is hidden rather than showing "0m".
 
 **Undo history.** `HistoryAction` is either `"delete"` (ties into Recently deleted) or `"change"`:
-each affected task's full state before and after (`src/lib/history.ts`, `diffTasks`/
+each affected task's full state before and after (`packages/core/src/lib/history.ts`, `diffTasks`/
 `applyTaskStates`), recorded per task rather than as a whole-list copy so undoing one change
 can't roll back unrelated edits made since (e.g. synced from another device). Anything that
 should be undoable goes through `changeTasks(fn, label, toast)` -- completing (incl. the spawned
@@ -563,7 +584,7 @@ entry in that map. Feedback, Clear completed and the version line stay outside t
 
 **Settings extras.** Subjects can be renamed/recolored (`updateSubject`, carries the rename to
 tasks, trash and templates). Date & time: `timeFormat` (`formatTime(t, h24)`, passed to
-`TaskModal`/`MiniCard` as `h24`) and `weekStart` (`startOfWeek()` in `src/lib/dates.ts`, used by
+`TaskModal`/`MiniCard` as `h24`) and `weekStart` (`startOfWeek()` in `packages/core/src/lib/dates.ts`, used by
 the Inbox's weekly recap).
 
 **Task detail actions.** `TaskModal` can edit a task's own fields (an Edit panel, via
@@ -590,14 +611,14 @@ one-tap Start. Focus Mode also has a **stopwatch** (`swStartedAt`/`swBanked`/
 `swElapsed`, clock-based, keeps running outside Focus Mode, shown on the Focus button when the
 Pomodoro isn't running); "Log Xm to task" (`saveStopwatch`) adds a session to `focusTask` and resets
 it. `focusShow` (`hw-focus-show`, local-only, Settings -> Focus timer -> Show in Focus; options
-and helpers in `src/lib/stopwatch.ts`) decides which timers show; Settings presents it as two
+and helpers in `packages/core/src/lib/stopwatch.ts`) decides which timers show; Settings presents it as two
 switches, Pomodoro and Stopwatch (`focusShowFor()` maps them to the stored value), and hides the
 Pomodoro's length settings while it's off. In Focus Mode the order is Pomodoro, task, stopwatch,
 centered as a group. **JSON import** (`importBackupJSON`) merges an
 export: tasks with ids already present are skipped, subjects/templates added if missing, existing
 subject colors win, settings untouched.
 
-**What's New** (`WHATS_NEW` in `src/whatsNew.ts`, the Inbox's Updates list) is hand-maintained, newest first -- add an
+**What's New** (`WHATS_NEW` in `packages/core/src/whatsNew.ts`, the Inbox's Updates list) is hand-maintained, newest first -- add an
 entry whenever a user-facing change ships. Each entry has a `kind` (category: "New feature", "Bug
 fix"...), a `headline` (its short title), the `description`, and a `where` -- how to get to it,
 using the on-screen labels ("Sidebar (top left button) → Settings → ..."), shown as "Where to find it"
@@ -619,7 +640,7 @@ menu; harmless now that it's a screen). The Inbox's two parts (Messages, Updates
 `SettingsSection` dropdowns (`openInbox`, not persisted: they start closed and close again when `activeTab` leaves the
 screen, tracked by `lastTab`, like Settings; the Import/Export screen's two
 sections, Import from Syllabus and Backup & export, are dropdowns in the same list). **Messages** are
-recaps (`src/lib/recaps.ts`, unit-tested): when a day, week, month or year ends, an effect in
+recaps (`packages/core/src/lib/recaps.ts`, unit-tested): when a day, week, month or year ends, an effect in
 `HomeworkPlanner` writes a snapshot (finished count, logged minutes, on-time count, busiest
 subject, finished titles) into `recaps` (`hw-recaps`, local-only, newest 60), skipping periods
 where nothing was finished or worked on. `recapsChecked` (`hw-recaps-checked`) is the last date
@@ -654,7 +675,7 @@ required (e.g. `contrastColor()`), and `T.borderFaint` for a lighter divider (`T
 
 **Text size** (`textSize`, `hw-text-size`, three buttons in Settings -> Looks, local-only): Small
 (the sizes the app had until 2026-10-12), Default (small text about 15% larger) and Large (about
-30%). Every font size goes through `fz(px)` (`src/lib/textSize.ts`, unit-tested), in inline styles
+30%). Every font size goes through `fz(px)` (`apps/web/src/lib/textSize.ts`, unit-tested), in inline styles
 (`fontSize:fz(11)`) and in the runtime css (`font-size:${fz(12)}`): it returns
 `calc(11px + 11px * var(--ts, 0.15))`, and a layout effect sets `--ts` on `<html>`. Text of 12px
 and under takes the whole increase, larger text less, and from 20px up none (`fz` then returns the
@@ -664,7 +685,7 @@ font size under 20px**, never a bare number, or that text won't follow the setti
 nothing cut off, and the tap areas (below) still clear of each other.
 
 **Animation speed** (`animSpeed`, `hw-anim-speed`, a slider in Settings -> Looks, 0.5x to 2x,
-local-only) is applied globally by `src/lib/animSpeed.ts` instead of per call site: it wraps
+local-only) is applied globally by `apps/web/src/lib/animSpeed.ts` instead of per call site: it wraps
 `Element.prototype.animate` once and listens for `transitionrun`/`animationstart` on the
 document, setting each animation's `playbackRate`. So a new CSS transition or `.animate()` call
 follows the setting with no extra work, but a `setTimeout` that waits out an animation must use
@@ -712,7 +733,7 @@ far, each fixed, and what to keep doing:
   first keyframe segment of the slide it made the card rise, hesitate, then set off.
 - *Cards that grow from a row* freeze their contents at the final size first (`freezeBox`), so the
   text is revealed in place instead of re-wrapping while the box grows.
-- *Scrollbars.* `html{scrollbar-gutter:stable}` and `body{overflow-x:clip}` (`src/index.css`): with
+- *Scrollbars.* `html{scrollbar-gutter:stable}` and `body{overflow-x:clip}` (`apps/web/src/index.css`): with
   `overflow-x:hidden`, body was its own scroll container and grew a second scrollbar while cards
   were mid-animation below its edge, shifting the page sideways for a moment.
 To check, record each element's box on every frame while the interaction plays, with
@@ -751,7 +772,7 @@ Done column or tier (not while it's in `justDone`). Use these for any new layout
 to scrolling only when vertical is larger (10px), and act past `SWIPE_THRESHOLD` (64px) or on a flick (over 600px/s after 24px). The earlier,
 stricter rule (1.5x flatter than tall, 90px) dropped most real thumb swipes.
 
-**Pull to reload** (`src/hooks/usePullToReload.ts`): in the installed app only (`isStandalone()`;
+**Pull to reload** (`apps/web/src/hooks/usePullToReload.ts`): in the installed app only (`isStandalone()`;
 browser tabs have their own), pulling down 90px from the top of the page reloads it. Off while a
 task, search, an Inbox message or Profile is open; ignores pulls that start on something scrollable,
 a dialog, a field or the reorder handle.
@@ -819,7 +840,7 @@ Chrome accessibility tree):
 - Keyboard focus ring: a global `:focus-visible` rule with `!important` (beats inline
   `outline:none`).
 - Colored text goes through `ink(color, T.light)` (module scope, wraps `readableOn()` in
-  `src/lib/format.ts`), which darkens or lightens it just enough for 4.5:1. Calling it (or other
+  `packages/core/src/lib/format.ts`), which darkens or lightens it just enough for 4.5:1. Calling it (or other
   helpers) inside a function declared *above* the `css` useMemo in `HomeworkPlanner` trips the
   React Compiler's `preserve-manual-memoization` check, like the forward-reference note above; the
   swipe-reveal label keeps plain hex for that reason.
@@ -840,7 +861,7 @@ date clears it); "Pick a date..." applies on Set, not on change. Priority "Autom
 
 **New task questions** (Settings; `hw-add-questions`, local-only like the Focus timer settings): which
 of the add-task questions after the title (`QUESTIONS`: subject, due date, estimate, repeat) are asked,
-and in what order. Stored as `{key,on}[]`, cleaned by `normalizeQuestionPrefs()` (`src/lib/addQuestions.ts`,
+and in what order. Stored as `{key,on}[]`, cleaned by `normalizeQuestionPrefs()` (`packages/core/src/lib/addQuestions.ts`,
 unit-tested: unknown/duplicate keys dropped, missing ones appended on). The wizard indexes
 `askQuestions` (the enabled ones, in order), never `QUESTIONS`, so `step` means "position in the
 user's list". `askQuestions` is `useMemo`'d over the module-scope `askedQuestions()` -- computed
@@ -901,8 +922,8 @@ A `Content-Security-Policy-Report-Only` header is set (2026-10-12): it blocks no
 only logs what an enforced policy would have refused (DevTools console, "[Report Only]"). It is
 report-only because a wrong policy would silently break Google Sign-In/reCAPTCHA/Google Fonts; rename
 it to `Content-Security-Policy` only after signing in, syncing and loading every screen on the live
-site shows no such lines. The inline scripts in `index.html` (and the font link's `onload`, via
-`'unsafe-hashes'`) are allowed by hash, and `src/lib/csp.test.ts` (in `npm test`) recomputes those
+site shows no such lines. The inline scripts in `apps/web/index.html` (and the font link's `onload`, via
+`'unsafe-hashes'`) are allowed by hash, and `apps/web/src/lib/csp.test.ts` (in `npm test`) recomputes those
 hashes, so editing one of them fails the test with the hash to paste in. Styles need
 `'unsafe-inline'` (the app styles inline). A new outside script, font, image host or API needs
 adding to the policy.

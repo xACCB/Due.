@@ -147,7 +147,7 @@ describe("task sync metadata", () => {
   });
 });
 
-// Mirrors src/lib/limits.ts -- the app stays inside these, the rules enforce them.
+// Mirrors packages/core/src/lib/limits.ts -- the app stays inside these, the rules enforce them.
 describe("size caps", () => {
   const full = { ...validTask, subtasks:[{ id:"a", text:"x", done:false }], recurrence:"weekly", archived:false,
     completedAt:null, tags:["exam"], priorityOverride:"high", sessions:[{ mins:25, at:1 }], spawnedNextId:null, updatedAt:1 };

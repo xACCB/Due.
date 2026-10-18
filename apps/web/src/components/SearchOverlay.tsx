@@ -1,10 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import type { Task } from "../types";
-import { priColor } from "../constants";
-import { searchTasks } from "../lib/taskViews";
-import type { ThemeObj } from "../themes";
-import { getPriority, daysUntil, ink } from "../lib/format";
-import { FONT } from "../fonts";
+import type { Task } from "@dueplanner/core/types";
+import { priColor } from "@dueplanner/core/constants";
+import { searchTasks } from "@dueplanner/core/lib/taskViews";
+import type { ThemeObj } from "@dueplanner/core/themes";
+import { getPriority, daysUntil, ink } from "@dueplanner/core/lib/format";
+import { FONT } from "@dueplanner/core/fonts";
 import { IconSearch } from "./icons";
 import { fz } from "../lib/textSize";
 

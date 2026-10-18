@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
-import type { Task } from "../types";
-import type { ThemeObj } from "../themes";
-import { formatDate, formatTime, formatDuration, countdown, ink } from "../lib/format";
-import { FONT } from "../fonts";
+import type { Task } from "@dueplanner/core/types";
+import type { ThemeObj } from "@dueplanner/core/themes";
+import { formatDate, formatTime, formatDuration, countdown, ink } from "@dueplanner/core/lib/format";
+import { FONT } from "@dueplanner/core/fonts";
 import { CheckMark } from "./icons";
 import { activateOnKey, box, freezeBox, pin, unpin } from "../lib/dom";
 import { fz } from "../lib/textSize";

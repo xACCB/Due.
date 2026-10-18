@@ -1,0 +1,22 @@
+{
+  // Shared code for the web and phone apps, so deliberately no "DOM" lib and
+  // no ambient types: window, document, localStorage and the like don't
+  // type-check here. Anything browser-specific belongs in apps/web.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": false,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["src"]
+}

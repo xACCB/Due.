@@ -1,4 +1,4 @@
-import type { ThemeObj } from "./themes";
+import type { ThemeObj } from "@dueplanner/core/themes";
 import { fz } from "./lib/textSize";
 
 // The app's one stylesheet, built from the active theme and font and injected

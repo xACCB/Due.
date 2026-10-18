@@ -1,15 +1,15 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import type { Priority, Recurrence, Subtask, Task } from "../types";
-import { priColor } from "../constants";
-import type { SnoozeKind } from "../lib/tasks";
-import type { ThemeObj } from "../themes";
-import { localDateStr, todayISO } from "../lib/dates";
-import { nextId } from "../lib/id";
+import type { Priority, Recurrence, Subtask, Task } from "@dueplanner/core/types";
+import { priColor } from "@dueplanner/core/constants";
+import type { SnoozeKind } from "@dueplanner/core/lib/tasks";
+import type { ThemeObj } from "@dueplanner/core/themes";
+import { localDateStr, todayISO } from "@dueplanner/core/lib/dates";
+import { nextId } from "@dueplanner/core/lib/id";
 import { animationRate } from "../lib/animSpeed";
-import { contrastColor, getPriority, formatDate, formatTime, formatDuration, countdown, ink } from "../lib/format";
-import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "../lib/spring";
-import { LIMITS } from "../lib/limits";
-import { FONT } from "../fonts";
+import { contrastColor, getPriority, formatDate, formatTime, formatDuration, countdown, ink } from "@dueplanner/core/lib/format";
+import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "@dueplanner/core/lib/spring";
+import { LIMITS } from "@dueplanner/core/lib/limits";
+import { FONT } from "@dueplanner/core/fonts";
 import { fz } from "../lib/textSize";
 
 // ─── TASK SESSION MODAL ───────────────────────────────────────────────────────

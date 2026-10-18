@@ -8,7 +8,7 @@ const PORT = 5199;
 const APP_URL = `http://localhost:${PORT}/`;
 const isWindows = process.platform === "win32";
 
-const server = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], {
+const server = spawn("npx", ["vite", "apps/web", "--port", String(PORT), "--strictPort"], {
   env: { ...process.env, VITE_FIREBASE_EMULATORS: "1" }, stdio: "ignore", shell: isWindows, detached: !isWindows,
 });
 const stopServer = () => {

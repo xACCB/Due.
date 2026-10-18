@@ -3,13 +3,13 @@ import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebas
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
 import { doc, setDoc } from "firebase/firestore";
-import { LIMITS, sanitizeTask } from "../src/lib/limits";
+import { LIMITS, sanitizeTask } from "@dueplanner/core/lib/limits";
 
 // The contract between the app and the rules, checked by behaviour: anything
-// the app can write at its limits (src/lib/limits.ts) is accepted, and one
+// the app can write at its limits (packages/core/src/lib/limits.ts) is accepted, and one
 // step over each limit is refused. The numbers come from LIMITS, not typed in
 // here, so this fails if the app's limits and the rules' ever disagree.
-// (src/lib/limits.rules.test.ts checks the same numbers by reading the file.)
+// (packages/core/src/lib/limits.rules.test.ts checks the same numbers by reading the file.)
 let env: RulesTestEnvironment;
 
 beforeAll(async () => {

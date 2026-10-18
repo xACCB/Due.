@@ -1,10 +1,10 @@
 import { useState } from "react";
-import type { Task } from "../types";
-import type { ThemeObj } from "../themes";
-import { ink } from "../lib/format";
-import { SIDEBAR_TASK_CAP, dueShort } from "../lib/sidebarSubjects";
-import type { SubjectGroup } from "../lib/sidebarSubjects";
-import { FONT } from "../fonts";
+import type { Task } from "@dueplanner/core/types";
+import type { ThemeObj } from "@dueplanner/core/themes";
+import { ink } from "@dueplanner/core/lib/format";
+import { SIDEBAR_TASK_CAP, dueShort } from "@dueplanner/core/lib/sidebarSubjects";
+import type { SubjectGroup } from "@dueplanner/core/lib/sidebarSubjects";
+import { FONT } from "@dueplanner/core/fonts";
 import { fz } from "../lib/textSize";
 
 // One row of the sidebar. Styled by .sb-row in the runtime css; `current` marks

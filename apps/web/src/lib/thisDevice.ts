@@ -1,4 +1,4 @@
-import { newDeviceId } from "./devices";
+import { newDeviceId } from "@dueplanner/core/lib/devices";
 
 // Captured at module load so the "Add to Home Screen" button can trigger the
 // browser's own install prompt later (Chrome/Edge/Android fire this event;

@@ -136,6 +136,39 @@ commonly gets silently blocked by ad/privacy-blocker extensions (AdGuard, uBlock
 throwing -- `isSupported()` checks that explicitly instead of half-initializing. `public/privacy.html`
 discloses this; keep that page in sync if what's collected here changes.
 
+**Error reports (Sentry).** `src/lib/report.ts`: `reportError(err, where)` (`where` a short fixed
+label such as `"sync-tasks-save"`) is called from the render `ErrorBoundary`, global error/rejection
+handlers, every place that sets `syncError`, device list writes and account deletion. Inert unless
+Vercel's `VITE_SENTRY_DSN` is set, never in emulator mode; the SDK (`@sentry/browser`) is
+dynamically imported when the app is idle, so it is its own chunk. Sends only the error, the label,
+the app version and the browser: default integrations off (no breadcrumbs, no global handlers of its
+own), `dataCollection` all off but the User-Agent header, and `scrubEvent()` (unit-tested) strips
+user/extra/breadcrumbs/request data whatever the SDK attaches. Never pass task text as `where`.
+`public/privacy.html` describes this; keep it in step. CSP `connect-src` allows `*.ingest.sentry.io`
+(plus the `us`/`de` regions).
+
+**Feature flags (Remote Config).** `src/lib/flags.ts`: `FLAG_DEFAULTS` in code is what every load
+starts from (and all it ever uses offline, in emulator mode, or until a parameter exists in the
+console); `startFlags()` (from `src/firebase.ts`) fetches when idle, at most hourly, and only values
+whose source is `"remote"` override a default. Read with `useFlags()` (`src/hooks/useFlags.ts`,
+`useSyncExternalStore`) or `getFlags()`. To add one: a default here, then optionally a parameter of
+the same name in Firebase console -> Remote Config. `devicesAutoSignOut` (default true) gates only
+the Devices effect's "my entry is gone, sign out" branch: setting it to false in the console stops
+that without a deploy.
+
+**Data versions (`schemaVersion`).** `src/lib/migrations.ts`: `SCHEMA_VERSION` and one step per
+version for tasks (`TASK_STEPS`) and the profile (`PROFILE_STEPS`). `schemaVersion` is sync
+metadata like `updatedAt`, never a `Task` field: `taskWrites.ts` stamps it on every task/trash doc
+written (`stamp()`), the profile save writes it, and `cloudRecord()` splits it off and runs
+`migrateTask` on the way in. This device's `hw-tasks` has its version in `hw-schema`; a JSON export
+records `schemaVersion` and `readBackup` migrates from it. A step must be safe to run again on
+current data (an older app can rewrite a doc without the field, which then reads as version 0). A doc
+from a newer app (`isFromNewerApp`) is read but never written back (`newerIdsRef`/`newerProfileRef`
+in `HomeworkPlanner`), and the sync note asks for a reload (`shownSyncError`). **Changing a task or
+profile shape:** bump `SCHEMA_VERSION`, add the step, and still follow "Known fields only" below for
+any new field. The rules accept `schemaVersion` as a whole number 0..1000 (`validVersion()`,
+`LIMITS.schemaVersion`), never required.
+
 **Firestore data model.** Split across two paths per user, specifically so a small edit doesn't
 require rewriting a user's entire history:
 - `users/{uid}` — small "profile" fields only: `layout`, `colorCodeUrgency`, `subjects`,

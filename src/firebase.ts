@@ -5,6 +5,7 @@ import type { Firestore } from "firebase/firestore";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getPerformance } from "firebase/performance";
 import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
+import { startFlags } from "./lib/flags";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD9W3eTvKjthiEZ_0MjeCHBIZ6BevMKgSo",
@@ -57,6 +58,8 @@ if (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULATORS === "1") {
   connectFirestoreEmulator(db, "127.0.0.1", 8080);
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 }
+// Feature flags (src/lib/flags.ts): not in emulator mode, where the defaults stand.
+else startFlags(fbApp);
 export const googleProvider = new GoogleAuthProvider();
 // App Check proves requests are coming from this real app (not a script
 // hitting the project directly with the public firebaseConfig above) via a

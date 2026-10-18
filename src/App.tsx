@@ -38,6 +38,7 @@ import { diffTasks, applyTaskStates } from "./lib/history";
 import { downloadFile } from "./lib/download";
 import { LIMITS } from "./lib/limits";
 import { reportError } from "./lib/report";
+import { useFlags } from "./hooks/useFlags";
 import { SCHEMA_VERSION, isFromNewerApp, migrateProfile, migrateTask, migrateTasks } from "./lib/migrations";
 import { describeDevice, deviceAction, listDevices, pruneDevices } from "./lib/devices";
 import type { DeviceEntry, DeviceMap } from "./lib/devices";
@@ -1293,6 +1294,10 @@ export default function HomeworkPlanner() {
   // Compiler's forward-reference check (see CLAUDE.md).
   const signOutRef=useRef(signOutFirebase);
   useEffect(()=>{signOutRef.current=signOutFirebase;});
+  // Remote kill switch for signing this device out (src/lib/flags.ts).
+  const flags=useFlags();
+  const autoSignOutRef=useRef(flags.devicesAutoSignOut);
+  useEffect(()=>{autoSignOutRef.current=flags.devicesAutoSignOut;});
   useEffect(()=>{
     if(!fbUser)return;
     signingOut.current=false;
@@ -1316,11 +1321,11 @@ export default function HomeworkPlanner() {
           .finally(()=>{deviceRegistering.current=false;});
       }
       if(action==="touch")updateDoc(ref,{[`d.${id}.lastSeen`]:Date.now()}).catch(()=>{/* best effort */});
-      if(action==="signOut"){
+      if(action==="signOut"&&autoSignOutRef.current){
         signingOut.current=true;
         signOutRef.current()
           .then(()=>{setSignInError("This device was signed out from another device. Sign in again to keep syncing.");setShowProfile(true);})
-          .catch(e=>{console.error(e); reportError(e,"device-register");});
+          .catch(e=>{console.error(e); reportError(e,"device-self-signout");});
       }
     },()=>{/* the list can't be read (e.g. offline with nothing cached): no list, and nothing else changes */});
   },[fbUser]);

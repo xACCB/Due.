@@ -9,6 +9,7 @@ import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { Button, Chip, Stepper } from "./ui";
 import { DateTimeField } from "./DateTimeField";
+import type { TaskTemplate } from "@dueplanner/core/types";
 
 // Adding a task: "What's the assignment?", then the questions the New task
 // questions setting asks, in its order (core's addFlow, like the web wizard).
@@ -25,21 +26,23 @@ function inDays(d: number): string {
   return localDateStr(dt);
 }
 
-export function AddSheet({ visible, presetDate, onClose }: { visible: boolean; presetDate?: string; onClose: () => void }) {
+// `template`: start from a saved template (only the due date is asked; the
+// caller adds the task directly when that question is off, see Home).
+export function AddSheet({ visible, presetDate, template, onClose }: { visible: boolean; presetDate?: string; template?: TaskTemplate | null; onClose: () => void }) {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       {/* Remounted per opening (visible), so every add starts fresh. */}
-      {visible && <AddFlowView presetDate={presetDate} onClose={onClose} />}
+      {visible && <AddFlowView presetDate={presetDate} template={template ?? null} onClose={onClose} />}
     </Modal>
   );
 }
 
-function AddFlowView({ presetDate, onClose }: { presetDate?: string; onClose: () => void }) {
+function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; template: TaskTemplate | null; onClose: () => void }) {
   const app = useApp();
   const { T, h24, questions } = app;
   const { subjects, subjectColors } = app.settings;
-  const [flow, setFlow] = useState(() => A.startAdd(questions, presetDate));
-  const [title, setTitle] = useState("");
+  const [flow, setFlow] = useState(() => (template && A.startFromTemplate(questions, template).flow) || A.startAdd(questions, presetDate));
+  const [title, setTitle] = useState(template?.name ?? "");
   const [customDate, setCustomDate] = useState("");
   const [customTime, setCustomTime] = useState("");
   const [hours, setHours] = useState(0);
@@ -61,7 +64,7 @@ function AddFlowView({ presetDate, onClose }: { presetDate?: string; onClose: ()
   };
 
   const d = flow.draft;
-  const total = questions.length + 1;
+  const total = flow.questions.length + 1;
   const at = flow.step + 1;
 
   return (
@@ -99,7 +102,7 @@ function AddFlowView({ presetDate, onClose }: { presetDate?: string; onClose: ()
               accessibilityLabel="What's the assignment?"
               style={[styles.input, { color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
             />
-            <Button label={questions.length ? "Next" : "Add"} onPress={() => run(A.submitTitle(flow, title))} disabled={!title.trim()} T={T} style={styles.next} />
+            <Button label={flow.questions.length ? "Next" : "Add"} onPress={() => run(A.submitTitle(flow, title))} disabled={!title.trim()} T={T} style={styles.next} />
           </>
         )}
 

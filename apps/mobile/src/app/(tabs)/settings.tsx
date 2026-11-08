@@ -6,24 +6,24 @@ import { QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS } from "@dueplanner/core/con
 import { moveQuestion, normalizeQuestionPrefs } from "@dueplanner/core/lib/addQuestions";
 import { subjectToAdd, withoutSubjectColor } from "@dueplanner/core/lib/taskActions";
 import { focusShowFor, showsPomodoro, showsStopwatch } from "@dueplanner/core/lib/stopwatch";
-import { formatAgo } from "@dueplanner/core/lib/format";
+import { ink } from "@dueplanner/core/lib/format";
 import { LIMITS } from "@dueplanner/core/lib/limits";
 import { useApp } from "../../state/appContext";
-import { clock } from "../../lib/clock";
 import { requestNotifications } from "../../lib/notifications";
 import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Row, Section, Segmented, Stepper, ToggleRow } from "../../components/ui";
 
-// Settings, in the web's sections (Looks, Date & time, Task list, New task
-// questions, Subjects, Focus timer, Reminders), plus Recently deleted.
+// Settings, in the web's sections and order (Looks, Date & time, Focus timer,
+// New task questions, Subjects, Task list, Reminders), then feedback and
+// Clear completed. Recently deleted is in History, as on the web.
+const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
 export default function SettingsScreen() {
   const app = useApp();
   const { T } = app;
   const s = app.settings;
   const [newSubject, setNewSubject] = useState("");
   const prefs = normalizeQuestionPrefs(s.addQuestions, QUESTION_KEYS);
-  const now = clock();
 
   const addSubject = () => {
     const add = subjectToAdd(newSubject, s.subjects, s.subjectColors);
@@ -50,17 +50,23 @@ export default function SettingsScreen() {
   const toggleOffset = (key: string, on: boolean) =>
     s.setReminderOffsets(REMINDER_OFFSETS.map(o => o.key as string).filter(k => (k === key ? on : s.reminderOffsets.includes(k))));
 
-  const trash = [...app.trash].sort((a, b) => b.deletedAt - a.deletedAt);
+  const done = app.tasks.filter(t => t.done && !t.archived);
+  const doneCount = done.length;
+  const clearCompleted = () => app.removeMany(done.map(t => t.id));
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.body} contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled">
-        <Text style={[styles.h1, { color: T.accent }]} accessibilityRole="header">Settings</Text>
+        <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Settings</Text>
 
         <Section title="Looks" T={T}>
           <Row label="Appearance" T={T}>
             <Segmented label="Appearance" T={T} value={s.themeMode} onChange={s.setThemeMode}
               options={[{ label: "System", value: "auto" }, { label: "Light", value: "light" }, { label: "Dark", value: "dark" }]} />
+          </Row>
+          <Row label="Text size" T={T}>
+            <Segmented label="Text size" T={T} value={s.textSize} onChange={s.setTextSize}
+              options={[{ label: "Small", value: "small" }, { label: "Default", value: "default" }, { label: "Large", value: "large" }]} />
           </Row>
           <ToggleRow label="Urgency color coding" hint="Red, orange and green by how soon a task is due" value={s.colorCodeUrgency} onChange={s.setColorCodeUrgency} T={T} />
         </Section>
@@ -75,8 +81,16 @@ export default function SettingsScreen() {
           <ToggleRow label="Calendar shows only this month" hint="Off: six full weeks, with the days around it" value={s.calendarMonthOnly} onChange={s.setCalendarMonthOnly} T={T} />
         </Section>
 
-        <Section title="Task list" T={T}>
-          <ToggleRow label="Show completed" value={s.showDone} onChange={s.setShowDone} T={T} />
+        <Section title="Focus timer" T={T}>
+          <ToggleRow label="Pomodoro" value={showsPomodoro(s.focusShow)} onChange={on => s.setFocusShow(focusShowFor(on, showsStopwatch(s.focusShow)))} T={T} />
+          <ToggleRow label="Stopwatch" value={showsStopwatch(s.focusShow)} onChange={on => s.setFocusShow(focusShowFor(showsPomodoro(s.focusShow), on))} T={T} />
+          {showsPomodoro(s.focusShow) && (
+            <>
+              <Row label="Focus length" T={T}><Stepper value={s.pomodoroWork} onChange={s.setPomodoroWork} min={5} max={180} step={5} T={T} label="focus length" unit="min" /></Row>
+              <Row label="Break length" T={T}><Stepper value={s.pomodoroBreak} onChange={s.setPomodoroBreak} min={1} max={60} T={T} label="break length" unit="min" /></Row>
+              <ToggleRow label="Start breaks automatically" value={s.pomodoroAutoBreak} onChange={s.setPomodoroAutoBreak} T={T} />
+            </>
+          )}
         </Section>
 
         <Section title="New task questions" T={T}>
@@ -124,16 +138,18 @@ export default function SettingsScreen() {
           )}
         </Section>
 
-        <Section title="Focus timer" T={T}>
-          <ToggleRow label="Pomodoro" value={showsPomodoro(s.focusShow)} onChange={on => s.setFocusShow(focusShowFor(on, showsStopwatch(s.focusShow)))} T={T} />
-          <ToggleRow label="Stopwatch" value={showsStopwatch(s.focusShow)} onChange={on => s.setFocusShow(focusShowFor(showsPomodoro(s.focusShow), on))} T={T} />
-          {showsPomodoro(s.focusShow) && (
-            <>
-              <Row label="Focus length" T={T}><Stepper value={s.pomodoroWork} onChange={s.setPomodoroWork} min={5} max={180} step={5} T={T} label="focus length" unit="min" /></Row>
-              <Row label="Break length" T={T}><Stepper value={s.pomodoroBreak} onChange={s.setPomodoroBreak} min={1} max={60} T={T} label="break length" unit="min" /></Row>
-              <ToggleRow label="Start breaks automatically" value={s.pomodoroAutoBreak} onChange={s.setPomodoroAutoBreak} T={T} />
-            </>
-          )}
+        <Section title="Task list" T={T}>
+          <Row label="Group by" T={T}>
+            <Segmented label="Group by" T={T} value={s.groupBy} onChange={s.setGroupBy}
+              options={[{ label: "None", value: "none" }, { label: "Subject", value: "subject" }, { label: "Priority", value: "priority" }, { label: "Due", value: "dueDate" }]} />
+          </Row>
+          <ToggleRow label="Show smart suggestion" hint="The most urgent task, above the list" value={s.showSuggestion} onChange={s.setShowSuggestion} T={T} />
+          <ToggleRow label="Show completed" value={s.showDone} onChange={s.setShowDone} T={T} />
+          <Row label="Auto-archive completed" hint="Done tasks move to Archived after this long. You can still archive any task from its page." T={T} />
+          <View style={styles.segRow}>
+            <Segmented label="Auto-archive completed" T={T} value={s.autoArchiveDays} onChange={s.setAutoArchiveDays}
+              options={[{ label: "Never", value: 0 }, { label: "1 day", value: 1 }, { label: "7 days", value: 7 }, { label: "30 days", value: 30 }]} />
+          </View>
         </Section>
 
         <Section title="Reminders" T={T}>
@@ -144,16 +160,13 @@ export default function SettingsScreen() {
           {s.notifications && <Row label="Tasks with only a date" hint="Get one reminder at 8 AM on the day" T={T} />}
         </Section>
 
-        <Section title="Recently deleted" T={T}>
-          {trash.length === 0 && <Row label="Nothing deleted in the last 30 days" T={T} />}
-          {trash.slice(0, 50).map(e => (
-            <Row key={e.task.id} label={e.task.title} hint={`Deleted ${formatAgo(e.deletedAt, now)}`} T={T}>
-              <Pressable onPress={() => app.restore(e.task.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Restore ${e.task.title}`}>
-                <Text style={[styles.link, { color: T.text }]}>Restore</Text>
-              </Pressable>
-            </Row>
-          ))}
-        </Section>
+        <Pressable onPress={() => { Linking.openURL(FEEDBACK_URL).catch(() => {}); }} accessibilityRole="link" style={[styles.wide, { borderColor: T.border }]}>
+          <Text style={[styles.wideText, { color: T.textMuted }]}>Send feedback / report a bug</Text>
+        </Pressable>
+        <Pressable onPress={clearCompleted} disabled={doneCount === 0} accessibilityRole="button" accessibilityHint="Deletes completed tasks that aren't archived. You can undo this"
+          style={[styles.wide, { borderColor: "#FF475744", opacity: doneCount ? 1 : 0.45 }]}>
+          <Text style={[styles.wideText, { color: ink("#FF4757", T.light) }]}>Clear completed{doneCount ? ` (${doneCount})` : ""}</Text>
+        </Pressable>
 
         <Text style={[styles.foot, { color: T.textFaint }]}>DuePlanner {Constants.expoConfig?.version ?? ""}, by due. studios</Text>
       </ScrollView>
@@ -180,6 +193,8 @@ const styles = StyleSheet.create({
   input: { fontSize: 16, fontFamily: F.body, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
   arrow: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   arrowGlyph: { fontSize: 11 },
-  link: { fontSize: 13, fontFamily: F.body, textDecorationLine: "underline" },
+  segRow: { paddingHorizontal: 14, paddingBottom: 12, alignItems: "flex-start" },
+  wide: { borderWidth: 1, borderRadius: 9, paddingVertical: 10, paddingHorizontal: 14, alignItems: "center", marginBottom: 8 },
+  wideText: { fontSize: 12, fontFamily: F.body },
   foot: { fontSize: 11, fontFamily: F.body, textAlign: "center", marginTop: 8 },
 });

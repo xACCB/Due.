@@ -7,7 +7,7 @@
 // goForwardStep / confirmDueTime): with the estimate question off a new task
 // gets no estimate (not the picker's 30-minute start), skipping the estimate
 // also means none, and with every question off the title alone adds the task.
-import type { Recurrence } from "../types";
+import type { Recurrence, TaskTemplate } from "../types";
 import { QUESTIONS } from "../constants";
 import { LIMITS, oneLine } from "./limits";
 
@@ -20,6 +20,8 @@ export interface AddDraft {
   dueTime: string;
   estMins: number;
   recurrence?: Recurrence;
+  // From a template: subtasks to create, unchecked.
+  subtasks?: { text: string }[];
 }
 
 export interface AddFlow {
@@ -106,4 +108,17 @@ export function skip(f: AddFlow): AddStep {
 export function back(f: AddFlow): AddFlow {
   if (currentQuestion(f)?.type === "date" && f.pendingDate != null) return { ...f, pendingDate: null };
   return f.step > -1 ? { ...f, step: f.step - 1 } : f;
+}
+
+// Starting from a template (the web's startFromTemplate): the template has
+// answered everything but the due date, so only that question is asked; with
+// it turned off, the task is ready at once.
+export function startFromTemplate(questions: AddQuestion[], tpl: TaskTemplate): AddStep {
+  const draft: AddDraft = {
+    title: oneLine(tpl.name).trim().slice(0, LIMITS.title), subject: tpl.subject, dueDate: "", dueTime: "",
+    estMins: tpl.estMins, recurrence: tpl.recurrence, subtasks: tpl.subtasks,
+  };
+  const dateQ = questions.find(q => q.type === "date");
+  if (!dateQ) return { done: draft };
+  return { flow: { questions: [dateQ], step: 0, draft, pendingDate: null } };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addTask, deleteTask, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX } from "./taskStore";
+import { withSyllabusTasks } from "@dueplanner/core/lib/backup";
+import { addTask, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX } from "./taskStore";
 
 describe("taskStore", () => {
   it("adds a trimmed one-line task and ignores a blank title", () => {
@@ -111,5 +112,40 @@ describe("taskStore", () => {
     expect(r.trash).toEqual([]);
     expect(restoreTask(r, id)).toBe(r);
   });
-});
 
+  it("auto-archives tasks done before the cutoff, and leaves the rest alone", () => {
+    const base = emptyStore([
+      { id: 1, title: "Old", subject: "", dueDate: "", dueTime: "", estMins: 0, done: true, order: 0, completedAt: 1000 },
+      { id: 2, title: "Recent", subject: "", dueDate: "", dueTime: "", estMins: 0, done: true, order: 1, completedAt: 5000 },
+      { id: 3, title: "Open", subject: "", dueDate: "", dueTime: "", estMins: 0, done: false, order: 2 },
+    ]);
+    const s = autoArchive(base, 2000);
+    expect(s.tasks.map(t => !!t.archived)).toEqual([true, false, false]);
+    expect(s.undo).toEqual([]);
+    expect(autoArchive(s, 2000)).toBe(s);
+  });
+
+  it("empties Recently deleted for good", () => {
+    const a = addTask(emptyStore(), "Quiz");
+    const gone = deleteTask(a, a.tasks[0].id);
+    expect(emptyTrash(gone).trash).toEqual([]);
+    const none = emptyStore();
+    expect(emptyTrash(none)).toBe(none);
+  });
+
+  it("imports syllabus items as tasks, not as an undo step", () => {
+    const a = addTask(emptyStore(), "Existing");
+    const s = importTasks(a, withSyllabusTasks(a.tasks, [{ title: "Essay 1", dueDate: "2026-12-01" }], "English"));
+    expect(s.tasks.map(t => [t.title, t.subject, t.dueDate])).toEqual([["Existing", "", ""], ["Essay 1", "English", "2026-12-01"]]);
+    expect(s.undo).toEqual(a.undo);
+  });
+
+  it("deletes several tasks as one undo step", () => {
+    let s = addTask(addTask(addTask(emptyStore(), "A"), "B"), "C");
+    const [a, , c] = s.tasks.map(t => t.id);
+    s = deleteTasks(s, [a, c]);
+    expect(s.tasks.map(t => t.title)).toEqual(["B"]);
+    expect(s.trash).toHaveLength(2);
+    expect(undo(s).tasks.map(t => t.title).sort()).toEqual(["A", "B", "C"]);
+  });
+});

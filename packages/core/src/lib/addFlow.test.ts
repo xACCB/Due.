@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { QUESTIONS } from "../constants";
 import { askedQuestions } from "../constants";
-import { answer, back, confirmTime, currentQuestion, ESTIMATE_START, pickDate, skip, startAdd, submitTitle, type AddFlow, type AddStep } from "./addFlow";
+import { answer, back, confirmTime, currentQuestion, ESTIMATE_START, pickDate, skip, startAdd, startFromTemplate, submitTitle, type AddFlow, type AddStep } from "./addFlow";
 
 const all = askedQuestions(null); // subject, dueDate, estMins, recurrence
 const flow = (s: AddStep): AddFlow => { if (!s.flow) throw new Error("finished early"); return s.flow; };
@@ -96,5 +96,17 @@ describe("addFlow", () => {
     const f = flow(submitTitle(startAdd([QUESTIONS[2]]), "Big"));
     expect(answer(f, 10_000_000).done?.estMins).toBe(100000);
     expect(answer(f, "abc").done?.estMins).toBe(0);
+  });
+
+  it("starts from a template on the due-date question, or adds at once with it off", () => {
+    const tpl = { id: "t1", name: "Lab write-up", subject: "Science", estMins: 60, recurrence: "weekly" as const, subtasks: [{ text: "Data" }] };
+    const step = startFromTemplate(all, tpl);
+    const f = step.flow!;
+    expect(currentQuestion(f)?.type).toBe("date");
+    expect(f.draft).toMatchObject({ title: "Lab write-up", subject: "Science", estMins: 60, recurrence: "weekly", subtasks: [{ text: "Data" }] });
+    const picked = pickDate(f, "2026-12-01").flow!;
+    expect(confirmTime(picked, "09:00").done).toMatchObject({ title: "Lab write-up", dueDate: "2026-12-01", dueTime: "09:00" });
+    const noDate = startFromTemplate(all.filter(q => q.type !== "date"), tpl);
+    expect(noDate.done).toMatchObject({ title: "Lab write-up", dueDate: "", estMins: 60 });
   });
 });

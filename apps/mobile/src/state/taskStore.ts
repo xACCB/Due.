@@ -12,7 +12,7 @@ import type { AddDraft } from "@dueplanner/core/lib/addFlow";
 import { trashEntries } from "@dueplanner/core/lib/trash";
 import { applyTaskStates, diffTasks } from "@dueplanner/core/lib/history";
 import { setDone } from "@dueplanner/core/lib/tasks";
-import { duplicateOf, patchTask, restoredInto, withNewTask, withTrashed, withoutTasks, withoutTrashed } from "@dueplanner/core/lib/taskActions";
+import { duplicateOf, freshSubtasks, patchTask, restoredInto, withNewTask, withTrashed, withoutTasks, withoutTrashed } from "@dueplanner/core/lib/taskActions";
 import { withSession } from "@dueplanner/core/lib/timers";
 import { LIMITS, oneLine } from "@dueplanner/core/lib/limits";
 
@@ -50,6 +50,7 @@ export function addTask(s: TaskStore, input: string | AddDraft): TaskStore {
     id: 0, title, subject: d.subject, dueDate: d.dueDate, dueTime: d.dueDate ? d.dueTime : "",
     estMins: d.estMins, done: false, order: 0,
     ...(d.recurrence && d.recurrence !== "none" ? { recurrence: d.recurrence } : {}),
+    ...(d.subtasks?.length ? { subtasks: freshSubtasks(d.subtasks) } : {}),
   };
   return changed(s, withNewTask(s.tasks, task), "Added");
 }
@@ -87,13 +88,18 @@ export function logSession(s: TaskStore, id: number, mins: number, at: number): 
 
 // Deleting moves the task to Recently deleted, as on the web.
 export function deleteTask(s: TaskStore, id: number): TaskStore {
-  const t = s.tasks.find(x => x.id === id);
-  if (!t) return s;
+  return deleteTasks(s, [id]);
+}
+
+// Several at once (Settings -> Clear completed): one undo step for all of them.
+export function deleteTasks(s: TaskStore, ids: number[]): TaskStore {
+  const gone = s.tasks.filter(t => ids.includes(t.id));
+  if (!gone.length) return s;
   return {
     ...s,
-    tasks: withoutTasks(s.tasks, [id]),
-    trash: withTrashed(s.trash, trashEntries([t])),
-    ...pushUndo(s, { type: "delete", tasks: [t] }),
+    tasks: withoutTasks(s.tasks, gone.map(t => t.id)),
+    trash: withTrashed(s.trash, trashEntries(gone)),
+    ...pushUndo(s, { type: "delete", tasks: gone }),
   };
 }
 
@@ -122,4 +128,23 @@ export function redo(s: TaskStore): TaskStore {
   const a = s.redo[s.redo.length - 1];
   if (!a) return s;
   return { ...s, ...applyAction(s, a, true), redo: s.redo.slice(0, -1), undo: [...s.undo, a] };
+}
+
+// Auto-archive (Settings -> Task list), as on the web: a task done before
+// `cutoff` (ms) moves to Archived. Not an undo step (the web's isn't either),
+// and a no-op when nothing qualifies, so it's safe to run on every change.
+export function autoArchive(s: TaskStore, cutoff: number): TaskStore {
+  if (!s.tasks.some(t => t.done && !t.archived && t.completedAt && t.completedAt < cutoff)) return s;
+  return { ...s, tasks: s.tasks.map(t => (t.done && !t.archived && t.completedAt && t.completedAt < cutoff ? { ...t, archived: true } : t)) };
+}
+
+// History -> Recently deleted -> Empty: deletes them for good (not undoable, as on the web).
+export function emptyTrash(s: TaskStore): TaskStore {
+  return s.trash.length ? { ...s, trash: [] } : s;
+}
+
+// Imports (Import/Export: a syllabus scan, a backup): the new list as the
+// import built it. Not an undo step, as on the web.
+export function importTasks(s: TaskStore, next: Task[]): TaskStore {
+  return next === s.tasks ? s : { ...s, tasks: next };
 }

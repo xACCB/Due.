@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { useColorScheme } from "react-native";
-import type { Task } from "@dueplanner/core/types";
+import type { HistoryAction, Task } from "@dueplanner/core/types";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
 import type { AddDraft } from "@dueplanner/core/lib/addFlow";
 import { pruneTrash } from "@dueplanner/core/lib/trash";
 import { migrateTasks, SCHEMA_VERSION } from "@dueplanner/core/lib/migrations";
 import { askedQuestions } from "@dueplanner/core/constants";
 import { THEMES } from "@dueplanner/core/themes";
+import { scaledPx } from "@dueplanner/core/lib/textSize";
+import { mergeRecaps, newRecaps } from "@dueplanner/core/lib/recaps";
+import { todayISO } from "@dueplanner/core/lib/dates";
 import { readJSON, writeJSON } from "../lib/storage";
 import { usePersisted } from "../lib/usePersisted";
 import { syncReminders } from "../lib/notifications";
@@ -21,7 +24,11 @@ type Op =
   | { kind: "duplicate"; id: number }
   | { kind: "session"; id: number; mins: number; at: number }
   | { kind: "delete"; id: number }
+  | { kind: "deleteMany"; ids: number[] }
   | { kind: "restore"; id: number }
+  | { kind: "autoArchive"; cutoff: number }
+  | { kind: "emptyTrash" }
+  | { kind: "import"; build: (tasks: Task[]) => Task[] }
   | { kind: "undo" }
   | { kind: "redo" };
 
@@ -34,7 +41,11 @@ function reduce(s: S.TaskStore, op: Op): S.TaskStore {
     case "duplicate": return S.duplicateTask(s, op.id);
     case "session": return S.logSession(s, op.id, op.mins, op.at);
     case "delete": return S.deleteTask(s, op.id);
+    case "deleteMany": return S.deleteTasks(s, op.ids);
     case "restore": return S.restoreTask(s, op.id);
+    case "autoArchive": return S.autoArchive(s, op.cutoff);
+    case "emptyTrash": return S.emptyTrash(s);
+    case "import": return S.importTasks(s, op.build(s.tasks));
     case "undo": return S.undo(s);
     case "redo": return S.redo(s);
   }
@@ -48,6 +59,11 @@ function load(): S.TaskStore {
   const rawTrash = readJSON<unknown>("hw-trash", []);
   const trash = pruneTrash(Array.isArray(rawTrash) ? (rawTrash as TrashEntry[]).filter(e => e && e.task && typeof e.deletedAt === "number") : []);
   return S.emptyStore(tasks, trash);
+}
+
+// What an undo step was, for the History screen's buttons (the web's describeAction).
+function describe(a: HistoryAction): string {
+  return a.type === "change" ? a.label : `delete ${a.tasks.length === 1 ? `"${a.tasks[0].title}"` : `${a.tasks.length} tasks`}`;
 }
 
 function useSetting<K extends keyof typeof SETTINGS>(name: K) {
@@ -81,11 +97,48 @@ export function useAppValue() {
   const [addQuestions, setAddQuestions] = useSetting("addQuestions");
   const [subjects, setSubjects] = useSetting("subjects");
   const [subjectColors, setSubjectColors] = useSetting("subjectColors");
+  const [textSize, setTextSize] = useSetting("textSize");
+  const [groupBy, setGroupBy] = useSetting("groupBy");
+  const [showSuggestion, setShowSuggestion] = useSetting("showSuggestion");
+  const [hiddenSuggestionFor, setHiddenSuggestionFor] = useSetting("hiddenSuggestionFor");
+  const [autoArchiveDays, setAutoArchiveDays] = useSetting("autoArchiveDays");
+  const [templates, setTemplates] = useSetting("templates");
+  const [recaps, setRecaps] = useSetting("recaps");
+  const [recapsChecked, setRecapsChecked] = useSetting("recapsChecked");
+  const [openSubjects, setOpenSubjects] = useSetting("openSubjects");
+
+  // Recaps, as on the web: when a day, week, month or year has ended since the
+  // last check, write its snapshot (skipped when nothing was finished or worked
+  // on). Checked on launch, on every change to the tasks, and each minute, so
+  // a recap appears soon after midnight with the app open.
+  const [today, setToday] = useState(todayISO);
+  useEffect(() => {
+    const id = setInterval(() => setToday(todayISO()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (recapsChecked === today) return;
+    const fresh = newRecaps(store.tasks, recapsChecked, today, weekStart);
+    if (fresh.length) setRecaps(prev => mergeRecaps(prev, fresh));
+    setRecapsChecked(today);
+  }, [store.tasks, recapsChecked, today, weekStart, setRecaps, setRecapsChecked]);
+
+  // Home's filter chip and subject filter, shared so the menu's subjects and
+  // the Time left sheet can set them (the web's filter / subjectFilter). Not saved.
+  const [homeFilter, setHomeFilter] = useState("all");
+  const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
+
+  // Auto-archive, re-checked whenever the tasks or the setting change (the web's effect).
+  useEffect(() => {
+    if (autoArchiveDays > 0) dispatch({ kind: "autoArchive", cutoff: Date.now() - autoArchiveDays * 86400000 });
+  }, [store.tasks, autoArchiveDays]);
 
   const scheme = useColorScheme();
   const light = themeMode === "light" || (themeMode === "auto" && scheme === "light");
   const T = light ? THEMES.stealthLight : THEMES.stealth;
   const h24 = timeFormat === "24h";
+  // A font size in the web's px, drawn at the Text size setting (core's scaledPx, the web's fz()).
+  const fz = useMemo(() => (px: number) => scaledPx(px, textSize), [textSize]);
   const questions = useMemo(() => askedQuestions(addQuestions), [addQuestions]);
 
   // Reminders follow the tasks: rescheduled a moment after any change, so a
@@ -96,7 +149,8 @@ export function useAppValue() {
   }, [store.tasks, notifications, reminderOffsets, h24]);
 
   return {
-    T, h24, questions,
+    T, h24, questions, fz,
+    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter,
     tasks: store.tasks,
     trash: store.trash,
     canUndo: store.undo.length > 0,
@@ -108,7 +162,12 @@ export function useAppValue() {
     duplicate: (id: number) => dispatch({ kind: "duplicate", id }),
     logSession: (id: number, mins: number, at: number) => dispatch({ kind: "session", id, mins, at }),
     remove: (id: number) => dispatch({ kind: "delete", id }),
+    removeMany: (ids: number[]) => dispatch({ kind: "deleteMany", ids }),
     restore: (id: number) => dispatch({ kind: "restore", id }),
+    emptyTrash: () => dispatch({ kind: "emptyTrash" }),
+    importTasks: (build: (tasks: Task[]) => Task[]) => dispatch({ kind: "import", build }),
+    undoLabel: store.undo.length ? describe(store.undo[store.undo.length - 1]) : null,
+    redoLabel: store.redo.length ? describe(store.redo[store.redo.length - 1]) : null,
     undo: () => dispatch({ kind: "undo" }),
     redo: () => dispatch({ kind: "redo" }),
     settings: {
@@ -118,6 +177,9 @@ export function useAppValue() {
       pomodoroWork, setPomodoroWork, pomodoroBreak, setPomodoroBreak, pomodoroAutoBreak, setPomodoroAutoBreak,
       focusShow, setFocusShow, addQuestions, setAddQuestions,
       subjects, setSubjects, subjectColors, setSubjectColors,
+      textSize, setTextSize, groupBy, setGroupBy, showSuggestion, setShowSuggestion, hiddenSuggestionFor, setHiddenSuggestionFor,
+      autoArchiveDays, setAutoArchiveDays, templates, setTemplates,
+      recaps, setRecaps, openSubjects, setOpenSubjects,
     },
   };
 }

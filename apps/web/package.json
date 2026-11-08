@@ -12,7 +12,7 @@
   "dependencies": {
     "@dueplanner/core": "*",
     "@sentry/browser": "^11.8.0",
-    "firebase": "^12.13.0",
+    "firebase": "^13.2.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

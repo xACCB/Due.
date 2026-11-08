@@ -18,7 +18,9 @@
     "test:e2e": "npx firebase-tools emulators:exec --only auth,firestore \"node tests/e2e/run.mjs\"",
     "rules:rollback": "node scripts/rules-rollback.mjs",
     "audit:contrast": "node --experimental-strip-types scripts/check-theme-contrast.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "mobile": "npm run start -w @dueplanner/mobile",
+    "typecheck:mobile": "npm run typecheck -w @dueplanner/mobile"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -27,16 +29,18 @@
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "firebase": "^12.13.0",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vitest": "^5.0.1",
-    "firebase": "^12.13.0"
+    "vitest": "^5.0.1"
   },
   "overrides": {
-    "@grpc/grpc-js": "^1.14.6"
+    "@grpc/grpc-js": "^1.14.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": "eslint --fix"

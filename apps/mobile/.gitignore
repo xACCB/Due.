@@ -1,0 +1,23 @@
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# Generated native projects (Continuous Native Generation: `npx expo run:ios`
+# and `expo prebuild` recreate them from app.json; never edit them by hand)
+/ios
+/android
+.kotlin/
+
+# Signing material: never commit
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.orig.*
+
+.env*.local

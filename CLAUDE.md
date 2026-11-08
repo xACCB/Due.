@@ -68,7 +68,11 @@ and every command above still runs from the root:
 - `apps/web` (`@dueplanner/web`): the Vite app. `vercel.json` stays at the repo root and tells Vercel
   to build from the root (`npm run build`) and serve `apps/web/dist`, so the Vercel project's settings
   didn't change.
-- `apps/mobile`: the Expo app, not started yet (`docs/mobile-plan.md`).
+- `apps/mobile` (`@dueplanner/mobile`): the Expo app (SDK 58, expo-router, `src/app/` routes; plan in
+  `docs/mobile-plan.md`, how to run it in `apps/mobile/README.md`). Native builds need a Mac
+  (`npx expo run:ios`); on Windows, `npm run typecheck:mobile` and `npx expo export --platform ios`
+  (in `apps/mobile`) still check it. One React for both apps: pinned in the root `overrides` and
+  `apps/web`, moved together with Expo SDK upgrades. RN/Expo need Node 22.13+.
 - At the root: `firestore.rules`, `firebase.json`, `tests/` (rules, contract, fuzz, e2e, stress),
   `scripts/`, the ESLint config and `vitest.config.ts` (runs both workspaces' unit tests as projects).
 - `npm run build` type-checks core on its own (`tsc -p packages/core`), then builds the web app.

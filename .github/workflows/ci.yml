@@ -109,10 +109,15 @@ jobs:
       # Checks that each installed package really is the one the npm registry
       # published (its signature and, where a package has one, its provenance).
       # Needs the packages on disk, so this is the one install in this job.
+      # Each command gets up to 3 tries: it asks the registry about every
+      # package (~970 since the phone app), and one dropped request used to
+      # fail the job at random (the same lockfile passed and failed,
+      # 2026-11-08). A real bad signature fails all three, so it still blocks.
       - name: Verify package signatures
         run: |
-          npm ci --ignore-scripts
-          npm audit signatures
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "Attempt $i failed: $*"; sleep 15; done; return 1; }
+          retry npm ci --ignore-scripts
+          retry npm audit signatures
 
       # Secret scanning with gitleaks' default rules plus .gitleaks.toml (which
       # allowlists only the public Firebase web key). The plain binary rather

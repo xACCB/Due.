@@ -119,14 +119,20 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
 - `.github/workflows/ci.yml` runs on every push/PR to `main` and weekly (Monday cron). The
   workflow token is read-only (`permissions: contents: read`), actions are pinned to commit SHAs
   (Dependabot's `github-actions` entry moves them), and installs use `npm ci --ignore-scripts`. Job
-  `build-and-lint`: `npm run build`, `npm run lint`, `npm test`, `npm run test:rules` (uploading the
-  rules coverage summary as an artifact). Job `e2e`: `npm run test:e2e`, not yet required to pass
-  (`continue-on-error`; remove that once it has proved steady). Job
-  `security`: `npm audit signatures`, `npm audit --audit-level=high` (blocking, dev dependencies included; Dependabot's PRs
-  are the usual fix) and a gitleaks secret scan of the full git history (pinned binary, config in
-  `.gitleaks.toml`, which allowlists only the public Firebase web API key by exact value). Vercel's
-  own build would catch a broken build, but not these. GitHub's own secret scanning and push
-  protection are repo settings (Settings -> Advanced Security), not files in the repo.
+  `build-and-lint` (Node 22): `npm run build`, `npm run typecheck:mobile`, `npm run lint`, `npm test`,
+  `npm run test:rules` (uploading the rules coverage summary as an artifact). Job `e2e`:
+  `npm run test:e2e`, not yet required to pass (`continue-on-error`; remove that once it has proved
+  steady). Job `security`: `npm audit --audit-level=high` (blocking, dev dependencies included;
+  Dependabot's PRs are the usual fix), `npm ci` then `npm audit signatures` (each retried up to 3
+  times: one dropped registry request among ~970 packages failed the job at random, the same
+  lockfile passing and failing on 2026-11-08), and a gitleaks secret scan of the full git history
+  (pinned binary, config in `.gitleaks.toml`, which allowlists only the public Firebase web API key
+  by exact value). Vercel's own build would catch a broken build, but not these. GitHub's own secret
+  scanning and push protection are repo settings (Settings -> Advanced Security), not files in the
+  repo. To see CI results without `gh` or a login (the repo is public):
+  `curl -s "https://api.github.com/repos/xACCB/Due./actions/runs?per_page=10"` lists runs with their
+  `conclusion`, and `.../actions/runs/<id>/jobs` shows each job's steps. Full logs need a login
+  (`gh run view <id> --log-failed`, e.g. on the Mac).
 
 ## Architecture
 
@@ -992,7 +998,8 @@ and correct this section when real behaviour differs.
 `react-native-nitro-modules` as a direct dependency so autolinking picks it up),
 `@react-native-community/datetimepicker` 9 (`onValueChange`/`onDismiss`; `onChange` is deprecated),
 `expo-notifications`, `expo-keep-awake`, `expo-haptics`, `expo-font` with
-`@expo-google-fonts/dm-serif-display` and `dm-mono`, `expo-splash-screen`, `react-native-reanimated`
+`@expo-google-fonts/dm-serif-display` and `dm-mono`, `expo-splash-screen`, `expo-symbols` (the
+tab bar's Android icons), `react-native-reanimated`
 4 and `react-native-gesture-handler` 3 (installed, not used yet: they're for the swipe gestures).
 `app.json` turns on `experiments.reactCompiler` and `typedRoutes`. Expo and React Native need Node
 22.13+, which is why CI uses Node 22. Before using an Expo or React Native API, read the installed
@@ -1047,8 +1054,11 @@ auto-archive, templates, recaps, Inbox.
   load (or fail: a font error must not keep the app hidden), then `AppProvider`, the status bar and
   the Stack, themed from `T`. The task page has a native header ("Task", back button).
 - `(tabs)/_layout.tsx`: `NativeTabs` (iOS draws the real tab bar, so iOS 26 gets Liquid Glass):
-  Home (`house`), Calendar (`calendar`), Focus (`timer`), Settings (`gearshape`), as SF Symbols, tinted
-  `T.accent`. Android icons aren't set yet (they'd need `md`/`drawable`).
+  Home (`house`), Calendar (`calendar`), Focus (`timer`), Settings (`gearshape`), as SF Symbols
+  (`sf`, iOS), with Material Symbols for Android (`md`: `home`, `calendar_month`, `timer`,
+  `settings`), tinted `T.accent`. `md` needs the `expo-symbols` package: without it the names
+  aren't type-checked (the type silently becomes `any`) and the icons don't draw. With it, a wrong
+  name fails `npm run typecheck:mobile`.
 - `(tabs)/index.tsx` **Home**: header with the open count and Undo/Redo, the filter chips (All,
   Pending, Done, Archived: core's `filterTasks` over `sortTasks`, honouring Show completed), a
   "+ Add homework" button as the list header (opens `AddSheet`), `TaskRow`s (tap opens the task page,
@@ -1176,8 +1186,13 @@ warnings in the build log are normal.
 - Local notifications scheduled ahead (no server, free), instead of the web's check-while-open.
 - The bundle id is `com.duestudios.dueplanner` (`app.json`; also the Android package). It can
   change freely until the first TestFlight upload, then never.
-- The app icon is the web's 512px `favicon-512.png` for now; the App Store needs 1024px before
-  release. The launch screen is the same image on `#0a0a0a`.
+- The app icon (`apps/mobile/assets/icon.png`) is 1024x1024 with no transparency (the App Store
+  requires both): the website's shadowed "dp" (`apps/web/public/favicon-512.png`, the same design as
+  `apple-touch-icon.png`) scaled up 2x with high-quality bicubic and flattened onto black, because
+  no larger original exists in the repo. A crisper export from the original design file would
+  be better if the user has one. Don't render `favicon.svg` instead: it's a different, flat design
+  used only as the browser-tab icon. The launch screen is the 512px image on `#000000`, matching
+  its own black background and the web's `#splash`.
 
 ## Planning (Notion)
 

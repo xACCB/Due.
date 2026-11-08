@@ -70,11 +70,22 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
 
 ## Where things stand (update this when it changes)
 
-- **2026-11-08:** the phone app (`apps/mobile`) has M2, most of M4 and M5 written and unit-tested on
-  Windows. **First run on the Mac's iPhone 18 Pro Simulator worked** (build 0 errors, Home renders
-  with the fonts and the native tab bar). The next step is the test checklist (add
-  questions, task page, Calendar, Focus, Settings, a reminder notification, data kept after
-  quitting). Then M3: sign-in and sync (`docs/mobile-plan.md`).
+- **2026-11-08:** the phone app (`apps/mobile`) runs on the Mac's iPhone 18 Pro Simulator. Home,
+  Search, Time left, the menu (the web's sidebar: Inbox, History, Import/Export, subjects), Inbox
+  (recap Messages only; the web's Updates describe the website), History, Import/Export, Calendar
+  (Month and Deck) and Settings now follow the web (commits 9f914a1, e839bfb). **Next:** the task
+  page against the web's TaskModal (missing: Snooze, Save as template, the session timer's
+  "Sessions today"), then Focus, the list layouts other than List, drag to reorder, and the
+  Settings rows following Text size (`components/ui.tsx` still uses fixed sizes). Swipes, the file
+  picker and the share sheet haven't been tried by hand. Then M3: sign-in and sync
+  (`docs/mobile-plan.md`).
+- **Checking screens without tapping (dev only):** with Metro running (`npx expo start
+  --dev-client`, never with `CI=1`, which turns off file watching), the app reads
+  `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with
+  `python3 -m http.server 8099`, write `{"n":<next>,"go":"/calendar"}` (or `"seed":true` for the
+  sample tasks in `src/lib/devSample.ts`, `"set":["hw-key",value]`, `"back":true`), then
+  `xcrun simctl io booted screenshot`. `simctl openurl` shows an "Open in DuePlanner?" prompt
+  that can't be dismissed without tapping, so avoid it.
 - **Before M3, flag these to the user:** the iOS app has to be registered in the Firebase console
   (which gives a `GoogleService-Info.plist`); App Check needs App Attest for iOS and debug tokens
   for the Simulator, since App Check is enforced; and Sign in with Apple (which Apple requires when

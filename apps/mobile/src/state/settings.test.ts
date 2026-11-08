@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SUBJECTS } from "@dueplanner/core/constants";
-import { bool, cleanOffsets, cleanSubjectColors, cleanSubjects, int, oneOf, SETTINGS } from "./settings";
+import { bool, cleanDate, cleanHiddenFor, cleanNames, cleanOffsets, cleanRecaps, cleanSubjectColors, cleanSubjects, cleanTemplates, int, oneOf, SETTINGS } from "./settings";
 
 describe("settings cleaners", () => {
   it("keep valid values and fall back on anything else", () => {
@@ -40,5 +40,31 @@ describe("settings cleaners", () => {
     expect(SETTINGS.pomodoroWork).toMatchObject({ key: "hw-pomodoro-work", initial: 25 });
     expect(SETTINGS.reminderOffsets.initial).toEqual(["0"]);
     for (const s of Object.values(SETTINGS)) expect(s.key).toMatch(/^hw-/);
+  });
+
+  it("clean the settings added for the web's Home, Inbox and Looks", () => {
+    expect(cleanTemplates([{ id: "t", name: "Lab", subject: "Science", estMins: 30 }, { id: "x", name: " ", subject: "", estMins: 0 }, "junk", null]))
+      .toEqual([{ id: "t", name: "Lab", subject: "Science", estMins: 30 }]);
+    expect(cleanTemplates("nope")).toEqual([]);
+    expect(cleanHiddenFor(12)).toBe(12);
+    expect(cleanHiddenFor("12")).toBeNull();
+    expect(cleanDate("2026-11-08")).toBe("2026-11-08");
+    expect(cleanDate("Nov 8")).toBeNull();
+    expect(cleanNames(["Math", 3, "Art"])).toEqual(["Math", "Art"]);
+    const recap = { id: "r", period: "day", start: "2026-11-07", end: "2026-11-07", finished: 1, mins: 0, dated: 0, onTime: 0, busiest: null, titles: ["A"], read: false };
+    expect(cleanRecaps([recap, { id: "bad" }])).toEqual([recap]);
+    const anim = SETTINGS.animSpeed.clean;
+    expect(anim(1.5)).toBe(1.5);
+    expect(anim(1.6)).toBe(1.5); // to the nearest 0.25
+    expect(anim(9)).toBe(2);
+    expect(anim("fast")).toBe(1);
+    expect(SETTINGS.layout.clean("kanban")).toBe("kanban");
+    expect(SETTINGS.layout.clean("timeline")).toBe("list"); // a removed web layout
+    expect(SETTINGS.autoArchiveDays.clean(30)).toBe(30);
+    expect(SETTINGS.autoArchiveDays.clean(14)).toBe(7);
+    expect(SETTINGS.textSize.clean("large")).toBe("large");
+    expect(SETTINGS.textSize.clean("huge")).toBe("default");
+    expect(SETTINGS.calendarView.clean("deck")).toBe("deck");
+    expect(SETTINGS.groupBy.clean("tags")).toBe("none");
   });
 });

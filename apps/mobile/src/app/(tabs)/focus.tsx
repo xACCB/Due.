@@ -6,6 +6,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
 import { showsPomodoro, showsStopwatch, formatStopwatch, stopwatchMinutes } from "@dueplanner/core/lib/stopwatch";
 import { sortTasks } from "@dueplanner/core/lib/taskViews";
+import { mostUrgent } from "@dueplanner/core/lib/timeLeft";
 import { contrastColor, formatDate, formatDuration, formatTime, ink } from "@dueplanner/core/lib/format";
 import { useApp } from "../../state/appContext";
 import { usePersisted } from "../../lib/usePersisted";
@@ -41,12 +42,17 @@ export default function FocusScreen() {
   const topTask = openSorted[0];
   const task = openSorted.find(t => t.id === state.taskId) ?? topTask;
   const [picking, setPicking] = useState(false);
+  // When a break runs out: the web's "Break's over" card, suggesting the task
+  // last worked on if it's still open ("Keep going on"), else the most urgent
+  // one ("Next up"). Not saved: it's about this moment.
+  const [breakEnded, setBreakEnded] = useState(false);
+  const [lastWorked, setLastWorked] = useState<number | null>(null);
   const taskId = task?.id ?? null;
 
   // Applies a timer change, logging any finished work time to its task.
   const apply = (r: Fx.Result) => {
     setState(r.state);
-    if (r.log) app.logSession(r.log.taskId, r.log.mins, clock());
+    if (r.log) { app.logSession(r.log.taskId, r.log.mins, clock()); setLastWorked(r.log.taskId); }
   };
 
   // The latest values, for the ticking interval (set after each render).
@@ -67,6 +73,7 @@ export default function FocusScreen() {
         live.current = { ...v, state: done.state };
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         v.apply(done);
+        if (v.state.phase === "break") setBreakEnded(true);
       }
     };
     tick();
@@ -123,6 +130,17 @@ export default function FocusScreen() {
     setPicking(false);
   };
   const ghost = [styles.btn, { borderWidth: 1, borderColor: T.border }];
+  const keepGoing = openSorted.find(t => t.id === lastWorked);
+  const suggestion = keepGoing ?? mostUrgent(openSorted); // the web's nextSuggestion
+  const startSuggested = () => {
+    if (!suggestion) return;
+    setBreakEnded(false);
+    const n = clock();
+    const switched = suggestion.id !== taskId ? Fx.switchTask(state, n, L, taskId, suggestion.id) : { state };
+    if (switched.log) app.logSession(switched.log.taskId, switched.log.mins, n);
+    setNow(n);
+    setState(Fx.start(switched.state, n));
+  };
   const solid = [styles.btn, { backgroundColor: T.accent }];
 
   return (
@@ -133,6 +151,31 @@ export default function FocusScreen() {
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
       <ScrollView contentContainerStyle={styles.body}>
+        {breakEnded && (
+          <View style={[styles.breakCard, { backgroundColor: T.card, borderColor: "#2ED57355" }]} accessibilityLiveRegion="polite">
+            <View style={styles.breakHead}>
+              <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(12), color: ink("#2ED573", T.light) }}>Break&apos;s over</Text>
+              <Pressable onPress={() => setBreakEnded(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss">
+                <Text style={{ fontSize: fz(15), color: T.textMuted }}>×</Text>
+              </Pressable>
+            </View>
+            {suggestion ? (
+              <>
+                <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted, marginBottom: 2 }}>{keepGoing ? "Keep going on" : "Next up"}</Text>
+                <Text style={{ fontFamily: F.heading, fontSize: fz(17), color: T.text, marginBottom: 12 }}>{suggestion.title}</Text>
+                <View style={styles.btnRow}>
+                  <Pressable onPress={startSuggested} accessibilityRole="button" style={[solid, { flex: 1 }]}>
+                    <Text style={[styles.btnText, { fontSize: fz(12), color: contrastColor(T.accent) }]}>Start {pomodoroWork} min</Text>
+                  </Pressable>
+                  <Pressable onPress={() => { setBreakEnded(false); setPicking(true); }} accessibilityRole="button" style={ghost}>
+                    <Text style={[styles.btnText, { fontSize: fz(12), color: T.textMuted }]}>Pick another</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textMuted, marginTop: 6 }}>Nothing left on your list. Nice.</Text>}
+          </View>
+        )}
+
         {showsPomodoro(focusShow) && (
           <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
             <Text style={[styles.kicker, { fontSize: fz(10), color: onBreak ? ink("#2ED573", T.light) : T.textMuted }]}>{onBreak ? "BREAK" : "POMODORO TIMER"}</Text>
@@ -245,6 +288,8 @@ const styles = StyleSheet.create({
   taskTitle: { fontFamily: F.heading, fontSize: 22, lineHeight: 28, marginBottom: 8 },
   taskMeta: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
   done: { marginTop: 14, borderWidth: 1, borderRadius: 11, paddingVertical: 11, alignItems: "center" },
+  breakCard: { borderWidth: 1, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16 },
+  breakHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   nothing: { textAlign: "center", fontFamily: F.body },
   sw: { fontFamily: F.bodyMedium, fontSize: 34, fontVariant: ["tabular-nums"], marginTop: 6, marginBottom: 14 },
 });

@@ -2,6 +2,43 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working with the user
+
+Standing preferences, copied here from Claude's per-machine memory (2026-11-08) so every computer
+gets them. The user works on a Windows PC and a Mac, kept in step through GitHub.
+- **Commit and push** finished work to `origin/main` without asking each time, once build, lint and
+  tests pass. Hold off only if told to, or for something unusually risky or destructive.
+- **End every task with a summary**: what changed, anything that differs from the plan or roadmap,
+  what was verified and what wasn't (e.g. not run in a browser or on a phone), and what was updated
+  elsewhere (commit hash, Notion, What's New, this file).
+- **What's New for every user-facing change**, even a small fix to something shipped yesterday, in
+  the same commit, with a `where` using the exact on-screen labels (see What's New below). The
+  phone app isn't released yet, so its changes don't get entries until it ships.
+- **No dash-joined phrasing in user-facing text** ("--", "—", " - "): the user finds it looks AI
+  written. Use two sentences, a comma, a colon, or "so"/"because". Keep the same restraint in chat
+  summaries and commit message titles.
+- **Notion is the roadmap** (see Planning below). New ideas go on "DuePlanner — Feature ideas" as
+  unchecked to-dos (`- [ ]`); checked means the user wants it on the roadmap. On review, move
+  checked ideas into Roadmap items and delete unchecked ones. The page "Dueplanner Ideas" is the
+  user's own notes: read it, don't restructure it. Keep Notion copies of repo planning docs current.
+  The connector can't delete pages, so point out stale ones for the user to remove.
+- **Aim: a mainstream product**, not a hobby project. Treat security, scalability, monitoring and
+  reliability as real priorities, but default to free options. Anything that costs money (a
+  domain, Firebase Blaze, store accounts) is the user's call, so flag it rather than proceed.
+- **The phone app is React Native with Expo, never Capacitor** or another web-view wrapper: the user
+  wants a real app, not "a website". Plan: `docs/mobile-plan.md`; code: `apps/mobile`.
+- **Branding**: the company is Due Studios ("due. studios" in in-app credits), the product is
+  DuePlanner. Never bare "Due" (see Branding below).
+- **React Compiler forward references**: in `apps/web/src/App.tsx`'s `HomeworkPlanner`, a function
+  that reads a `const` declared further down makes the compiler bail out on an unrelated `useMemo`
+  (`preserve-manual-memoization`, often reported on the `css` memo). Read the value's source
+  directly, or declare things in order. Suspect this first when that lint error appears somewhere
+  unrelated to your change.
+- **Windows only**: the folder's real name is `Projects\Dueplanner` (lowercase p). npm links made
+  from the `DuePlanner` spelling make Metro fail with `Unable to resolve "@dueplanner/core/..."`.
+  Run Expo from the `Dueplanner` path; if it already broke, delete `node_modules\@dueplanner`
+  and run `npm install`. The Mac clone doesn't have this problem.
+
 ## Commands
 
 - `npm run dev` — start the Vite dev server (default port 5173).

@@ -61,8 +61,11 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
-      <ScrollView contentContainerStyle={styles.body} contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled">
+      <View style={styles.header}>
         <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Settings</Text>
+      </View>
+      <View style={[styles.rule, { backgroundColor: T.accent }]} />
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
 
         <Section title="Looks" T={T}>
           <Row label="Appearance" T={T}>
@@ -205,7 +208,9 @@ function Arrow({ glyph, a11y, disabled, onPress, T }: { glyph: string; a11y: str
 const styles = StyleSheet.create({
   root: { flex: 1 },
   body: { padding: 16, paddingBottom: 140 },
-  h1: { fontSize: 34, fontFamily: F.heading, marginTop: 12, marginBottom: 18, marginLeft: 4 },
+  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
+  h1: { fontSize: 26, lineHeight: 30, fontFamily: F.heading },
+  rule: { height: 1, marginBottom: 16 },
   inline: { flexDirection: "row", alignItems: "center", gap: 10 },
   swatch: { width: 14, height: 14, borderRadius: 7 },
   x: { fontSize: 20, lineHeight: 22, paddingHorizontal: 4 },

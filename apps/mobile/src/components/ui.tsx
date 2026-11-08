@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Switch, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { useState, type ReactNode } from "react";
+import { LayoutAnimation, Pressable, StyleSheet, Switch, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { contrastColor, ink } from "@dueplanner/core/lib/format";
 import type { Theme } from "../theme/types";
 import { F } from "../theme/fonts";
@@ -55,12 +55,25 @@ export function Button({ label, onPress, T, kind = "primary", disabled, accessib
   );
 }
 
+// A Settings section as a dropdown (the web's SettingsSection): the header
+// row toggles it and the body renders only while open. Closed when Settings
+// opens, as on the web.
 export function Section({ title, T, children }: { title: string; T: Theme; children: ReactNode }) {
   const { fz } = useApp();
+  const [open, setOpen] = useState(false);
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { fontSize: fz(11), color: T.textMuted }]} accessibilityRole="header">{title.toUpperCase()}</Text>
-      <View style={[styles.sectionBody, { backgroundColor: T.card, borderColor: T.border }]}>{children}</View>
+    <View style={[styles.sectionBody, styles.section, { backgroundColor: T.card, borderColor: T.border }]}>
+      <Pressable
+        onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.create(200, "easeOut", "opacity")); setOpen(o => !o); }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={title}
+        style={styles.sectionHead}
+      >
+        <Text style={[styles.sectionTitle, { fontSize: fz(10), color: T.textMuted }]}>{title.toUpperCase()}</Text>
+        <Text style={{ fontSize: fz(13), color: T.textMuted, transform: [{ rotate: open ? "180deg" : "0deg" }] }}>⌄</Text>
+      </Pressable>
+      {open && <View style={[styles.sectionInner, { borderTopColor: T.border }]}>{children}</View>}
     </View>
   );
 }
@@ -135,8 +148,10 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, fontFamily: F.body },
   button: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, alignItems: "center", justifyContent: "center" },
   buttonText: { fontSize: 14, fontFamily: F.bodyMedium },
-  section: { marginBottom: 22 },
-  sectionTitle: { fontSize: 11, fontFamily: F.body, letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
+  section: { marginBottom: 8 },
+  sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16 },
+  sectionTitle: { fontFamily: F.body, letterSpacing: 0.8 },
+  sectionInner: { borderTopWidth: StyleSheet.hairlineWidth },
   sectionBody: { borderWidth: 1, borderRadius: 14, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 50, borderBottomWidth: StyleSheet.hairlineWidth },
   rowText: { flex: 1, gap: 2 },

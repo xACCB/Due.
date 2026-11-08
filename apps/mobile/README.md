@@ -27,18 +27,40 @@ Without ccache installed the build still works.
 ## What's where
 
 - `src/app/` (expo-router: every file is a screen)
-  - `_layout.tsx`: fonts, the launch screen, `AppProvider`, and the stack (tabs, then the task page).
+  - `_layout.tsx`: fonts, the launch screen, `AppProvider`, the gesture root, and the stack: the
+    tabs, then the pushed screens (task page, Inbox, History, Import/Export, back reads "Home")
+    and the sheets (menu, Time left, Search).
   - `(tabs)/_layout.tsx`: the native tab bar (iOS draws it; SF Symbol icons).
-  - `(tabs)/index.tsx` Home, `calendar.tsx`, `focus.tsx`, `settings.tsx`; `task/[id].tsx` the task page.
+  - `(tabs)/index.tsx` Home (the web's Home: Time left, suggestion, search, chips, the six layouts,
+    drag to reorder, templates), `calendar.tsx` (Month and Deck), `focus.tsx` (the web's Focus
+    Mode), `settings.tsx` (the web's dropdown sections).
+  - `task/[id].tsx` the task page (the web's TaskModal page: fields, session timer, template).
+  - `menu.tsx` (the web's sidebar), `search.tsx`, `time-left.tsx`, `inbox.tsx` (recaps),
+    `history.tsx`, `import.tsx`.
 - `src/state/`
   - `taskStore.ts`: what each task action does, plus undo/redo (plain functions, unit-tested).
   - `focusTimer.ts`: the Pomodoro and stopwatch (plain functions, unit-tested).
   - `settings.ts`: every setting's `hw-*` key, default and cleaner (the web's keys and defaults).
-  - `useAppValue.ts` (the state), `appContext.ts` (`useApp()`), `AppState.tsx` (`AppProvider`).
+  - `useAppValue.ts` (the state, incl. the Focus timers and Home's filters), `appContext.ts`
+    (`useApp()`, which also gives `fz()` for Text size), `AppState.tsx` (`AppProvider`).
 - `src/lib/`: `storage.ts` (MMKV), `usePersisted.ts`, `notifications.ts` (local notifications),
-  `clock.ts`.
-- `src/components/`: `TaskRow`, `AddSheet` (the add questions), `DateTimeField` (system pickers),
-  `UndoToast`, `ui.tsx` (chips, buttons, settings rows).
+  `clock.ts`, `useNow.ts`, `day.ts` (Calendar helpers), `reorder.ts` (drag arithmetic, tested),
+  and, development only, `devRemote.ts` + `devSample.ts` (see "Checking screens" below).
+- `src/components/`: `TaskCard` (the web's MiniCard), `TaskLayouts` (Board, Checklist, Kanban,
+  Progress, Pyramid), `Swipe` (every card's swipe), `MiniTaskRow`, `DayTaskRow`, `DueDeck`, `Ring`
+  (the Pomodoro ring), `TimerPill`, `Dropdown`, `ScreenTitle`, `AddSheet` (the add questions),
+  `DateTimeField` (system pickers), `UndoToast`, `ui.tsx` (chips, buttons, settings sections/rows).
+
+## Checking screens without tapping (development only)
+
+With Metro running (`npx expo start --dev-client`; never `CI=1`, which turns off file watching),
+the app reads `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`). Serve a
+folder with `python3 -m http.server 8099 --bind 127.0.0.1`, write e.g.
+`{"n":2,"go":"/calendar"}` (`"seed":true` loads sample tasks, `"set":["hw-key",value]` writes a
+setting and reloads, `"set":["dev-open-section","Subjects"]` opens that Settings section,
+`"back":true`, `"push":"/task/1002"`), raising `n` each time, then
+`xcrun simctl io booted screenshot shot.png`. Avoid `xcrun simctl openurl`: it shows an "Open in
+DuePlanner?" prompt that only a tap dismisses.
 
 Data uses the web app's keys (`hw-tasks`, `hw-trash`, `hw-schema`, `hw-subjects`...) and shapes,
 so the account sync in M3 can reuse core's sync code unchanged. `hw-focus-state` (the running

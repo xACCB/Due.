@@ -1,11 +1,12 @@
 # DuePlanner mobile app: plan
 
-Status (2026-11-08): M1 (the monorepo) done 2026-10-18. Built on Windows, not yet run on a simulator
-or phone (needs the Mac): M2 (Home list, add questions, undo, MMKV, fonts, launch screen), most of M4
-(native tab bar: Home, Calendar, Focus, Settings; the task page; Recently deleted inside Settings) and
-M5 (local reminders, plus the Focus timer's end). Left: M3 (account and sync), Inbox and recaps,
-History as its own screen, swipe gestures, the Deck calendar view, templates, Import/Export. Where
-it lives: `apps/mobile/README.md`. Decided so far:
+Status (2026-11-08, evening): M1 (the monorepo) done 2026-10-18. M2, M4 and M5 run on the Mac's
+iOS Simulator: Home with the six layouts, swipes and drag to reorder, the menu (the web's sidebar),
+Search, Time left, Inbox (recaps), History, Import/Export, Calendar (Month and Deck), Focus, the
+task page and Settings, all following the web screen by screen; local reminders and the Focus
+timer's end notification. Left: M3 (account and sync), then M6 (ship). Not ported on purpose:
+the web's Updates list (it describes the website), Snooze, Calendar's DayDetail card, Animation
+speed. Where it lives: `apps/mobile/README.md`. Decided so far:
 
 - **React Native with Expo**, a natively built app. Not Capacitor or any other web-view wrapper.
 - **One repo (monorepo):** the web app and the phone app share one `packages/core`.

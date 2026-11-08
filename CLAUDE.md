@@ -70,15 +70,17 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
 
 ## Where things stand (update this when it changes)
 
-- **2026-11-08:** the phone app (`apps/mobile`) runs on the Mac's iPhone 18 Pro Simulator. Home,
-  Search, Time left, the menu (the web's sidebar: Inbox, History, Import/Export, subjects), Inbox
-  (recap Messages only; the web's Updates describe the website), History, Import/Export, Calendar
-  (Month and Deck) and Settings now follow the web (commits 9f914a1, e839bfb). **Next:** the task
-  page against the web's TaskModal (missing: Snooze, Save as template, the session timer's
-  "Sessions today"), then Focus, the list layouts other than List, drag to reorder, and the
-  Settings rows following Text size (`components/ui.tsx` still uses fixed sizes). Swipes, the file
-  picker and the share sheet haven't been tried by hand. Then M3: sign-in and sync
-  (`docs/mobile-plan.md`).
+- **2026-11-08 (evening):** the phone app (`apps/mobile`) runs on the Mac's iPhone 18 Pro
+  Simulator and now follows the web screen by screen: Home (Time left, suggestion, search, chips,
+  the six layouts, drag to reorder, templates, the completion hold and glide, the timer pill),
+  the menu (the web's sidebar), Search, Time left, Inbox (recap Messages only: the web's Updates
+  describe the website), History, Import/Export, Calendar (Month and Deck), Focus (ring, task
+  card, Break's over), the task page (session timer, Save as template) and Settings (the web's
+  dropdown sections, subject rename/recolour). Not tried by hand, since this Mac can't tap the
+  Simulator: swipes, drag to reorder, the Deck swipe, the file picker and the share sheet; try
+  them on the Simulator or a phone. Not ported on purpose: the web's Snooze (gone from its task
+  page too), Calendar's DayDetail card (the day panel shows the same), Animation speed.
+  **Next:** M3, sign-in and sync (`docs/mobile-plan.md`), after the items below.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
   `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with

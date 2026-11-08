@@ -45,6 +45,8 @@ export default function FocusScreen() {
   // last worked on if it's still open ("Keep going on"), else the most urgent
   // one ("Next up"). Not saved: it's about this moment.
   const [breakEnded, setBreakEnded] = useState(false);
+  // A finished Pomodoro: the web's toast ("Pomodoro done...") until OK.
+  const [pomodoroDone, setPomodoroDone] = useState(false);
   const [lastWorked, setLastWorked] = useState<number | null>(null);
   const taskId = task?.id ?? null;
 
@@ -73,6 +75,7 @@ export default function FocusScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         v.apply(done);
         if (v.state.phase === "break") setBreakEnded(true);
+        else setPomodoroDone(true);
       }
     };
     tick();
@@ -184,7 +187,7 @@ export default function FocusScreen() {
               </Ring>
             </View>
             <View style={styles.btnRow}>
-              <Pressable onPress={() => (state.endAt == null ? startPomodoro() : setState(Fx.pause(state, clock())))} accessibilityRole="button" style={solid}>
+              <Pressable onPress={() => { setPomodoroDone(false); if (state.endAt == null) startPomodoro(); else setState(Fx.pause(state, clock())); }} accessibilityRole="button" style={solid}>
                 <Text style={[styles.btnText, { fontSize: fz(12), color: contrastColor(T.accent) }]}>{state.endAt != null ? "Pause" : onBreak ? "Start break" : "Start"}</Text>
               </Pressable>
               <Pressable onPress={() => apply(onBreak ? Fx.skipPhase(state, clock(), L, taskId) : Fx.reset(state, clock(), L, taskId))} accessibilityRole="button" style={ghost}>
@@ -255,6 +258,16 @@ export default function FocusScreen() {
           </View>
         )}
       </ScrollView>
+      {pomodoroDone && (
+        <View style={[styles.toast, { backgroundColor: T.card, borderColor: T.border }]} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Text style={{ flex: 1, fontFamily: F.body, fontSize: fz(12), color: T.text }}>
+            {pomodoroAutoBreak ? `Pomodoro done. ${pomodoroBreak}-minute break started` : "Pomodoro done. Take a short break"}
+          </Text>
+          <Pressable onPress={() => setPomodoroDone(false)} accessibilityRole="button" style={[styles.toastBtn, { backgroundColor: T.accent }]}>
+            <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(12), color: contrastColor(T.accent) }}>OK</Text>
+          </Pressable>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -287,6 +300,8 @@ const styles = StyleSheet.create({
   taskTitle: { fontFamily: F.heading, fontSize: 22, lineHeight: 28, marginBottom: 8 },
   taskMeta: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
   done: { marginTop: 14, borderWidth: 1, borderRadius: 11, paddingVertical: 11, alignItems: "center" },
+  toast: { position: "absolute", left: 16, right: 16, bottom: 110, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 10, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  toastBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
   breakCard: { borderWidth: 1, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16 },
   breakHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   nothing: { textAlign: "center", fontFamily: F.body },

@@ -2,7 +2,7 @@
 // app's (App.tsx), so a value means the same on both and M3 can sync the
 // profile fields unchanged. Each comes with a cleaner that turns whatever was
 // stored into a valid value. Plain TypeScript, unit tested.
-import { DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, REMINDER_OFFSETS } from "@dueplanner/core/constants";
+import { DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, LAYOUTS, REMINDER_OFFSETS, type LayoutName } from "@dueplanner/core/constants";
 import { LIMITS, oneLine } from "@dueplanner/core/lib/limits";
 import type { TaskTemplate } from "@dueplanner/core/types";
 import { textSizeOf, type TextSize } from "@dueplanner/core/lib/textSize";
@@ -87,6 +87,7 @@ export const SETTINGS = {
   addQuestions: { key: "hw-add-questions", initial: null as unknown, clean: (raw: unknown) => raw },
   subjects: { key: "hw-subjects", initial: [...DEFAULT_SUBJECTS] as string[], clean: cleanSubjects },
   textSize: { key: "hw-text-size", initial: "default" as TextSize, clean: textSizeOf },
+  layout: { key: "hw-layout", initial: "list" as LayoutName, clean: oneOf(Object.keys(LAYOUTS) as LayoutName[], "list") },
   groupBy: { key: "hw-group", initial: "none" as (typeof GROUP_BYS)[number], clean: oneOf(GROUP_BYS, "none") },
   showSuggestion: { key: "hw-showsuggestion", initial: true as boolean, clean: bool(true) },
   hiddenSuggestionFor: { key: "hw-suggestion-hidden", initial: null as number | null, clean: cleanHiddenFor },

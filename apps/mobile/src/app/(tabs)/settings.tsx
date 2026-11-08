@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
-import { QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS } from "@dueplanner/core/constants";
+import { LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, type LayoutName } from "@dueplanner/core/constants";
+import { SymbolView, type SFSymbol } from "expo-symbols";
 import { moveQuestion, normalizeQuestionPrefs } from "@dueplanner/core/lib/addQuestions";
 import { subjectToAdd, withoutSubjectColor } from "@dueplanner/core/lib/taskActions";
 import { focusShowFor, showsPomodoro, showsStopwatch } from "@dueplanner/core/lib/stopwatch";
@@ -18,6 +19,10 @@ import { Row, Section, Segmented, Stepper, ToggleRow } from "../../components/ui
 // New task questions, Subjects, Task list, Reminders), then feedback and
 // Clear completed. Recently deleted is in History, as on the web.
 const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
+const LAYOUT_ICONS: Record<LayoutName, SFSymbol> = {
+  list: "list.bullet", board: "square.grid.2x2", checklist: "checklist",
+  kanban: "rectangle.split.3x1", progress: "chart.bar.xaxis", pyramid: "triangle",
+};
 export default function SettingsScreen() {
   const app = useApp();
   const { T, fz } = app;
@@ -68,6 +73,20 @@ export default function SettingsScreen() {
             <Segmented label="Text size" T={T} value={s.textSize} onChange={s.setTextSize}
               options={[{ label: "Small", value: "small" }, { label: "Default", value: "default" }, { label: "Large", value: "large" }]} />
           </Row>
+          <Row label="Layout" hint="How Home shows your tasks" T={T} />
+          <View style={styles.layouts}>
+            {(Object.entries(LAYOUTS) as [LayoutName, { name: string; desc: string }][]).map(([key, l]) => {
+              const on = s.layout === key;
+              return (
+                <Pressable key={key} onPress={() => s.setLayout(key)} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${l.name}, ${l.desc}`}
+                  style={[styles.layoutBtn, { backgroundColor: on ? T.accent + "22" : "transparent", borderColor: on ? T.accent : T.border }]}>
+                  <SymbolView name={LAYOUT_ICONS[key]} size={20} tintColor={on ? T.accent : T.textFaint} />
+                  <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(10), color: on ? T.accent : T.textMuted }}>{l.name}</Text>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(9), color: on ? T.accent : T.textMuted, opacity: 0.6, textAlign: "center" }}>{l.desc}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <ToggleRow label="Urgency color coding" hint="Red, orange and green by how soon a task is due" value={s.colorCodeUrgency} onChange={s.setColorCodeUrgency} T={T} />
         </Section>
 
@@ -143,6 +162,7 @@ export default function SettingsScreen() {
             <Segmented label="Group by" T={T} value={s.groupBy} onChange={s.setGroupBy}
               options={[{ label: "None", value: "none" }, { label: "Subject", value: "subject" }, { label: "Priority", value: "priority" }, { label: "Due", value: "dueDate" }]} />
           </Row>
+          {s.layout !== "list" && s.groupBy !== "none" && <Row label="Grouping only shows in the List layout" T={T} />}
           <ToggleRow label="Show smart suggestion" hint="The most urgent task, above the list" value={s.showSuggestion} onChange={s.setShowSuggestion} T={T} />
           <ToggleRow label="Show completed" value={s.showDone} onChange={s.setShowDone} T={T} />
           <Row label="Auto-archive completed" hint="Done tasks move to Archived after this long. You can still archive any task from its page." T={T} />
@@ -193,6 +213,8 @@ const styles = StyleSheet.create({
   input: { fontSize: 16, fontFamily: F.body, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
   arrow: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   arrowGlyph: { fontSize: 11 },
+  layouts: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingHorizontal: 14, paddingBottom: 12 },
+  layoutBtn: { width: "31%", flexGrow: 1, borderWidth: 1.5, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 7, alignItems: "center", gap: 4 },
   segRow: { paddingHorizontal: 14, paddingBottom: 12, alignItems: "flex-start" },
   wide: { borderWidth: 1, borderRadius: 9, paddingVertical: 10, paddingHorizontal: 14, alignItems: "center", marginBottom: 8 },
   wideText: { fontSize: 12, fontFamily: F.body },

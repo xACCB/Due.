@@ -14,6 +14,7 @@ import { useApp } from "../../state/appContext";
 import { useNow } from "../../lib/useNow";
 import { F } from "../../theme/fonts";
 import { TaskCard } from "../../components/TaskCard";
+import { TaskLayout } from "../../components/TaskLayouts";
 import { AddSheet } from "../../components/AddSheet";
 import { UndoToast } from "../../components/UndoToast";
 
@@ -28,7 +29,7 @@ const EMPTY: Record<string, string> = {
 // "3h 20m", or "0m" (the web header's fmtMins).
 const fmtMins = (m: number) => formatDuration(m) || "0m";
 
-type Row = { kind: "head"; key: string; label: string } | { kind: "task"; key: string; task: Task };
+type Row = { kind: "head"; key: string; label: string } | { kind: "task"; key: string; task: Task } | { kind: "layout"; key: string };
 
 // Home, as on the web: the menu button and Time left in the header, the smart
 // suggestion, search, the filter chips, the task cards (grouped when Group by
@@ -55,7 +56,9 @@ export default function Home() {
   const suggestionTask = allSorted.find(t => !t.done && !t.archived);
   const showSuggestionCard = !!suggestionTask && s.showSuggestion && s.hiddenSuggestionFor !== suggestionTask.id;
 
-  const rows: Row[] = s.groupBy !== "none"
+  const rows: Row[] = s.layout !== "list"
+    ? (shown.length ? [{ kind: "layout" as const, key: "layout" }] : [])
+    : s.groupBy !== "none"
     ? groupTasks(shown, s.groupBy).flatMap(g => [{ kind: "head" as const, key: "h-" + g.key, label: `${g.label} (${g.tasks.length})` }, ...g.tasks.map(t => ({ kind: "task" as const, key: String(t.id), task: t }))])
     : shown.map(t => ({ kind: "task" as const, key: String(t.id), task: t }));
 
@@ -154,7 +157,9 @@ export default function Home() {
         ListHeaderComponent={header}
         ListFooterComponent={footer}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => item.kind === "head"
+        renderItem={({ item }) => item.kind === "layout"
+          ? <TaskLayout layout={s.layout as Exclude<typeof s.layout, "list">} tasks={shown} now={now} onOpen={t => router.push(`/task/${t.id}`)} onToggle={toggle} onDelete={remove} />
+          : item.kind === "head"
           ? <Text style={[styles.groupHead, { fontSize: fz(10), color: T.textMuted }]} accessibilityRole="header">{item.label.toUpperCase()}</Text>
           : (
             <TaskCard

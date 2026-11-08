@@ -99,6 +99,7 @@ export function useAppValue() {
   const [subjects, setSubjects] = useSetting("subjects");
   const [subjectColors, setSubjectColors] = useSetting("subjectColors");
   const [textSize, setTextSize] = useSetting("textSize");
+  const [layout, setLayout] = useSetting("layout");
   const [groupBy, setGroupBy] = useSetting("groupBy");
   const [showSuggestion, setShowSuggestion] = useSetting("showSuggestion");
   const [hiddenSuggestionFor, setHiddenSuggestionFor] = useSetting("hiddenSuggestionFor");
@@ -178,7 +179,7 @@ export function useAppValue() {
       pomodoroWork, setPomodoroWork, pomodoroBreak, setPomodoroBreak, pomodoroAutoBreak, setPomodoroAutoBreak,
       focusShow, setFocusShow, addQuestions, setAddQuestions,
       subjects, setSubjects, subjectColors, setSubjectColors,
-      textSize, setTextSize, groupBy, setGroupBy, showSuggestion, setShowSuggestion, hiddenSuggestionFor, setHiddenSuggestionFor,
+      textSize, setTextSize, layout, setLayout, groupBy, setGroupBy, showSuggestion, setShowSuggestion, hiddenSuggestionFor, setHiddenSuggestionFor,
       autoArchiveDays, setAutoArchiveDays, templates, setTemplates,
       recaps, setRecaps, openSubjects, setOpenSubjects,
     },

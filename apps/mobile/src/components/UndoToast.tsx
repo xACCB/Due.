@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Theme } from "../theme/types";
 import { F } from "../theme/fonts";
 
-const TOAST_MS = 4000;
+const TOAST_MS = 5000; // the web's
 
 // "Completed · Undo", above the tab bar, gone after a few seconds. `n` changes
 // with every new message, so a repeat of the same text restarts the timer.

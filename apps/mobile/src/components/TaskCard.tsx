@@ -12,6 +12,7 @@ const DONE_GREEN = "#2ED573";
 interface Props {
   task: Task;
   rank: number; // place among open tasks (0: "do first", 1: "next up"), -1 for none
+  holding?: boolean; // just completed, holding its place: keeps its badge and due label until it settles
   T: Theme; fz: (px: number) => number; h24: boolean; colorCode: boolean; now: number;
   subjectColor?: string;
   onOpen: () => void;
@@ -27,7 +28,7 @@ interface Props {
 // One task on Home: the web's MiniCard. A swipe right marks it done (or not
 // done), a swipe left deletes it, as on the web; the check and × do the same
 // with a tap. Tapping the card opens the task page.
-export function TaskCard({ task, rank, T, fz, h24, colorCode, now, subjectColor, onOpen, onToggle, onDelete, reorder }: Props) {
+export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subjectColor, onOpen, onToggle, onDelete, reorder }: Props) {
   const [dy] = useState(() => new Animated.Value(0));
   const [held, setHeld] = useState(false);
   const handlers = useRef(reorder);
@@ -47,7 +48,7 @@ export function TaskCard({ task, rank, T, fz, h24, colorCode, now, subjectColor,
   const pr = getPriority(task.dueDate, task.estMins, task.priorityOverride);
   const sc = subjectColor || T.accent;
   const dm = countdown(task.dueDate, task.dueTime, now) ?? daysUntil(task.dueDate);
-  const live = !task.done;
+  const live = !task.done || !!holding;
   const isTop = rank === 0 && live;
   const isNext = rank === 1 && live;
   const subs = task.subtasks ?? [];

@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, FlatList, LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import type { Task, TaskTemplate } from "@dueplanner/core/types";
-import { filterTasks, groupTasks, sortTasks, timeLeft } from "@dueplanner/core/lib/taskViews";
+import { filterTasks, groupTasks, heldOpen, sortTasks, timeLeft } from "@dueplanner/core/lib/taskViews";
 import { buildSuggestion } from "@dueplanner/core/lib/tasks";
 import { contrastColor, formatDuration } from "@dueplanner/core/lib/format";
 import { todayISO } from "@dueplanner/core/lib/dates";
@@ -48,9 +48,21 @@ export default function Home() {
   const filter = app.homeFilter;
   // A subject filter whose subject no longer has tasks or a row is ignored (the web's subjectFilterOn).
   const subjectOn = app.subjectFilter != null && (s.subjects.includes(app.subjectFilter) || app.tasks.some(t => t.subject === app.subjectFilter)) ? app.subjectFilter : null;
-  const allSorted = useMemo(() => sortTasks(app.tasks, []), [app.tasks]);
-  const shown = filterTasks(allSorted, { filter, subject: subjectOn, showDone: s.showDone, justDone: [] });
-  const pending = allSorted.filter(t => !t.done);
+  // Completing a task (the web's justDone): the card holds its place for 640ms
+  // while its check fills and its title strikes, then glides to its new spot
+  // (LayoutAnimation). Reduced motion skips the hold and the glide.
+  const [justDone, setJustDone] = useState<number[]>([]);
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduced).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduced);
+    return () => sub.remove();
+  }, []);
+  const glide = () => { if (!reduced) LayoutAnimation.configureNext(LayoutAnimation.create(320, "easeInEaseOut", "opacity")); };
+
+  const allSorted = useMemo(() => sortTasks(app.tasks, justDone), [app.tasks, justDone]);
+  const shown = filterTasks(allSorted, { filter, subject: subjectOn, showDone: s.showDone, justDone });
+  const pending = allSorted.filter(t => heldOpen(t, justDone));
   const tl = timeLeft(app.tasks, todayISO());
   const pendingCount = shown.filter(t => !t.done && !t.archived).length;
 
@@ -83,14 +95,18 @@ export default function Home() {
   };
 
   const toggle = (t: Task) => {
+    if (!t.done && !reduced) {
+      setJustDone(prev => [...prev, t.id]);
+      setTimeout(() => { glide(); setJustDone(prev => prev.filter(x => x !== t.id)); }, 640);
+    } else glide();
     app.toggle(t.id);
     if (!t.done) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    say(t.done ? "Marked not done" : "Completed");
+    say(t.done ? `"${t.title}" marked not done` : `"${t.title}" completed`);
   };
-  const remove = (t: Task) => { app.remove(t.id); say("Deleted"); };
+  const remove = (t: Task) => { glide(); app.remove(t.id); say(`"${t.title}" deleted`); };
   const startTemplate = (tpl: TaskTemplate) => {
     const step = startFromTemplate(app.questions, tpl);
-    if (step.done) { app.add(step.done); say("Added"); } else setAdding({ template: tpl });
+    if (step.done) { glide(); app.add(step.done); say(`"${step.done.title}" added`); } else setAdding({ template: tpl });
   };
 
   const chip = (label: string, on: boolean, onPress: () => void, a11y?: string) => (
@@ -119,7 +135,7 @@ export default function Home() {
       </Pressable>
 
       <View style={styles.filters}>
-        {FILTERS.map(f => chip(f[0].toUpperCase() + f.slice(1), filter === f, () => app.setHomeFilter(f)))}
+        {FILTERS.map(f => chip(f[0].toUpperCase() + f.slice(1), filter === f, () => { if (f !== filter) glide(); app.setHomeFilter(f); }))}
         {filter === "noest" && chip("No estimate ×", true, () => app.setHomeFilter("all"), "Clear no-estimate filter")}
         {subjectOn != null && chip(`${subjectOn || "No subject"} ×`, true, () => app.setSubjectFilter(null), `Stop showing only ${subjectOn || "No subject"}`)}
         <Text style={[styles.pendingCount, { fontSize: fz(10), color: T.textFaint }]}>{pendingCount} pending</Text>
@@ -186,6 +202,7 @@ export default function Home() {
             <TaskCard
               task={item.task}
               rank={pending.indexOf(item.task)}
+              holding={justDone.includes(item.task.id)}
               T={T} fz={fz} h24={h24} now={now}
               colorCode={s.colorCodeUrgency}
               subjectColor={s.subjectColors[item.task.subject]}

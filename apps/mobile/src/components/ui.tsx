@@ -4,6 +4,7 @@ import { contrastColor, ink } from "@dueplanner/core/lib/format";
 import type { Theme } from "../theme/types";
 import { F } from "../theme/fonts";
 import { useApp } from "../state/appContext";
+import { readJSON } from "../lib/storage";
 
 // Small shared pieces, styled from the theme like the web's runtime css
 // (.chip, buttons, settings rows). Components only: this file exports nothing else.
@@ -60,7 +61,9 @@ export function Button({ label, onPress, T, kind = "primary", disabled, accessib
 // opens, as on the web.
 export function Section({ title, T, children }: { title: string; T: Theme; children: ReactNode }) {
   const { fz } = useApp();
-  const [open, setOpen] = useState(false);
+  // Development only: the "dev-open-section" key opens one section, so a
+  // screenshot can show it (see lib/devRemote.ts).
+  const [open, setOpen] = useState(() => __DEV__ && readJSON<string | null>("dev-open-section", null) === title);
   return (
     <View style={[styles.sectionBody, styles.section, { backgroundColor: T.card, borderColor: T.border }]}>
       <Pressable

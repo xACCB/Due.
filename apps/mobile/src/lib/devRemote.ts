@@ -8,6 +8,8 @@ import { writeJSON } from "./storage";
 // http://localhost:8099/cmd.json, e.g. `{ "n": 3, "go": "/calendar" }`,
 // `{ "n": 4, "seed": true }` or `{ "n": 5, "set": ["hw-group", "subject"] }`,
 // and acts once per new `n`. Never started in a release build (app/_layout.tsx).
+// `"set":["dev-open-section","Subjects"]` opens that Settings section after the
+// reload (components/ui.tsx Section), so a screenshot can show it.
 const URL = "http://localhost:8099/cmd.json";
 
 type Cmd = { n?: number; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean };

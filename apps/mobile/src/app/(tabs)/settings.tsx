@@ -209,10 +209,11 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Task list" T={T}>
-          <Row label="Group by" T={T}>
+          <Row label="Group by" hint="Groups the List layout into headed sections" T={T} />
+          <View style={styles.segRow}>
             <Segmented label="Group by" T={T} value={s.groupBy} onChange={s.setGroupBy}
-              options={[{ label: "None", value: "none" }, { label: "Subject", value: "subject" }, { label: "Priority", value: "priority" }, { label: "Due", value: "dueDate" }]} />
-          </Row>
+              options={[{ label: "None", value: "none" }, { label: "Subject", value: "subject" }, { label: "Priority", value: "priority" }, { label: "Due date", value: "dueDate" }]} />
+          </View>
           {s.layout !== "list" && s.groupBy !== "none" && <Row label="Grouping only shows in the List layout" T={T} />}
           <ToggleRow label="Show smart suggestion" hint="The most urgent task, above the list" value={s.showSuggestion} onChange={s.setShowSuggestion} T={T} />
           <ToggleRow label="Show completed" value={s.showDone} onChange={s.setShowDone} T={T} />

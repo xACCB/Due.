@@ -19,6 +19,7 @@ import { Row, Section, Segmented, Stepper, ToggleRow } from "../../components/ui
 // New task questions, Subjects, Task list, Reminders), then feedback and
 // Clear completed. Recently deleted is in History, as on the web.
 const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
+const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
 const LAYOUT_ICONS: Record<LayoutName, SFSymbol> = {
   list: "list.bullet", board: "square.grid.2x2", checklist: "checklist",
   kanban: "rectangle.split.3x1", progress: "chart.bar.xaxis", pyramid: "triangle",
@@ -237,6 +238,9 @@ export default function SettingsScreen() {
 
         <Pressable onPress={() => { Linking.openURL(FEEDBACK_URL).catch(() => {}); }} accessibilityRole="link" style={[styles.wide, { borderColor: T.border }]}>
           <Text style={[styles.wideText, { fontSize: fz(12), color: T.textMuted }]}>Send feedback / report a bug</Text>
+        </Pressable>
+        <Pressable onPress={() => { Linking.openURL(PRIVACY_URL).catch(() => {}); }} accessibilityRole="link" style={[styles.wide, { borderColor: T.border }]}>
+          <Text style={[styles.wideText, { fontSize: fz(12), color: T.textMuted }]}>Privacy policy</Text>
         </Pressable>
         <Pressable onPress={clearCompleted} disabled={doneCount === 0} accessibilityRole="button" accessibilityHint="Deletes completed tasks that aren't archived. You can undo this"
           style={[styles.wide, { borderColor: "#FF475744", opacity: doneCount ? 1 : 0.45 }]}>

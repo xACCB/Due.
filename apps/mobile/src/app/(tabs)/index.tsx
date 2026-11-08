@@ -108,7 +108,10 @@ export default function Home() {
     if (!t.done && !reduced) {
       setJustDone(prev => [...prev, t.id]);
       setTimeout(() => { glide(); setJustDone(prev => prev.filter(x => x !== t.id)); }, app.ms(640));
-    } else glide();
+    } else {
+      setJustDone(prev => prev.filter(x => x !== t.id)); // unticked during its hold
+      glide();
+    }
     app.toggle(t.id);
     if (!t.done) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     say(t.done ? `"${t.title}" marked not done` : `"${t.title}" completed`);

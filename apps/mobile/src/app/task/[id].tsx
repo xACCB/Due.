@@ -74,7 +74,7 @@ function TaskForm({ task }: { task: Task }) {
   // with the phone locked still counts. Ending it logs a session on the task;
   // so does leaving the page while it runs (the web's leaveTaskPage).
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  const now = useNow(1000);
+  const now = useNow(startedAt != null ? 1000 : 60000); // every second only while a session runs
   const secs = startedAt == null ? 0 : secondsSince(startedAt, now);
   const running = useRef<{ at: number | null; log: (mins: number, at: number) => void }>({ at: null, log: () => {} });
   useEffect(() => { running.current = { at: startedAt, log: (m, at) => app.logSession(task.id, m, at) }; });

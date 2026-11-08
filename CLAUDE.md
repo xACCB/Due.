@@ -38,12 +38,41 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   from the `DuePlanner` spelling make Metro fail with `Unable to resolve "@dueplanner/core/..."`.
   Run Expo from the `Dueplanner` path; if it already broke, delete `node_modules\@dueplanner`
   and run `npm install`. The Mac clone doesn't have this problem.
+- **Explain plainly, give exact steps.** The user is new to Mac, Xcode and native app tooling. Say
+  what a term means the first time (e.g. "scaffolding"), give commands to paste as code blocks in
+  the order to run them, say what output to expect and what to do if it fails, and keep a short
+  checklist for anything they do by hand. While a long download or build runs, carry on with work
+  that doesn't need it and say what you're doing.
+- **Two machines.** Windows: `C:\Users\aaron\OneDrive\Desktop\Me\Projects\Dueplanner` (the web app
+  and most work so far). Mac: `~/dev/DuePlanner` (needed for every iOS build and the Simulator).
+  Start each session with `git pull`; only one machine should have unpushed work at a time. The
+  Mac has Xcode, Homebrew, `node@22`, watchman, cocoapods, `gh` and openjdk. Homebrew's openjdk
+  isn't on PATH, so before `npm run test:rules` or `test:e2e` there, run
+  `export PATH="$(brew --prefix openjdk)/bin:$PATH"`.
+
+## Where things stand (update this when it changes)
+
+- **2026-11-08:** the phone app (`apps/mobile`) has M2, most of M4 and M5 written and unit-tested on
+  Windows, but it has **never run yet**. The next step is the first `npx expo run:ios` on the Mac:
+  fix whatever the build or the Simulator turns up, then go through the test checklist (add
+  questions, task page, Calendar, Focus, Settings, a reminder notification, data kept after
+  quitting). Then M3: sign-in and sync (`docs/mobile-plan.md`).
+- **Before M3, flag these to the user:** the iOS app has to be registered in the Firebase console
+  (which gives a `GoogleService-Info.plist`); App Check needs App Attest for iOS and debug tokens
+  for the Simulator, since App Check is enforced; and Sign in with Apple (which Apple requires when
+  Google sign-in is offered) needs the paid Apple Developer Program ($99 a year), the user's call.
 
 ## Commands
 
 - `npm run dev` — start the Vite dev server (default port 5173).
 - `npm run build` — type-check (`tsc -b`) then production-build (`vite build`) into `dist/`.
 - `npm run lint` — run ESLint over the whole project.
+- Phone app (`apps/mobile`): `npm run mobile` (Expo dev server; the app must already be built),
+  `npm run typecheck:mobile`, and on the Mac `cd apps/mobile && npx expo run:ios` (builds the native
+  app and opens it in the Simulator; run it again after adding a package with native code). Without
+  a Mac, `cd apps/mobile && npx expo export --platform ios --output-dir <tmp>` proves the
+  JavaScript bundles, and `npx expo-doctor` checks the dependencies. Add packages with
+  `npx expo install`.
 - `npm run preview` — serve the built `dist/` output locally.
 - `npm test` — Vitest, unit tests for the pure functions in `packages/core/src/lib/` (dates, priority/format
   helpers, syllabus parsing). Fast, no external services; this is what CI runs.

@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
-import { LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, type LayoutName } from "@dueplanner/core/constants";
+import { LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, SUBJECT_COLOR_PALETTE, type LayoutName } from "@dueplanner/core/constants";
 import { SymbolView, type SFSymbol } from "expo-symbols";
 import { moveQuestion, normalizeQuestionPrefs } from "@dueplanner/core/lib/addQuestions";
-import { subjectToAdd, withoutSubjectColor } from "@dueplanner/core/lib/taskActions";
+import { recolouredSubjects, renamedSubjects, subjectRename, subjectToAdd, templatesRenamedSubject, withoutSubjectColor } from "@dueplanner/core/lib/taskActions";
 import { focusShowFor, showsPomodoro, showsStopwatch } from "@dueplanner/core/lib/stopwatch";
-import { ink } from "@dueplanner/core/lib/format";
+import { contrastColor, ink } from "@dueplanner/core/lib/format";
 import { LIMITS } from "@dueplanner/core/lib/limits";
 import { useApp } from "../../state/appContext";
 import { requestNotifications } from "../../lib/notifications";
@@ -38,11 +38,22 @@ export default function SettingsScreen() {
     }
     setNewSubject("");
   };
-  const removeSubject = (name: string) => {
-    Alert.alert(`Remove ${name}?`, "Tasks keep their subject; it just leaves this list.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: () => { s.setSubjects(s.subjects.filter(x => x !== name)); s.setSubjectColors(withoutSubjectColor(s.subjectColors, name)); } },
-    ]);
+  // Two taps to delete (tasks keep their subject), and editing in place, as on the web.
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ old: string; name: string; color: string } | null>(null);
+  const removeSubject = (name: string) => { s.setSubjects(s.subjects.filter(x => x !== name)); s.setSubjectColors(withoutSubjectColor(s.subjectColors, name)); };
+  // The web's updateSubject: the new name goes to the tasks, Recently deleted and templates.
+  const saveSubject = () => {
+    if (!editing) return;
+    const next = subjectRename(editing.old, editing.name, s.subjects);
+    if (next == null) return;
+    s.setSubjects(renamedSubjects(s.subjects, editing.old, next));
+    s.setSubjectColors(recolouredSubjects(s.subjectColors, editing.old, next, editing.color));
+    if (next !== editing.old) {
+      app.renameSubject(editing.old, next);
+      s.setTemplates(prev => templatesRenamedSubject(prev, editing.old, next));
+    }
+    setEditing(null);
   };
   const setReminders = async (on: boolean) => {
     if (!on) { s.setNotifications(false); return; }
@@ -132,32 +143,69 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Subjects" T={T}>
-          {s.subjects.map(name => (
-            <Row key={name} label={name} T={T}>
-              <View style={styles.inline}>
-                <View style={[styles.swatch, { backgroundColor: s.subjectColors[name] || T.textMuted }]} />
-                <Pressable onPress={() => removeSubject(name)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${name}`}>
-                  <Text style={[styles.x, { color: T.textMuted }]}>×</Text>
-                </Pressable>
-              </View>
-            </Row>
-          ))}
-          {s.subjects.length < LIMITS.subjects && (
-            <View style={styles.addRow}>
+          <View style={styles.subjects}>
+            {s.subjects.map(name => {
+              const confirming = pendingDelete === name;
+              if (editing?.old === name) {
+                const clash = s.subjects.some(x => x !== name && x.toLowerCase() === editing.name.trim().toLowerCase());
+                return (
+                  <View key={name} style={[styles.subjectEdit, { backgroundColor: T.surface }]}>
+                    <TextInput value={editing.name} onChangeText={v => setEditing({ ...editing, name: v })} autoFocus maxLength={LIMITS.subject} accessibilityLabel="Subject name"
+                      onSubmitEditing={saveSubject} returnKeyType="done"
+                      style={[styles.input, { fontSize: fz(12), color: T.text, backgroundColor: T.card, borderColor: T.border, paddingVertical: 7 }]} />
+                    <View style={styles.palette} accessibilityRole="radiogroup" accessibilityLabel="Subject color">
+                      {SUBJECT_COLOR_PALETTE.map(c => (
+                        <Pressable key={c} onPress={() => setEditing({ ...editing, color: c })} accessibilityRole="radio" accessibilityState={{ checked: editing.color === c }} accessibilityLabel={c}
+                          style={[styles.swatchBtn, { backgroundColor: c, borderColor: editing.color === c ? T.text : "transparent" }]} />
+                      ))}
+                    </View>
+                    {clash && <Text style={{ fontFamily: F.body, fontSize: fz(10), color: ink("#FF4757", T.light) }}>There&apos;s already a subject with that name</Text>}
+                    <View style={styles.editBtns}>
+                      <Pressable onPress={() => setEditing(null)} accessibilityRole="button" style={[styles.smallBtn, { borderWidth: 1, borderColor: T.border }]}>
+                        <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted }}>Cancel</Text>
+                      </Pressable>
+                      <Pressable onPress={saveSubject} accessibilityRole="button" style={[styles.smallBtn, { backgroundColor: T.accent }]}>
+                        <Text style={{ fontFamily: F.body, fontSize: fz(11), color: contrastColor(T.accent) }}>Save</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              }
+              return (
+                <View key={name} style={[styles.subjectRow, { backgroundColor: T.surface }]}>
+                  <View style={[styles.dot, { backgroundColor: s.subjectColors[name] || T.accent }]} />
+                  <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.body, fontSize: fz(12), color: T.text }}>{name}</Text>
+                  <Pressable onPress={() => { setPendingDelete(null); setEditing({ old: name, name, color: s.subjectColors[name] || SUBJECT_COLOR_PALETTE[0] }); }}
+                    hitSlop={8} accessibilityRole="button" accessibilityLabel={`Edit ${name}`} accessibilityHint="Rename or change color">
+                    <Text style={{ fontSize: fz(13), color: T.textFaint }}>✎</Text>
+                  </Pressable>
+                  <Pressable onPress={() => { if (confirming) { removeSubject(name); setPendingDelete(null); } else setPendingDelete(name); }}
+                    hitSlop={8} accessibilityRole="button" accessibilityLabel={confirming ? `Confirm deleting ${name}` : `Delete ${name}`} accessibilityHint={confirming ? "Tasks keep their subject" : undefined}
+                    style={confirming ? [styles.confirm, { backgroundColor: "#FF475722" }] : null}>
+                    <Text style={{ fontFamily: F.body, fontSize: fz(confirming ? 11 : 15), color: confirming ? "#FF4757" : T.textFaint }}>{confirming ? "Delete?" : "×"}</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+            <View style={styles.addSubject}>
               <TextInput
                 value={newSubject}
                 onChangeText={setNewSubject}
                 onSubmitEditing={addSubject}
                 submitBehavior="submit"
-                placeholder="Add a subject..."
-                placeholderTextColor={T.textMuted}
+                editable={s.subjects.length < LIMITS.subjects}
+                placeholder={s.subjects.length >= LIMITS.subjects ? `Limit of ${LIMITS.subjects} subjects reached` : "Add a subject..."}
+                placeholderTextColor={T.textFaint}
                 maxLength={LIMITS.subject}
                 returnKeyType="done"
                 accessibilityLabel="Add a subject"
-                style={[styles.input, { color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
+                style={[styles.input, { flex: 1, fontSize: fz(12), color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
               />
+              <Pressable onPress={addSubject} disabled={!newSubject.trim()} accessibilityRole="button" style={[styles.smallBtn, { backgroundColor: T.accent, opacity: newSubject.trim() ? 1 : 0.5, justifyContent: "center" }]}>
+                <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(12), color: contrastColor(T.accent) }}>Add</Text>
+              </Pressable>
             </View>
-          )}
+          </View>
         </Section>
 
         <Section title="Task list" T={T}>
@@ -220,6 +268,16 @@ const styles = StyleSheet.create({
   arrowGlyph: { fontSize: 11 },
   layouts: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingHorizontal: 14, paddingBottom: 12 },
   layoutBtn: { width: "31%", flexGrow: 1, borderWidth: 1.5, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 7, alignItems: "center", gap: 4 },
+  subjects: { padding: 12, gap: 6 },
+  subjectRow: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 9, paddingVertical: 9, paddingHorizontal: 12 },
+  subjectEdit: { borderRadius: 9, paddingVertical: 10, paddingHorizontal: 12, gap: 8 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  palette: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  swatchBtn: { width: 22, height: 22, borderRadius: 11, borderWidth: 2 },
+  editBtns: { flexDirection: "row", gap: 6, justifyContent: "flex-end" },
+  smallBtn: { borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12 },
+  confirm: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  addSubject: { flexDirection: "row", gap: 8, marginTop: 2 },
   segRow: { paddingHorizontal: 14, paddingBottom: 12, alignItems: "flex-start" },
   wide: { borderWidth: 1, borderRadius: 9, paddingVertical: 10, paddingHorizontal: 14, alignItems: "center", marginBottom: 8 },
   wideText: { fontSize: 12, fontFamily: F.body },

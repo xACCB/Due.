@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { withSyllabusTasks } from "@dueplanner/core/lib/backup";
-import { addTask, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, moveTask, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX } from "./taskStore";
+import { addTask, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, moveTask, renameSubject, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX } from "./taskStore";
 
 describe("taskStore", () => {
   it("adds a trimmed one-line task and ignores a blank title", () => {
@@ -157,5 +157,17 @@ describe("taskStore", () => {
     expect(order).toEqual(["B", "C", "A"]);
     expect(moved.undo).toEqual(s.undo);
     expect(moveTask(s, a, -1)).toBe(s); // already first
+  });
+
+  it("renames a subject on tasks and in Recently deleted", () => {
+    let s = importTasks(emptyStore(), [
+      { id: 1, title: "A", subject: "Maths", dueDate: "", dueTime: "", estMins: 0, done: false, order: 0 },
+      { id: 2, title: "B", subject: "Maths", dueDate: "", dueTime: "", estMins: 0, done: false, order: 1 },
+      { id: 3, title: "C", subject: "Art", dueDate: "", dueTime: "", estMins: 0, done: false, order: 2 },
+    ]);
+    s = deleteTask(s, 2);
+    s = renameSubject(s, "Maths", "Math");
+    expect(s.tasks.map(t => t.subject)).toEqual(["Math", "Art"]);
+    expect(s.trash[0].task.subject).toBe("Math");
   });
 });

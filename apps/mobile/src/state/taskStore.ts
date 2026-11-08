@@ -12,7 +12,7 @@ import type { AddDraft } from "@dueplanner/core/lib/addFlow";
 import { trashEntries } from "@dueplanner/core/lib/trash";
 import { applyTaskStates, diffTasks } from "@dueplanner/core/lib/history";
 import { setDone } from "@dueplanner/core/lib/tasks";
-import { duplicateOf, freshSubtasks, movedOrder, patchTask, withOrder, restoredInto, withNewTask, withTrashed, withoutTasks, withoutTrashed } from "@dueplanner/core/lib/taskActions";
+import { duplicateOf, freshSubtasks, movedOrder, patchTask, tasksRenamedSubject, trashRenamedSubject, withOrder, restoredInto, withNewTask, withTrashed, withoutTasks, withoutTrashed } from "@dueplanner/core/lib/taskActions";
 import { withSession } from "@dueplanner/core/lib/timers";
 import { sortTasks } from "@dueplanner/core/lib/taskViews";
 import { LIMITS, oneLine } from "@dueplanner/core/lib/limits";
@@ -155,4 +155,11 @@ export function importTasks(s: TaskStore, next: Task[]): TaskStore {
 export function moveTask(s: TaskStore, id: number, delta: number): TaskStore {
   const moved = movedOrder(sortTasks(s.tasks, []).filter(t => !t.done).map(t => t.id), id, delta);
   return moved ? { ...s, tasks: withOrder(s.tasks, moved.order) } : s;
+}
+
+// Renaming a subject (Settings -> Subjects) carries the new name to its tasks
+// and to Recently deleted, as the web's updateSubject does. Not an undo step.
+export function renameSubject(s: TaskStore, old: string, next: string): TaskStore {
+  if (old === next) return s;
+  return { ...s, tasks: tasksRenamedSubject(s.tasks, old, next), trash: trashRenamedSubject(s.trash, old, next) };
 }

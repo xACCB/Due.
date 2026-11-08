@@ -104,6 +104,9 @@ export function useAppValue() {
   const [subjects, setSubjects] = useSetting("subjects");
   const [subjectColors, setSubjectColors] = useSetting("subjectColors");
   const [textSize, setTextSize] = useSetting("textSize");
+  const [animSpeed, setAnimSpeed] = useSetting("animSpeed");
+  // An animation's length at the Animation speed setting (the web's scaledMs).
+  const ms = useMemo(() => (n: number) => Math.round(n / animSpeed), [animSpeed]);
   const [layout, setLayout] = useSetting("layout");
   const [groupBy, setGroupBy] = useSetting("groupBy");
   const [showSuggestion, setShowSuggestion] = useSetting("showSuggestion");
@@ -160,7 +163,7 @@ export function useAppValue() {
   }, [store.tasks, notifications, reminderOffsets, h24]);
 
   return {
-    T, h24, questions, fz,
+    T, h24, questions, fz, ms,
     homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus,
     tasks: store.tasks,
     trash: store.trash,
@@ -190,7 +193,7 @@ export function useAppValue() {
       pomodoroWork, setPomodoroWork, pomodoroBreak, setPomodoroBreak, pomodoroAutoBreak, setPomodoroAutoBreak,
       focusShow, setFocusShow, addQuestions, setAddQuestions,
       subjects, setSubjects, subjectColors, setSubjectColors,
-      textSize, setTextSize, layout, setLayout, groupBy, setGroupBy, showSuggestion, setShowSuggestion, hiddenSuggestionFor, setHiddenSuggestionFor,
+      textSize, setTextSize, animSpeed, setAnimSpeed, layout, setLayout, groupBy, setGroupBy, showSuggestion, setShowSuggestion, hiddenSuggestionFor, setHiddenSuggestionFor,
       autoArchiveDays, setAutoArchiveDays, templates, setTemplates,
       recaps, setRecaps, openSubjects, setOpenSubjects,
     },

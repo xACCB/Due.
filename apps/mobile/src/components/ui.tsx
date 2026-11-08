@@ -60,14 +60,14 @@ export function Button({ label, onPress, T, kind = "primary", disabled, accessib
 // row toggles it and the body renders only while open. Closed when Settings
 // opens, as on the web.
 export function Section({ title, T, children }: { title: string; T: Theme; children: ReactNode }) {
-  const { fz } = useApp();
+  const { fz, ms } = useApp();
   // Development only: the "dev-open-section" key opens one section, so a
   // screenshot can show it (see lib/devRemote.ts).
   const [open, setOpen] = useState(() => __DEV__ && readJSON<string | null>("dev-open-section", null) === title);
   return (
     <View style={[styles.sectionBody, styles.section, { backgroundColor: T.card, borderColor: T.border }]}>
       <Pressable
-        onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.create(200, "easeOut", "opacity")); setOpen(o => !o); }}
+        onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.create(ms(200), "easeOut", "opacity")); setOpen(o => !o); }}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={title}

@@ -66,7 +66,7 @@ export default function Home() {
     const sub = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduced);
     return () => sub.remove();
   }, []);
-  const glide = () => { if (!reduced) LayoutAnimation.configureNext(LayoutAnimation.create(320, "easeInEaseOut", "opacity")); };
+  const glide = () => { if (!reduced) LayoutAnimation.configureNext(LayoutAnimation.create(app.ms(320), "easeInEaseOut", "opacity")); };
 
   const allSorted = useMemo(() => sortTasks(app.tasks, justDone), [app.tasks, justDone]);
   const shown = filterTasks(allSorted, { filter, subject: subjectOn, showDone: s.showDone, justDone });
@@ -105,7 +105,7 @@ export default function Home() {
   const toggle = (t: Task) => {
     if (!t.done && !reduced) {
       setJustDone(prev => [...prev, t.id]);
-      setTimeout(() => { glide(); setJustDone(prev => prev.filter(x => x !== t.id)); }, 640);
+      setTimeout(() => { glide(); setJustDone(prev => prev.filter(x => x !== t.id)); }, app.ms(640));
     } else glide();
     app.toggle(t.id);
     if (!t.done) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});

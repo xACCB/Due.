@@ -7,12 +7,12 @@ import { F } from "../theme/fonts";
 // Import/Export): the header row toggles it, and the body is only rendered
 // while open. Starts closed, and isn't remembered, as on the web.
 export function Dropdown({ title, children, gap = 0 }: { title: string; children: ReactNode; gap?: number }) {
-  const { T, fz } = useApp();
+  const { T, fz, ms } = useApp();
   const [open, setOpen] = useState(false);
   return (
     <View style={[styles.box, { backgroundColor: T.card, borderColor: T.border }]}>
       <Pressable
-        onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.create(200, "easeOut", "opacity")); setOpen(o => !o); }}
+        onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.create(ms(200), "easeOut", "opacity")); setOpen(o => !o); }}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={title}

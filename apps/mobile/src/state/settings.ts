@@ -86,6 +86,8 @@ export const SETTINGS = {
   focusShow: { key: "hw-focus-show", initial: "all" as (typeof FOCUS_SHOWS)[number], clean: oneOf(FOCUS_SHOWS, "all") },
   addQuestions: { key: "hw-add-questions", initial: null as unknown, clean: (raw: unknown) => raw },
   subjects: { key: "hw-subjects", initial: [...DEFAULT_SUBJECTS] as string[], clean: cleanSubjects },
+  // The web's Animation speed (0.5x to 2x in 0.25 steps; 1 is normal).
+  animSpeed: { key: "hw-anim-speed", initial: 1 as number, clean: (raw: unknown) => (typeof raw === "number" && Number.isFinite(raw) ? Math.min(2, Math.max(0.5, Math.round(raw * 4) / 4)) : 1) },
   textSize: { key: "hw-text-size", initial: "default" as TextSize, clean: textSizeOf },
   layout: { key: "hw-layout", initial: "list" as LayoutName, clean: oneOf(Object.keys(LAYOUTS) as LayoutName[], "list") },
   groupBy: { key: "hw-group", initial: "none" as (typeof GROUP_BYS)[number], clean: oneOf(GROUP_BYS, "none") },

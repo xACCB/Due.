@@ -101,6 +101,9 @@ export default function SettingsScreen() {
               );
             })}
           </View>
+          <Row label="Animation speed" hint={s.animSpeed === 1 ? "Normal" : s.animSpeed < 1 ? "Slower" : "Faster"} T={T}>
+            <Stepper value={s.animSpeed} onChange={s.setAnimSpeed} min={0.5} max={2} step={0.25} T={T} label="animation speed" unit="×" />
+          </Row>
           <ToggleRow label="Urgency color coding" hint="Red, orange and green by how soon a task is due" value={s.colorCodeUrgency} onChange={s.setColorCodeUrgency} T={T} />
         </Section>
 

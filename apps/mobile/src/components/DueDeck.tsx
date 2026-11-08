@@ -20,7 +20,7 @@ const DECK_HEIGHT = 470;
 // remembered by its date, so changes elsewhere don't move you.
 export function DueDeck() {
   const app = useApp();
-  const { T, fz } = app;
+  const { T, fz, ms } = app;
   const { width } = useWindowDimensions();
   const today = todayISO();
   const due = useMemo(() => byDueDate(app.tasks.filter(t => !t.archived)), [app.tasks]);
@@ -36,17 +36,17 @@ export function DueDeck() {
   useEffect(() => { AccessibilityInfo.isReduceMotionEnabled().then(v => { reduced.current = v; }).catch(() => {}); }, []);
 
   // Read by the gesture, which is made once.
-  const live = useRef({ idx, dates, width });
-  useEffect(() => { live.current = { idx, dates, width }; }, [idx, dates, width]);
+  const live = useRef({ idx, dates, width, ms });
+  useEffect(() => { live.current = { idx, dates, width, ms }; }, [idx, dates, width, ms]);
 
   const go = (delta: number) => {
-    const { idx: i, dates: ds, width: w } = live.current;
+    const { idx: i, dates: ds, width: w, ms: t } = live.current;
     const next = ds[i + delta];
     if (!next || busy.current) return false;
     if (reduced.current) { setPicked(next); x.setValue(0); return true; }
     busy.current = true;
     if (delta > 0) {
-      Animated.timing(x, { toValue: -w * 1.2, duration: 220, useNativeDriver: true }).start(() => {
+      Animated.timing(x, { toValue: -w * 1.2, duration: t(220), useNativeDriver: true }).start(() => {
         setPicked(next);
         x.setValue(0);
         busy.current = false;
@@ -54,7 +54,7 @@ export function DueDeck() {
     } else {
       setPicked(next);
       x.setValue(-w * 1.2);
-      Animated.timing(x, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => { busy.current = false; });
+      Animated.timing(x, { toValue: 0, duration: t(260), useNativeDriver: true }).start(() => { busy.current = false; });
     }
     return true;
   };

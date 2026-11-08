@@ -79,7 +79,7 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   dropdown sections, subject rename/recolour). Not tried by hand, since this Mac can't tap the
   Simulator: swipes, drag to reorder, the Deck swipe, the file picker and the share sheet; try
   them on the Simulator or a phone. Not ported on purpose: the web's Snooze (gone from its task
-  page too), Calendar's DayDetail card (the day panel shows the same), Animation speed.
+  page too) and Calendar's DayDetail card (the day panel shows the same).
   **Next:** M3, sign-in and sync (`docs/mobile-plan.md`), after the items below.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads

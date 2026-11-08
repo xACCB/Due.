@@ -5,8 +5,7 @@ iOS Simulator: Home with the six layouts, swipes and drag to reorder, the menu (
 Search, Time left, Inbox (recaps), History, Import/Export, Calendar (Month and Deck), Focus, the
 task page and Settings, all following the web screen by screen; local reminders and the Focus
 timer's end notification. Left: M3 (account and sync), then M6 (ship). Not ported on purpose:
-the web's Updates list (it describes the website), Snooze, Calendar's DayDetail card, Animation
-speed. Where it lives: `apps/mobile/README.md`. Decided so far:
+the web's Updates list (it describes the website), Snooze and Calendar's DayDetail card. Where it lives: `apps/mobile/README.md`. Decided so far:
 
 - **React Native with Expo**, a natively built app. Not Capacitor or any other web-view wrapper.
 - **One repo (monorepo):** the web app and the phone app share one `packages/core`.

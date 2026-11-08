@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Switch, Text, View, type StyleProp, type ViewSty
 import { contrastColor, ink } from "@dueplanner/core/lib/format";
 import type { Theme } from "../theme/types";
 import { F } from "../theme/fonts";
+import { useApp } from "../state/appContext";
 
 // Small shared pieces, styled from the theme like the web's runtime css
 // (.chip, buttons, settings rows). Components only: this file exports nothing else.
@@ -10,6 +11,7 @@ import { F } from "../theme/fonts";
 export function Chip({ label, onPress, T, selected, color, accessibilityLabel }: {
   label: string; onPress: () => void; T: Theme; selected?: boolean; color?: string; accessibilityLabel?: string;
 }) {
+  const { fz } = useApp();
   const fg = color ? ink(color, T.light) : T.text;
   return (
     <Pressable
@@ -23,7 +25,7 @@ export function Chip({ label, onPress, T, selected, color, accessibilityLabel }:
         { borderColor: selected ? T.accent : color ?? T.border, backgroundColor: selected ? T.accent : color ? color + "22" : T.cardAlt, opacity: pressed ? 0.7 : 1 },
       ]}
     >
-      <Text style={[styles.chipText, { color: selected ? contrastColor(T.accent) : fg }]}>{label}</Text>
+      <Text style={[styles.chipText, { fontSize: fz(13), color: selected ? contrastColor(T.accent) : fg }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -31,6 +33,7 @@ export function Chip({ label, onPress, T, selected, color, accessibilityLabel }:
 export function Button({ label, onPress, T, kind = "primary", disabled, accessibilityLabel, style }: {
   label: string; onPress: () => void; T: Theme; kind?: "primary" | "plain" | "danger"; disabled?: boolean; accessibilityLabel?: string; style?: StyleProp<ViewStyle>;
 }) {
+  const { fz } = useApp();
   const bg = kind === "primary" ? T.accent : "transparent";
   const fg = kind === "primary" ? contrastColor(T.accent) : kind === "danger" ? ink("#FF4757", T.light) : T.text;
   return (
@@ -47,26 +50,28 @@ export function Button({ label, onPress, T, kind = "primary", disabled, accessib
         style,
       ]}
     >
-      <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
+      <Text style={[styles.buttonText, { fontSize: fz(14), color: fg }]}>{label}</Text>
     </Pressable>
   );
 }
 
 export function Section({ title, T, children }: { title: string; T: Theme; children: ReactNode }) {
+  const { fz } = useApp();
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: T.textMuted }]} accessibilityRole="header">{title.toUpperCase()}</Text>
+      <Text style={[styles.sectionTitle, { fontSize: fz(11), color: T.textMuted }]} accessibilityRole="header">{title.toUpperCase()}</Text>
       <View style={[styles.sectionBody, { backgroundColor: T.card, borderColor: T.border }]}>{children}</View>
     </View>
   );
 }
 
 export function Row({ label, T, children, hint }: { label: string; T: Theme; children?: ReactNode; hint?: string }) {
+  const { fz } = useApp();
   return (
     <View style={[styles.row, { borderBottomColor: T.border }]}>
       <View style={styles.rowText}>
-        <Text style={[styles.rowLabel, { color: T.text }]}>{label}</Text>
-        {!!hint && <Text style={[styles.rowHint, { color: T.textMuted }]}>{hint}</Text>}
+        <Text style={[styles.rowLabel, { fontSize: fz(14), color: T.text }]}>{label}</Text>
+        {!!hint && <Text style={[styles.rowHint, { fontSize: fz(11), color: T.textMuted }]}>{hint}</Text>}
       </View>
       {children}
     </View>
@@ -85,6 +90,7 @@ export function ToggleRow({ label, value, onChange, T, hint }: { label: string; 
 export function Segmented<V extends string | number>({ options, value, onChange, T, label }: {
   options: { label: string; value: V }[]; value: V; onChange: (v: V) => void; T: Theme; label: string;
 }) {
+  const { fz } = useApp();
   return (
     <View style={[styles.seg, { borderColor: T.border }]} accessibilityRole="radiogroup" accessibilityLabel={label}>
       {options.map(o => {
@@ -98,7 +104,7 @@ export function Segmented<V extends string | number>({ options, value, onChange,
             accessibilityLabel={o.label}
             style={[styles.segItem, { backgroundColor: on ? T.accent : "transparent" }]}
           >
-            <Text style={[styles.segText, { color: on ? contrastColor(T.accent) : T.text }]}>{o.label}</Text>
+            <Text style={[styles.segText, { fontSize: fz(12), color: on ? contrastColor(T.accent) : T.text }]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -110,12 +116,13 @@ export function Segmented<V extends string | number>({ options, value, onChange,
 export function Stepper({ value, onChange, min, max, step = 1, T, label, unit }: {
   value: number; onChange: (v: number) => void; min: number; max: number; step?: number; T: Theme; label: string; unit?: string;
 }) {
+  const { fz } = useApp();
   return (
     <View style={styles.stepper}>
       <Pressable onPress={() => onChange(Math.max(min, value - step))} disabled={value <= min} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Less ${label}`} style={[styles.stepBtn, { borderColor: T.border, opacity: value <= min ? 0.4 : 1 }]}>
         <Text style={[styles.stepGlyph, { color: T.text }]}>−</Text>
       </Pressable>
-      <Text style={[styles.stepValue, { color: T.text }]} accessibilityLabel={`${label}: ${value}${unit ? " " + unit : ""}`}>{value}{unit ? ` ${unit}` : ""}</Text>
+      <Text style={[styles.stepValue, { fontSize: fz(14), color: T.text }]} accessibilityLabel={`${label}: ${value}${unit ? " " + unit : ""}`}>{value}{unit ? ` ${unit}` : ""}</Text>
       <Pressable onPress={() => onChange(Math.min(max, value + step))} disabled={value >= max} hitSlop={6} accessibilityRole="button" accessibilityLabel={`More ${label}`} style={[styles.stepBtn, { borderColor: T.border, opacity: value >= max ? 0.4 : 1 }]}>
         <Text style={[styles.stepGlyph, { color: T.text }]}>+</Text>
       </Pressable>

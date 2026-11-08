@@ -20,7 +20,7 @@ import { Row, Section, Segmented, Stepper, ToggleRow } from "../../components/ui
 const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
 export default function SettingsScreen() {
   const app = useApp();
-  const { T } = app;
+  const { T, fz } = app;
   const s = app.settings;
   const [newSubject, setNewSubject] = useState("");
   const prefs = normalizeQuestionPrefs(s.addQuestions, QUESTION_KEYS);
@@ -161,14 +161,14 @@ export default function SettingsScreen() {
         </Section>
 
         <Pressable onPress={() => { Linking.openURL(FEEDBACK_URL).catch(() => {}); }} accessibilityRole="link" style={[styles.wide, { borderColor: T.border }]}>
-          <Text style={[styles.wideText, { color: T.textMuted }]}>Send feedback / report a bug</Text>
+          <Text style={[styles.wideText, { fontSize: fz(12), color: T.textMuted }]}>Send feedback / report a bug</Text>
         </Pressable>
         <Pressable onPress={clearCompleted} disabled={doneCount === 0} accessibilityRole="button" accessibilityHint="Deletes completed tasks that aren't archived. You can undo this"
           style={[styles.wide, { borderColor: "#FF475744", opacity: doneCount ? 1 : 0.45 }]}>
-          <Text style={[styles.wideText, { color: ink("#FF4757", T.light) }]}>Clear completed{doneCount ? ` (${doneCount})` : ""}</Text>
+          <Text style={[styles.wideText, { fontSize: fz(12), color: ink("#FF4757", T.light) }]}>Clear completed{doneCount ? ` (${doneCount})` : ""}</Text>
         </Pressable>
 
-        <Text style={[styles.foot, { color: T.textFaint }]}>DuePlanner {Constants.expoConfig?.version ?? ""}, by due. studios</Text>
+        <Text style={[styles.foot, { fontSize: fz(11), color: T.textFaint }]}>DuePlanner {Constants.expoConfig?.version ?? ""}, by due. studios</Text>
       </ScrollView>
     </SafeAreaView>
   );

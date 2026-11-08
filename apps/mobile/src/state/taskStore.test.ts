@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { withSyllabusTasks } from "@dueplanner/core/lib/backup";
-import { addTask, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX } from "./taskStore";
+import { addTask, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, moveTask, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX } from "./taskStore";
 
 describe("taskStore", () => {
   it("adds a trimmed one-line task and ignores a blank title", () => {
@@ -147,5 +147,15 @@ describe("taskStore", () => {
     expect(s.tasks.map(t => t.title)).toEqual(["B"]);
     expect(s.trash).toHaveLength(2);
     expect(undo(s).tasks.map(t => t.title).sort()).toEqual(["A", "B", "C"]);
+  });
+
+  it("moves an open task among the open tasks, not as an undo step", () => {
+    const s = addTask(addTask(addTask(emptyStore(), "A"), "B"), "C");
+    const a = s.tasks.find(t => t.title === "A")!.id;
+    const moved = moveTask(s, a, 2);
+    const order = [...moved.tasks].sort((x, y) => x.order - y.order).map(t => t.title);
+    expect(order).toEqual(["B", "C", "A"]);
+    expect(moved.undo).toEqual(s.undo);
+    expect(moveTask(s, a, -1)).toBe(s); // already first
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -17,6 +17,7 @@ import { TaskCard } from "../../components/TaskCard";
 import { TaskLayout } from "../../components/TaskLayouts";
 import { AddSheet } from "../../components/AddSheet";
 import { UndoToast } from "../../components/UndoToast";
+import { dragDelta } from "../../lib/reorder";
 
 // The web's filter chips (taskViews' filterTasks). "noest" (no estimate) has
 // no chip of its own: Time left's "Show them" sets it, and its chip clears it.
@@ -61,6 +62,25 @@ export default function Home() {
     : s.groupBy !== "none"
     ? groupTasks(shown, s.groupBy).flatMap(g => [{ kind: "head" as const, key: "h-" + g.key, label: `${g.label} (${g.tasks.length})` }, ...g.tasks.map(t => ({ kind: "task" as const, key: String(t.id), task: t }))])
     : shown.map(t => ({ kind: "task" as const, key: String(t.id), task: t }));
+
+  // Drag to reorder (List, no grouping, as on the web): the drop lands among
+  // the open cards on screen, then moves the task that far in the full order.
+  const canReorder = s.layout === "list" && s.groupBy === "none";
+  const [dragging, setDragging] = useState(false);
+  const heights = useRef(new Map<number, number>());
+  const visibleOpen = shown.filter(t => !t.done);
+  const drop = (t: Task, dy: number) => {
+    const from = visibleOpen.findIndex(x => x.id === t.id);
+    const d = dragDelta(visibleOpen.map(x => heights.current.get(x.id) ?? 80), from, dy);
+    const target = visibleOpen[from + d];
+    if (!d || !target) return;
+    app.moveBy(t.id, pending.indexOf(target) - pending.indexOf(t));
+    Haptics.selectionAsync().catch(() => {});
+  };
+  const moveBy = (t: Task, delta: number) => {
+    const target = visibleOpen[visibleOpen.findIndex(x => x.id === t.id) + delta];
+    if (target) app.moveBy(t.id, pending.indexOf(target) - pending.indexOf(t));
+  };
 
   const toggle = (t: Task) => {
     app.toggle(t.id);
@@ -157,6 +177,7 @@ export default function Home() {
         ListHeaderComponent={header}
         ListFooterComponent={footer}
         keyboardShouldPersistTaps="handled"
+        scrollEnabled={!dragging}
         renderItem={({ item }) => item.kind === "layout"
           ? <TaskLayout layout={s.layout as Exclude<typeof s.layout, "list">} tasks={shown} now={now} onOpen={t => router.push(`/task/${t.id}`)} onToggle={toggle} onDelete={remove} />
           : item.kind === "head"
@@ -171,6 +192,12 @@ export default function Home() {
               onOpen={() => router.push(`/task/${item.task.id}`)}
               onToggle={() => toggle(item.task)}
               onDelete={() => remove(item.task)}
+              reorder={canReorder && !item.task.done ? {
+                drop: dy => drop(item.task, dy),
+                moveBy: d => moveBy(item.task, d),
+                dragging: setDragging,
+                height: px => { heights.current.set(item.task.id, px); },
+              } : undefined}
             />
           )}
       />

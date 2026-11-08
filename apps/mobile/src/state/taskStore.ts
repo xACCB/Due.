@@ -12,8 +12,9 @@ import type { AddDraft } from "@dueplanner/core/lib/addFlow";
 import { trashEntries } from "@dueplanner/core/lib/trash";
 import { applyTaskStates, diffTasks } from "@dueplanner/core/lib/history";
 import { setDone } from "@dueplanner/core/lib/tasks";
-import { duplicateOf, freshSubtasks, patchTask, restoredInto, withNewTask, withTrashed, withoutTasks, withoutTrashed } from "@dueplanner/core/lib/taskActions";
+import { duplicateOf, freshSubtasks, movedOrder, patchTask, withOrder, restoredInto, withNewTask, withTrashed, withoutTasks, withoutTrashed } from "@dueplanner/core/lib/taskActions";
 import { withSession } from "@dueplanner/core/lib/timers";
+import { sortTasks } from "@dueplanner/core/lib/taskViews";
 import { LIMITS, oneLine } from "@dueplanner/core/lib/limits";
 
 export interface TaskStore {
@@ -147,4 +148,11 @@ export function emptyTrash(s: TaskStore): TaskStore {
 // import built it. Not an undo step, as on the web.
 export function importTasks(s: TaskStore, next: Task[]): TaskStore {
   return next === s.tasks ? s : { ...s, tasks: next };
+}
+
+// Drag to reorder (Home's List): moves an open task `delta` places among the
+// open tasks, in their order on Home. Not an undo step, as on the web.
+export function moveTask(s: TaskStore, id: number, delta: number): TaskStore {
+  const moved = movedOrder(sortTasks(s.tasks, []).filter(t => !t.done).map(t => t.id), id, delta);
+  return moved ? { ...s, tasks: withOrder(s.tasks, moved.order) } : s;
 }

@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { AccessibilityInfo, Animated, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Task } from "@dueplanner/core/types";
 import { priColor } from "@dueplanner/core/constants";
 import { countdown, daysUntil, formatDate, formatDuration, formatTime, getPriority, ink } from "@dueplanner/core/lib/format";
@@ -16,12 +17,33 @@ interface Props {
   onOpen: () => void;
   onToggle: () => void;
   onDelete: () => void;
+  // The List's drag handle (open tasks, no grouping): `drop(dy)` when let go
+  // after dragging dy pixels, `moveBy(±1)` for the accessibility actions,
+  // `dragging(on)` so the list can stop scrolling meanwhile, `height(px)` so
+  // it knows how far each card is.
+  reorder?: { drop: (dy: number) => void; moveBy: (delta: number) => void; dragging: (on: boolean) => void; height: (px: number) => void };
 }
 
 // One task on Home: the web's MiniCard. A swipe right marks it done (or not
 // done), a swipe left deletes it, as on the web; the check and × do the same
 // with a tap. Tapping the card opens the task page.
-export function TaskCard({ task, rank, T, fz, h24, colorCode, now, subjectColor, onOpen, onToggle, onDelete }: Props) {
+export function TaskCard({ task, rank, T, fz, h24, colorCode, now, subjectColor, onOpen, onToggle, onDelete, reorder }: Props) {
+  const [dy] = useState(() => new Animated.Value(0));
+  const [held, setHeld] = useState(false);
+  const handlers = useRef(reorder);
+  useEffect(() => { handlers.current = reorder; });
+  // Created once; it reads the latest callbacks through `handlers`, and only
+  // during a drag (the lint can't tell PanResponder callbacks from render code).
+  // eslint-disable-next-line react-hooks/refs
+  const [grip] = useState(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: () => { setHeld(true); handlers.current?.dragging(true); },
+    onPanResponderMove: (_, g) => dy.setValue(g.dy),
+    onPanResponderRelease: (_, g) => { handlers.current?.drop(g.dy); dy.setValue(0); setHeld(false); handlers.current?.dragging(false); },
+    onPanResponderTerminate: () => { dy.setValue(0); setHeld(false); handlers.current?.dragging(false); },
+  }));
   const pr = getPriority(task.dueDate, task.estMins, task.priorityOverride);
   const sc = subjectColor || T.accent;
   const dm = countdown(task.dueDate, task.dueTime, now) ?? daysUntil(task.dueDate);
@@ -33,6 +55,8 @@ export function TaskCard({ task, rank, T, fz, h24, colorCode, now, subjectColor,
   const due = task.dueDate ? formatDate(task.dueDate) + (task.dueTime ? ` ${formatTime(task.dueTime, h24)}` : "") : "";
 
   return (
+    <Animated.View onLayout={e => reorder?.height(e.nativeEvent.layout.height + 10)}
+      style={held ? { transform: [{ translateY: dy }, { scale: 1.02 }], zIndex: 10, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 8 } } : null}>
     <Swipe done={task.done} radius={13} gap={10} onToggle={onToggle} onDelete={onDelete}>
       <Pressable
         onPress={onOpen}
@@ -51,6 +75,25 @@ export function TaskCard({ task, rank, T, fz, h24, colorCode, now, subjectColor,
       >
         {live && <View style={[styles.bar, { backgroundColor: priColor(pr, colorCode) }]} />}
         <View style={styles.row}>
+          {!!reorder && live && (
+            <View
+              {...grip.panHandlers}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel={`Reorder ${task.title}`}
+              accessibilityHint="Drag to move it in the list"
+              accessibilityActions={[{ name: "increment", label: "Move up" }, { name: "decrement", label: "Move down" }]}
+              onAccessibilityAction={e => {
+                const up = e.nativeEvent.actionName === "increment";
+                reorder.moveBy(up ? -1 : 1);
+                AccessibilityInfo.announceForAccessibility(up ? "Moved up" : "Moved down");
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
+              style={styles.grip}
+            >
+              <Text style={{ fontSize: fz(14), color: T.textFaint, lineHeight: fz(14) + 4 }}>⠿</Text>
+            </View>
+          )}
           <Pressable
             onPress={onToggle}
             hitSlop={10}
@@ -95,6 +138,7 @@ export function TaskCard({ task, rank, T, fz, h24, colorCode, now, subjectColor,
         </View>
       </Pressable>
     </Swipe>
+    </Animated.View>
   );
 }
 
@@ -116,6 +160,7 @@ const styles = StyleSheet.create({
   subs: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 5 },
   subsTrack: { flex: 1, maxWidth: 80, height: 4, borderRadius: 999, overflow: "hidden" },
   subsFill: { height: "100%", borderRadius: 999 },
+  grip: { marginTop: 1, paddingHorizontal: 2 },
   del: { paddingHorizontal: 5, paddingVertical: 2 },
   delText: { lineHeight: 18 },
 });

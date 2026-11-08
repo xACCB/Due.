@@ -28,6 +28,7 @@ type Op =
   | { kind: "restore"; id: number }
   | { kind: "autoArchive"; cutoff: number }
   | { kind: "emptyTrash" }
+  | { kind: "move"; id: number; delta: number }
   | { kind: "import"; build: (tasks: Task[]) => Task[] }
   | { kind: "undo" }
   | { kind: "redo" };
@@ -45,6 +46,7 @@ function reduce(s: S.TaskStore, op: Op): S.TaskStore {
     case "restore": return S.restoreTask(s, op.id);
     case "autoArchive": return S.autoArchive(s, op.cutoff);
     case "emptyTrash": return S.emptyTrash(s);
+    case "move": return S.moveTask(s, op.id, op.delta);
     case "import": return S.importTasks(s, op.build(s.tasks));
     case "undo": return S.undo(s);
     case "redo": return S.redo(s);
@@ -167,6 +169,7 @@ export function useAppValue() {
     removeMany: (ids: number[]) => dispatch({ kind: "deleteMany", ids }),
     restore: (id: number) => dispatch({ kind: "restore", id }),
     emptyTrash: () => dispatch({ kind: "emptyTrash" }),
+    moveBy: (id: number, delta: number) => dispatch({ kind: "move", id, delta }),
     importTasks: (build: (tasks: Task[]) => Task[]) => dispatch({ kind: "import", build }),
     undoLabel: store.undo.length ? describe(store.undo[store.undo.length - 1]) : null,
     redoLabel: store.redo.length ? describe(store.redo[store.redo.length - 1]) : null,

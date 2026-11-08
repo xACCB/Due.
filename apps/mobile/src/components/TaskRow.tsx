@@ -3,6 +3,7 @@ import type { Task } from "@dueplanner/core/types";
 import { formatDate, formatDuration, getPriority } from "@dueplanner/core/lib/format";
 import { priColor } from "@dueplanner/core/constants";
 import type { Theme } from "../theme/useTheme";
+import { F } from "../theme/fonts";
 
 interface Props { task: Task; T: Theme; onToggle: () => void; onDelete: () => void; }
 
@@ -44,8 +45,8 @@ const styles = StyleSheet.create({
   check: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: "center", justifyContent: "center", marginLeft: 12 },
   tick: { color: "#000", fontSize: 14, fontWeight: "700", lineHeight: 16 },
   body: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, gap: 2 },
-  title: { fontSize: 16 },
-  meta: { fontSize: 12 },
+  title: { fontSize: 15, fontFamily: F.body },
+  meta: { fontSize: 11, fontFamily: F.body },
   del: { paddingHorizontal: 14, alignSelf: "stretch", justifyContent: "center" },
   delText: { fontSize: 22, lineHeight: 24 },
 });

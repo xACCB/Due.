@@ -16,7 +16,16 @@
       "package": "com.duestudios.dueplanner"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0a0a0a",
+          "image": "./assets/splash.png",
+          "imageWidth": 120
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

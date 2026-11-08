@@ -5,6 +5,7 @@ import { filterTasks, sortTasks } from "@dueplanner/core/lib/taskViews";
 import { LIMITS } from "@dueplanner/core/lib/limits";
 import { contrastColor } from "@dueplanner/core/lib/format";
 import { useTheme } from "../theme/useTheme";
+import { F } from "../theme/fonts";
 import { useTasks } from "../state/useTasks";
 import { TaskRow } from "../components/TaskRow";
 
@@ -112,16 +113,16 @@ function HeaderBtn({ label, disabled, onPress, T }: { label: string; disabled: b
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 },
-  h1: { fontSize: 32, fontWeight: "600" },
-  sub: { fontSize: 13, marginTop: 2 },
+  h1: { fontSize: 34, fontFamily: F.heading },
+  sub: { fontSize: 12, marginTop: 2, fontFamily: F.body },
   headerBtns: { flexDirection: "row", gap: 18, paddingBottom: 4 },
-  headerBtn: { fontSize: 15 },
+  headerBtn: { fontSize: 14, fontFamily: F.body },
   list: { paddingHorizontal: 16, paddingBottom: 16 },
   toast: { position: "absolute", left: 16, right: 16, bottom: 84, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12 },
-  toastText: { fontSize: 14 },
-  toastBtn: { fontSize: 14, fontWeight: "600" },
+  toastText: { fontSize: 13, fontFamily: F.body },
+  toastBtn: { fontSize: 13, fontFamily: F.bodyMedium },
   addBar: { flexDirection: "row", gap: 10, padding: 12, borderTopWidth: 1 },
-  input: { flex: 1, fontSize: 16, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  input: { flex: 1, fontSize: 16, fontFamily: F.body, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
   addBtn: { borderRadius: 10, paddingHorizontal: 18, justifyContent: "center" },
-  addBtnText: { fontSize: 15, fontWeight: "600" },
+  addBtnText: { fontSize: 14, fontFamily: F.bodyMedium },
 });

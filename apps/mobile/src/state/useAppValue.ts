@@ -87,6 +87,7 @@ export function useAppValue() {
   const [timeFormat, setTimeFormat] = useSetting("timeFormat");
   const [weekStart, setWeekStart] = useSetting("weekStart");
   const [calendarMonthOnly, setCalendarMonthOnly] = useSetting("calendarMonthOnly");
+  const [calendarView, setCalendarView] = useSetting("calendarView");
   const [showDone, setShowDone] = useSetting("showDone");
   const [notifications, setNotifications] = useSetting("notifications");
   const [reminderOffsets, setReminderOffsets] = useSetting("reminderOffsets");
@@ -172,7 +173,7 @@ export function useAppValue() {
     redo: () => dispatch({ kind: "redo" }),
     settings: {
       themeMode, setThemeMode, colorCodeUrgency, setColorCodeUrgency, timeFormat, setTimeFormat,
-      weekStart, setWeekStart, calendarMonthOnly, setCalendarMonthOnly, showDone, setShowDone,
+      weekStart, setWeekStart, calendarMonthOnly, setCalendarMonthOnly, calendarView, setCalendarView, showDone, setShowDone,
       notifications, setNotifications, reminderOffsets, setReminderOffsets,
       pomodoroWork, setPomodoroWork, pomodoroBreak, setPomodoroBreak, pomodoroAutoBreak, setPomodoroAutoBreak,
       focusShow, setFocusShow, addQuestions, setAddQuestions,

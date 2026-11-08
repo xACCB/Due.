@@ -75,6 +75,7 @@ export const SETTINGS = {
   colorCodeUrgency: { key: "hw-colorcode-urgency", initial: true as boolean, clean: bool(true) },
   timeFormat: { key: "hw-timeformat", initial: "12h" as "12h" | "24h", clean: oneOf(TIME_FORMATS, "12h") },
   weekStart: { key: "hw-weekstart", initial: 0 as number, clean: int(0, 0, 1) },
+  calendarView: { key: "hw-calendar-view", initial: "month" as "month" | "deck", clean: oneOf(["month", "deck"] as const, "month") },
   calendarMonthOnly: { key: "hw-calendar-month-only", initial: true as boolean, clean: bool(true) },
   showDone: { key: "hw-showdone", initial: true as boolean, clean: bool(true) },
   notifications: { key: "hw-notifications", initial: false as boolean, clean: bool(false) },

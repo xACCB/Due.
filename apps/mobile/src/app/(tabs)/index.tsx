@@ -91,6 +91,7 @@ export default function Home() {
   const visibleOpen = shown.filter(t => !t.done);
   const drop = (t: Task, dy: number) => {
     const from = visibleOpen.findIndex(x => x.id === t.id);
+    if (from < 0) return; // just completed: it's leaving the open tasks
     const d = dragDelta(visibleOpen.map(x => heights.current.get(x.id) ?? 80), from, dy);
     const target = visibleOpen[from + d];
     if (!d || !target) return;
@@ -98,7 +99,8 @@ export default function Home() {
     Haptics.selectionAsync().catch(() => {});
   };
   const moveBy = (t: Task, delta: number) => {
-    const target = visibleOpen[visibleOpen.findIndex(x => x.id === t.id) + delta];
+    const from = visibleOpen.findIndex(x => x.id === t.id);
+    const target = from < 0 ? undefined : visibleOpen[from + delta];
     if (target) app.moveBy(t.id, pending.indexOf(target) - pending.indexOf(t));
   };
 
@@ -220,7 +222,7 @@ export default function Home() {
               onOpen={() => router.push(`/task/${item.task.id}`)}
               onToggle={() => toggle(item.task)}
               onDelete={() => remove(item.task)}
-              reorder={canReorder && !item.task.done ? {
+              reorder={canReorder && (!item.task.done || justDone.includes(item.task.id)) ? {
                 drop: dy => drop(item.task, dy),
                 moveBy: d => moveBy(item.task, d),
                 dragging: setDragging,

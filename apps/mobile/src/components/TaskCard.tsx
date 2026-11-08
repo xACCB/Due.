@@ -21,7 +21,7 @@ interface Props {
   // The List's drag handle (open tasks, no grouping): `drop(dy)` when let go
   // after dragging dy pixels, `moveBy(±1)` for the accessibility actions,
   // `dragging(on)` so the list can stop scrolling meanwhile, `height(px)` so
-  // it knows how far each card is.
+  // it knows how far each card is (its height includes the gap below it).
   reorder?: { drop: (dy: number) => void; moveBy: (delta: number) => void; dragging: (on: boolean) => void; height: (px: number) => void };
 }
 
@@ -56,7 +56,7 @@ export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subj
   const due = task.dueDate ? formatDate(task.dueDate) + (task.dueTime ? ` ${formatTime(task.dueTime, h24)}` : "") : "";
 
   return (
-    <Animated.View onLayout={e => reorder?.height(e.nativeEvent.layout.height + 10)}
+    <Animated.View onLayout={e => reorder?.height(e.nativeEvent.layout.height)}
       style={held ? { transform: [{ translateY: dy }, { scale: 1.02 }], zIndex: 10, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 8 } } : null}>
     <Swipe done={task.done} radius={13} gap={10} onToggle={onToggle} onDelete={onDelete}>
       <Pressable

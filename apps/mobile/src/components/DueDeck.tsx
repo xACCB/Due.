@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import { byDueDate } from "@dueplanner/core/lib/calendar";
@@ -39,22 +39,35 @@ export function DueDeck() {
   const live = useRef({ idx, dates, width, ms });
   useEffect(() => { live.current = { idx, dates, width, ms }; }, [idx, dates, width, ms]);
 
+  // What to do with the shared position once the new top card is in place:
+  // reset it (after a card flew off) or bring the earlier card in from the
+  // left. Done in a layout effect, after React has swapped the cards; doing it
+  // straight away would flash the outgoing card for a frame.
+  const after = useRef<null | "reset" | "enter">(null);
+  useLayoutEffect(() => {
+    const step = after.current;
+    after.current = null;
+    if (step === "reset") { x.setValue(0); busy.current = false; }
+    if (step === "enter") {
+      x.setValue(-live.current.width * 1.2);
+      Animated.timing(x, { toValue: 0, duration: live.current.ms(260), useNativeDriver: true }).start(() => { busy.current = false; });
+    }
+  }, [current, x]);
+
   const go = (delta: number) => {
     const { idx: i, dates: ds, width: w, ms: t } = live.current;
     const next = ds[i + delta];
     if (!next || busy.current) return false;
-    if (reduced.current) { setPicked(next); x.setValue(0); return true; }
+    if (reduced.current) { x.setValue(0); setPicked(next); return true; }
     busy.current = true;
     if (delta > 0) {
       Animated.timing(x, { toValue: -w * 1.2, duration: t(220), useNativeDriver: true }).start(() => {
+        after.current = "reset";
         setPicked(next);
-        x.setValue(0);
-        busy.current = false;
       });
     } else {
+      after.current = "enter";
       setPicked(next);
-      x.setValue(-w * 1.2);
-      Animated.timing(x, { toValue: 0, duration: t(260), useNativeDriver: true }).start(() => { busy.current = false; });
     }
     return true;
   };

@@ -4,16 +4,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useIsFocused } from "expo-router";
 import { useKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
-import { showsPomodoro, showsStopwatch, formatStopwatch } from "@dueplanner/core/lib/stopwatch";
-import { mostUrgent } from "@dueplanner/core/lib/timeLeft";
-import { formatDuration } from "@dueplanner/core/lib/format";
+import { showsPomodoro, showsStopwatch, formatStopwatch, stopwatchMinutes } from "@dueplanner/core/lib/stopwatch";
+import { sortTasks } from "@dueplanner/core/lib/taskViews";
+import { contrastColor, formatDate, formatDuration, formatTime, ink } from "@dueplanner/core/lib/format";
 import { useApp } from "../../state/appContext";
 import { usePersisted } from "../../lib/usePersisted";
 import { clock } from "../../lib/clock";
 import { cancelFocusEnd, requestNotifications, scheduleFocusEnd } from "../../lib/notifications";
 import * as Fx from "../../state/focusTimer";
 import { F } from "../../theme/fonts";
-import { Button, Chip } from "../../components/ui";
+import { Ring } from "../../components/Ring";
 
 // Focus (the web's Focus Mode): the task to work on, the Pomodoro and the
 // stopwatch, as Settings -> Focus timer chooses. Time is logged to the task as
@@ -28,15 +28,19 @@ const mmss = (secs: number) => `${two(Math.floor(secs / 60))}:${two(secs % 60)}`
 
 export default function FocusScreen() {
   const app = useApp();
-  const { T } = app;
-  const { pomodoroWork, pomodoroBreak, pomodoroAutoBreak, focusShow } = app.settings;
+  const { T, fz, h24 } = app;
+  const { pomodoroWork, pomodoroBreak, pomodoroAutoBreak, focusShow, subjectColors } = app.settings;
   const L: Fx.Lengths = { work: pomodoroWork, brk: pomodoroBreak, autoBreak: pomodoroAutoBreak };
   const [state, setState] = usePersisted<Fx.FocusState>("hw-focus-state", Fx.initialFocus(pomodoroWork), raw => Fx.cleanFocus(raw, pomodoroWork));
   const [now, setNow] = useState(clock);
   const focused = useIsFocused();
 
-  const open = app.tasks.filter(t => !t.done && !t.archived);
-  const task = open.find(t => t.id === state.taskId) ?? mostUrgent(open);
+  // The first open task in your own order, as on the web (topTask), unless
+  // you've picked another.
+  const openSorted = sortTasks(app.tasks, []).filter(t => !t.done && !t.archived);
+  const topTask = openSorted[0];
+  const task = openSorted.find(t => t.id === state.taskId) ?? topTask;
+  const [picking, setPicking] = useState(false);
   const taskId = task?.id ?? null;
 
   // Applies a timer change, logging any finished work time to its task.
@@ -105,72 +109,107 @@ export default function FocusScreen() {
   const secs = Math.min(Fx.remaining(state, now), Math.max(total, state.secsLeft));
   const pct = total ? Math.max(0, Math.min(1, 1 - secs / total)) : 0;
   const swMs = Fx.stopwatchMs(state, now);
-  const logged = (task?.sessions ?? []).reduce((n, s) => n + s.mins, 0);
+
+  // The task's card (the web's): "up next" while it's the first open task in
+  // your order, "focusing on" once you've picked another.
+  const isTop = !!task && task.id === topTask?.id;
+  const sc = task ? subjectColors[task.subject] || T.accent : T.accent;
+  const onBreak = state.phase === "break";
+  const markDone = () => {
+    if (!task) return;
+    apply(Fx.creditTask(state, clock(), L, task.id));
+    app.toggle(task.id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setPicking(false);
+  };
+  const ghost = [styles.btn, { borderWidth: 1, borderColor: T.border }];
+  const solid = [styles.btn, { backgroundColor: T.accent }];
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       {running && focused && <KeepAwake />}
-      <ScrollView contentContainerStyle={styles.body} contentInsetAdjustmentBehavior="automatic">
-        <Text style={[styles.h1, { color: T.accent }]} accessibilityRole="header">Focus</Text>
-
+      <View style={styles.header}>
+        <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Focus</Text>
+      </View>
+      <View style={[styles.rule, { backgroundColor: T.accent }]} />
+      <ScrollView contentContainerStyle={styles.body}>
         {showsPomodoro(focusShow) && (
           <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
-            <Text style={[styles.phase, { color: T.textMuted }]}>{state.phase === "work" ? "FOCUS" : "BREAK"}</Text>
-            <Text style={[styles.clock, { color: T.text }]} accessibilityRole="timer" accessibilityLabel={`${Math.floor(secs / 60)} minutes ${secs % 60} seconds left`}>{mmss(secs)}</Text>
-            <View style={[styles.track, { backgroundColor: T.border }]}>
-              <View style={[styles.fill, { width: `${Math.round(pct * 100)}%`, backgroundColor: state.phase === "work" ? T.accent : "#2ED573" }]} />
+            <Text style={[styles.kicker, { fontSize: fz(10), color: onBreak ? ink("#2ED573", T.light) : T.textMuted }]}>{onBreak ? "BREAK" : "POMODORO TIMER"}</Text>
+            <View style={styles.ringBox}>
+              <Ring pct={pct} size={100} stroke={6} color={onBreak ? "#2ED573" : T.accent} track={T.border}>
+                <Text style={[styles.ringText, { fontSize: fz(18), color: T.text }]} accessibilityRole="timer" accessibilityLabel={`${Math.floor(secs / 60)} minutes ${secs % 60} seconds left`}>{mmss(secs)}</Text>
+              </Ring>
             </View>
-            <View style={styles.row}>
-              {state.endAt == null
-                ? <Button label={secs === total ? "Start" : "Resume"} onPress={startPomodoro} T={T} style={styles.flex} />
-                : <Button label="Pause" onPress={() => setState(Fx.pause(state, clock()))} T={T} style={styles.flex} />}
-              <Button label="Reset" kind="plain" onPress={() => apply(Fx.reset(state, clock(), L, taskId))} T={T} disabled={Fx.untouched(state, L) && state.phase === "work"} style={styles.flex} />
-              <Button label={state.phase === "work" ? "Break" : "Skip"} kind="plain" accessibilityLabel={state.phase === "work" ? "Take a break now" : "Skip the break"} onPress={() => apply(Fx.skipPhase(state, clock(), L, taskId))} T={T} style={styles.flex} />
+            <View style={styles.btnRow}>
+              <Pressable onPress={() => (state.endAt == null ? startPomodoro() : setState(Fx.pause(state, clock())))} accessibilityRole="button" style={solid}>
+                <Text style={[styles.btnText, { fontSize: fz(12), color: contrastColor(T.accent) }]}>{state.endAt != null ? "Pause" : onBreak ? "Start break" : "Start"}</Text>
+              </Pressable>
+              <Pressable onPress={() => apply(onBreak ? Fx.skipPhase(state, clock(), L, taskId) : Fx.reset(state, clock(), L, taskId))} accessibilityRole="button" style={ghost}>
+                <Text style={[styles.btnText, { fontSize: fz(12), color: T.textMuted }]}>{onBreak ? "Skip break" : "Reset"}</Text>
+              </Pressable>
             </View>
           </View>
         )}
 
-        <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
-          <Text style={[styles.phase, { color: T.textMuted }]}>WORKING ON</Text>
-          {task ? (
-            <>
-              <Text style={[styles.task, { color: T.text }]}>{task.title}</Text>
-              {logged > 0 && <Text style={[styles.small, { color: T.textMuted }]}>{formatDuration(logged)} worked so far</Text>}
-            </>
-          ) : (
-            <Text style={[styles.small, { color: T.textMuted }]}>No open tasks. Add one on Home to log time to it.</Text>
-          )}
-          {open.length > 1 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pickRow}>
-              {open.map(t => (
-                <Chip
-                  key={t.id}
-                  label={t.title.length > 24 ? t.title.slice(0, 23) + "…" : t.title}
-                  accessibilityLabel={`Work on ${t.title}`}
-                  selected={t.id === taskId}
-                  T={T}
-                  onPress={() => apply(Fx.switchTask(state, clock(), L, taskId, t.id))}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </View>
+        {task ? (
+          <View style={[styles.taskCard, { backgroundColor: T.cardAlt, borderColor: T.accent + "44" }]}>
+            <View style={styles.taskTop}>
+              <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.accent + "33", color: T.accent }]}>{isTop ? "up next" : "focusing on"}</Text>
+              {!!task.subject && <Text style={[styles.pill, { fontSize: fz(10), backgroundColor: sc + "22", color: ink(sc, T.light) }]}>{task.subject}</Text>}
+              <Pressable onPress={() => setPicking(o => !o)} accessibilityRole="button" accessibilityState={{ expanded: picking }} style={[styles.change, { borderColor: T.border }]}>
+                <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textMuted }}>{picking ? "Close" : "Change task"}</Text>
+              </Pressable>
+            </View>
+            {picking && (
+              <ScrollView style={styles.picker} contentContainerStyle={{ gap: 4 }} nestedScrollEnabled>
+                {openSorted.map(t => {
+                  const on = t.id === task.id;
+                  return (
+                    <Pressable key={t.id} onPress={() => { if (!on) apply(Fx.switchTask(state, clock(), L, taskId, t.id)); setPicking(false); }} accessibilityRole="button" accessibilityState={{ selected: on }}
+                      style={[styles.pick, { backgroundColor: on ? T.accent + "22" : T.surface, borderColor: on ? T.accent : T.border }]}>
+                      <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>
+                        {t.title}{!!t.subject && <Text style={{ color: T.textFaint }}> · {t.subject}</Text>}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+            <Text style={[styles.taskTitle, { color: T.text }]}>{task.title}</Text>
+            {(!!task.dueDate || task.estMins > 0) && (
+              <View style={styles.taskMeta}>
+                {!!task.dueDate && <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textMuted }}>{formatDate(task.dueDate)}{task.dueTime ? ` ${formatTime(task.dueTime, h24)}` : ""}</Text>}
+                {task.estMins > 0 && <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textMuted }}>{formatDuration(task.estMins)}</Text>}
+              </View>
+            )}
+            <Pressable onPress={markDone} accessibilityRole="button" style={[styles.done, { backgroundColor: "#2ED57322", borderColor: "#2ED57344" }]}>
+              <Text style={[styles.btnText, { fontSize: fz(13), color: ink("#2ED573", T.light) }]}>Mark done</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Text style={[styles.nothing, { fontSize: fz(13), color: T.textFaint }]}>Nothing left to focus on</Text>
+        )}
 
         {showsStopwatch(focusShow) && (
           <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
-            <Text style={[styles.phase, { color: T.textMuted }]}>STOPWATCH</Text>
-            <Text style={[styles.clockSmall, { color: T.text }]} accessibilityRole="timer">{formatStopwatch(swMs)}</Text>
-            <View style={styles.row}>
-              {state.swStartedAt == null
-                ? <Button label={swMs ? "Resume" : "Start"} onPress={() => { const n = clock(); setNow(n); setState(Fx.swStart(state, n)); }} T={T} style={styles.flex} />
-                : <Button label="Pause" onPress={() => setState(Fx.swPause(state, clock()))} T={T} style={styles.flex} />}
-              <Button label="Reset" kind="plain" disabled={!swMs} onPress={() => setState(Fx.swReset(state))} T={T} style={styles.flex} />
-            </View>
-            {!!task && swMs >= 1000 && (
-              <Pressable onPress={() => apply(Fx.swLog(state, clock(), taskId))} accessibilityRole="button" hitSlop={6} style={styles.logLink}>
-                <Text style={[styles.small, { color: T.text, textDecorationLine: "underline" }]}>Log {Math.max(1, Math.round(swMs / 60000))}m to task</Text>
+            <Text style={[styles.kicker, { fontSize: fz(10), color: T.textMuted }]}>STOPWATCH</Text>
+            <Text style={[styles.sw, { color: T.text }]} accessibilityRole="timer" accessibilityLabel="Stopwatch">{formatStopwatch(swMs)}</Text>
+            <View style={styles.btnRow}>
+              <Pressable onPress={() => { if (state.swStartedAt == null) { const n = clock(); setNow(n); setState(Fx.swStart(state, n)); } else setState(Fx.swPause(state, clock())); }} accessibilityRole="button" style={solid}>
+                <Text style={[styles.btnText, { fontSize: fz(12), color: contrastColor(T.accent) }]}>{state.swStartedAt != null ? "Pause" : swMs > 0 ? "Resume" : "Start"}</Text>
               </Pressable>
-            )}
+              {swMs > 0 && (
+                <Pressable onPress={() => setState(Fx.swReset(state))} accessibilityRole="button" style={ghost}>
+                  <Text style={[styles.btnText, { fontSize: fz(12), color: T.textMuted }]}>Reset</Text>
+                </Pressable>
+              )}
+              {swMs >= 30000 && !!task && (
+                <Pressable onPress={() => apply(Fx.swLog(state, clock(), taskId))} accessibilityRole="button" style={ghost}>
+                  <Text style={[styles.btnText, { fontSize: fz(12), color: T.textMuted }]}>Log {formatDuration(stopwatchMinutes(swMs))} to task</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -185,18 +224,27 @@ function KeepAwake() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  body: { padding: 16, paddingBottom: 140 },
-  h1: { fontSize: 34, fontFamily: F.heading, marginTop: 12, marginBottom: 16, marginLeft: 4 },
-  card: { borderWidth: 1, borderRadius: 16, padding: 18, marginBottom: 14 },
-  phase: { fontSize: 11, fontFamily: F.body, letterSpacing: 1, marginBottom: 8 },
-  clock: { fontSize: 64, fontFamily: F.heading, textAlign: "center", marginVertical: 6, fontVariant: ["tabular-nums"] },
-  clockSmall: { fontSize: 40, fontFamily: F.heading, textAlign: "center", marginVertical: 4, fontVariant: ["tabular-nums"] },
-  track: { height: 4, borderRadius: 2, overflow: "hidden", marginTop: 6, marginBottom: 16 },
-  fill: { height: 4 },
-  row: { flexDirection: "row", gap: 8 },
-  flex: { flex: 1 },
-  task: { fontSize: 20, fontFamily: F.heading },
-  small: { fontSize: 12, fontFamily: F.body, marginTop: 4 },
-  pickRow: { gap: 8, paddingTop: 14 },
-  logLink: { alignSelf: "center", marginTop: 12 },
+  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
+  h1: { fontSize: 26, lineHeight: 30, fontFamily: F.heading },
+  rule: { height: 1, marginBottom: 16 },
+  body: { paddingHorizontal: 16, paddingBottom: 140, gap: 16 },
+  card: { borderWidth: 1, borderRadius: 12, padding: 16, alignItems: "center" },
+  kicker: { alignSelf: "flex-start", fontFamily: F.body, letterSpacing: 0.8, paddingBottom: 6 },
+  ringBox: { marginVertical: 10 },
+  ringText: { fontFamily: F.bodyMedium, fontVariant: ["tabular-nums"] },
+  btnRow: { flexDirection: "row", gap: 8, justifyContent: "center", flexWrap: "wrap" },
+  btn: { borderRadius: 9, paddingVertical: 8, paddingHorizontal: 18 },
+  btnText: { fontFamily: F.body, textAlign: "center" },
+  taskCard: { borderWidth: 1, borderRadius: 16, padding: 20 },
+  taskTop: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 },
+  badge: { fontFamily: F.bodyMedium, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: "hidden" },
+  pill: { fontFamily: F.body, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: "hidden" },
+  change: { marginLeft: "auto", borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },
+  picker: { maxHeight: 180, marginBottom: 12 },
+  pick: { borderWidth: 1, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 10 },
+  taskTitle: { fontFamily: F.heading, fontSize: 22, lineHeight: 28, marginBottom: 8 },
+  taskMeta: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
+  done: { marginTop: 14, borderWidth: 1, borderRadius: 11, paddingVertical: 11, alignItems: "center" },
+  nothing: { textAlign: "center", fontFamily: F.body },
+  sw: { fontFamily: F.bodyMedium, fontSize: 34, fontVariant: ["tabular-nums"], marginTop: 6, marginBottom: 14 },
 });

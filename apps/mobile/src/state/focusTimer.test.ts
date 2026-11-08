@@ -81,4 +81,12 @@ describe("focus timer", () => {
     expect(F.cleanFocus(null, 25)).toEqual(F.initialFocus(25));
     expect(F.cleanFocus({ phase: "nap", secsLeft: -3, endAt: "x", taskId: 4 }, 25)).toMatchObject({ phase: "work", secsLeft: 1500, endAt: null, taskId: 4 });
   });
+
+  it("credits the work so far to a task marked done, and keeps the timer running", () => {
+    const s = F.start(F.initialFocus(25), T0);
+    const r = F.creditTask(s, T0 + 10 * min, L, 7);
+    expect(r.log).toEqual({ taskId: 7, mins: 10 });
+    expect(r.state.endAt).toBe(s.endAt);
+    expect(F.creditTask(r.state, T0 + 10 * min, L, 7).log).toBeUndefined(); // already credited
+  });
 });

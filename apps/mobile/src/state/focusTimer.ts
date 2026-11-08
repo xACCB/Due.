@@ -101,6 +101,13 @@ export function switchTask(s: FocusState, now: number, L: Lengths, from: number 
   return { state: { ...s, taskId: to, credited: c.credited }, log: c.log };
 }
 
+// Marking the focus task done from Focus (the web's creditPomodoro): the work
+// time so far goes to it; the timer carries on.
+export function creditTask(s: FocusState, now: number, L: Lengths, taskId: number | null): Result {
+  const c = credit(s, now, L, taskId);
+  return { state: { ...s, credited: c.credited }, log: c.log };
+}
+
 // A changed length moves the timer only if it's untouched at the start of that
 // phase (core's lengthChangeResetsTimer); a paused or running one keeps its time.
 export function applyLengths(s: FocusState, before: Lengths, after: Lengths): FocusState {

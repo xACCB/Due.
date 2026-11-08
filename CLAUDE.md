@@ -55,15 +55,24 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
 - **Two machines.** Windows: `C:\Users\aaron\OneDrive\Desktop\Me\Projects\Dueplanner` (the web app
   and most work so far). Mac: `~/dev/DuePlanner` (needed for every iOS build and the Simulator).
   Start each session with `git pull`; only one machine should have unpushed work at a time. The
-  Mac has Xcode, Homebrew, `node@22`, watchman, cocoapods, `gh` and openjdk. Homebrew's openjdk
+  Mac has Xcode, Homebrew, `node@22`, watchman, cocoapods, ccache, `gh` and openjdk. Homebrew's openjdk
   isn't on PATH, so before `npm run test:rules` or `test:e2e` there, run
   `export PATH="$(brew --prefix openjdk)/bin:$PATH"`.
+- **The Mac's npm is 10.9.9**, which drops the `libc` lines from `package-lock.json` on every
+  install. Don't commit that: there, run installs as `npx -y npm@11 install` (as Windows' npm does),
+  or `git checkout -- package-lock.json` after a plain `npm install` that added nothing.
+- **The Mac is a MacBook Air (M1, 8 GB).** Memory is the limit: one Simulator at a time, and a
+  native build (`npx expo run:ios`) only when a package with native code changed; otherwise
+  `npx expo start` and reload. ccache is on (`expo-build-properties`, `ios.ccacheEnabled` in
+  `app.json`) but saves little here (Objective-C/Swift); the big saving is Xcode's DerivedData
+  (first build over 10 minutes, the next 290s). Keep `apps/mobile/ios/` and DerivedData unless
+  something is broken; `npx expo prebuild --clean` forces a full rebuild.
 
 ## Where things stand (update this when it changes)
 
 - **2026-11-08:** the phone app (`apps/mobile`) has M2, most of M4 and M5 written and unit-tested on
-  Windows, but it has **never run yet**. The next step is the first `npx expo run:ios` on the Mac:
-  fix whatever the build or the Simulator turns up, then go through the test checklist (add
+  Windows. **First run on the Mac's iPhone 18 Pro Simulator worked** (build 0 errors, Home renders
+  with the fonts and the native tab bar). The next step is the test checklist (add
   questions, task page, Calendar, Focus, Settings, a reminder notification, data kept after
   quitting). Then M3: sign-in and sync (`docs/mobile-plan.md`).
 - **Before M3, flag these to the user:** the iOS app has to be registered in the Firebase console

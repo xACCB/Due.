@@ -18,6 +18,12 @@ npx expo run:ios       # first run builds the native app (a few minutes) and ope
 After the first build, `npx expo start` (or `npm run mobile` at the root) is enough for JS
 changes; re-run `npx expo run:ios` after adding a package with native code.
 
+Native builds go through ccache (`brew install ccache`; turned on by `expo-build-properties` in
+`app.json`), which helps a little with plain C/C++ (on 2026-11-08 it cached only about 1 MB: the
+Objective-C and Swift here mostly can't be cached). The real saving is Xcode's own build folder
+(DerivedData): the first build took well over 10 minutes on the M1 Air, the next one 290 seconds.
+Without ccache installed the build still works.
+
 ## What's where
 
 - `src/app/` (expo-router: every file is a screen)

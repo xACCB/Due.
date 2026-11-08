@@ -39,7 +39,7 @@ export function AddSheet({ visible, presetDate, template, onClose }: { visible: 
 
 function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; template: TaskTemplate | null; onClose: () => void }) {
   const app = useApp();
-  const { T, h24, questions } = app;
+  const { T, h24, questions, fz } = app;
   const { subjects, subjectColors } = app.settings;
   const [flow, setFlow] = useState(() => (template && A.startFromTemplate(questions, template).flow) || A.startAdd(questions, presetDate));
   const [title, setTitle] = useState(template?.name ?? "");
@@ -71,7 +71,7 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: T.bg }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={styles.top}>
         <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Cancel">
-          <Text style={[styles.topBtn, { color: T.textMuted }]}>Cancel</Text>
+          <Text style={[styles.topBtn, { fontSize: fz(14), color: T.textMuted }]}>Cancel</Text>
         </Pressable>
         <View style={styles.dots} accessible accessibilityLabel={`Step ${at + 1} of ${total}`}>
           {Array.from({ length: total }, (_, i) => (
@@ -80,7 +80,7 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
         </View>
         {q ? (
           <Pressable onPress={() => run(A.skip(flow))} hitSlop={10} accessibilityRole="button" accessibilityLabel="Skip">
-            <Text style={[styles.topBtn, { color: T.textMuted }]}>Skip</Text>
+            <Text style={[styles.topBtn, { fontSize: fz(14), color: T.textMuted }]}>Skip</Text>
           </Pressable>
         ) : <View style={styles.topSpacer} />}
       </View>
@@ -88,7 +88,7 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {flow.step === -1 && (
           <>
-            <Text style={[styles.q, { color: T.accent }]} accessibilityRole="header">What&apos;s the assignment?</Text>
+            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">What&apos;s the assignment?</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
@@ -100,7 +100,7 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
               maxLength={LIMITS.title}
               returnKeyType="next"
               accessibilityLabel="What's the assignment?"
-              style={[styles.input, { color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
+              style={[styles.input, { fontSize: fz(16), color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
             />
             <Button label={flow.questions.length ? "Next" : "Add"} onPress={() => run(A.submitTitle(flow, title))} disabled={!title.trim()} T={T} style={styles.next} />
           </>
@@ -108,21 +108,21 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
 
         {q?.type === "select" && (
           <>
-            <Text style={[styles.q, { color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
             <View style={styles.wrap}>
               {subjects.map(s => <Chip key={s} label={s} color={subjectColors[s]} T={T} onPress={() => run(A.answer(flow, s))} />)}
             </View>
-            {subjects.length === 0 && <Text style={[styles.note, { color: T.textMuted }]}>No subjects yet. Add some in Settings, or skip this.</Text>}
+            {subjects.length === 0 && <Text style={[styles.note, { fontSize: fz(13), color: T.textMuted }]}>No subjects yet. Add some in Settings, or skip this.</Text>}
           </>
         )}
 
         {q?.type === "date" && flow.pendingDate == null && (
           <>
-            <Text style={[styles.q, { color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
             <View style={styles.wrap}>
               {DATE_PICKS.map(p => <Chip key={p.l} label={p.l} T={T} onPress={() => run(A.pickDate(flow, inDays(p.d)))} />)}
             </View>
-            <Text style={[styles.sub, { color: T.textMuted }]}>Or pick a date</Text>
+            <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted }]}>Or pick a date</Text>
             <DateTimeField mode="date" value={customDate} onChange={setCustomDate} T={T} h24={h24} label="Due date" display="inline" />
             <Button label="Use this date" onPress={() => run(A.pickDate(flow, customDate || localDateStr(new Date())))} T={T} style={styles.next} />
           </>
@@ -130,28 +130,28 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
 
         {q?.type === "date" && flow.pendingDate != null && (
           <>
-            <Text style={[styles.q, { color: T.accent }]} accessibilityRole="header">Due {formatDate(flow.pendingDate)}. What time?</Text>
+            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">Due {formatDate(flow.pendingDate)}. What time?</Text>
             <View style={styles.wrap}>
               <Chip label="Any time" T={T} onPress={() => run(A.confirmTime(flow, ""))} />
               {TIME_PICKS.map(t => <Chip key={t} label={formatTime(t, h24)} T={T} onPress={() => run(A.confirmTime(flow, t))} />)}
             </View>
-            <Text style={[styles.sub, { color: T.textMuted }]}>Or pick a time</Text>
+            <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted }]}>Or pick a time</Text>
             <DateTimeField mode="time" value={customTime} onChange={setCustomTime} T={T} h24={h24} label="Due time" display="spinner" />
             <Button label="Set time" onPress={() => run(A.confirmTime(flow, customTime || "09:00"))} T={T} style={styles.next} />
             <Pressable onPress={() => setFlow(A.back(flow))} hitSlop={8} accessibilityRole="button" style={styles.backLink}>
-              <Text style={[styles.note, { color: T.textMuted }]}>‹ Back to date</Text>
+              <Text style={[styles.note, { fontSize: fz(13), color: T.textMuted }]}>‹ Back to date</Text>
             </Pressable>
           </>
         )}
 
         {q?.type === "time" && (
           <>
-            <Text style={[styles.q, { color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
             <View style={styles.wrap}>
               {ESTIMATE_PICKS.map(p => <Chip key={p.l} label={p.l} T={T} onPress={() => run(A.answer(flow, p.m))} />)}
             </View>
             <View style={[styles.custom, { backgroundColor: T.surface, borderColor: T.border }]}>
-              <Text style={[styles.sub, { color: T.textMuted, marginTop: 0 }]}>Custom time</Text>
+              <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted, marginTop: 0 }]}>Custom time</Text>
               <View style={styles.steppers}>
                 <Stepper value={hours} onChange={setHours} min={0} max={23} T={T} label="hours" unit="h" />
                 <Stepper value={mins} onChange={setMins} min={0} max={55} step={5} T={T} label="minutes" unit="m" />
@@ -169,7 +169,7 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
 
         {q?.type === "recurrence" && (
           <>
-            <Text style={[styles.q, { color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
             <View style={styles.wrap}>
               {REPEAT_PICKS.map(p => <Chip key={p.v} label={p.l} T={T} onPress={() => run(A.answer(flow, p.v))} />)}
             </View>
@@ -178,18 +178,18 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
 
         {flow.step > -1 && !(q?.type === "date" && flow.pendingDate != null) && (
           <Pressable onPress={() => setFlow(A.back(flow))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back" style={styles.backLink}>
-            <Text style={[styles.note, { color: T.textMuted }]}>‹ Back</Text>
+            <Text style={[styles.note, { fontSize: fz(13), color: T.textMuted }]}>‹ Back</Text>
           </Pressable>
         )}
 
         {!!d.title && (
           <View style={[styles.preview, { backgroundColor: T.card, borderColor: T.border }]} accessible accessibilityLabel={`Adding ${d.title}`}>
-            <Text style={[styles.previewLabel, { color: T.textFaint }]}>Adding</Text>
-            <Text style={[styles.previewTitle, { color: T.text }]}>{d.title}</Text>
+            <Text style={[styles.previewLabel, { fontSize: fz(10), color: T.textFaint }]}>Adding</Text>
+            <Text style={[styles.previewTitle, { fontSize: fz(16), color: T.text }]}>{d.title}</Text>
             <View style={styles.previewMeta}>
-              {!!d.subject && <Text style={[styles.meta, { color: ink(subjectColors[d.subject] || T.accent, T.light) }]}>{d.subject}</Text>}
-              {!!d.dueDate && <Text style={[styles.meta, { color: T.textMuted }]}>{formatDate(d.dueDate)}{d.dueTime ? ` at ${formatTime(d.dueTime, h24)}` : ""}</Text>}
-              {!!d.recurrence && d.recurrence !== "none" && <Text style={[styles.meta, { color: T.textMuted }]}>↻ {d.recurrence}</Text>}
+              {!!d.subject && <Text style={[styles.meta, { fontSize: fz(11), color: ink(subjectColors[d.subject] || T.accent, T.light) }]}>{d.subject}</Text>}
+              {!!d.dueDate && <Text style={[styles.meta, { fontSize: fz(11), color: T.textMuted }]}>{formatDate(d.dueDate)}{d.dueTime ? ` at ${formatTime(d.dueTime, h24)}` : ""}</Text>}
+              {!!d.recurrence && d.recurrence !== "none" && <Text style={[styles.meta, { fontSize: fz(11), color: T.textMuted }]}>↻ {d.recurrence}</Text>}
             </View>
           </View>
         )}

@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Standing preferences, copied here from Claude's per-machine memory (2026-11-08) so every computer
 gets them. The user works on a Windows PC and a Mac, kept in step through GitHub.
+- **Keep this file current, as you go.** It is the only context a new session gets (sessions don't
+  carry over between conversations or machines, and per-machine memory doesn't sync). Whenever
+  something changes that the next session would need (a decision and its reason, a new screen,
+  file, setting, key, command or convention, a gotcha that cost time, a change of plan, a user
+  preference), update the relevant section here in the same commit as the change. Update
+  "Where things stand" whenever the next step changes. When the user states a preference or
+  corrects you, add it to this list rather than (or as well as) memory. Prefer editing an existing
+  section to appending a new one, delete what's no longer true, and keep the existing tone: say
+  what and why, with file and function names a reader can search for.
 - **Commit and push** finished work to `origin/main` without asking each time, once build, lint and
   tests pass. Hold off only if told to, or for something unusually risky or destructive.
 - **End every task with a summary**: what changed, anything that differs from the plan or roadmap,
@@ -75,7 +84,8 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   `npx expo install`.
 - `npm run preview` — serve the built `dist/` output locally.
 - `npm test` — Vitest, unit tests for the pure functions in `packages/core/src/lib/` (dates, priority/format
-  helpers, syllabus parsing). Fast, no external services; this is what CI runs.
+  helpers, syllabus parsing), plus the `web` and `mobile` projects (`apps/mobile/src/state/*.test.ts`:
+  the task store, settings and Focus timer). Fast, no external services; this is what CI runs.
 - `npm run test:rules` — Firestore emulator + `@firebase/rules-unit-testing`, verifying
   `firestore.rules` actually rejects malformed writes and cross-user access. Needs Java (a JRE) for
   the emulator; CI installs one and runs it. Run it locally before changing `firestore.rules`
@@ -137,9 +147,10 @@ and every command above still runs from the root:
 - `apps/mobile` (`@dueplanner/mobile`): the Expo app (SDK 58, expo-router, `src/app/` routes; plan in
   `docs/mobile-plan.md`, how to run it in `apps/mobile/README.md`). Native builds need a Mac
   (`npx expo run:ios`); on Windows, `npm run typecheck:mobile` and `npx expo export --platform ios`
-  (in `apps/mobile`) still check it. Its plain-TypeScript state (`src/state/taskStore.ts`) is unit-tested
+  (in `apps/mobile`) still check it. Its plain-TypeScript state (`src/state/*.ts`) is unit-tested
   in `npm test` (the `mobile` vitest project). One React for both apps: pinned in the root `overrides` and
-  `apps/web`, moved together with Expo SDK upgrades. RN/Expo need Node 22.13+.
+  `apps/web`, moved together with Expo SDK upgrades. RN/Expo need Node 22.13+. Full detail: the
+  "Phone app" section below.
 - At the root: `firestore.rules`, `firebase.json`, `tests/` (rules, contract, fuzz, e2e, stress),
   `scripts/`, the ESLint config and `vitest.config.ts` (runs both workspaces' unit tests as projects).
 - `npm run build` type-checks core on its own (`tsc -p packages/core`), then builds the web app.
@@ -966,6 +977,207 @@ is open, since offset reminders need to fire close to a specific time, not just 
 **Data export** (`exportAllDataJSON`/`exportTasksCSV`) uses a shared `downloadFile()` helper
 (`Blob` + object URL + a synthetic `<a download>` click) — the standard client-side download
 pattern, no server involved.
+
+## Phone app (`apps/mobile`)
+
+A natively built iPhone (later Android) app in React Native with Expo, sharing `packages/core` with
+the website. Plan and milestones: `docs/mobile-plan.md`. File map and run steps:
+`apps/mobile/README.md`. **Status:** see "Where things stand" above. Everything below was written
+and unit-tested on Windows and has not yet run on a simulator or phone, so expect first-run fixes,
+and correct this section when real behaviour differs.
+
+**Stack (versions matter; Expo changes APIs every SDK).** Expo SDK 58, React Native 0.88.1, React
+19.3.0, TypeScript 6, expo-router 58 (file routes under `src/app/`, `NativeTabs` from
+`expo-router/native-tabs`), `expo-dev-client` (no Expo Go), `react-native-mmkv` 4 (needs
+`react-native-nitro-modules` as a direct dependency so autolinking picks it up),
+`@react-native-community/datetimepicker` 9 (`onValueChange`/`onDismiss`; `onChange` is deprecated),
+`expo-notifications`, `expo-keep-awake`, `expo-haptics`, `expo-font` with
+`@expo-google-fonts/dm-serif-display` and `dm-mono`, `expo-splash-screen`, `react-native-reanimated`
+4 and `react-native-gesture-handler` 3 (installed, not used yet: they're for the swipe gestures).
+`app.json` turns on `experiments.reactCompiler` and `typedRoutes`. Expo and React Native need Node
+22.13+, which is why CI uses Node 22. Before using an Expo or React Native API, read the installed
+package's `.d.ts` (or the versioned docs at `docs.expo.dev/versions/v58.0.0/`) rather than relying
+on memory: that's how `NativeTabs.Trigger.Icon sf=...`, the notifications trigger shape
+(`{ type: SchedulableTriggerInputTypes.DATE, date }`) and the `NotificationBehavior` fields
+(`shouldShowBanner`/`shouldShowList`) were confirmed.
+
+**One React in the repo.** npm hoists one copy, and two copies break at runtime. `react` and
+`react-dom` are pinned to the same exact version in the root `package.json` `overrides` and in
+`apps/web/package.json` (the web app moved from 19.2.6 to 19.3.0 for this). On an Expo SDK upgrade,
+move all three to the version Expo's template uses, then check `npm ls react react-dom --all` shows
+a single version. If the lockfile clings to an old copy, remove the `node_modules/react*` entries
+from `package-lock.json` and reinstall: that's what fixed it the first time.
+
+**State.** One `AppProvider` (`src/state/AppState.tsx`) holds everything the screens share, built by
+`useAppValue()` (`src/state/useAppValue.ts`) and read anywhere with `useApp()`
+(`src/state/appContext.ts`). It's three files because the react-refresh lint rule allows a
+component file to export only components. `useApp()` gives:
+- `tasks`, `trash`, `canUndo`/`canRedo`, and actions: `add` (a title or an `AddDraft`), `toggle`,
+  `edit(id, patch, label?)` (undoable), `quiet(id, patch)` (not undoable), `duplicate`, `logSession`,
+  `remove` (to Recently deleted), `restore`, `undo`, `redo`;
+- `T` (the active theme object: `THEMES.stealth` or `stealthLight`, from the Appearance setting and
+  the phone's light/dark mode), `h24`, and `questions` (`askedQuestions(addQuestions)`);
+- `settings`: every setting's value and setter (below).
+The task logic is `src/state/taskStore.ts`: plain `(store, ...) => store` functions over core
+(`withNewTask`, `setDone` including repeat copies, `patchTask`, `duplicateOf`, `withTrashed`,
+`restoredInto`, `withSession`, `diffTasks`/`applyTaskStates`), unit-tested in
+`taskStore.test.ts`. What's undoable matches the web's `changeTasks`: add, complete, edit, archive,
+duplicate and delete are; subtask ticks, tags, the priority override and logged sessions
+(`quietPatch`/`logSession`) aren't. An `editTask` that changes nothing adds no undo step. The undo
+history holds 50 steps in memory and isn't saved. A restore from Recently deleted isn't undoable.
+
+**Saved data.** MMKV (`src/lib/storage.ts`, instance id `dueplanner`) under the **web's key names and
+shapes**, so M3 can feed it to core's sync code unchanged: `hw-tasks` (migrated on load with
+`migrateTasks` from `hw-schema`, and `hw-schema` rewritten as `SCHEMA_VERSION` on save), `hw-trash`
+(30-day `pruneTrash` on load; bad entries dropped). Settings use `usePersisted(key, initial,
+clean)` (`src/lib/usePersisted.ts`), with each key, default and cleaner in `src/state/settings.ts`
+(`SETTINGS`, unit-tested, defaults copied from the web): `hw-thememode` (auto), `hw-colorcode-urgency`
+(true), `hw-timeformat` (12h), `hw-weekstart` (0), `hw-calendar-month-only` (true), `hw-showdone`
+(true), `hw-notifications` (false), `hw-reminder-offsets` (["0"]), `hw-pomodoro-work` (25),
+`hw-pomodoro-break` (5), `hw-pomodoro-autobreak` (true), `hw-focus-show` (all), `hw-add-questions`
+(null), `hw-subjects` (the default six), `hw-subjectcolors` (merged over the defaults, like the web).
+`hw-focus-state` (the running timers) is phone-only. A new setting: add it to `SETTINGS` with a
+cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaults like `true` or
+`25` need `as boolean`/`as number`, or the setter only accepts that exact value.
+Not on the phone yet: text size, animation speed, layouts, group by, smart suggestion,
+auto-archive, templates, recaps, Inbox.
+
+**Screens** (`src/app/`; the Stack in `_layout.tsx` holds `(tabs)` and `task/[id]`):
+- `_layout.tsx`: keeps the launch screen up (`SplashScreen.preventAutoHideAsync`) until the fonts
+  load (or fail: a font error must not keep the app hidden), then `AppProvider`, the status bar and
+  the Stack, themed from `T`. The task page has a native header ("Task", back button).
+- `(tabs)/_layout.tsx`: `NativeTabs` (iOS draws the real tab bar, so iOS 26 gets Liquid Glass):
+  Home (`house`), Calendar (`calendar`), Focus (`timer`), Settings (`gearshape`), as SF Symbols, tinted
+  `T.accent`. Android icons aren't set yet (they'd need `md`/`drawable`).
+- `(tabs)/index.tsx` **Home**: header with the open count and Undo/Redo, the filter chips (All,
+  Pending, Done, Archived: core's `filterTasks` over `sortTasks`, honouring Show completed), a
+  "+ Add homework" button as the list header (opens `AddSheet`), `TaskRow`s (tap opens the task page,
+  the circle completes with a success haptic, × deletes), and `UndoToast` ("Completed" / "Deleted"
+  with Undo, 4s, placed above the tab bar).
+- `components/AddSheet.tsx` **adding a task**: a native page sheet (`Modal presentationStyle=
+  "pageSheet"`, swipe down to cancel) driven by core's `lib/addFlow.ts` (see "Where things live").
+  Steps: "What's the assignment?", then each question the user turned on, in their order. Subject:
+  subject chips. Due date: Today / Tomorrow / 3 days / Next week, or an inline calendar, then
+  "What time?": Any time / 9:00 AM / 3:00 PM / 11:59 PM, or a spinner. Estimate: 15 min to 2 hrs, or
+  hours and minutes steppers. Repeats: none, daily, weekly, monthly. Skip and Back on every step
+  (Skip on the estimate means no estimate; Skip on "what time?" keeps the date). A progress-dot row
+  and an "Adding" preview card. `busy` stops a quick second tap adding the task twice. The sheet's
+  content is remounted per opening, so each add starts fresh. `presetDate` (from Calendar) opens
+  the date question on "what time?".
+- `task/[id].tsx` **task page** (the web's `TaskModal` in its `page` form): title (multiline, saved
+  on blur or Return; can't be emptied), Mark done, Archive/Unarchive, subject chips (tap again to
+  clear; a subject not in the list still shows), due date and time (system pickers, "Add a due
+  date", "Add a time", "Any time", "No due date"), estimate (digit-only hours and minutes, saved
+  on blur; minutes past 59 roll into hours), Repeats and Priority (Auto/High/Medium/Low) as
+  segmented controls, subtasks (tick is quiet, add and delete are undoable, capped at
+  `LIMITS.subtasks`), tags (quiet, capped at `LIMITS.tags`/`LIMITS.tag`), time worked, Duplicate and
+  Delete (both go back). Each field saves on its own, so each change is one undo step. The typed
+  title and estimate follow the saved values when those change underneath (undo, another screen)
+  through React's "adjust state while rendering" pattern (`seen`), not an effect. A deleted task
+  shows "This task isn't here any more" with Back.
+- `(tabs)/calendar.tsx` **Calendar** (the web's Month view): `monthOnlyGrid`/`monthGrid` by the
+  Calendar setting, `weekdayLabels(weekStart)`, ‹ › and Today, each day with up to 3 subject-coloured
+  dots for open tasks (`byDueDate`), today ringed, the picked day filled with the accent. Below:
+  that day's tasks (non-archived, done ones included) and "+ Add homework due ...", which opens
+  `AddSheet` with `presetDate`. No swipe between months and no Deck view yet.
+- `(tabs)/focus.tsx` **Focus** (the web's Focus Mode): Pomodoro card (FOCUS/BREAK, big clock,
+  progress bar, Start/Resume/Pause, Reset, Break/Skip), a "Working on" card (the task's title and
+  time so far, plus chips to switch task; defaults to `mostUrgent` of the open tasks), and the
+  stopwatch (Start/Pause, Reset, "Log Xm to task"). Which cards show follows `hw-focus-show`. The
+  logic is `src/state/focusTimer.ts` (plain functions over core's `lib/timers.ts`, unit-tested):
+  **clock-based** like the web (a running Pomodoro is its `endAt`, the stopwatch its `swStartedAt`),
+  and saved in `hw-focus-state`, so it stays right through a locked phone or the app being closed.
+  Finishing work logs `pomodoroFinishMinutes` (less what was already credited) and moves to the
+  break, which starts at once, from the moment work ended, when auto-start breaks is on. Reset,
+  Break and switching task credit the work done so far (`pomodoroCreditMinutes`, under a minute
+  logs nothing). A changed length moves only an untouched timer (`applyLengths`, applied while
+  rendering). The screen ticks every 500ms while a timer runs and catches up when the app comes
+  back to the foreground (`AppState` "active"). After a finish, `live.current.state` is updated at
+  once so two ticks before the next render can't log a session twice. The screen stays awake
+  (`useKeepAwake`) only while a timer runs and the Focus tab is showing. Start asks for
+  notification permission once, and the phase's end is scheduled as a notification
+  (`scheduleFocusEnd`, id `focus-end`), rescheduled after permission is granted and cancelled
+  while paused.
+- `(tabs)/settings.tsx` **Settings**: Looks (Appearance System/Light/Dark, Urgency color coding),
+  Date & time (12h/24h, week starts Sun/Mon, Calendar shows only this month), Task list (Show
+  completed), New task questions (▲ ▼ to reorder with core's `moveQuestion`, a switch each), Subjects
+  (colour swatch, × asks before removing; tasks keep their subject; new ones get the next palette
+  colour via `subjectToAdd`; no rename or recolour yet), Focus timer (Pomodoro and Stopwatch switches
+  via `focusShowFor`, lengths, auto-start breaks), Reminders (asks iOS for permission when turned
+  on; if refused, an alert offers Open Settings), Recently deleted (newest first, Restore), and a
+  "DuePlanner 0.1.0, by due. studios" line.
+
+**Reminders (local notifications).** `src/lib/notifications.ts`. `syncReminders()` cancels every
+scheduled notification whose id starts `rem-` and schedules core's `upcomingReminders()` again (at
+most 62: iOS keeps 64 pending per app, and Focus needs one). `useAppValue` calls it 0.8s after any
+change to the tasks, the Reminders switch, the offsets or the time format, and calls run one at a
+time (a promise queue), because two overlapping runs could leave a reminder behind. It does nothing
+without permission. What gets scheduled: for a task with a due time, one notification per enabled
+offset, worded as the web would word it at that moment; for date-only tasks (and timed ones when
+every offset is off), one summary per due date at 8 AM. Only future ones: unlike the web, the phone
+doesn't announce tasks that are already overdue. The handler shows banners even while the app is
+open.
+
+**Conventions for this app** (the lint and the React Compiler enforce some of these):
+- A component file exports only components; hooks, helpers and constants go in `.ts` files.
+- No `Date.now()` in a component (the compiler's purity lint): call `clock()` from `src/lib/clock.ts`.
+- Don't call `setState` synchronously in an effect. For state that follows a prop or setting,
+  adjust it while rendering (compare with a stored previous value), as the task page and Focus do.
+- Define components at module scope, never inside another component.
+- Style from `useApp().T` (type `Theme` from `src/theme/types.ts`) and `F` from
+  `src/theme/fonts.ts`: `F.heading` (DM Serif Display), `F.body` (DM Mono), `F.bodyMedium`. With a
+  custom font iOS ignores `fontWeight`, so use `F.bodyMedium` instead. Only the three weights used
+  are bundled, imported per weight (`@expo-google-fonts/dm-mono/400Regular`), because the package
+  root bundles all eight.
+- Text on an accent fill uses `contrastColor(T.accent)`, and coloured text (subjects, the danger
+  button) goes through `ink(color, T.light)`, as on the web.
+- Dates and times are picked with `src/components/DateTimeField.tsx`, which stores the web's text
+  (`YYYY-MM-DD`, `HH:MM`, "" for none). iOS draws the system picker in place (`compact` on the task
+  page, `inline` and `spinner` in the add sheet); Android opens its dialog on a tap. Only the time
+  picker follows 12h/24h (its locale); dates keep the phone's own order.
+- Shared building blocks are in `src/components/ui.tsx`: `Chip`, `Button` (primary, plain or
+  danger), `Section`/`Row`/`ToggleRow` (settings rows), `Segmented`, `Stepper`. Use them rather than
+  restyling.
+- Every control has an `accessibilityRole` and `accessibilityLabel` (naming the task where there
+  is one, e.g. "Mark Essay done"), state where it applies (`checked`, `selected`, `disabled`), and
+  `hitSlop` when it's small (the phone's version of the web's `.hit`).
+- User-facing text follows the same rules as the web (no dash-joined phrasing, "DuePlanner").
+- Text from outside (typing, pasting) goes through `oneLine()` and the `LIMITS` caps before it's
+  stored, as on the web, so M3's sync won't be refused by the rules.
+- New native packages: `npx expo install <name>` in `apps/mobile`, then a rebuild
+  (`npx expo run:ios`). Never edit `ios/` or `android/` (generated, gitignored): change
+  `app.json` or add a config plugin.
+- New logic the web could share goes in `packages/core` with tests (as `addFlow` and
+  `upcomingReminders` did); phone-only plain logic goes in `apps/mobile/src/state` with a
+  `*.test.ts` beside it (the `mobile` vitest project, `apps/mobile/vitest.config.mts`).
+
+**Checking a change.** Without a Mac: `npm test`, `npm run lint`, `npm run typecheck:mobile`, then in
+`apps/mobile` `npx expo export --platform ios --output-dir <a temp folder>` (it must end with
+"Exported"; "Unable to resolve" means an import path is wrong) and `npx expo-doctor` (20/20). On
+the Mac, `npx expo run:ios`, then in the Simulator: press r in Terminal to reload, Cmd+D for the
+dev menu, Cmd+Shift+A to switch light and dark, Cmd+Shift+H for the home screen, Cmd+S for a
+screenshot. A run-through: add a task through every question, complete and undo, delete and undo,
+the filters, edit every field on the task page, Calendar dots and adding from a day, a Pomodoro
+start/pause/reset and a stopwatch log, each setting taking effect, a reminder arriving with the
+app in the background, and data still there after quitting the app.
+
+**First-build troubleshooting (Mac).** `xcrun: error` / "unable to find utility": run `sudo
+xcode-select -s /Applications/Xcode.app`. No simulator or runtime: Xcode → Settings → Components →
+iOS. CocoaPods repo or CDN errors: `pod repo update`, then build again. A red screen naming a file
+in `src/`: our bug, so fix it here. "Unable to resolve @dueplanner/core": the workspace link is
+missing, so run `npm install` at the repo root (on Windows, see the folder-casing note). Yellow
+warnings in the build log are normal.
+
+**Decisions so far, and why.**
+- Expo with native tabs and system pickers, not a web view: the user wants a real app (see
+  "Working with the user").
+- Data in the web's `hw-*` shape, so sync (M3) reuses `packages/core/src/lib/sync.ts` and the same
+  `firestore.rules`.
+- Local notifications scheduled ahead (no server, free), instead of the web's check-while-open.
+- The bundle id is `com.duestudios.dueplanner` (`app.json`; also the Android package). It can
+  change freely until the first TestFlight upload, then never.
+- The app icon is the web's 512px `favicon-512.png` for now; the App Store needs 1024px before
+  release. The launch screen is the same image on `#0a0a0a`.
 
 ## Planning (Notion)
 

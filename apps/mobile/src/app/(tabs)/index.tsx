@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, FlatList, LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import type { Task, TaskTemplate } from "@dueplanner/core/types";
@@ -42,6 +42,13 @@ export default function Home() {
   const s = app.settings;
   const now = useNow();
   const [adding, setAdding] = useState<{ template?: TaskTemplate } | null>(null);
+  // dueplanner://?add=1 opens the add sheet (a shortcut into adding).
+  const { add } = useLocalSearchParams<{ add?: string }>();
+  useEffect(() => {
+    if (!add) return;
+    setAdding({}); // eslint-disable-line react-hooks/set-state-in-effect -- opening from a link is an outside event
+    router.setParams({ add: undefined });
+  }, [add]);
   const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
   const hideToast = useCallback(() => setToast(null), []);
   const say = (text: string) => setToast(prev => ({ text, n: (prev?.n ?? 0) + 1 }));

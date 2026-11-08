@@ -423,6 +423,11 @@ that will reuse them; keep adding logic here, not in the component):
   `completionStats`, and `heldOpen`/`isSettled` (the `justDone` hold).
 - `packages/core/src/lib/reminders.ts`: `dailySummary` and `offsetReminders` decide what is owed; the effect in
   `HomeworkPlanner` only shows the notifications and stores what was sent.
+  `upcomingReminders` is the same reminders worked out ahead of time, for the phone app to schedule
+  (`apps/mobile/src/lib/notifications.ts`); `dueIn` is the shared "in 3h" wording.
+- `packages/core/src/lib/addFlow.ts`: the add-task questions as a state machine (title, then
+  `askedQuestions`, the date's "what time?" step, skip/back). The phone's add sheet uses it; the web
+  wizard in `HomeworkPlanner` still has its own copy of the same rules, so change both together.
 - `packages/core/src/lib/backup.ts`: `tasksCsv`, `readBackup` and the `withImported...` merges, `withSyllabusTasks`.
 - `packages/core/src/lib/timers.ts`: the timers' arithmetic (`secondsLeft`, `stopwatchTotal`,
   `pomodoroFinishMinutes`, `pomodoroCreditMinutes`, `sessionMinutes`, `withSession`). The state,

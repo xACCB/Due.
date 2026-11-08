@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../types";
-import { dailySummary, offsetReminders } from "./reminders";
+import { dailySummary, dueIn, offsetReminders, upcomingReminders } from "./reminders";
 
 const task = (id: number, extra: Partial<Task> = {}): Task =>
   ({ id, title: `Task ${id}`, subject: "", dueDate: "", dueTime: "", estMins: 0, done: false, order: id, ...extra });
@@ -80,5 +80,59 @@ describe("offsetReminders", () => {
     const base = offsetReminders([due3pm], ["1h"], {}, at(2026, 10, 10, 14, 30), true).notes[0].body;
     expect(base).toContain("15:00");
     expect(offsetReminders([due3pm], ["1h"], {}, at(2026, 10, 10, 14, 30), false).notes[0].body).toContain("3:00");
+  });
+});
+
+describe("dueIn", () => {
+  it("words how far off a due time is", () => {
+    expect(dueIn(0)).toBe("now");
+    expect(dueIn(-5)).toBe("now");
+    expect(dueIn(20)).toBe("in 20 min");
+    expect(dueIn(180)).toBe("in 3h");
+    expect(dueIn(1440)).toBe("in 1 day");
+    expect(dueIn(10080)).toBe("in 7 days");
+  });
+});
+
+describe("upcomingReminders", () => {
+  const now = at(2026, 10, 10, 9, 0);
+  it("schedules one per enabled offset for a timed task, only in the future, soonest first", () => {
+    const t = task(1, { title: "Essay", dueDate: "2026-10-11", dueTime: "15:00" });
+    const r = upcomingReminders([t], ["1d", "1h", "0"], now, false);
+    expect(r.map(x => x.id)).toEqual(["rem-1-1d", "rem-1-1h", "rem-1-0"]);
+    expect(r[0].at).toBe(at(2026, 10, 10, 15, 0));
+    expect(r[0].title).toBe(`"Essay" is due in 1 day`);
+    expect(r[2].title).toBe(`"Essay" is due now`);
+    expect(r[1].body).toMatch(/at 3:00/);
+    // the 1-week one would have been in the past
+    expect(upcomingReminders([t], ["1w"], now, false)).toEqual([]);
+  });
+  it("words a reminder as offsetReminders would at that moment", () => {
+    const t = task(7, { title: "Lab", dueDate: "2026-10-10", dueTime: "18:00" });
+    const [sched] = upcomingReminders([t], ["3h"], now, true);
+    const live = offsetReminders([t], ["3h"], {}, sched.at, true).notes[0];
+    expect({ title: sched.title, body: sched.body }).toEqual(live);
+  });
+  it("sums up date-only tasks per day at the summary hour", () => {
+    const tasks = [task(1, { title: "Read", dueDate: "2026-10-12" }), task(2, { dueDate: "2026-10-12" }), task(3, { title: "Quiz", dueDate: "2026-10-13" })];
+    const r = upcomingReminders(tasks, ["0"], now, false);
+    expect(r).toEqual([
+      { id: "rem-day-2026-10-12", at: at(2026, 10, 12, 8, 0), title: "2 tasks due today", body: "Read, Task 2" },
+      { id: "rem-day-2026-10-13", at: at(2026, 10, 13, 8, 0), title: `"Quiz" is due today`, body: "Quiz" },
+    ]);
+    // today's 8am has passed
+    expect(upcomingReminders([task(4, { dueDate: "2026-10-10" })], ["0"], now, false)).toEqual([]);
+  });
+  it("puts timed tasks in the day summary when every offset is off", () => {
+    const r = upcomingReminders([task(1, { title: "Talk", dueDate: "2026-10-11", dueTime: "15:00" })], [], now, false);
+    expect(r.map(x => x.id)).toEqual(["rem-day-2026-10-11"]);
+  });
+  it("skips finished, archived and undated tasks, and caps the count", () => {
+    const skipped = [task(1, { dueDate: "2026-10-12", done: true }), task(2, { dueDate: "2026-10-12", archived: true }), task(3)];
+    expect(upcomingReminders(skipped, ["0"], now, false)).toEqual([]);
+    const many = Array.from({ length: 30 }, (_, i) => task(i + 1, { dueDate: "2026-10-20", dueTime: `${String(10 + (i % 10)).padStart(2, "0")}:00` }));
+    const r = upcomingReminders(many, ["1d", "1h", "0"], now, false, { max: 60 });
+    expect(r).toHaveLength(60);
+    expect(r.every((x, i) => i === 0 || r[i - 1].at <= x.at)).toBe(true);
   });
 });

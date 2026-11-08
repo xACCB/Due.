@@ -18,15 +18,42 @@ npx expo run:ios       # first run builds the native app (a few minutes) and ope
 After the first build, `npx expo start` (or `npm run mobile` at the root) is enough for JS
 changes; re-run `npx expo run:ios` after adding a package with native code.
 
+## What's where
+
+- `src/app/` (expo-router: every file is a screen)
+  - `_layout.tsx`: fonts, the launch screen, `AppProvider`, and the stack (tabs, then the task page).
+  - `(tabs)/_layout.tsx`: the native tab bar (iOS draws it; SF Symbol icons).
+  - `(tabs)/index.tsx` Home, `calendar.tsx`, `focus.tsx`, `settings.tsx`; `task/[id].tsx` the task page.
+- `src/state/`
+  - `taskStore.ts`: what each task action does, plus undo/redo (plain functions, unit-tested).
+  - `focusTimer.ts`: the Pomodoro and stopwatch (plain functions, unit-tested).
+  - `settings.ts`: every setting's `hw-*` key, default and cleaner (the web's keys and defaults).
+  - `useAppValue.ts` (the state), `appContext.ts` (`useApp()`), `AppState.tsx` (`AppProvider`).
+- `src/lib/`: `storage.ts` (MMKV), `usePersisted.ts`, `notifications.ts` (local notifications),
+  `clock.ts`.
+- `src/components/`: `TaskRow`, `AddSheet` (the add questions), `DateTimeField` (system pickers),
+  `UndoToast`, `ui.tsx` (chips, buttons, settings rows).
+
+Data uses the web app's keys (`hw-tasks`, `hw-trash`, `hw-schema`, `hw-subjects`...) and shapes,
+so the account sync in M3 can reuse core's sync code unchanged. `hw-focus-state` (the running
+timers) is phone-only.
+
 ## Rules
 
-- **No Expo Go.** Native Firebase (M3) needs a development build, so this app uses
-  `expo-dev-client` from day one.
+- **No Expo Go.** Native modules (MMKV now, Firebase in M3) need a development build, so this app
+  uses `expo-dev-client`.
 - `ios/` and `android/` are generated from `app.json` and gitignored. Never edit them by hand;
   change `app.json` or a config plugin instead.
 - Add packages with `npx expo install <name>` (inside `apps/mobile`), so the version matches the SDK.
 - One React for the whole repo: `react`/`react-dom` are pinned in the root `overrides` and in
   `apps/web`. When an Expo SDK upgrade moves React, move all three together (duplicate Reacts
   break at runtime).
+- A component file exports only components (the react-refresh lint rule); hooks and helpers go in
+  `.ts` files. `Date.now()` inside a component trips the React Compiler's purity lint: use `clock()`.
+- Reminders are local notifications from core's `upcomingReminders()`, rescheduled (all at once,
+  one pass at a time) 0.8s after any task or setting change. iOS keeps at most 64 pending; we use
+  62 plus one for the Focus timer.
 - Bundle id `com.duestudios.dueplanner` (`app.json`). It can change freely until the first
   TestFlight upload, then never.
+- On Windows, run Expo from `...\Projects\Dueplanner` (the folder's real casing): links made from
+  `DuePlanner` make Metro fail to find `@dueplanner/core`.

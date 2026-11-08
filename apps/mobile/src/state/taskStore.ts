@@ -1,13 +1,19 @@
-// The phone app's task state as plain functions: what add, complete, delete,
-// undo and redo do to the list, the Recently deleted entries and the undo
-// history. Built only from @dueplanner/core (no React Native), so it's unit
-// tested in `npm test`. useTasks.ts holds it in React and saves it.
+// The phone app's task state as plain functions: what each task action does to
+// the list, the Recently deleted entries and the undo history. Built only from
+// @dueplanner/core (no React Native), so it's unit tested in `npm test`.
+// AppState.tsx holds it in React and saves it.
+//
+// Undoable, as on the web (`changeTasks` there): add, complete, edit, archive,
+// duplicate, delete. Not undoable, also as on the web: subtask ticks, tags,
+// the priority override, and logged work sessions (`quietPatch`).
 import type { HistoryAction, Task } from "@dueplanner/core/types";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
+import type { AddDraft } from "@dueplanner/core/lib/addFlow";
 import { trashEntries } from "@dueplanner/core/lib/trash";
 import { applyTaskStates, diffTasks } from "@dueplanner/core/lib/history";
 import { setDone } from "@dueplanner/core/lib/tasks";
-import { withNewTask, withTrashed, withoutTasks, withoutTrashed } from "@dueplanner/core/lib/taskActions";
+import { duplicateOf, patchTask, restoredInto, withNewTask, withTrashed, withoutTasks, withoutTrashed } from "@dueplanner/core/lib/taskActions";
+import { withSession } from "@dueplanner/core/lib/timers";
 import { LIMITS, oneLine } from "@dueplanner/core/lib/limits";
 
 export interface TaskStore {
@@ -35,17 +41,48 @@ function changed(s: TaskStore, next: Task[], label: string): TaskStore {
   return { ...s, tasks: next, ...pushUndo(s, { type: "change", before, after, label }) };
 }
 
-export function addTask(s: TaskStore, title: string): TaskStore {
-  const clean = oneLine(title).trim().slice(0, LIMITS.title);
-  if (!clean) return s;
-  const blank: Task = { id: 0, title: clean, subject: "", dueDate: "", dueTime: "", estMins: 0, done: false, order: 0 };
-  return changed(s, withNewTask(s.tasks, blank), "Added");
+// A new task from a title, or from the add questions' answers.
+export function addTask(s: TaskStore, input: string | AddDraft): TaskStore {
+  const d: AddDraft = typeof input === "string" ? { title: input, subject: "", dueDate: "", dueTime: "", estMins: 0 } : input;
+  const title = oneLine(d.title).trim().slice(0, LIMITS.title);
+  if (!title) return s;
+  const task: Task = {
+    id: 0, title, subject: d.subject, dueDate: d.dueDate, dueTime: d.dueDate ? d.dueTime : "",
+    estMins: d.estMins, done: false, order: 0,
+    ...(d.recurrence && d.recurrence !== "none" ? { recurrence: d.recurrence } : {}),
+  };
+  return changed(s, withNewTask(s.tasks, task), "Added");
 }
 
 export function toggleDone(s: TaskStore, id: number): TaskStore {
   const t = s.tasks.find(x => x.id === id);
   if (!t) return s;
   return changed(s, setDone(s.tasks, [id], !t.done), t.done ? "Marked not done" : "Completed");
+}
+
+// An undoable edit of a task's own fields. A patch that changes nothing adds no undo step.
+export function editTask(s: TaskStore, id: number, patch: Partial<Task>, label = "Edited"): TaskStore {
+  const t = s.tasks.find(x => x.id === id);
+  if (!t || Object.entries(patch).every(([k, v]) => JSON.stringify(t[k as keyof Task]) === JSON.stringify(v))) return s;
+  return changed(s, patchTask(s.tasks, id, patch), label);
+}
+
+// A change that isn't an undo step (subtask ticks, tags, priority override).
+export function quietPatch(s: TaskStore, id: number, patch: Partial<Task>): TaskStore {
+  if (!s.tasks.some(x => x.id === id)) return s;
+  return { ...s, tasks: patchTask(s.tasks, id, patch) };
+}
+
+export function duplicateTask(s: TaskStore, id: number): TaskStore {
+  const t = s.tasks.find(x => x.id === id);
+  if (!t) return s;
+  return changed(s, [...s.tasks, duplicateOf(t, s.tasks)], "Duplicated");
+}
+
+// A finished work session (Focus), logged to a task; not an undo step.
+export function logSession(s: TaskStore, id: number, mins: number, at: number): TaskStore {
+  if (mins < 1 || !s.tasks.some(x => x.id === id)) return s;
+  return { ...s, tasks: withSession(s.tasks, id, mins, at) };
 }
 
 // Deleting moves the task to Recently deleted, as on the web.
@@ -58,6 +95,13 @@ export function deleteTask(s: TaskStore, id: number): TaskStore {
     trash: withTrashed(s.trash, trashEntries([t])),
     ...pushUndo(s, { type: "delete", tasks: [t] }),
   };
+}
+
+// Back from Recently deleted, at the end of the list.
+export function restoreTask(s: TaskStore, id: number): TaskStore {
+  const entry = s.trash.find(e => e.task.id === id);
+  if (!entry) return s;
+  return { ...s, tasks: restoredInto(s.tasks, entry), trash: withoutTrashed(s.trash, [id]) };
 }
 
 function applyAction(s: TaskStore, a: HistoryAction, forward: boolean): Pick<TaskStore, "tasks" | "trash"> {
@@ -79,4 +123,3 @@ export function redo(s: TaskStore): TaskStore {
   if (!a) return s;
   return { ...s, ...applyAction(s, a, true), redo: s.redo.slice(0, -1), undo: [...s.undo, a] };
 }
-

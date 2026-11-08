@@ -16,6 +16,16 @@ export type SentReminders = Record<string, true>;
 // grace its window (due time to due time) would be empty and it never could.
 const AT_DUE_GRACE_MS = 15 * 60000;
 
+// "now", "in 20 min", "in 3h", "in 2 days": how far off a due time is.
+export function dueIn(minsLeft: number): string {
+  const daysLeft = Math.round(minsLeft / 1440);
+  return minsLeft <= 0 ? "now" : minsLeft < 60 ? `in ${minsLeft} min` : minsLeft < 1440 ? `in ${formatDuration(minsLeft)}` : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+}
+// The reminder for a task with a due time, `minsLeft` before it's due.
+function timedNote(t: Task, minsLeft: number, h24: boolean): ReminderNote {
+  return { title: `"${t.title}" is due ${dueIn(minsLeft)}`, body: `${formatDate(t.dueDate)} at ${formatTime(t.dueTime, h24)}` };
+}
+
 // The once-a-day summary of what's due or overdue, or null if there's nothing
 // to say. Tasks with a due time get their own offset reminders, so the summary
 // only covers date-only tasks, unless every offset is off or the task is
@@ -45,10 +55,7 @@ export function offsetReminders(tasks: Task[], enabledOffsets: string[], already
     const sentKey = (o: typeof REMINDER_OFFSETS[number]) => `${t.id}-${o.key}-${t.dueDate}T${t.dueTime}`;
     const closest = eligible.reduce((a, b) => b.mins < a.mins ? b : a);
     if (!sent[sentKey(closest)]) {
-      const minsLeft = Math.round((dueAt - now) / 60000);
-      const daysLeft = Math.round(minsLeft / 1440);
-      const when = minsLeft <= 0 ? "now" : minsLeft < 60 ? `in ${minsLeft} min` : minsLeft < 1440 ? `in ${formatDuration(minsLeft)}` : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
-      notes.push({ title: `"${t.title}" is due ${when}`, body: `${formatDate(t.dueDate)} at ${formatTime(t.dueTime, h24)}` });
+      notes.push(timedNote(t, Math.round((dueAt - now) / 60000), h24));
     }
     for (const o of eligible) { if (!sent[sentKey(o)]) { sent[sentKey(o)] = true; changed = true; } }
   }
@@ -57,4 +64,46 @@ export function offsetReminders(tasks: Task[], enabledOffsets: string[], already
     if (!live.some(([pre, post]) => k.startsWith(pre) && k.endsWith(post))) { delete sent[k]; changed = true; }
   }
   return { notes, sent, changed };
+}
+
+// ---- Scheduled ahead (the phone app) ----
+// A phone can schedule notifications to fire later with the app closed, so
+// instead of "what is owed now" it asks "what will be owed, and when". The
+// same reminders as above, worked out in advance:
+// - a task with a due time: one per enabled offset, at due time minus the
+//   offset, worded as offsetReminders would word it at that moment;
+// - date-only tasks (and timed ones when every offset is off, as in
+//   dailySummary): one summary per due date, at `summaryHour` that morning.
+// Only future ones, soonest first, at most `max` (iOS keeps 64 pending per app).
+export type ScheduledReminder = ReminderNote & { id: string; at: number };
+
+export function upcomingReminders(tasks: Task[], enabledOffsets: string[], now: number, h24: boolean, opts: { summaryHour?: number; max?: number } = {}): ScheduledReminder[] {
+  const { summaryHour = 8, max = 60 } = opts;
+  const out: ScheduledReminder[] = [];
+  const byDay = new Map<string, Task[]>();
+  for (const t of tasks) {
+    if (t.done || t.archived || !t.dueDate) continue;
+    if (t.dueTime && enabledOffsets.length) {
+      const dueAt = new Date(`${t.dueDate}T${t.dueTime}`).getTime();
+      if (Number.isNaN(dueAt)) continue;
+      for (const o of REMINDER_OFFSETS) {
+        if (!enabledOffsets.includes(o.key)) continue;
+        const at = dueAt - o.mins * 60000;
+        if (at > now) out.push({ id: `rem-${t.id}-${o.key}`, at, ...timedNote(t, o.mins, h24) });
+      }
+    } else {
+      const list = byDay.get(t.dueDate);
+      if (list) list.push(t); else byDay.set(t.dueDate, [t]);
+    }
+  }
+  for (const [day, list] of byDay) {
+    const at = new Date(`${day}T${String(summaryHour).padStart(2, "0")}:00`).getTime();
+    if (Number.isNaN(at) || at <= now) continue;
+    out.push({
+      id: `rem-day-${day}`, at,
+      title: list.length === 1 ? `"${list[0].title}" is due today` : `${list.length} tasks due today`,
+      body: list.slice(0, 3).map(t => t.title).join(", "),
+    });
+  }
+  return out.sort((a, b) => a.at - b.at).slice(0, max);
 }

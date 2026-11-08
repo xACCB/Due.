@@ -5,6 +5,6 @@ import { defineConfig } from "vitest/config";
 // the emulator and run separately (`npm run test:rules`, vitest.rules.config.ts).
 export default defineConfig({
   test: {
-    projects: ["packages/core", "apps/web"],
+    projects: ["packages/core", "apps/web", "apps/mobile"],
   },
 });

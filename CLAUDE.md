@@ -71,7 +71,8 @@ and every command above still runs from the root:
 - `apps/mobile` (`@dueplanner/mobile`): the Expo app (SDK 58, expo-router, `src/app/` routes; plan in
   `docs/mobile-plan.md`, how to run it in `apps/mobile/README.md`). Native builds need a Mac
   (`npx expo run:ios`); on Windows, `npm run typecheck:mobile` and `npx expo export --platform ios`
-  (in `apps/mobile`) still check it. One React for both apps: pinned in the root `overrides` and
+  (in `apps/mobile`) still check it. Its plain-TypeScript state (`src/state/taskStore.ts`) is unit-tested
+  in `npm test` (the `mobile` vitest project). One React for both apps: pinned in the root `overrides` and
   `apps/web`, moved together with Expo SDK upgrades. RN/Expo need Node 22.13+.
 - At the root: `firestore.rules`, `firebase.json`, `tests/` (rules, contract, fuzz, e2e, stress),
   `scripts/`, the ESLint config and `vitest.config.ts` (runs both workspaces' unit tests as projects).

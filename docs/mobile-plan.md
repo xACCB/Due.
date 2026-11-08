@@ -1,8 +1,10 @@
 # DuePlanner mobile app: plan
 
-Status: M1 (the monorepo) done 2026-10-18. M2 started 2026-11-08: `apps/mobile` scaffolded (Expo
-SDK 58, expo-router, a placeholder Home screen reading from core, typechecked in CI; see
-`apps/mobile/README.md`). Decided so far:
+Status: M1 (the monorepo) done 2026-10-18. M2 started 2026-11-08: `apps/mobile` (Expo SDK 58,
+expo-router; see `apps/mobile/README.md`) has the Home list with add, complete, delete (to Recently
+deleted) and undo/redo, saved with MMKV under the web's `hw-tasks`/`hw-trash`/`hw-schema` keys. The
+state logic is `apps/mobile/src/state/taskStore.ts`, unit-tested in `npm test`. Not yet run on a
+device or simulator. Left for M2: the DM Serif/DM Mono fonts, swipe gestures, the add questions. Decided so far:
 
 - **React Native with Expo**, a natively built app. Not Capacitor or any other web-view wrapper.
 - **One repo (monorepo):** the web app and the phone app share one `packages/core`.

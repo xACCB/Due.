@@ -9,6 +9,7 @@ import { SCHEMA_VERSION } from "@dueplanner/core/lib/migrations";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { ScreenTitle } from "../components/ScreenTitle";
+import { Dropdown } from "../components/Dropdown";
 
 type Found = { title: string; dueDate: string; checked: boolean };
 
@@ -90,8 +91,7 @@ export default function ImportExport() {
     <ScrollView style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
       <ScreenTitle title="Import/Export" />
 
-      <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
-        <Text style={[styles.cardTitle, { fontSize: fz(13), color: T.text }]} accessibilityRole="header">Import from Syllabus</Text>
+      <Dropdown title="Import from Syllabus">
         <TextInput
           value={text}
           onChangeText={v => { setText(v); setPreview(null); setAdded(null); }}
@@ -146,25 +146,22 @@ export default function ImportExport() {
               )}
           </View>
         )}
-      </View>
+      </Dropdown>
 
-      <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
-        <Text style={[styles.cardTitle, { fontSize: fz(13), color: T.text }]} accessibilityRole="header">Backup & export</Text>
+      <Dropdown title="Backup & export">
         <View style={styles.btnRow}>
           {plainBtn("Import backup (JSON)", importBackup)}
           {plainBtn("Export all (JSON)", exportJSON)}
           {plainBtn("Export tasks (CSV)", exportCSV)}
         </View>
         {!!note && <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted, marginTop: 8 }}>{note}</Text>}
-      </View>
+      </Dropdown>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 16, paddingBottom: 48, gap: 10 },
-  card: { borderWidth: 1, borderRadius: 12, padding: 14 },
-  cardTitle: { fontFamily: F.bodyMedium, marginBottom: 12 },
+  body: { padding: 16, paddingBottom: 48, gap: 8 },
   area: { minHeight: 100, maxHeight: 200, borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, fontFamily: F.body, textAlignVertical: "top", marginBottom: 10 },
   kicker: { fontFamily: F.body, letterSpacing: 0.7, marginBottom: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 10 },

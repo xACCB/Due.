@@ -5,6 +5,7 @@ import { formatDate } from "@dueplanner/core/lib/format";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { ScreenTitle } from "../components/ScreenTitle";
+import { Dropdown } from "../components/Dropdown";
 
 // Inbox -> Messages (the web's): a recap when a day, week, month or year ends,
 // if something was finished or worked on in it. Tapping one opens it in full
@@ -26,8 +27,7 @@ export default function Inbox() {
   return (
     <ScrollView style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
       <ScreenTitle title="Inbox" />
-      <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
-        <Text style={[styles.kicker, { fontSize: fz(11), color: T.textMuted }]} accessibilityRole="header">MESSAGES{items.length ? ` (${items.length})` : ""}</Text>
+      <Dropdown title={`Messages${items.length ? ` (${items.length})` : ""}`} gap={12}>
         {items.length === 0
           ? <Text style={[styles.none, { fontSize: fz(11), color: T.textFaint }]}>No messages yet. A recap arrives here when a day, week, month or year ends, if you finished or worked on something in it.</Text>
           : items.map(({ r, m }) => {
@@ -58,15 +58,13 @@ export default function Inbox() {
               </View>
             );
           })}
-      </View>
+      </Dropdown>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   body: { padding: 16, paddingBottom: 48 },
-  card: { borderWidth: 1, borderRadius: 12, padding: 14, gap: 12 },
-  kicker: { fontFamily: F.body, letterSpacing: 0.7 },
   none: { fontFamily: F.body, lineHeight: 17 },
   item: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   itemMain: { flex: 1, minWidth: 0 },

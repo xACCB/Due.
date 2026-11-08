@@ -9,7 +9,6 @@ import { sortTasks } from "@dueplanner/core/lib/taskViews";
 import { mostUrgent } from "@dueplanner/core/lib/timeLeft";
 import { contrastColor, formatDate, formatDuration, formatTime, ink } from "@dueplanner/core/lib/format";
 import { useApp } from "../../state/appContext";
-import { usePersisted } from "../../lib/usePersisted";
 import { clock } from "../../lib/clock";
 import { cancelFocusEnd, requestNotifications, scheduleFocusEnd } from "../../lib/notifications";
 import * as Fx from "../../state/focusTimer";
@@ -32,7 +31,7 @@ export default function FocusScreen() {
   const { T, fz, h24 } = app;
   const { pomodoroWork, pomodoroBreak, pomodoroAutoBreak, focusShow, subjectColors } = app.settings;
   const L: Fx.Lengths = { work: pomodoroWork, brk: pomodoroBreak, autoBreak: pomodoroAutoBreak };
-  const [state, setState] = usePersisted<Fx.FocusState>("hw-focus-state", Fx.initialFocus(pomodoroWork), raw => Fx.cleanFocus(raw, pomodoroWork));
+  const { focus: state, setFocus: setState } = app;
   const [now, setNow] = useState(clock);
   const focused = useIsFocused();
 

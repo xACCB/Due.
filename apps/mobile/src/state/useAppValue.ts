@@ -14,6 +14,7 @@ import { readJSON, writeJSON } from "../lib/storage";
 import { usePersisted } from "../lib/usePersisted";
 import { syncReminders } from "../lib/notifications";
 import { SETTINGS } from "./settings";
+import * as Fx from "./focusTimer";
 import * as S from "./taskStore";
 
 type Op =
@@ -107,6 +108,10 @@ export function useAppValue() {
   const [hiddenSuggestionFor, setHiddenSuggestionFor] = useSetting("hiddenSuggestionFor");
   const [autoArchiveDays, setAutoArchiveDays] = useSetting("autoArchiveDays");
   const [templates, setTemplates] = useSetting("templates");
+  // The Focus timers (Pomodoro and stopwatch), phone-only (hw-focus-state).
+  // Held here so Home's header can show a running one (the web's timer pill);
+  // the Focus tab runs them.
+  const [focus, setFocus] = usePersisted<Fx.FocusState>("hw-focus-state", Fx.initialFocus(pomodoroWork), raw => Fx.cleanFocus(raw, pomodoroWork));
   const [recaps, setRecaps] = useSetting("recaps");
   const [recapsChecked, setRecapsChecked] = useSetting("recapsChecked");
   const [openSubjects, setOpenSubjects] = useSetting("openSubjects");
@@ -154,7 +159,7 @@ export function useAppValue() {
 
   return {
     T, h24, questions, fz,
-    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter,
+    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus,
     tasks: store.tasks,
     trash: store.trash,
     canUndo: store.undo.length > 0,

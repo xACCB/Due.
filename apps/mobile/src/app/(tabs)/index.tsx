@@ -17,6 +17,7 @@ import { TaskCard } from "../../components/TaskCard";
 import { TaskLayout } from "../../components/TaskLayouts";
 import { AddSheet } from "../../components/AddSheet";
 import { UndoToast } from "../../components/UndoToast";
+import { TimerPill } from "../../components/TimerPill";
 import { dragDelta } from "../../lib/reorder";
 
 // The web's filter chips (taskViews' filterTasks). "noest" (no estimate) has
@@ -179,10 +180,13 @@ export default function Home() {
           </Pressable>
           <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Home</Text>
         </View>
+        <View style={styles.headRight}>
+        {(app.focus.endAt != null || app.focus.swStartedAt != null) && <TimerPill />}
         <Pressable onPress={() => router.push("/time-left")} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Time left: ${fmtMins(tl.totalMins)}. Show the breakdown`} style={styles.timeLeft}>
           <Text style={[styles.tlLabel, { fontSize: fz(9), color: T.textFaint }]}>Time left</Text>
           <Text style={[styles.tlValue, { color: T.light ? "#000" : "#fff" }]}>{fmtMins(tl.totalMins)}</Text>
         </Pressable>
+        </View>
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
 
@@ -231,6 +235,7 @@ const styles = StyleSheet.create({
   headLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   h1: { fontSize: 26, lineHeight: 30, fontFamily: F.heading },
   timeLeft: { alignItems: "flex-end" },
+  headRight: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
   tlLabel: { fontFamily: F.body },
   tlValue: { fontFamily: F.heading, fontSize: 20, lineHeight: 24 },
   rule: { height: 1, marginBottom: 16 },

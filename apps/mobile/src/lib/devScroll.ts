@@ -37,3 +37,19 @@ export function useDevToggle(fn: (id: number) => void): void {
     return () => { togglers.delete(fn); };
   }, [fn]);
 }
+
+// `"act": ["open-message", "recap-day-2026-11-09"]`: a named development action a
+// screen answers (useDevAction), standing in for a tap the remote can't make.
+const actions = new Map<string, Set<(arg: string) => void>>();
+export function devAct(name: string, arg: string): void {
+  for (const f of actions.get(name) ?? []) f(arg);
+}
+export function useDevAction(name: string, fn: (arg: string) => void): void {
+  useEffect(() => {
+    if (!__DEV__) return;
+    const set = actions.get(name) ?? new Set();
+    actions.set(name, set);
+    set.add(fn);
+    return () => { set.delete(fn); };
+  }, [name, fn]);
+}

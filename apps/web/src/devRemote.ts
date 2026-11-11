@@ -9,10 +9,11 @@
 //   {"n":5,"scroll":600}                scroll the page to y
 //   {"n":5,"scroll":600,"in":"[role=dialog]"}  scroll the first scrollable box inside that element instead
 //   {"n":6,"reload":true}
+//   {"n":7,"probe":"[role=dialog]"}     POST each match's box, styles and start of its HTML to the server (probe.txt)
 // The server must send Access-Control-Allow-Origin (a plain http.server doesn't).
 const URL = "http://localhost:8099/web.json";
 
-type Cmd = { n?: number; ls?: Record<string, unknown>; clearLs?: boolean; click?: string; css?: string; scroll?: number; in?: string; reload?: boolean };
+type Cmd = { n?: number; ls?: Record<string, unknown>; clearLs?: boolean; click?: string; css?: string; scroll?: number; in?: string; reload?: boolean; probe?: string };
 
 function visible(el: Element): boolean {
   const r = el.getBoundingClientRect();
@@ -49,6 +50,13 @@ export function startDevRemote(): void {
         const root = cmd.in ? document.querySelector<HTMLElement>(cmd.in) : null;
         const box = root ? [root, ...root.querySelectorAll<HTMLElement>("*")].find(el => el.scrollHeight > el.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) : null;
         if (box) box.scrollTop = cmd.scroll; else window.scrollTo(0, cmd.scroll);
+      }
+      if (cmd.probe) {
+        const report = [...document.querySelectorAll<HTMLElement>(cmd.probe)].slice(0, 5).map(el => {
+          const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+          return `${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)} pos=${cs.position} vis=${cs.visibility} op=${cs.opacity} z=${cs.zIndex} tf=${cs.transform}\n${el.outerHTML.slice(0, 400)}`;
+        });
+        await fetch(URL.replace("web.json", "probe"), { method: "POST", body: `${location.href} vw=${innerWidth}x${innerHeight}\n${report.join("\n---\n") || "no match"}` });
       }
     } catch { /* no script running */ }
   }, 1000);

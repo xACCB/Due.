@@ -6,11 +6,12 @@ import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { ScreenTitle } from "../components/ScreenTitle";
 import { Dropdown } from "../components/Dropdown";
-import { useDevScroll } from "../lib/devScroll";
+import { MessageCard } from "../components/MessageCard";
+import { useDevAction, useDevScroll } from "../lib/devScroll";
 
 // Inbox -> Messages (the web's): a recap when a day, week, month or year ends,
 // if something was finished or worked on in it. Tapping one opens it in full
-// and marks it read; × dismisses it. (The web's Updates list describes the
+// (MessageCard, with Back / Next / Dismiss) and marks it read; × dismisses it. (The web's Updates list describes the
 // website, so it isn't shown here until the phone app has its own.)
 export default function Inbox() {
   const app = useApp();
@@ -18,12 +19,15 @@ export default function Inbox() {
   const { recaps, setRecaps } = app.settings;
   const [openId, setOpenId] = useState<string | null>(null);
   const items = recaps.map(r => ({ r, m: recapMessage(r) }));
+  const openIndex = openId ? items.findIndex(x => x.m.id === openId) : -1;
 
+  // The web's openMessage: opens it and marks it read.
   const open = (id: string) => {
-    setOpenId(o => (o === id ? null : id));
+    setOpenId(id);
     setRecaps(prev => prev.map(r => (r.id === id && !r.read ? { ...r, read: true } : r)));
   };
   const dismiss = (id: string) => setRecaps(prev => prev.filter(r => r.id !== id));
+  useDevAction("open-message", id => open(id)); // development only
 
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
@@ -35,10 +39,9 @@ export default function Inbox() {
           ? <Text style={[styles.none, { fontSize: fz(11), color: T.textFaint }]}>No messages yet. A recap arrives here when a day, week, month or year ends, if you finished or worked on something in it.</Text>
           : items.map(({ r, m }) => {
             const unread = !r.read;
-            const isOpen = openId === m.id;
             return (
               <View key={m.id} style={styles.item}>
-                <Pressable onPress={() => open(m.id)} accessibilityRole="button" accessibilityState={{ expanded: isOpen }}
+                <Pressable onPress={() => open(m.id)} accessibilityRole="button" accessibilityHint="Opens the message"
                   accessibilityLabel={`${unread ? "Unread: " : ""}${m.headline}, ${formatDate(m.date)}`} style={styles.itemMain}>
                   <View style={styles.itemHead}>
                     <View style={styles.headline}>
@@ -48,12 +51,7 @@ export default function Inbox() {
                     <Text style={[styles.date, { fontSize: fz(10), color: T.textFaint }]}>{formatDate(m.date)}</Text>
                   </View>
                   <Text style={[styles.kind, { fontSize: fz(10), color: T.textFaint }]}>{m.kind}</Text>
-                  <Text numberOfLines={isOpen ? undefined : 2} style={[styles.desc, { fontSize: fz(11), color: unread ? T.text : T.textMuted }]}>{m.description}</Text>
-                  {isOpen && !!m.list?.length && (
-                    <View style={styles.list}>
-                      {m.list.map((line, i) => <Text key={i} style={[styles.desc, { fontSize: fz(11), color: T.textMuted }]}>· {line}</Text>)}
-                    </View>
-                  )}
+                  <Text numberOfLines={2} style={[styles.desc, { fontSize: fz(11), color: unread ? T.text : T.textMuted }]}>{m.description}</Text>
                 </Pressable>
                 <Pressable onPress={() => dismiss(m.id)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Dismiss ${m.headline}`}>
                   <Text style={{ fontSize: fz(14), color: T.textFaint }}>×</Text>
@@ -62,6 +60,15 @@ export default function Inbox() {
             );
           })}
       </Dropdown>
+      {openIndex >= 0 && (
+        <MessageCard
+          items={items.map(x => x.m)}
+          index={openIndex}
+          onIndex={i => open(items[i].m.id)}
+          onDismiss={id => { setOpenId(null); dismiss(id); }}
+          onClose={() => setOpenId(null)}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -78,5 +85,4 @@ const styles = StyleSheet.create({
   date: { fontFamily: F.body },
   kind: { fontFamily: F.body, marginTop: 1 },
   desc: { fontFamily: F.body, marginTop: 2, lineHeight: 16 },
-  list: { marginTop: 6, gap: 2 },
 });

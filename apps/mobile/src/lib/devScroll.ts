@@ -23,3 +23,17 @@ export function useDevScroll(ref: RefObject<Scrollable | null>): void {
     return () => { listeners.delete(l); };
   }, [ref]);
 }
+
+// `"toggle": 1003` ticks (or unticks) that task through Home's own toggle, so
+// the completion hold and animation run as from a tap. Development only.
+const togglers = new Set<(id: number) => void>();
+export function devToggle(id: number): void {
+  for (const t of togglers) t(id);
+}
+export function useDevToggle(fn: (id: number) => void): void {
+  useEffect(() => {
+    if (!__DEV__) return;
+    togglers.add(fn);
+    return () => { togglers.delete(fn); };
+  }, [fn]);
+}

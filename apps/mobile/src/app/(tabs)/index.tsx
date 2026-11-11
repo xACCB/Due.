@@ -19,7 +19,7 @@ import { AddSheet } from "../../components/AddSheet";
 import { UndoToast } from "../../components/UndoToast";
 import { TimerPill } from "../../components/TimerPill";
 import { dragDelta } from "../../lib/reorder";
-import { useDevScroll } from "../../lib/devScroll";
+import { useDevScroll, useDevToggle } from "../../lib/devScroll";
 
 // The web's filter chips (taskViews' filterTasks). "noest" (no estimate) has
 // no chip of its own: Time left's "Show them" sets it, and its chip clears it.
@@ -122,6 +122,8 @@ export default function Home() {
     if (!t.done) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     say(t.done ? `"${t.title}" marked not done` : `"${t.title}" completed`);
   };
+  // Development only: the dev remote's "toggle" ticks a task the way a tap does.
+  useDevToggle(id => { const t = app.tasks.find(x => x.id === id); if (t) toggle(t); });
   const remove = (t: Task) => { glide(); app.remove(t.id); say(`"${t.title}" deleted`); };
   const startTemplate = (tpl: TaskTemplate) => {
     const step = startFromTemplate(app.questions, tpl);
@@ -219,7 +221,7 @@ export default function Home() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!dragging}
         renderItem={({ item }) => item.kind === "layout"
-          ? <TaskLayout layout={s.layout as Exclude<typeof s.layout, "list">} tasks={shown} now={now} onOpen={t => router.push(`/task/${t.id}`)} onToggle={toggle} onDelete={remove} />
+          ? <TaskLayout layout={s.layout as Exclude<typeof s.layout, "list">} tasks={shown} now={now} onOpen={t => router.push(`/task/${t.id}`)} onToggle={toggle} onDelete={remove} justDone={justDone} />
           : item.kind === "head"
           ? <Text style={[styles.groupHead, { fontSize: fz(10), color: T.textMuted }]} accessibilityRole="header">{item.label.toUpperCase()}</Text>
           : (

@@ -7,6 +7,7 @@ import type { LayoutName } from "@dueplanner/core/constants";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { Swipe } from "./Swipe";
+import { CheckGlyph, CheckPop, StrikeText } from "./DoneMarks";
 
 const DONE_GREEN = "#2ED573";
 
@@ -17,13 +18,15 @@ interface Props {
   onOpen: (t: Task) => void;
   onToggle: (t: Task) => void;
   onDelete: (t: Task) => void;
+  // Tasks just ticked, in Home's hold: their check and strike animate in.
+  justDone?: number[];
 }
 
 // The web's other task layouts (renderTasks in App.tsx): Board, Checklist,
 // Kanban, Progress and Pyramid. Every card swipes like the List's (right:
 // done, left: delete); Kanban and Pyramid sort by priority and show no due
 // label, as on the web. Grouping applies only to the List.
-export function TaskLayout({ layout, tasks, now, onOpen, onToggle, onDelete }: Props) {
+export function TaskLayout({ layout, tasks, now, onOpen, onToggle, onDelete, justDone = [] }: Props) {
   const app = useApp();
   const { T, fz } = app;
   const { colorCodeUrgency: cc, subjectColors } = app.settings;
@@ -31,12 +34,15 @@ export function TaskLayout({ layout, tasks, now, onOpen, onToggle, onDelete }: P
   const dueText = (t: Task) => countdown(t.dueDate, t.dueTime, now) ?? daysUntil(t.dueDate);
   const sc = (t: Task) => subjectColors[t.subject] || T.accent;
 
+  const held = (t: Task) => t.done && justDone.includes(t.id);
   const check = (t: Task, size: number, round = true) => (
+    <CheckPop key={`chk-${t.id}`} animate={held(t)}>
     <Pressable onPress={() => onToggle(t)} hitSlop={10} accessibilityRole="checkbox" accessibilityState={{ checked: t.done }}
       accessibilityLabel={t.done ? `Mark ${t.title} not done` : `Mark ${t.title} done`}
       style={{ width: size, height: size, borderRadius: round ? size / 2 : 4, borderWidth: size < 16 ? 1.5 : 2, borderColor: t.done ? DONE_GREEN : T.textFaint, backgroundColor: t.done ? DONE_GREEN : "transparent", alignItems: "center", justifyContent: "center" }}>
-      {t.done && <Text style={{ color: "#111", fontSize: Math.round(size * 0.6), lineHeight: Math.round(size * 0.7), fontWeight: "700" }}>✓</Text>}
+      {t.done && <CheckGlyph size={size - (size < 16 ? 3 : 4)} font={Math.round(size * 0.6)} animate={held(t)} />}
     </Pressable>
+    </CheckPop>
   );
   const del = (t: Task, size = 13) => (
     <Pressable onPress={() => onDelete(t)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Delete ${t.title}`}>
@@ -44,7 +50,7 @@ export function TaskLayout({ layout, tasks, now, onOpen, onToggle, onDelete }: P
     </Pressable>
   );
   const title = (t: Task, size: number, heading: boolean, oneLine = false) => (
-    <Text numberOfLines={oneLine ? 1 : undefined} style={{ flexShrink: 1, fontFamily: heading ? F.heading : F.body, fontSize: fz(size), color: t.done ? T.textFaint : T.text, textDecorationLine: t.done ? "line-through" : "none" }}>{t.title}</Text>
+    <StrikeText done={t.done} animate={held(t)} color={T.textFaint} numberOfLines={oneLine ? 1 : undefined} style={{ fontFamily: heading ? F.heading : F.body, fontSize: fz(size), color: t.done ? T.textFaint : T.text }}>{t.title}</StrikeText>
   );
   const pill = (t: Task) => !!t.subject && (
     <Text style={[styles.pill, { fontSize: fz(10), backgroundColor: sc(t) + "22", color: ink(sc(t), T.light) }]}>{t.subject}</Text>

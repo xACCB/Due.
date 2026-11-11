@@ -6,6 +6,7 @@ import { countdown, daysUntil, formatDate, formatDuration, formatTime, getPriori
 import type { Theme } from "../theme/types";
 import { F } from "../theme/fonts";
 import { Swipe } from "./Swipe";
+import { CheckGlyph, CheckPop, StrikeText } from "./DoneMarks";
 
 const DONE_GREEN = "#2ED573";
 
@@ -95,6 +96,7 @@ export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subj
               <Text style={{ fontSize: fz(14), color: T.textFaint, lineHeight: fz(14) + 4 }}>⠿</Text>
             </View>
           )}
+          <CheckPop animate={!!holding && task.done}>
           <Pressable
             onPress={onToggle}
             hitSlop={10}
@@ -103,13 +105,14 @@ export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subj
             accessibilityLabel={task.done ? `Mark ${task.title} not done` : `Mark ${task.title} done`}
             style={[styles.check, { borderColor: task.done ? DONE_GREEN : T.textFaint, backgroundColor: task.done ? DONE_GREEN : "transparent" }]}
           >
-            {task.done && <Text style={styles.tick}>✓</Text>}
+            {task.done && <CheckGlyph size={15} font={11} animate={!!holding} />}
           </Pressable>
+          </CheckPop>
           <View style={styles.body}>
             <View style={styles.titleLine}>
               {isTop && <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.accent + "33", color: T.accent }]}>do first</Text>}
               {isNext && <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.text + "11", color: T.text }]}>next up</Text>}
-              <Text style={[styles.title, { fontSize: fz(15), color: task.done ? T.textFaint : T.text, textDecorationLine: task.done ? "line-through" : "none" }]}>{task.title}</Text>
+              <StrikeText done={task.done} animate={!!holding} color={T.textFaint} style={[styles.title, { fontSize: fz(15), color: task.done ? T.textFaint : T.text }]}>{task.title}</StrikeText>
               {!!task.recurrence && task.recurrence !== "none" && <Text style={{ color: T.textMuted, fontSize: fz(12) }} accessibilityLabel={`Repeats ${task.recurrence}`}>↻</Text>}
               {!!task.subject && <Text style={[styles.pill, { fontSize: fz(10), backgroundColor: sc + "22", color: ink(sc, T.light) }]}>{task.subject}</Text>}
               {!!task.priorityOverride && (

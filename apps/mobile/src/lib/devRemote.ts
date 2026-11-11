@@ -2,7 +2,7 @@ import { DevSettings } from "react-native";
 import { router, type Href } from "expo-router";
 import { devSampleTasks } from "./devSample";
 import { writeJSON } from "./storage";
-import { devScrollTo } from "./devScroll";
+import { devScrollTo, devToggle } from "./devScroll";
 
 // Development only: lets a script on the Mac move the Simulator's app around,
 // to check screens without tapping. Every second it reads
@@ -14,7 +14,7 @@ import { devScrollTo } from "./devScroll";
 // scrolls the screen showing (lib/devScroll.ts).
 const URL = "http://localhost:8099/cmd.json";
 
-type Cmd = { n?: number; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean; scroll?: number };
+type Cmd = { n?: number; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean; scroll?: number; toggle?: number };
 
 export function startDevRemote(): () => void {
   let last: number | null = null;
@@ -35,6 +35,7 @@ export function startDevRemote(): () => void {
       if (cmd.go) router.navigate(cmd.go as Href);
       if (cmd.push) router.push(cmd.push as Href);
       if (typeof cmd.scroll === "number") devScrollTo(cmd.scroll); // screens using useDevScroll
+      if (typeof cmd.toggle === "number") devToggle(cmd.toggle); // Home's toggle (useDevToggle)
     } catch { /* no script running: nothing to do */ }
   };
   const id = setInterval(tick, 1000);

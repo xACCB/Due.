@@ -87,7 +87,16 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   `python3 -m http.server 8099`, write `{"n":<next>,"go":"/calendar"}` (or `"seed":true` for the
   sample tasks in `src/lib/devSample.ts`, `"set":["hw-key",value]`, `"back":true`), then
   `xcrun simctl io booted screenshot`. `simctl openurl` shows an "Open in DuePlanner?" prompt
-  that can't be dismissed without tapping, so avoid it.
+  that can't be dismissed without tapping, so avoid it. `"scroll":600` scrolls the screen showing
+  (screens pass their ScrollView/FlatList ref to `useDevScroll`, `src/lib/devScroll.ts`).
+- **Comparing with the website on the same Simulator:** start the web dev server with
+  `VITE_DEV_REMOTE=1 npx vite` (in `apps/web`), open it in the Simulator's Safari with
+  `xcrun simctl openurl booted http://localhost:5173/` (an http URL shows no prompt), and drive it
+  the same way through `http://localhost:8099/web.json` (`apps/web/src/devRemote.ts`: `ls` writes
+  localStorage and reloads, `click` presses a button by its text or aria-label, `scroll` with an
+  optional `in` selector). The file server must send `Access-Control-Allow-Origin: *`, which
+  `python3 -m http.server` doesn't. `xcrun simctl launch booted com.apple.mobilesafari` or
+  `com.duestudios.dueplanner` brings either to the front. None of this opens a window on the Mac.
 - **Before M3, flag these to the user:** the iOS app has to be registered in the Firebase console
   (which gives a `GoogleService-Info.plist`); App Check needs App Attest for iOS and debug tokens
   for the Simulator, since App Check is enforced; and Sign in with Apple (which Apple requires when

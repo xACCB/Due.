@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type ComponentRef } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import type { Priority, Recurrence, Task } from "@dueplanner/core/types";
-import { contrastColor, formatDuration, formatTime, ink } from "@dueplanner/core/lib/format";
+import { contrastColor, formatDate, formatDuration, formatTime, ink } from "@dueplanner/core/lib/format";
 import { localDateStr, todayISO } from "@dueplanner/core/lib/dates";
 import { secondsSince, sessionMinutes } from "@dueplanner/core/lib/timers";
-import { templateFromTask } from "@dueplanner/core/lib/taskActions";
+import { skipPatch, snoozePatch, templateFromTask } from "@dueplanner/core/lib/taskActions";
+import { snoozeTarget, type SnoozeKind } from "@dueplanner/core/lib/tasks";
 import { allTagsOf } from "@dueplanner/core/lib/taskViews";
 import { priColor } from "@dueplanner/core/constants";
 import { LIMITS, oneLine } from "@dueplanner/core/lib/limits";
@@ -17,6 +18,8 @@ import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Chip, Segmented } from "../../components/ui";
 import { DateTimeField } from "../../components/DateTimeField";
+import { UndoToast } from "../../components/UndoToast";
+import { useDevScroll } from "../../lib/devScroll";
 
 // The task page (the web's TaskModal in its `page` form): every field is open
 // to edit and saves on its own when you leave it, so each change is one undo
@@ -26,6 +29,8 @@ import { DateTimeField } from "../../components/DateTimeField";
 const REPEATS: { label: string; value: Recurrence }[] = [
   { label: "None", value: "none" }, { label: "Daily", value: "daily" }, { label: "Weekly", value: "weekly" }, { label: "Monthly", value: "monthly" },
 ];
+// The web sheet's Snooze choices (core's snoozeTarget).
+const SNOOZES: [SnoozeKind, string][] = [["later", "In 3 hours"], ["tomorrow", "Tomorrow"], ["week", "Next week"]];
 // The web's order: Auto, then Low to High, each in its priority colour.
 const PRIORITIES: (Priority | null)[] = [null, "low", "medium", "high"];
 
@@ -52,6 +57,19 @@ function TaskForm({ task }: { task: Task }) {
   const { subjects, subjectColors, colorCodeUrgency } = app.settings;
   const edit = (patch: Partial<Task>) => app.edit(task.id, patch);
   const quiet = (patch: Partial<Task>) => app.quiet(task.id, patch);
+  // The web's toast for Snooze and Skip: what happened, with Undo.
+  const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
+  const say = (text: string) => setToast(t => ({ text, n: (t?.n ?? 0) + 1 }));
+  const snooze = (kind: SnoozeKind) => {
+    const after = snoozePatch(task, snoozeTarget(kind));
+    app.edit(task.id, after, `snooze "${task.title}"`);
+    say(`"${task.title}" snoozed to ${formatDate(after.dueDate)}${after.dueTime ? ` ${formatTime(after.dueTime, h24)}` : ""}`);
+  };
+  const skipOne = () => {
+    const after = skipPatch(task, todayISO());
+    app.edit(task.id, after, `skip "${task.title}"`);
+    say(`"${task.title}" skipped to ${formatDate(after.dueDate)}`);
+  };
 
   // Text fields hold what's typed until it's saved; when the saved value
   // changes underneath (undo, another screen), they take it again.
@@ -129,9 +147,11 @@ function TaskForm({ task }: { task: Task }) {
     setTag("");
   };
 
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={100}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <TextInput
           value={title}
           onChangeText={setTitle}
@@ -169,6 +189,27 @@ function TaskForm({ task }: { task: Task }) {
           )}
         </Field>
 
+        {/* The web sheet's Snooze row: moves the due date on (and for "In 3
+            hours" the time), and for a repeating task "Skip this one" moves it
+            to its next occurrence without completing it. Each is an undo step. */}
+        {!task.done && (
+          <View style={styles.snooze}>
+            <Text style={[styles.snoozeLabel, { fontSize: fz(10), color: T.textMuted }]}>SNOOZE</Text>
+            {SNOOZES.map(([k, l]) => (
+              <Pressable key={k} onPress={() => snooze(k)} accessibilityRole="button" accessibilityLabel={`Snooze ${l.toLowerCase()}`}
+                style={({ pressed }) => [styles.snoozeBtn, { backgroundColor: T.surface, borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
+                <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.text }}>{l}</Text>
+              </Pressable>
+            ))}
+            {!!task.recurrence && task.recurrence !== "none" && (
+              <Pressable onPress={skipOne} accessibilityRole="button" accessibilityHint="Moves this repeating task to its next occurrence without completing it"
+                style={({ pressed }) => [styles.snoozeBtn, { backgroundColor: T.surface, borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
+                <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.text }}>Skip this one ↻</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
         <Field label="How long it takes" T={T}>
           <View style={styles.line}>
             <NumberBox value={hours} onChange={setHours} onDone={saveEstimate} T={T} label="Hours" />
@@ -182,7 +223,7 @@ function TaskForm({ task }: { task: Task }) {
           <Segmented label="Repeats" options={REPEATS} value={task.recurrence ?? "none"} onChange={v => edit({ recurrence: v })} T={T} />
         </Field>
 
-        <Field label="Priority" T={T}>
+        <Field label="Priority" card T={T} fz={fz}>
           <View style={styles.prioRow} accessibilityRole="radiogroup" accessibilityLabel="Priority">
             {PRIORITIES.map(p => {
               const active = p === null ? !task.priorityOverride : task.priorityOverride === p;
@@ -197,7 +238,7 @@ function TaskForm({ task }: { task: Task }) {
           </View>
         </Field>
 
-        <Field label={`Subtasks${subtasks.length ? ` (${subtasks.filter(s => s.done).length}/${subtasks.length})` : ""}`} T={T}>
+        <Field label="Subtasks" card T={T} fz={fz} right={subtasks.length ? `${subtasks.filter(s => s.done).length}/${subtasks.length}` : undefined}>
           {subtasks.map(s => (
             <View key={s.id} style={styles.subRow}>
               <Pressable
@@ -206,17 +247,18 @@ function TaskForm({ task }: { task: Task }) {
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: s.done }}
                 accessibilityLabel={s.text}
-                style={[styles.subCheck, { borderColor: s.done ? "#2ED573" : T.textMuted, backgroundColor: s.done ? "#2ED573" : "transparent" }]}
+                style={[styles.subCheck, { borderColor: s.done ? "#2ED573" : T.textFaint, backgroundColor: s.done ? "#2ED573" : "transparent" }]}
               >
-                {s.done && <Text style={styles.tick}>✓</Text>}
+                {s.done && <Text style={[styles.subTick, { fontSize: fz(9) }]}>✓</Text>}
               </Pressable>
-              <Text style={[styles.subText, { color: s.done ? T.textMuted : T.text, textDecorationLine: s.done ? "line-through" : "none" }]}>{s.text}</Text>
-              <Pressable onPress={() => edit({ subtasks: subtasks.filter(x => x.id !== s.id) })} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Delete subtask ${s.text}`}>
-                <Text style={[styles.x, { color: T.textMuted }]}>×</Text>
+              <Text style={[styles.subText, { fontSize: fz(12), color: s.done ? T.textFaint : T.text, textDecorationLine: s.done ? "line-through" : "none" }]}>{s.text}</Text>
+              <Pressable onPress={() => edit({ subtasks: subtasks.filter(x => x.id !== s.id) })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Delete subtask ${s.text}`}>
+                <Text style={{ fontSize: fz(13), color: T.textFaint, paddingHorizontal: 2 }}>×</Text>
               </Pressable>
             </View>
           ))}
           {subtasks.length < LIMITS.subtasks && (
+            <View style={styles.addRow}>
             <TextInput
               value={subtask}
               onChangeText={setSubtask}
@@ -227,18 +269,28 @@ function TaskForm({ task }: { task: Task }) {
               maxLength={LIMITS.title}
               returnKeyType="done"
               accessibilityLabel="Add a subtask"
-              style={[styles.input, { color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
+              style={[styles.addInput, { fontSize: fz(12), color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
             />
+            <PlusButton label="Add subtask" onPress={addSubtask} T={T} fz={fz} />
+            </View>
           )}
         </Field>
 
-        <Field label="Tags" T={T}>
+        <Field label="Tags" card T={T} fz={fz}>
           {tags.length > 0 && (
-            <View style={[styles.wrap, { marginBottom: 10 }]}>
-              {tags.map(t => <Chip key={t} label={`${t}  ×`} accessibilityLabel={`Remove tag ${t}`} T={T} onPress={() => quiet({ tags: tags.filter(x => x !== t) })} />)}
+            <View style={[styles.wrap, { gap: 6, marginBottom: 10 }]}>
+              {tags.map(t => (
+                <View key={t} style={[styles.tagPill, { backgroundColor: T.accent + "22" }]}>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.accent }}>{t}</Text>
+                  <Pressable onPress={() => quiet({ tags: tags.filter(x => x !== t) })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Remove tag ${t}`}>
+                    <Text style={{ fontSize: fz(13), color: T.accent, paddingHorizontal: 4 }}>×</Text>
+                  </Pressable>
+                </View>
+              ))}
             </View>
           )}
           {tags.length < LIMITS.tags && (
+            <View style={styles.addRow}>
             <TextInput
               value={tag}
               onChangeText={setTag}
@@ -250,8 +302,10 @@ function TaskForm({ task }: { task: Task }) {
               autoCapitalize="none"
               returnKeyType="done"
               accessibilityLabel="Add a tag"
-              style={[styles.input, { color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
+              style={[styles.addInput, { fontSize: fz(12), color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
             />
+            <PlusButton label="Add tag" onPress={addTag} T={T} fz={fz} />
+            </View>
           )}
           {tags.length < LIMITS.tags && suggestions.length > 0 && (
             <View style={[styles.wrap, { marginTop: 8, gap: 6 }]}>
@@ -350,16 +404,32 @@ function TaskForm({ task }: { task: Task }) {
           </View>
         )}
       </ScrollView>
+      {toast && <UndoToast text={toast.text} n={toast.n} T={T} bottom={24} onHide={() => setToast(null)} onUndo={() => { app.undo(); setToast(null); }} />}
     </KeyboardAvoidingView>
   );
 }
 
-function Field({ label, T, children }: { label: string; T: Theme; children: ReactNode }) {
+// A labelled field. `card`: in the web's rounded card (Priority, Subtasks,
+// Tags), with `right` (e.g. the subtask count) across from the label.
+function Field({ label, T, card, right, fz, children }: { label: string; T: Theme; card?: boolean; right?: string; fz?: (n: number) => number; children: ReactNode }) {
+  const size = fz ? fz(10) : 11;
   return (
-    <View style={styles.field}>
-      <Text style={[styles.label, { color: T.textMuted }]}>{label.toUpperCase()}</Text>
+    <View style={card ? [styles.cardField, { backgroundColor: T.card, borderColor: T.border }] : styles.field}>
+      <View style={styles.labelRow}>
+        <Text style={[styles.label, { fontSize: size, color: T.textMuted }]}>{label.toUpperCase()}</Text>
+        {!!right && <Text style={{ fontFamily: F.body, fontSize: size + 1, color: T.textFaint }}>{right}</Text>}
+      </View>
       {children}
     </View>
+  );
+}
+
+// The web's accent "+" beside the subtask and tag fields.
+function PlusButton({ label, onPress, T, fz }: { label: string; onPress: () => void; T: Theme; fz: (n: number) => number }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.plus, { backgroundColor: T.accent, opacity: pressed ? 0.8 : 1 }]}>
+      <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(12), color: contrastColor(T.accent) }}>+</Text>
+    </Pressable>
   );
 }
 
@@ -389,6 +459,9 @@ function NumberBox({ value, onChange, onDone, T, label }: { value: string; onCha
 }
 
 const styles = StyleSheet.create({
+  snooze: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: -8, marginBottom: 18 },
+  snoozeLabel: { fontFamily: F.body, letterSpacing: 0.8, marginRight: 2 },
+  snoozeBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
   body: { padding: 20, paddingBottom: 60 },
   gone: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16, padding: 24 },
   title: { fontSize: 26, fontFamily: F.heading, marginBottom: 16, paddingVertical: 4 },
@@ -412,6 +485,13 @@ const styles = StyleSheet.create({
   todayRight: { flexDirection: "row", gap: 10, alignItems: "center" },
   todayTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTopWidth: 1 },
   field: { marginBottom: 22 },
+  cardField: { borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 16 },
+  labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  addRow: { flexDirection: "row", gap: 6 },
+  addInput: { flex: 1, fontFamily: F.body, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  plus: { borderRadius: 8, paddingHorizontal: 12, justifyContent: "center" },
+  tagPill: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 999, paddingLeft: 10, paddingRight: 4, paddingVertical: 3 },
+  subTick: { color: "#111", fontWeight: "700" },
   label: { fontSize: 11, fontFamily: F.body, letterSpacing: 1, marginBottom: 10 },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   line: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 6 },
@@ -420,10 +500,10 @@ const styles = StyleSheet.create({
   unit: { fontSize: 14, fontFamily: F.body, marginLeft: -6 },
   num: { width: 64, fontSize: 16, fontFamily: F.body, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, textAlign: "center" },
   input: { fontSize: 16, fontFamily: F.body, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 4 },
-  subRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
-  subCheck: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  subRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  subCheck: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   tick: { color: "#000", fontSize: 13, fontWeight: "700", lineHeight: 15 },
-  subText: { flex: 1, fontSize: 14, fontFamily: F.body },
+  subText: { flex: 1, fontFamily: F.body },
   x: { fontSize: 20, lineHeight: 22, paddingHorizontal: 4 },
   value: { fontSize: 14, fontFamily: F.body },
 });

@@ -19,6 +19,7 @@ import { AddSheet } from "../../components/AddSheet";
 import { UndoToast } from "../../components/UndoToast";
 import { TimerPill } from "../../components/TimerPill";
 import { dragDelta } from "../../lib/reorder";
+import { useDevScroll } from "../../lib/devScroll";
 
 // The web's filter chips (taskViews' filterTasks). "noest" (no estimate) has
 // no chip of its own: Time left's "Show them" sets it, and its chip clears it.
@@ -188,6 +189,8 @@ export default function Home() {
     </View>
   );
 
+  const scrollRef = useRef<FlatList<Row>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <View style={styles.header}>
@@ -207,7 +210,7 @@ export default function Home() {
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
 
-      <FlatList
+      <FlatList ref={scrollRef}
         data={rows}
         keyExtractor={r => r.key}
         contentContainerStyle={styles.list}

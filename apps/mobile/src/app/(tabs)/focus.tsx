@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { AppState as RNAppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useIsFocused } from "expo-router";
@@ -14,6 +14,7 @@ import { cancelFocusEnd, requestNotifications, scheduleFocusEnd } from "../../li
 import * as Fx from "../../state/focusTimer";
 import { F } from "../../theme/fonts";
 import { Ring } from "../../components/Ring";
+import { useDevScroll } from "../../lib/devScroll";
 
 // Focus (the web's Focus Mode): the task to work on, the Pomodoro and the
 // stopwatch, as Settings -> Focus timer chooses. Time is logged to the task as
@@ -145,6 +146,8 @@ export default function FocusScreen() {
   };
   const solid = [styles.btn, { backgroundColor: T.accent }];
 
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       {running && focused && <KeepAwake />}
@@ -152,7 +155,7 @@ export default function FocusScreen() {
         <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Focus</Text>
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
         {breakEnded && (
           <View style={[styles.breakCard, { backgroundColor: T.card, borderColor: "#2ED57355" }]} accessibilityLiveRegion="polite">
             <View style={styles.breakHead}>

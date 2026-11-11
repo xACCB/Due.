@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, type ComponentRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { recapMessage } from "@dueplanner/core/lib/recaps";
 import { formatDate } from "@dueplanner/core/lib/format";
@@ -6,6 +6,7 @@ import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { ScreenTitle } from "../components/ScreenTitle";
 import { Dropdown } from "../components/Dropdown";
+import { useDevScroll } from "../lib/devScroll";
 
 // Inbox -> Messages (the web's): a recap when a day, week, month or year ends,
 // if something was finished or worked on in it. Tapping one opens it in full
@@ -24,8 +25,10 @@ export default function Inbox() {
   };
   const dismiss = (id: string) => setRecaps(prev => prev.filter(r => r.id !== id));
 
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <ScrollView style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
+    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
       <ScreenTitle title="Inbox" />
       <Dropdown title={`Messages${items.length ? ` (${items.length})` : ""}`} gap={12}>
         {items.length === 0

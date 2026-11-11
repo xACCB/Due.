@@ -150,12 +150,12 @@ const styles = StyleSheet.create({
   check: { width: 19, height: 19, borderRadius: 10, borderWidth: 2, alignItems: "center", justifyContent: "center", marginTop: 2 },
   tick: { color: "#111", fontSize: 11, lineHeight: 13, fontWeight: "700" },
   body: { flex: 1, minWidth: 0 },
-  titleLine: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", columnGap: 7, rowGap: 4 },
+  titleLine: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7 }, // the web's gap:7, both ways
   title: { fontFamily: F.heading },
   badge: { fontFamily: F.bodyMedium, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: "hidden" },
   pill: { fontFamily: F.body, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: "hidden" },
   tag: { fontFamily: F.body },
-  metaLine: { flexDirection: "row", flexWrap: "wrap", columnGap: 12, marginTop: 4 },
+  metaLine: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 4 }, // the web's gap:12, so a wrapped due label sits 12px lower
   meta: { fontFamily: F.body },
   metaStrong: { fontFamily: F.bodyMedium },
   subs: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 5 },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, type ComponentRef } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
@@ -14,6 +14,7 @@ import { requestNotifications } from "../../lib/notifications";
 import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Row, Section, Segmented, Stepper, ToggleRow } from "../../components/ui";
+import { useDevScroll } from "../../lib/devScroll";
 
 // Settings, in the web's sections and order (Looks, Date & time, Focus timer,
 // New task questions, Subjects, Task list, Reminders), then feedback and
@@ -73,13 +74,15 @@ export default function SettingsScreen() {
   const doneCount = done.length;
   const clearCompleted = () => app.removeMany(done.map(t => t.id));
 
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Settings</Text>
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
 
         <Section title="Looks" T={T}>
           <Row label="Appearance" T={T}>

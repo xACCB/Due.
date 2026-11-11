@@ -10,6 +10,8 @@ import { initErrorReporting } from './lib/report'
 // emulator mode (src/lib/report.ts).
 initErrorReporting(import.meta.env.VITE_FIREBASE_EMULATORS === '1' ? undefined : import.meta.env.VITE_SENTRY_DSN, __APP_VERSION__, import.meta.env.MODE)
 installGestureDebug()
+// Development only: the screen-comparison remote (src/devRemote.ts). Never in a build.
+if (import.meta.env.DEV && import.meta.env.VITE_DEV_REMOTE === '1') import('./devRemote').then(m => m.startDevRemote())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

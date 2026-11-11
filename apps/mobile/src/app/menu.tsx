@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, type ComponentRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
@@ -7,6 +7,7 @@ import { dueShort, SIDEBAR_TASK_CAP, subjectGroups } from "@dueplanner/core/lib/
 import { todayISO } from "@dueplanner/core/lib/dates";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
+import { useDevScroll } from "../lib/devScroll";
 
 // The menu (the web's sidebar, which on a phone is a drawer): Search, Inbox,
 // History, Import/Export and Settings, then the subjects. A subject's arrow
@@ -39,8 +40,10 @@ export default function Menu() {
     </Pressable>
   );
 
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <ScrollView style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
+    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
       {row({ ios: "magnifyingglass", android: "search" }, "Search", () => go("/search"))}
       <View style={[styles.rule, { backgroundColor: T.border }]} />
       {row({ ios: "bell", android: "notifications" }, "Inbox", () => go("/inbox"), unread > 0 && (

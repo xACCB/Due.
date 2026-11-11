@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -12,6 +12,7 @@ import { AddSheet } from "../../components/AddSheet";
 import { DayTaskRow } from "../../components/DayTaskRow";
 import { DueDeck } from "../../components/DueDeck";
 import { sortDay } from "../../lib/day";
+import { useDevScroll } from "../../lib/devScroll";
 
 const longDay = (iso: string) => new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
@@ -20,13 +21,15 @@ export default function CalendarScreen() {
   const app = useApp();
   const { T, fz } = app;
   const { calendarView, setCalendarView } = app.settings;
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Calendar</Text>
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
         <View style={styles.switch}>
           {([["month", "Month"], ["deck", "Deck"]] as const).map(([k, l]) => {
             const on = calendarView === k;

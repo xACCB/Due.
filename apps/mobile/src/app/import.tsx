@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, type ComponentRef } from "react";
 import { Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { File, Paths } from "expo-file-system";
 import { parseSyllabus } from "@dueplanner/core/lib/syllabus";
@@ -10,6 +10,7 @@ import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { ScreenTitle } from "../components/ScreenTitle";
 import { Dropdown } from "../components/Dropdown";
+import { useDevScroll } from "../lib/devScroll";
 
 type Found = { title: string; dueDate: string; checked: boolean };
 
@@ -87,8 +88,10 @@ export default function ImportExport() {
     </Pressable>
   );
 
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <ScrollView style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
       <ScreenTitle title="Import/Export" />
 
       <Dropdown title="Import from Syllabus">

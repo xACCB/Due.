@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, type ComponentRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import type { Task } from "@dueplanner/core/types";
@@ -9,6 +9,7 @@ import { formatDuration, ink } from "@dueplanner/core/lib/format";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { MiniTaskRow } from "../components/MiniTaskRow";
+import { useDevScroll } from "../lib/devScroll";
 
 const fmtMins = (m: number) => formatDuration(m) || "0m";
 
@@ -31,8 +32,10 @@ export default function TimeLeft() {
     </View>
   );
 
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <ScrollView style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
+    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
       <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Time left</Text>
       <Text style={[styles.total, { color: T.light ? "#000" : "#fff" }]}>{fmtMins(tl.totalMins)}</Text>
 

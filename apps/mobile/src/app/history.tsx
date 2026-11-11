@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, type ComponentRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SymbolView } from "expo-symbols";
 import { formatDate } from "@dueplanner/core/lib/format";
@@ -6,6 +6,7 @@ import { localDateStr } from "@dueplanner/core/lib/dates";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { ScreenTitle } from "../components/ScreenTitle";
+import { useDevScroll } from "../lib/devScroll";
 
 // History (the web's History screen): undo and redo, and Recently deleted
 // (kept 30 days) with Restore and Empty.
@@ -25,8 +26,10 @@ export default function History() {
     </Pressable>
   );
 
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <ScrollView style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
+    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
       <ScreenTitle title="History" />
       <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
         <View style={styles.steps}>

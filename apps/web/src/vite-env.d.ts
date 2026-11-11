@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   // Sentry DSN for error reports (src/lib/report.ts). Optional: nothing is
   // loaded or sent without it. Not a secret (it only allows sending events).
   readonly VITE_SENTRY_DSN?: string;
+  // "1" turns on the development screen-comparison remote (src/devRemote.ts).
+  readonly VITE_DEV_REMOTE?: string;
 }
 
 interface ImportMeta {

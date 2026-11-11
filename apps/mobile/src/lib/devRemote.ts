@@ -2,6 +2,7 @@ import { DevSettings } from "react-native";
 import { router, type Href } from "expo-router";
 import { devSampleTasks } from "./devSample";
 import { writeJSON } from "./storage";
+import { devScrollTo } from "./devScroll";
 
 // Development only: lets a script on the Mac move the Simulator's app around,
 // to check screens without tapping. Every second it reads
@@ -9,10 +10,11 @@ import { writeJSON } from "./storage";
 // `{ "n": 4, "seed": true }` or `{ "n": 5, "set": ["hw-group", "subject"] }`,
 // and acts once per new `n`. Never started in a release build (app/_layout.tsx).
 // `"set":["dev-open-section","Subjects"]` opens that Settings section after the
-// reload (components/ui.tsx Section), so a screenshot can show it.
+// reload (components/ui.tsx Section), so a screenshot can show it. `"scroll":600`
+// scrolls the screen showing (lib/devScroll.ts).
 const URL = "http://localhost:8099/cmd.json";
 
-type Cmd = { n?: number; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean };
+type Cmd = { n?: number; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean; scroll?: number };
 
 export function startDevRemote(): () => void {
   let last: number | null = null;
@@ -32,6 +34,7 @@ export function startDevRemote(): () => void {
       if (cmd.back && router.canGoBack()) router.back();
       if (cmd.go) router.navigate(cmd.go as Href);
       if (cmd.push) router.push(cmd.push as Href);
+      if (typeof cmd.scroll === "number") devScrollTo(cmd.scroll); // screens using useDevScroll
     } catch { /* no script running: nothing to do */ }
   };
   const id = setInterval(tick, 1000);

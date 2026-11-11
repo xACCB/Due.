@@ -15,6 +15,7 @@ import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Row, Section, Segmented, Stepper, ToggleRow } from "../../components/ui";
 import { useDevScroll } from "../../lib/devScroll";
+import { AppHeader } from "../../components/AppHeader";
 
 // Settings, in the web's sections and order (Looks, Date & time, Focus timer,
 // New task questions, Subjects, Task list, Reminders), then feedback and
@@ -78,10 +79,7 @@ export default function SettingsScreen() {
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
-      <View style={styles.header}>
-        <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Settings</Text>
-      </View>
-      <View style={[styles.rule, { backgroundColor: T.accent }]} />
+      <AppHeader title="Settings" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
 
         <Section title="Looks" T={T}>
@@ -244,15 +242,16 @@ export default function SettingsScreen() {
         <Pressable onPress={() => { Linking.openURL(FEEDBACK_URL).catch(() => {}); }} accessibilityRole="link" style={[styles.wide, { borderColor: T.border }]}>
           <Text style={[styles.wideText, { fontSize: fz(12), color: T.textMuted }]}>Send feedback / report a bug</Text>
         </Pressable>
-        <Pressable onPress={() => { Linking.openURL(PRIVACY_URL).catch(() => {}); }} accessibilityRole="link" style={[styles.wide, { borderColor: T.border }]}>
-          <Text style={[styles.wideText, { fontSize: fz(12), color: T.textMuted }]}>Privacy policy</Text>
-        </Pressable>
         <Pressable onPress={clearCompleted} disabled={doneCount === 0} accessibilityRole="button" accessibilityState={{ disabled: doneCount === 0 }} accessibilityHint="Deletes completed tasks that aren't archived. You can undo this"
           style={[styles.wide, { borderColor: "#FF475744", opacity: doneCount ? 1 : 0.45 }]}>
-          <Text style={[styles.wideText, { fontSize: fz(12), color: ink("#FF4757", T.light) }]}>Clear completed{doneCount ? ` (${doneCount})` : ""}</Text>
+          <Text style={[styles.wideText, { fontSize: fz(11), color: ink("#FF4757", T.light) }]}>{doneCount ? `Clear ${doneCount} task${doneCount === 1 ? "" : "s"} completed` : "No completed tasks to clear"}</Text>
         </Pressable>
 
-        <Text style={[styles.foot, { fontSize: fz(11), color: T.textFaint }]}>DuePlanner {Constants.expoConfig?.version ?? ""}, by due. studios</Text>
+        {/* The web's foot: the version, then the privacy policy as a link. */}
+        <Text style={[styles.foot, { fontSize: fz(9), color: T.textFaint }]}>
+          DuePlanner v{Constants.expoConfig?.version ?? ""} ·{" "}
+          <Text onPress={() => { Linking.openURL(PRIVACY_URL).catch(() => {}); }} accessibilityRole="link" style={{ textDecorationLine: "underline" }}>Privacy policy</Text>
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -269,9 +268,6 @@ function Arrow({ glyph, a11y, disabled, onPress, T }: { glyph: string; a11y: str
 const styles = StyleSheet.create({
   root: { flex: 1 },
   body: { padding: 16, paddingBottom: 140 },
-  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
-  h1: { fontSize: 26, lineHeight: 30, fontFamily: F.heading },
-  rule: { height: 1, marginBottom: 16 },
   inline: { flexDirection: "row", alignItems: "center", gap: 10 },
   swatch: { width: 14, height: 14, borderRadius: 7 },
   x: { fontSize: 20, lineHeight: 22, paddingHorizontal: 4 },

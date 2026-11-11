@@ -11,8 +11,11 @@ import { F } from "../../theme/fonts";
 import { AddSheet } from "../../components/AddSheet";
 import { DayTaskRow } from "../../components/DayTaskRow";
 import { DueDeck } from "../../components/DueDeck";
-import { sortDay } from "../../lib/day";
-import { useDevScroll } from "../../lib/devScroll";
+import { relativeDay, sortDay } from "../../lib/day";
+import { PopCard } from "../../components/PopCard";
+import { useDevAction, useDevScroll } from "../../lib/devScroll";
+import type { Task } from "@dueplanner/core/types";
+import { AppHeader } from "../../components/AppHeader";
 
 const longDay = (iso: string) => new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
@@ -25,10 +28,7 @@ export default function CalendarScreen() {
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
-      <View style={styles.header}>
-        <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Calendar</Text>
-      </View>
-      <View style={[styles.rule, { backgroundColor: T.accent }]} />
+      <AppHeader title="Calendar" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
         <View style={styles.switch}>
           {([["month", "Month"], ["deck", "Deck"]] as const).map(([k, l]) => {
@@ -54,7 +54,9 @@ function MonthView() {
   const today = todayISO();
   const [[year, month], setYM] = useState<[number, number]>(() => [Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1]);
   const [selected, setSelected] = useState(today);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null); // the date a new task gets
+  const [dayCard, setDayCard] = useState<string | null>(null); // the day open in DayCard
+  useDevAction("open-day", iso => { setSelected(iso); setDayCard(iso); }); // development only
 
   const cells = calendarMonthOnly ? monthOnlyGrid(year, month, weekStart) : monthGrid(year, month, weekStart);
   const due = useMemo(() => byDueDate(app.tasks.filter(t => !t.archived)), [app.tasks]);
@@ -112,7 +114,7 @@ function MonthView() {
             return (
               <View key={iso} style={styles.cellBox}>
                 <Pressable
-                  onPress={() => setSelected(iso)}
+                  onPress={() => { setSelected(iso); setDayCard(iso); }}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isSel }}
                   accessibilityLabel={longDay(iso) + (isToday ? ", today" : "") + (open.length ? `, ${open.length} due${mins ? `, ${formatDuration(mins)}` : ""}` : "") + (overdue ? ", overdue" : "")}
@@ -138,22 +140,62 @@ function MonthView() {
         {dayTasks.length === 0
           ? <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textFaint, marginBottom: 10 }}>Nothing due.</Text>
           : <View style={styles.rows}>{dayTasks.map(t => <DayTaskRow key={t.id} t={t} surface onOpen={() => router.push(`/task/${t.id}`)} />)}</View>}
-        <Pressable onPress={() => setAdding(true)} accessibilityRole="button" style={({ pressed }) => [styles.add, { borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
+        <Pressable onPress={() => setAdding(selected)} accessibilityRole="button" style={({ pressed }) => [styles.add, { borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
           <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textMuted }}>
             + Add homework due {selected === today ? "today" : new Date(selected + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </Text>
         </Pressable>
       </View>
-      <AddSheet visible={adding} presetDate={selected} onClose={() => setAdding(false)} />
+      {dayCard && (
+        <DayCard iso={dayCard} today={today} list={sortDay(due.get(dayCard) ?? [])}
+          onOpen={t => { setDayCard(null); router.push(`/task/${t.id}`); }}
+          onAdd={() => { setAdding(dayCard); setDayCard(null); }}
+          onClose={() => setDayCard(null)} />
+      )}
+      <AddSheet visible={adding != null} presetDate={adding ?? selected} onClose={() => setAdding(null)} />
     </View>
+  );
+}
+
+// A day opened from the Month grid (the web's DayDetail): the weekday, the
+// date, how far off it is and what's due, that day's tasks, and adding one.
+function DayCard({ iso, today, list, onOpen, onAdd, onClose }: {
+  iso: string; today: string; list: Task[]; onOpen: (t: Task) => void; onAdd: () => void; onClose: () => void;
+}) {
+  const { T, fz } = useApp();
+  const d = new Date(iso + "T00:00:00");
+  const open = list.filter(t => !t.done);
+  const mins = open.reduce((n, t) => n + (t.estMins || 0), 0);
+  const late = iso < today && open.length > 0;
+  const rel = relativeDay(iso, today);
+  return (
+    <PopCard onClose={onClose} label={longDay(iso)}>
+      <View style={{ paddingRight: 28 }}>
+        <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted, letterSpacing: 1.3 }}>{d.toLocaleDateString(undefined, { weekday: "long" }).toUpperCase()}</Text>
+        <Text style={{ fontFamily: F.heading, fontSize: 30, lineHeight: 33, color: T.text, marginTop: 4 }} accessibilityRole="header">{d.toLocaleDateString(undefined, { month: "long", day: "numeric" })}</Text>
+        <Text style={{ fontFamily: F.body, fontSize: fz(11), color: late ? ink("#FF4757", T.light) : T.textMuted, marginTop: 6 }}>
+          {rel}{late ? ", overdue" : ""}{list.length > 0 ? ` · ${open.length === 0 ? "all done" : `${open.length} due`}${mins ? ` · ${formatDuration(mins)}` : ""}` : ""}
+        </Text>
+      </View>
+      <View style={{ height: 1, backgroundColor: T.border, marginTop: 14, marginBottom: 12 }} />
+      {list.length === 0
+        ? <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textFaint, marginBottom: 12 }}>Nothing due.</Text>
+        : (
+          <ScrollView style={{ flexGrow: 0, marginBottom: 12 }} contentContainerStyle={{ gap: 6 }}>
+            {list.map(t => <DayTaskRow key={t.id} t={t} surface onOpen={() => onOpen(t)} />)}
+          </ScrollView>
+        )}
+      <Pressable onPress={onAdd} accessibilityRole="button" style={({ pressed }) => [styles.add, { borderColor: T.border, opacity: pressed ? 0.7 : 1, marginTop: 0 }]}>
+        <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textMuted }}>
+          + Add homework due {iso === today ? "today" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+        </Text>
+      </Pressable>
+    </PopCard>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
-  h1: { fontSize: 26, lineHeight: 30, fontFamily: F.heading },
-  rule: { height: 1, marginBottom: 16 },
   body: { paddingHorizontal: 16, paddingBottom: 140 },
   switch: { flexDirection: "row", gap: 6, marginBottom: 10 },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },

@@ -5,10 +5,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import type { Task, TaskTemplate } from "@dueplanner/core/types";
-import { filterTasks, groupTasks, heldOpen, sortTasks, timeLeft, withHeldOpen } from "@dueplanner/core/lib/taskViews";
+import { filterTasks, groupTasks, heldOpen, sortTasks, withHeldOpen } from "@dueplanner/core/lib/taskViews";
 import { buildSuggestion, suggestedTask } from "@dueplanner/core/lib/tasks";
-import { contrastColor, formatDuration } from "@dueplanner/core/lib/format";
-import { todayISO } from "@dueplanner/core/lib/dates";
+import { contrastColor } from "@dueplanner/core/lib/format";
 import { startFromTemplate } from "@dueplanner/core/lib/addFlow";
 import { useApp } from "../../state/appContext";
 import { useNow } from "../../lib/useNow";
@@ -17,9 +16,9 @@ import { TaskCard } from "../../components/TaskCard";
 import { TaskLayout } from "../../components/TaskLayouts";
 import { AddSheet } from "../../components/AddSheet";
 import { UndoToast } from "../../components/UndoToast";
-import { TimerPill } from "../../components/TimerPill";
 import { dragDelta } from "../../lib/reorder";
 import { useDevScroll, useDevToggle } from "../../lib/devScroll";
+import { AppHeader } from "../../components/AppHeader";
 
 // The web's filter chips (taskViews' filterTasks). "noest" (no estimate) has
 // no chip of its own: Time left's "Show them" sets it, and its chip clears it.
@@ -29,8 +28,6 @@ const EMPTY: Record<string, string> = {
   noest: "Every open task has an estimate", all: "Nothing here yet",
 };
 
-// "3h 20m", or "0m" (the web header's fmtMins).
-const fmtMins = (m: number) => formatDuration(m) || "0m";
 
 type Row = { kind: "head"; key: string; label: string } | { kind: "task"; key: string; task: Task } | { kind: "layout"; key: string };
 
@@ -72,7 +69,6 @@ export default function Home() {
   const allSorted = useMemo(() => sortTasks(app.tasks, justDone), [app.tasks, justDone]);
   const shown = filterTasks(allSorted, { filter, subject: subjectOn, showDone: s.showDone, justDone });
   const pending = allSorted.filter(t => heldOpen(t, justDone));
-  const tl = timeLeft(app.tasks, todayISO());
   const pendingCount = shown.filter(t => !t.done && !t.archived).length;
 
   // The task the suggestion names (not the list's top, which can be in a
@@ -195,22 +191,7 @@ export default function Home() {
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
-      <View style={styles.header}>
-        <View style={styles.headLeft}>
-          <Pressable onPress={() => router.push("/menu")} hitSlop={10} accessibilityRole="button" accessibilityLabel="Open menu" accessibilityHint="Inbox, History, Import/Export and your subjects">
-            <SymbolView name={{ ios: "sidebar.left", android: "left_panel_open" }} size={21} tintColor={T.textMuted} />
-          </Pressable>
-          <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Home</Text>
-        </View>
-        <View style={styles.headRight}>
-        {(app.focus.endAt != null || app.focus.swStartedAt != null) && <TimerPill />}
-        <Pressable onPress={() => router.push("/time-left")} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Time left: ${fmtMins(tl.totalMins)}. Show the breakdown`} style={styles.timeLeft}>
-          <Text style={[styles.tlLabel, { fontSize: fz(9), color: T.textFaint }]}>Time left</Text>
-          <Text style={[styles.tlValue, { color: T.light ? "#000" : "#fff" }]}>{fmtMins(tl.totalMins)}</Text>
-        </Pressable>
-        </View>
-      </View>
-      <View style={[styles.rule, { backgroundColor: T.accent }]} />
+      <AppHeader title="Home" />
 
       <FlatList ref={scrollRef}
         data={rows}
@@ -253,14 +234,6 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
-  headLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  h1: { fontSize: 26, lineHeight: 30, fontFamily: F.heading },
-  timeLeft: { alignItems: "flex-end" },
-  headRight: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
-  tlLabel: { fontFamily: F.body },
-  tlValue: { fontFamily: F.heading, fontSize: 20, lineHeight: 24 },
-  rule: { height: 1, marginBottom: 16 },
   list: { paddingHorizontal: 16, paddingBottom: 140 },
   suggest: { flexDirection: "row", alignItems: "flex-start", gap: 7, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 16 },
   suggestText: { flex: 1, fontFamily: F.body, lineHeight: 18 },

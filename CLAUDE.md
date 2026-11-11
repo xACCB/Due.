@@ -49,8 +49,9 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   and run `npm install`. The Mac clone doesn't have this problem.
 - **Skills and plugins are checked before they're installed** (the user's choice, 2026-11-10). Only from
   trustworthy sources (official company repos, well-known authors); download into
-  `~/tools/skill-quarantine/`, scan with NVIDIA SkillSpector
-  (`~/tools/skillspector/.venv/bin/skillspector scan <folder> --no-llm`), read the SKILL.md and every
+  `~/Claude/tools/skill-quarantine/`, scan with NVIDIA SkillSpector
+  (`~/Claude/tools/skillspector/.venv/bin/skillspector scan <folder> --no-llm`, a Python 3.13
+  environment: 3.15 can't build its yara-python), read the SKILL.md and every
   script yourself (the scanner flags plenty of harmless text), then copy just the skill folder into
   `~/.claude/skills/`. Never `npx skills add` straight in (find-skills suggests it). Anything that
   changes Claude Code's settings (hooks, MCP servers) is shown to the user first. Installed so far:
@@ -59,15 +60,16 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   frontend-design and playwright plugins, and the Context7 MCP server (`claude mcp add --transport http
   --scope user context7 https://mcp.context7.com/mcp`: current library docs, e.g. Expo SDK 58; the
   lookups go to Upstash, not the code). Declined: git guardrails (blocks every `git push`), Impeccable
-  (downloads a compiled engine and adds edit hooks). The user plans to move projects and tools into one `~/Claude`
-  folder: update these paths when that happens.
+  (downloads a compiled engine and adds edit hooks).
 - **Explain plainly, give exact steps.** The user is new to Mac, Xcode and native app tooling. Say
   what a term means the first time (e.g. "scaffolding"), give commands to paste as code blocks in
   the order to run them, say what output to expect and what to do if it fails, and keep a short
   checklist for anything they do by hand. While a long download or build runs, carry on with work
   that doesn't need it and say what you're doing.
 - **Two machines.** Windows: `C:\Users\aaron\OneDrive\Desktop\Me\Projects\Dueplanner` (the web app
-  and most work so far). Mac: `~/dev/DuePlanner` (needed for every iOS build and the Simulator).
+  and most work so far). Mac: `~/Claude/DuePlanner` (needed for every iOS build and the Simulator; moved from
+  `~/dev/Dueplanner` on 2026-11-10, with `~/Claude/tools` beside it; new projects go in `~/Claude`
+  too).
   Start each session with `git pull`; only one machine should have unpushed work at a time. The
   Mac has Xcode, Homebrew, `node@22`, watchman, cocoapods, ccache, `gh` and openjdk. Homebrew's openjdk
   isn't on PATH, so before `npm run test:rules` or `test:e2e` there, run

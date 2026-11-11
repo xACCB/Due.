@@ -7,7 +7,7 @@ The Expo app. Plan and milestones: `docs/mobile-plan.md`. Shared logic comes fro
 
 One-time setup: Xcode (App Store, open it once, then Settings -> Components -> an iOS Simulator),
 then `brew install node@22 git watchman cocoapods`, and clone the repo into a folder that iCloud
-doesn't sync (e.g. `~/dev`).
+doesn't sync (e.g. `~/Claude`, where it lives on the Mac).
 
 ```
 npm install            # at the repo root: installs the web app, core and this app together

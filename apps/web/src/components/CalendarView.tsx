@@ -4,7 +4,7 @@ import { priColor } from "@dueplanner/core/constants";
 import type { ThemeObj } from "@dueplanner/core/themes";
 import { localDateStr } from "@dueplanner/core/lib/dates";
 import { formatTime, formatDuration, ink } from "@dueplanner/core/lib/format";
-import { monthGrid, monthOnlyGrid, shiftMonth, weekdayLabels, byDueDate } from "@dueplanner/core/lib/calendar";
+import { monthGrid, monthOnlyGrid, shiftMonth, weekdayLabels, byDueDate, deckDates, deckTop, deckDragX, deckSwipe, monthSwipe } from "@dueplanner/core/lib/calendar";
 import { releaseVelocity } from "@dueplanner/core/lib/spring";
 import { FONT } from "@dueplanner/core/fonts";
 import { CheckMark } from "./icons";
@@ -97,7 +97,7 @@ export function CalendarView({tasks,T,F,subjectColors,colorCodeUrgency,weekStart
         <div style={{height:rows*48+(rows-1)*4+6,margin:-3,padding:3,boxSizing:"border-box",transition:"height .22s ease",overflow:"hidden"}}>
         <div ref={gridRef} key={`${year}-${month}`} className="sec-body" role="group" aria-label={`${monthName}, use arrow keys to move between days`} onKeyDown={onGridKey}
           onPointerDown={e=>{swipeX.current=e.clientX;}}
-          onPointerUp={e=>{const x=swipeX.current;swipeX.current=null;if(x!=null&&Math.abs(e.clientX-x)>50)goMonth(e.clientX<x?1:-1);}}
+          onPointerUp={e=>{const x=swipeX.current;swipeX.current=null;const step=x==null?0:monthSwipe(e.clientX-x);if(step)goMonth(step);}}
           style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,touchAction:"pan-y"}}>
           {cells.map((iso,i)=>{
             if(iso==null)return <div key={`blank-${i}`} aria-hidden="true" style={{height:48}}/>;
@@ -173,13 +173,12 @@ export function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone
 }){
   const today=localDateStr(new Date(now));
   const due=byDueDate(tasks.filter(t=>!t.archived));
-  const dates=[...due.keys()].filter(d=>d>=today||due.get(d)!.some(t=>!t.done)).sort();
-  // The card on top is remembered by its date, not its position, so adding or
-  // finishing tasks elsewhere doesn't move you to a different card.
+  const dates=deckDates(due,today);
+  // The card on top is remembered by its date, not its position (deckTop), so
+  // adding or finishing tasks elsewhere doesn't move you to a different card.
   const [picked,setPicked]=useState<string|null>(null);
-  const fallback=dates.find(d=>d>=today)??dates[dates.length-1];
-  const current=picked&&dates.includes(picked)?picked:fallback;
-  const idx=dates.indexOf(current);
+  const current=deckTop(dates,picked,today);
+  const idx=current?dates.indexOf(current):-1;
   const topRef=useRef<HTMLDivElement>(null);
   const drag=useRef<{x:number;y:number;locked:boolean;samples:{t:number;y:number}[]}|null>(null);
   const moved=useRef(false);
@@ -224,9 +223,7 @@ export function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone
       else return;
     }
     d.samples.push({t:e.timeStamp,y:e.clientX}); if(d.samples.length>8)d.samples.shift();
-    // Follows the finger toward the next card; resists when there's nothing
-    // that way, and when pulling right (the earlier card slides in over it).
-    const x=dx<0&&idx<dates.length-1?dx:dx*0.3;
+    const x=deckDragX(dx,idx<dates.length-1);
     el.style.transform=`translateX(${x}px) rotate(${x*0.04}deg)`;
   }
   function onUp(e:React.PointerEvent){
@@ -234,7 +231,7 @@ export function DueDeck({tasks,T,F,subjectColors,h24,now,onOpenTask,onToggleDone
     drag.current=null;
     if(!d||!d.locked||!el)return;
     const dx=e.clientX-d.x, v=releaseVelocity(d.samples);
-    const want=dx<=-70||(v<-600&&dx<-24)?1:dx>=70||(v>600&&dx>24)?-1:0;
+    const want=deckSwipe(dx,v);
     el.style.transition="";
     if(want===1&&go(1))return;
     el.style.transform=depthTransform(0);

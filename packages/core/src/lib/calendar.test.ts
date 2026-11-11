@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { monthGrid, monthOnlyGrid, shiftMonth, weekdayLabels, byDueDate } from "./calendar";
+import { monthGrid, monthOnlyGrid, shiftMonth, weekdayLabels, byDueDate, deckDates, deckTop, deckDragX, deckSwipe, monthSwipe } from "./calendar";
 
 describe("monthGrid", () => {
   it("is 42 consecutive days starting on the week holding the 1st", () => {
@@ -72,5 +72,55 @@ describe("byDueDate", () => {
     expect(m.get("2026-10-01")?.map(t => t.id)).toEqual([1, 3]);
     expect(m.get("2026-10-02")?.map(t => t.id)).toEqual([4]);
     expect(m.has("")).toBe(false);
+  });
+});
+
+describe("the Deck", () => {
+  const t = (done: boolean) => ({ done });
+  const due = new Map([
+    ["2026-11-01", [t(true)]],            // past, all done: no card
+    ["2026-11-03", [t(true), t(false)]],  // past with an open task: a card
+    ["2026-11-10", [t(true)]],            // today, even when done
+    ["2026-11-20", [t(false)]],
+    ["2026-11-12", [t(true)]],            // later, even when done
+  ]);
+  const today = "2026-11-10";
+
+  it("has a card for each date still open or not yet past, in order", () => {
+    expect(deckDates(due, today)).toEqual(["2026-11-03", "2026-11-10", "2026-11-12", "2026-11-20"]);
+    expect(deckDates(new Map(), today)).toEqual([]);
+  });
+
+  it("opens on the first date from today, and keeps a picked date while it exists", () => {
+    const dates = deckDates(due, today);
+    expect(deckTop(dates, null, today)).toBe("2026-11-10");
+    expect(deckTop(dates, "2026-11-03", today)).toBe("2026-11-03");
+    expect(deckTop(dates, "2026-11-01", today)).toBe("2026-11-10"); // gone: back to the default
+    expect(deckTop(["2026-10-01", "2026-10-05"], null, today)).toBe("2026-10-05"); // all past: the last
+    expect(deckTop([], null, today)).toBeUndefined();
+  });
+
+  it("follows the finger toward a next card and resists otherwise", () => {
+    expect(deckDragX(-50, true)).toBe(-50);
+    expect(deckDragX(-50, false)).toBe(-15);
+    expect(deckDragX(50, true)).toBe(15);
+  });
+
+  it("moves on past 70px or on a flick, and springs back from anything less", () => {
+    expect(deckSwipe(-70, 0)).toBe(1);
+    expect(deckSwipe(70, 0)).toBe(-1);
+    expect(deckSwipe(-69, 0)).toBe(0);
+    expect(deckSwipe(-30, -700)).toBe(1);   // a quick flick
+    expect(deckSwipe(30, 700)).toBe(-1);
+    expect(deckSwipe(-20, -900)).toBe(0);   // too short to count
+    expect(deckSwipe(-30, -500)).toBe(0);   // too slow
+    expect(deckSwipe(-30, 700)).toBe(0);    // flicked back the other way
+  });
+
+  it("changes month past 50px, left for the next", () => {
+    expect(monthSwipe(-51)).toBe(1);
+    expect(monthSwipe(51)).toBe(-1);
+    expect(monthSwipe(50)).toBe(0);
+    expect(monthSwipe(-10)).toBe(0);
   });
 });

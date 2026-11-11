@@ -51,3 +51,35 @@ export function byDueDate<T extends {dueDate:string}>(tasks:T[]):Map<string,T[]>
   }
   return m;
 }
+
+// The Deck (Calendar -> Deck, web and phone): one card per date that still has
+// an open task or is today or later, oldest first. `due` is byDueDate's map.
+export function deckDates<T extends {done:boolean}>(due:Map<string,T[]>, today:string):string[] {
+  return [...due.keys()].filter(d=>d>=today||due.get(d)!.some(t=>!t.done)).sort();
+}
+
+// The card on top: the picked date while it's still in the deck (remembered by
+// date, not position, so adding or finishing tasks elsewhere doesn't move you),
+// else the first date from today on, else the last. Undefined when empty.
+export function deckTop(dates:string[], picked:string|null, today:string):string|undefined {
+  if(picked&&dates.includes(picked))return picked;
+  return dates.find(d=>d>=today)??dates[dates.length-1];
+}
+
+// Where the top card sits while dragged `dx` pixels: with the finger toward a
+// next card, a third as far when there's none that way or when pulling right
+// (the earlier card comes in over it instead).
+export function deckDragX(dx:number, hasNext:boolean):number {
+  return dx<0&&hasNext?dx:dx*0.3;
+}
+
+// Letting go of the top card: 1 for the next date, -1 for the one before, 0 to
+// spring back. Past 70px, or a flick (over 600px/s) after 24px.
+export function deckSwipe(dx:number, velocity:number):-1|0|1 {
+  return dx<=-70||(velocity<-600&&dx<-24)?1:dx>=70||(velocity>600&&dx>24)?-1:0;
+}
+
+// The month grid: a swipe past 50px changes month, left for the next one.
+export function monthSwipe(dx:number):-1|0|1 {
+  return Math.abs(dx)>50?(dx<0?1:-1):0;
+}

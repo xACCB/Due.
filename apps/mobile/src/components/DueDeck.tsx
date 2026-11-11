@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
-import { byDueDate } from "@dueplanner/core/lib/calendar";
+import { byDueDate, deckDates, deckDragX, deckSwipe, deckTop } from "@dueplanner/core/lib/calendar";
 import { todayISO } from "@dueplanner/core/lib/dates";
 import { formatDuration, ink } from "@dueplanner/core/lib/format";
 import { useApp } from "../state/appContext";
@@ -24,11 +24,10 @@ export function DueDeck() {
   const { width } = useWindowDimensions();
   const today = todayISO();
   const due = useMemo(() => byDueDate(app.tasks.filter(t => !t.archived)), [app.tasks]);
-  const dates = useMemo(() => [...due.keys()].filter(d => d >= today || due.get(d)!.some(t => !t.done)).sort(), [due, today]);
+  const dates = useMemo(() => deckDates(due, today), [due, today]);
   const [picked, setPicked] = useState<string | null>(null);
-  const fallback = dates.find(d => d >= today) ?? dates[dates.length - 1];
-  const current = picked && dates.includes(picked) ? picked : fallback;
-  const idx = dates.indexOf(current);
+  const current = deckTop(dates, picked, today);
+  const idx = current ? dates.indexOf(current) : -1;
 
   const [x] = useState(() => new Animated.Value(0));
   const busy = useRef(false);
@@ -81,12 +80,10 @@ export function DueDeck() {
     onMoveShouldSetPanResponder: (_, g) => !busy.current && Math.abs(g.dx) >= 6 && Math.abs(g.dx) > Math.abs(g.dy),
     onPanResponderMove: (_, g) => {
       const { idx: i, dates: ds } = live.current;
-      // Follows the finger toward the next card; resists when there's nothing
-      // that way, and when pulling right (the earlier card comes in over it).
-      x.setValue(g.dx < 0 && i < ds.length - 1 ? g.dx : g.dx * 0.3);
+      x.setValue(deckDragX(g.dx, i < ds.length - 1));
     },
     onPanResponderRelease: (_, g) => {
-      const want = g.dx <= -70 || (g.vx < -0.6 && g.dx < -24) ? 1 : g.dx >= 70 || (g.vx > 0.6 && g.dx > 24) ? -1 : 0;
+      const want = deckSwipe(g.dx, g.vx * 1000); // vx is in px per ms
       if (want === 1 && goRef.current(1)) return;
       Animated.timing(x, { toValue: 0, duration: 200, useNativeDriver: true }).start();
       if (want === -1) goRef.current(-1);

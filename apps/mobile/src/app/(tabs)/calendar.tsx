@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { byDueDate, monthGrid, monthOnlyGrid, shiftMonth, weekdayLabels } from "@dueplanner/core/lib/calendar";
+import { byDueDate, monthGrid, monthOnlyGrid, shiftMonth, monthSwipe, weekdayLabels } from "@dueplanner/core/lib/calendar";
 import { todayISO } from "@dueplanner/core/lib/dates";
 import { contrastColor, formatDuration, ink } from "@dueplanner/core/lib/format";
 import { priColor } from "@dueplanner/core/constants";
@@ -71,7 +71,8 @@ function MonthView() {
   const [swipe] = useState(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
     onPanResponderRelease: (_, g) => {
-      if (Math.abs(g.dx) > 50) setYM(shiftMonth(ym.current.year, ym.current.month, g.dx < 0 ? 1 : -1));
+      const step = monthSwipe(g.dx);
+      if (step) setYM(shiftMonth(ym.current.year, ym.current.month, step));
     },
   }));
 

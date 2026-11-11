@@ -1155,7 +1155,8 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   after a swap runs in a layout effect, or the outgoing card flashes for a frame.
 - `(tabs)/focus.tsx` **Focus** (the web's Focus Mode): the Pomodoro as a `Ring` (FOCUS/BREAK,
   Start/Resume/Pause, Reset, Break/Skip), the task card ("up next" or "focusing on", Change task,
-  Mark done via `creditTask`; defaults to `mostUrgent` of the open tasks), and the stopwatch
+  Mark done via `creditTask`; defaults to the first open task in your own order, the web's
+  `topTask`), and the stopwatch
   (Start/Pause, Reset, "Log Xm to task"). A finished Pomodoro shows the web's "Pomodoro done" toast;
   a finished break shows the "Break's over" card suggesting the task just worked on (else
   `mostUrgent`) with Start. Which cards show follows `hw-focus-show`. The

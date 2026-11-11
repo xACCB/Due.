@@ -139,7 +139,7 @@ export default function ImportExport() {
                       </View>
                     </Pressable>
                   ))}
-                  <Pressable onPress={commit} disabled={!checked.length} accessibilityRole="button" style={[styles.mainBtn, { backgroundColor: T.accent, opacity: checked.length ? 1 : 0.4, marginTop: 6 }]}>
+                  <Pressable onPress={commit} disabled={!checked.length} accessibilityRole="button" accessibilityState={{ disabled: !checked.length }} style={[styles.mainBtn, { backgroundColor: T.accent, opacity: checked.length ? 1 : 0.4, marginTop: 6 }]}>
                     <Text style={[styles.mainText, { fontSize: fz(13), color: contrastColor(T.accent) }]}>+ Add {checked.length} task{checked.length === 1 ? "" : "s"}</Text>
                   </Pressable>
                 </>

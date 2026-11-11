@@ -135,11 +135,11 @@ export function Stepper({ value, onChange, min, max, step = 1, T, label, unit }:
   const { fz } = useApp();
   return (
     <View style={styles.stepper}>
-      <Pressable onPress={() => onChange(Math.max(min, value - step))} disabled={value <= min} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Less ${label}`} style={[styles.stepBtn, { borderColor: T.border, opacity: value <= min ? 0.4 : 1 }]}>
+      <Pressable onPress={() => onChange(Math.max(min, value - step))} disabled={value <= min} hitSlop={6} accessibilityRole="button" accessibilityState={{ disabled: value <= min }} accessibilityLabel={`Less ${label}`} style={[styles.stepBtn, { borderColor: T.border, opacity: value <= min ? 0.4 : 1 }]}>
         <Text style={[styles.stepGlyph, { color: T.text }]}>−</Text>
       </Pressable>
       <Text style={[styles.stepValue, { fontSize: fz(14), color: T.text }]} accessibilityLabel={`${label}: ${value}${unit ? " " + unit : ""}`}>{value}{unit ? ` ${unit}` : ""}</Text>
-      <Pressable onPress={() => onChange(Math.min(max, value + step))} disabled={value >= max} hitSlop={6} accessibilityRole="button" accessibilityLabel={`More ${label}`} style={[styles.stepBtn, { borderColor: T.border, opacity: value >= max ? 0.4 : 1 }]}>
+      <Pressable onPress={() => onChange(Math.min(max, value + step))} disabled={value >= max} hitSlop={6} accessibilityRole="button" accessibilityState={{ disabled: value >= max }} accessibilityLabel={`More ${label}`} style={[styles.stepBtn, { borderColor: T.border, opacity: value >= max ? 0.4 : 1 }]}>
         <Text style={[styles.stepGlyph, { color: T.text }]}>+</Text>
       </Pressable>
     </View>

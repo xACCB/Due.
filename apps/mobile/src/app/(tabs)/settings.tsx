@@ -205,7 +205,7 @@ export default function SettingsScreen() {
                 accessibilityLabel="Add a subject"
                 style={[styles.input, { flex: 1, fontSize: fz(12), color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
               />
-              <Pressable onPress={addSubject} disabled={!newSubject.trim()} accessibilityRole="button" style={[styles.smallBtn, { backgroundColor: T.accent, opacity: newSubject.trim() ? 1 : 0.5, justifyContent: "center" }]}>
+              <Pressable onPress={addSubject} disabled={!newSubject.trim()} accessibilityRole="button" accessibilityState={{ disabled: !newSubject.trim() }} style={[styles.smallBtn, { backgroundColor: T.accent, opacity: newSubject.trim() ? 1 : 0.5, justifyContent: "center" }]}>
                 <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(12), color: contrastColor(T.accent) }}>Add</Text>
               </Pressable>
             </View>
@@ -242,7 +242,7 @@ export default function SettingsScreen() {
         <Pressable onPress={() => { Linking.openURL(PRIVACY_URL).catch(() => {}); }} accessibilityRole="link" style={[styles.wide, { borderColor: T.border }]}>
           <Text style={[styles.wideText, { fontSize: fz(12), color: T.textMuted }]}>Privacy policy</Text>
         </Pressable>
-        <Pressable onPress={clearCompleted} disabled={doneCount === 0} accessibilityRole="button" accessibilityHint="Deletes completed tasks that aren't archived. You can undo this"
+        <Pressable onPress={clearCompleted} disabled={doneCount === 0} accessibilityRole="button" accessibilityState={{ disabled: doneCount === 0 }} accessibilityHint="Deletes completed tasks that aren't archived. You can undo this"
           style={[styles.wide, { borderColor: "#FF475744", opacity: doneCount ? 1 : 0.45 }]}>
           <Text style={[styles.wideText, { fontSize: fz(12), color: ink("#FF4757", T.light) }]}>Clear completed{doneCount ? ` (${doneCount})` : ""}</Text>
         </Pressable>

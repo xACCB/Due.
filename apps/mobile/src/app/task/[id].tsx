@@ -339,7 +339,7 @@ function TaskForm({ task }: { task: Task }) {
               maxLength={LIMITS.title} returnKeyType="done"
               onSubmitEditing={() => { const n = templateName.trim(); if (n) { app.settings.setTemplates(prev => [...prev, templateFromTask(task, n)]); setTemplateName(null); setTemplateSaved(true); } }}
               style={[styles.tplInput, { fontSize: fz(12), color: T.text, backgroundColor: T.surface, borderColor: T.border }]} />
-            <Pressable disabled={!templateName.trim()} accessibilityRole="button"
+            <Pressable disabled={!templateName.trim()} accessibilityRole="button" accessibilityState={{ disabled: !templateName.trim() }}
               onPress={() => { const n = templateName.trim(); if (n) { app.settings.setTemplates(prev => [...prev, templateFromTask(task, n)]); setTemplateName(null); setTemplateSaved(true); } }}
               style={[styles.tplBtn, { backgroundColor: T.accent, opacity: templateName.trim() ? 1 : 0.5 }]}>
               <Text style={[styles.btnText, { fontSize: fz(12), color: contrastColor(T.accent) }]}>Save</Text>

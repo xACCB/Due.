@@ -59,7 +59,9 @@ export async function scheduleFocusEnd(at: number, title: string, body: string):
   if (!(await notificationsAllowed())) return;
   await Notifications.scheduleNotificationAsync({
     identifier: FOCUS_END_ID,
-    content: { title, body },
+    // The web chimes when a session or break ends (playChime); here iOS plays
+    // its notification sound, in the app (the handler allows sounds) and out.
+    content: { title, body, sound: "default" },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
   });
 }

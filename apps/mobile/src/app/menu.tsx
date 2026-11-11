@@ -45,14 +45,6 @@ export default function Menu() {
   return (
     <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
       {row({ ios: "magnifyingglass", android: "search" }, "Search", () => go("/search"))}
-      <View style={[styles.rule, { backgroundColor: T.border }]} />
-      {row({ ios: "bell", android: "notifications" }, "Inbox", () => go("/inbox"), unread > 0 && (
-        <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.accent, color: contrastColor(T.accent) }]}>{unread}</Text>
-      ))}
-      {row({ ios: "clock.arrow.circlepath", android: "history" }, "History", () => go("/history"))}
-      {row({ ios: "square.and.arrow.down", android: "download" }, "Import/Export", () => go("/import"))}
-      {row({ ios: "gearshape", android: "settings" }, "Settings", () => { router.back(); router.navigate("/settings"); })}
-
       {groups.length > 0 && (
         <>
           <View style={[styles.rule, { backgroundColor: T.border }]} />
@@ -106,6 +98,15 @@ export default function Menu() {
           })}
         </>
       )}
+
+      {/* The web sidebar's order: Search, the subjects, then these. */}
+      <View style={[styles.rule, { backgroundColor: T.border }]} />
+      {row({ ios: "bell", android: "notifications" }, "Inbox", () => go("/inbox"), unread > 0 && (
+        <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.accent, color: contrastColor(T.accent) }]}>{unread}</Text>
+      ))}
+      {row({ ios: "clock.arrow.circlepath", android: "history" }, "History", () => go("/history"))}
+      {row({ ios: "square.and.arrow.down", android: "download" }, "Import/Export", () => go("/import"))}
+      {row({ ios: "gearshape", android: "settings" }, "Settings", () => { router.back(); router.navigate("/settings"); })}
 
       <Text style={[styles.foot, { fontSize: fz(9), color: T.textFaint }]}>DuePlanner, by due. studios</Text>
     </ScrollView>

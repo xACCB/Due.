@@ -55,7 +55,7 @@ export default function ImportExport() {
       schemaVersion: SCHEMA_VERSION,
       tasks: app.tasks, subjects: s.subjects, subjectColors: s.subjectColors, templates: s.templates,
       settings: {
-        themeMode: s.themeMode, layout: "list", groupBy: s.groupBy, colorCodeUrgency: s.colorCodeUrgency, showDone: s.showDone,
+        themeMode: s.themeMode, layout: s.layout, groupBy: s.groupBy, colorCodeUrgency: s.colorCodeUrgency, showDone: s.showDone,
         showSuggestion: s.showSuggestion, autoArchiveDays: s.autoArchiveDays, notificationsEnabled: s.notifications,
         enabledOffsets: s.reminderOffsets, timeFormat: s.timeFormat, weekStart: s.weekStart,
         pomodoroWorkMins: s.pomodoroWork, pomodoroBreakMins: s.pomodoroBreak, autoStartBreaks: s.pomodoroAutoBreak,

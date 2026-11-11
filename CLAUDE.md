@@ -92,8 +92,18 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   card, Break's over), the task page (session timer, Save as template) and Settings (the web's
   dropdown sections, subject rename/recolour). Not tried by hand, since this Mac can't tap the
   Simulator: swipes, drag to reorder, the Deck swipe, the file picker and the share sheet; try
-  them on the Simulator or a phone. Not ported on purpose: the web's Snooze (gone from its task
-  page too) and Calendar's DayDetail card (the day panel shows the same).
+  them on the Simulator or a phone.
+- **2026-11-10 (evening):** a second pass, screen by screen against the web in the same Simulator
+  (web in Safari, see below): the task page got the web sheet's Snooze / Skip this one and its
+  Priority/Subtasks/Tags cards; the completion animation (check pop, ✓ draw, strike, all layouts);
+  Inbox messages, Calendar's day card and Time left's rows open the web's cards (`MessageCard`,
+  `PopCard`); the web header on Home/Calendar/Settings (`AppHeader`); Settings rebuilt from the
+  web's pieces (`Toggle`, `Label`, `ToggleLine`, `Tiles`, `Slider` in `components/ui.tsx`); the
+  add sheet's Back/Skip and ▲/▼ duration; the menu in the sidebar's order; the error screens
+  (expo-router `ErrorBoundary`); a sound when a Pomodoro or break ends (`sound: "default"`, only
+  with notifications allowed; the web's two-tone chime would need a sound file and a native
+  build). Light and dark checked by screenshot. Still differs: cards over a dimmed (not blurred)
+  screen, since blur needs `expo-blur` and a native build; no Inbox Updates; no Profile/sign-in.
   **Next:** M3, sign-in and sync (`docs/mobile-plan.md`), after the items below.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
@@ -102,7 +112,14 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   sample tasks in `src/lib/devSample.ts`, `"set":["hw-key",value]`, `"back":true`), then
   `xcrun simctl io booted screenshot`. `simctl openurl` shows an "Open in DuePlanner?" prompt
   that can't be dismissed without tapping, so avoid it. `"scroll":600` scrolls the screen showing
-  (screens pass their ScrollView/FlatList ref to `useDevScroll`, `src/lib/devScroll.ts`).
+  (screens pass their ScrollView/FlatList ref to `useDevScroll`, `src/lib/devScroll.ts`);
+  `"toggle":1003` ticks a task through Home's own toggle (the completion animation runs);
+  `"act":["open-day","2026-11-11"]` runs a screen's named action (`useDevAction`: `open-message`,
+  `open-day`, `open-time` with `sub:Math` or `due:overdue`, `add-title`, `add-skip`, `crash`);
+  `"quiet":true` turns off the red dev error overlay so the app's own error screen shows. After
+  any reload the first command is ignored, so send one twice. A form sheet left open across a
+  reload stays on screen in its old colours: cold-restart (`simctl terminate` + `launch`) before
+  trusting a screenshot after a theme change.
 - **Comparing with the website on the same Simulator:** start the web dev server with
   `VITE_DEV_REMOTE=1 npx vite` (in `apps/web`), open it in the Simulator's Safari with
   `xcrun simctl openurl booted http://localhost:5173/` (an http URL shows no prompt), and drive it
@@ -1171,7 +1188,7 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   swipe on the grid (`PanResponder`) and Today, each day with up to 3 subject-coloured dots for open
   tasks (`byDueDate`), today ringed, the picked day filled with the accent. Below: that day's tasks
   (non-archived, done ones included) and "+ Add homework due ...", which opens `AddSheet` with
-  `presetDate`. The web's floating `DayDetail` card isn't ported: the day panel shows the same.
+  `presetDate`. Tapping a day also opens `DayCard` (the web's DayDetail) in a `PopCard`.
   Deck: `components/DueDeck.tsx` (the web's `DueDeck`): one card per date that still has an open
   task or is today or later, four drawn as a stack; swipe the top one left for the next date, right
   for the one before, or ‹ ›. The top card is tracked by its date (`picked`); the reset or entrance

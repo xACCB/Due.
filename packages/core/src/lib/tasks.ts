@@ -25,16 +25,28 @@ export function isUntouchedExample(t:Task):boolean{
 // Picks the most urgent pending task, computed locally and instantly from the
 // task data (this once called an AI API from the browser, which was both
 // broken and insecure; nothing about it needs a network call).
+// The task the smart suggestion is about: the most urgent open one (priority,
+// then due date). Not the top of the list, which can be in a hand-made order,
+// so hiding the card (hw-suggestion-hidden) must use this task's id.
+export function suggestedTask(tasks:Task[]):Task|undefined {
+  const o:Record<string,number>={high:0,medium:1,low:2};
+  let top:Task|undefined;
+  for(const t of tasks){
+    if(t.done||t.archived)continue;
+    if(!top)top=t;
+    else{
+      const d=o[getPriority(t.dueDate,t.estMins,t.priorityOverride)]-o[getPriority(top.dueDate,top.estMins,top.priorityOverride)];
+      if(d<0||(d===0&&(t.dueDate||"9999-99-99")<(top.dueDate||"9999-99-99")))top=t;
+    }
+  }
+  return top;
+}
+
 export function buildSuggestion(tasks:Task[]):string {
   const pending=tasks.filter(t=>!t.done&&!t.archived);
   if (pending.length===0) return "Nothing left to do. Great work!";
   if (pending.length===1) return `Just one task left: "${pending[0].title}". You've got this!`;
-  const sorted=[...pending].sort((a,b)=>{
-    const o:Record<string,number>={high:0,medium:1,low:2};
-    const d=o[getPriority(a.dueDate,a.estMins,a.priorityOverride)]-o[getPriority(b.dueDate,b.estMins,b.priorityOverride)];
-    return d!==0?d:(a.dueDate||"9999-99-99").localeCompare(b.dueDate||"9999-99-99");
-  });
-  const top=sorted[0];
+  const top=suggestedTask(pending)!;
   const days=daysUntil(top.dueDate);
   const timeStr=formatDuration(top.estMins);
   const urgencyWord=days==="Overdue!"?"overdue":days==="Due today!"?"due today":days==="Due tomorrow"?"due tomorrow":days?days.replace(" days left","d left"):"no deadline";

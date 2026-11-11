@@ -686,8 +686,10 @@ display sites with `task.dueDate&&`). Where undated tasks are grouped (group by 
 date, Time left buckets) the heading is "Anytime".
 
 **Smart suggestion** (the ✦ card above the list): its × hides only the current suggestion
-(`hiddenSuggestionFor`, `hw-suggestion-hidden`, the top task's id); it returns when a different task
-becomes most urgent. `showSuggestion` (Settings → Task list) turns it off entirely.
+(`hiddenSuggestionFor`, `hw-suggestion-hidden`, the id of `suggestedTask()` in
+`packages/core/src/lib/tasks.ts`, the task `buildSuggestion` names); it returns when a different task
+becomes most urgent. Never use the list's first task for this: a hand-made order makes it a
+different task (fixed 2026-11-10 on web and phone). `showSuggestion` (Settings → Task list) turns it off entirely.
 
 **Settings layout.** Every Settings section is a `SettingsSection` dropdown (module scope): Looks,
 Date & time, Focus timer, New task questions, Subjects, Task list (group by, smart suggestion, show

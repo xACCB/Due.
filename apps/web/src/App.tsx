@@ -9,7 +9,7 @@ import { LAYOUTS, GROUP_BY, DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, SUBJECT_CO
 import type { LayoutName } from "@dueplanner/core/constants";
 import { WHATS_NEW, kindRank, LEGACY_WHATSNEW_IDS } from "@dueplanner/core/whatsNew";
 import type { WhatsNewItem } from "@dueplanner/core/whatsNew";
-import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, dateInDays, snoozeTarget, setDone } from "@dueplanner/core/lib/tasks";
+import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, suggestedTask, dateInDays, snoozeTarget, setDone } from "@dueplanner/core/lib/tasks";
 import type { SnoozeKind } from "@dueplanner/core/lib/tasks";
 import { trashEntries, pruneTrash, localRecords } from "@dueplanner/core/lib/trash";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
@@ -1233,7 +1233,9 @@ export default function HomeworkPlanner() {
   // as open for it until that task settles (justDone): otherwise the card
   // changed, appeared or vanished at the tick, moving the whole list once
   // then, and again when the completed card glides away.
-  const suggestionTask=allSorted.find(t=>heldOpen(t,justDone)&&!t.archived);
+  // suggestionTask is the task the card names (not the top of the list, which
+  // can be in a hand-made order), so its × hides that one.
+  const suggestionTask=suggestedTask(withHeldOpen(tasks,justDone));
   const suggestion=buildSuggestion(withHeldOpen(tasks,justDone));
   const focusTask=tasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
   useEffect(()=>{pomodoroTaskRef.current=focusTask?.id??null;});

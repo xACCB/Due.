@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Task } from "../types";
-import { buildSuggestion, dateInDays, isUntouchedExample, nextOrder, setDone, snoozeTarget } from "./tasks";
+import { buildSuggestion, dateInDays, isUntouchedExample, nextOrder, setDone, snoozeTarget, suggestedTask } from "./tasks";
 
 const task = (id: number, extra: Partial<Task> = {}): Task =>
   ({ id, title: `Task ${id}`, subject: "Math", dueDate: "", dueTime: "", estMins: 30, done: false, order: id, ...extra });
@@ -98,6 +98,25 @@ describe("buildSuggestion", () => {
   it("leaves the estimate out when there isn't one", () => {
     const text = buildSuggestion([task(1, { title: "A", dueDate: "2026-10-10", estMins: 0 }), task(2, { title: "B", dueDate: "2026-10-20" })]);
     expect(text).toBe(`Most urgent: "A"\ndue today`);
+  });
+
+  it("is about suggestedTask, whatever order the list is in", () => {
+    // Hand-ordered so the list's first open task isn't the most urgent one.
+    const list = [
+      task(1, { title: "First in the list", dueDate: "2026-10-20", order: 0 }),
+      task(2, { title: "Done", dueDate: "2026-10-01", done: true, order: 1 }),
+      task(3, { title: "Overdue", dueDate: "2026-10-08", order: 2 }),
+      task(4, { title: "Also overdue, later", dueDate: "2026-10-09", order: 3 }),
+    ];
+    expect(suggestedTask(list)?.id).toBe(3);
+    expect(buildSuggestion(list)).toContain(`"Overdue"`);
+    // A pinned High beats an earlier date of lower priority (overdue counts as High already).
+    expect(suggestedTask([task(6, { dueDate: "2026-10-25" }), task(5, { dueDate: "2026-10-30", priorityOverride: "high" })])?.id).toBe(5);
+    expect(suggestedTask([task(1, { done: true }), task(2, { archived: true })])).toBeUndefined();
+  });
+
+  it("keeps the first of two equally urgent tasks", () => {
+    expect(suggestedTask([task(7, { dueDate: "2026-10-08" }), task(8, { dueDate: "2026-10-08" })])?.id).toBe(7);
   });
 });
 

@@ -5,8 +5,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import type { Task, TaskTemplate } from "@dueplanner/core/types";
-import { filterTasks, groupTasks, heldOpen, sortTasks, timeLeft } from "@dueplanner/core/lib/taskViews";
-import { buildSuggestion } from "@dueplanner/core/lib/tasks";
+import { filterTasks, groupTasks, heldOpen, sortTasks, timeLeft, withHeldOpen } from "@dueplanner/core/lib/taskViews";
+import { buildSuggestion, suggestedTask } from "@dueplanner/core/lib/tasks";
 import { contrastColor, formatDuration } from "@dueplanner/core/lib/format";
 import { todayISO } from "@dueplanner/core/lib/dates";
 import { startFromTemplate } from "@dueplanner/core/lib/addFlow";
@@ -74,7 +74,12 @@ export default function Home() {
   const tl = timeLeft(app.tasks, todayISO());
   const pendingCount = shown.filter(t => !t.done && !t.archived).length;
 
-  const suggestionTask = allSorted.find(t => !t.done && !t.archived);
+  // The task the suggestion names (not the list's top, which can be in a
+  // hand-made order), so its × hides that one. A task in its completion hold
+  // still counts as open, as on the web, so the card doesn't change at the
+  // tick and shift the list twice.
+  const heldTasks = withHeldOpen(app.tasks, justDone);
+  const suggestionTask = suggestedTask(heldTasks);
   const showSuggestionCard = !!suggestionTask && s.showSuggestion && s.hiddenSuggestionFor !== suggestionTask.id;
 
   const rows: Row[] = s.layout !== "list"
@@ -134,7 +139,7 @@ export default function Home() {
       {showSuggestionCard && (
         <View style={[styles.suggest, { backgroundColor: T.cardAlt, borderColor: T.accent + "33" }]}>
           <Text style={{ fontSize: fz(12), color: T.text }} accessibilityElementsHidden>✦</Text>
-          <Text style={[styles.suggestText, { fontSize: fz(12), color: T.text }]}>{buildSuggestion(app.tasks)}</Text>
+          <Text style={[styles.suggestText, { fontSize: fz(12), color: T.text }]}>{buildSuggestion(heldTasks)}</Text>
           <Pressable onPress={() => s.setHiddenSuggestionFor(suggestionTask!.id)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Hide this suggestion" accessibilityHint="It comes back when another task becomes most urgent">
             <Text style={{ fontSize: fz(16), color: T.textFaint, lineHeight: fz(16) + 2 }}>×</Text>
           </Pressable>

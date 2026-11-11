@@ -1224,6 +1224,13 @@ open.
 - User-facing text follows the same rules as the web (no dash-joined phrasing, "DuePlanner").
 - Text from outside (typing, pasting) goes through `oneLine()` and the `LIMITS` caps before it's
   stored, as on the web, so M3's sync won't be refused by the rules.
+- Icons are `SymbolView` from `expo-symbols` with both names, `name={{ ios: "<SF Symbol>", android:
+  "<Material Symbol>" }}` (a bare SF name draws nothing on Android). Both are type-checked, so a
+  wrong name fails `npm run typecheck:mobile`.
+- While Metro runs, don't edit files under `src/app/` with `sed -i` (macOS): it writes a temporary
+  `.!12345!name.tsx` beside the file, expo-router reads every file there as a route, and Metro
+  crashed with ENOENT when the temp file vanished (2026-11-10). Use an editor or a script that
+  writes the file in place.
 - New native packages: `npx expo install <name>` in `apps/mobile`, then a rebuild
   (`npx expo run:ios`). Never edit `ios/` or `android/` (generated, gitignored): change
   `app.json` or add a config plugin.

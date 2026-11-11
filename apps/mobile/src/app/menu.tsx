@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
-import { SymbolView, type SFSymbol } from "expo-symbols";
+import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { contrastColor, ink } from "@dueplanner/core/lib/format";
 import { dueShort, SIDEBAR_TASK_CAP, subjectGroups } from "@dueplanner/core/lib/sidebarSubjects";
 import { todayISO } from "@dueplanner/core/lib/dates";
@@ -30,7 +30,7 @@ export default function Menu() {
   };
   const toggleOpen = (name: string) => s.setOpenSubjects(s.openSubjects.includes(name) ? s.openSubjects.filter(n => n !== name) : [...s.openSubjects, name]);
 
-  const row = (icon: SFSymbol, label: string, onPress: () => void, extra?: React.ReactNode) => (
+  const row = (icon: SymbolViewProps["name"], label: string, onPress: () => void, extra?: React.ReactNode) => (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label + (label === "Inbox" && unread ? `, ${unread} unread` : "")}
       style={({ pressed }) => [styles.row, { backgroundColor: pressed ? T.cardAlt : "transparent" }]}>
       <SymbolView name={icon} size={18} tintColor={T.textMuted} />
@@ -41,14 +41,14 @@ export default function Menu() {
 
   return (
     <ScrollView style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
-      {row("magnifyingglass", "Search", () => go("/search"))}
+      {row({ ios: "magnifyingglass", android: "search" }, "Search", () => go("/search"))}
       <View style={[styles.rule, { backgroundColor: T.border }]} />
-      {row("bell", "Inbox", () => go("/inbox"), unread > 0 && (
+      {row({ ios: "bell", android: "notifications" }, "Inbox", () => go("/inbox"), unread > 0 && (
         <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.accent, color: contrastColor(T.accent) }]}>{unread}</Text>
       ))}
-      {row("clock.arrow.circlepath", "History", () => go("/history"))}
-      {row("square.and.arrow.down", "Import/Export", () => go("/import"))}
-      {row("gearshape", "Settings", () => { router.back(); router.navigate("/settings"); })}
+      {row({ ios: "clock.arrow.circlepath", android: "history" }, "History", () => go("/history"))}
+      {row({ ios: "square.and.arrow.down", android: "download" }, "Import/Export", () => go("/import"))}
+      {row({ ios: "gearshape", android: "settings" }, "Settings", () => { router.back(); router.navigate("/settings"); })}
 
       {groups.length > 0 && (
         <>
@@ -67,7 +67,7 @@ export default function Menu() {
                   <Pressable onPress={() => toggleOpen(g.name)} hitSlop={6} accessibilityRole="button" accessibilityState={{ expanded: isOpen }}
                     accessibilityLabel={`${isOpen ? "Hide" : "Show"} ${label} tasks`} style={styles.arrow}>
                     <View style={{ transform: [{ rotate: isOpen ? "90deg" : "0deg" }] }}>
-                      <SymbolView name="chevron.right" size={11} weight="semibold" tintColor={T.textMuted} />
+                      <SymbolView name={{ ios: "chevron.right", android: "chevron_right" }} size={11} weight="semibold" tintColor={T.textMuted} />
                     </View>
                   </Pressable>
                   <Pressable onPress={() => pick(g.name)} accessibilityRole="button" accessibilityState={{ selected: picked }} accessibilityLabel={`${label}, ${g.tasks.length} to do`}

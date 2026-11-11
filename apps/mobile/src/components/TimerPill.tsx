@@ -21,7 +21,7 @@ export function TimerPill() {
   return (
     <Pressable onPress={() => router.navigate("/focus")} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Timer running, ${text}. Open Focus`}
       style={[styles.pill, { backgroundColor: T.card, borderColor: T.border }]}>
-      <SymbolView name="timer" size={12} tintColor={T.text} />
+      <SymbolView name={{ ios: "timer", android: "timer" }} size={12} tintColor={T.text} />
       <Text style={[styles.text, { fontSize: fz(11), color: T.text }]}>{text}</Text>
     </Pressable>
   );

@@ -37,7 +37,7 @@ export default function Search() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.light ? "rgba(245,245,245,0.97)" : "rgba(0,0,0,0.94)" }]} edges={["top", "left", "right"]}>
       <View style={[styles.bar, { backgroundColor: T.card, borderColor: T.border }]}>
-        <SymbolView name="magnifyingglass" size={16} tintColor={T.textMuted} />
+        <SymbolView name={{ ios: "magnifyingglass", android: "search" }} size={16} tintColor={T.textMuted} />
         <TextInput
           value={query}
           onChangeText={setQuery}

@@ -148,7 +148,7 @@ export default function Home() {
 
       <Pressable onPress={() => router.push("/search")} accessibilityRole="search" accessibilityLabel="Search tasks"
         style={[styles.search, { backgroundColor: T.card, borderColor: T.border }]}>
-        <SymbolView name="magnifyingglass" size={15} tintColor={T.textFaint} />
+        <SymbolView name={{ ios: "magnifyingglass", android: "search" }} size={15} tintColor={T.textFaint} />
         <Text style={[styles.searchText, { fontSize: fz(13), color: T.textFaint }]}>Search tasks...</Text>
       </Pressable>
 
@@ -193,7 +193,7 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.headLeft}>
           <Pressable onPress={() => router.push("/menu")} hitSlop={10} accessibilityRole="button" accessibilityLabel="Open menu" accessibilityHint="Inbox, History, Import/Export and your subjects">
-            <SymbolView name="sidebar.left" size={21} tintColor={T.textMuted} />
+            <SymbolView name={{ ios: "sidebar.left", android: "left_panel_open" }} size={21} tintColor={T.textMuted} />
           </Pressable>
           <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Home</Text>
         </View>

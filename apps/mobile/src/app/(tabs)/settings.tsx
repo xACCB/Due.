@@ -3,7 +3,7 @@ import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextIn
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import { LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, SUBJECT_COLOR_PALETTE, type LayoutName } from "@dueplanner/core/constants";
-import { SymbolView, type SFSymbol } from "expo-symbols";
+import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { moveQuestion, normalizeQuestionPrefs } from "@dueplanner/core/lib/addQuestions";
 import { recolouredSubjects, renamedSubjects, subjectRename, subjectToAdd, templatesRenamedSubject, withoutSubjectColor } from "@dueplanner/core/lib/taskActions";
 import { focusShowFor, showsPomodoro, showsStopwatch } from "@dueplanner/core/lib/stopwatch";
@@ -20,9 +20,11 @@ import { Row, Section, Segmented, Stepper, ToggleRow } from "../../components/ui
 // Clear completed. Recently deleted is in History, as on the web.
 const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
 const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
-const LAYOUT_ICONS: Record<LayoutName, SFSymbol> = {
-  list: "list.bullet", board: "square.grid.2x2", checklist: "checklist",
-  kanban: "rectangle.split.3x1", progress: "chart.bar.xaxis", pyramid: "triangle",
+// SF Symbols on iOS, Material Symbols on Android (as the tab bar does).
+const LAYOUT_ICONS: Record<LayoutName, SymbolViewProps["name"]> = {
+  list: { ios: "list.bullet", android: "list" }, board: { ios: "square.grid.2x2", android: "grid_view" },
+  checklist: { ios: "checklist", android: "checklist" }, kanban: { ios: "rectangle.split.3x1", android: "view_kanban" },
+  progress: { ios: "chart.bar.xaxis", android: "bar_chart" }, pyramid: { ios: "triangle", android: "change_history" },
 };
 export default function SettingsScreen() {
   const app = useApp();

@@ -19,9 +19,9 @@ export default function History() {
     <Pressable onPress={onPress} disabled={!enabled} accessibilityRole="button" accessibilityState={{ disabled: !enabled }}
       accessibilityLabel={enabled ? `${label}: ${what}` : `Nothing to ${label.toLowerCase()}`}
       style={({ pressed }) => [styles.step, { backgroundColor: T.cardAlt, borderColor: T.border, opacity: !enabled ? 0.4 : pressed ? 0.7 : 1 }]}>
-      {label === "Undo" && <SymbolView name="arrow.uturn.backward" size={14} tintColor={T.text} />}
+      {label === "Undo" && <SymbolView name={{ ios: "arrow.uturn.backward", android: "undo" }} size={14} tintColor={T.text} />}
       <Text style={[styles.stepText, { fontSize: fz(12), color: T.text }]}>{label}</Text>
-      {label === "Redo" && <SymbolView name="arrow.uturn.forward" size={14} tintColor={T.text} />}
+      {label === "Redo" && <SymbolView name={{ ios: "arrow.uturn.forward", android: "redo" }} size={14} tintColor={T.text} />}
     </Pressable>
   );
 

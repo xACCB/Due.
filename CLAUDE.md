@@ -56,7 +56,10 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   changes Claude Code's settings (hooks, MCP servers) is shown to the user first. Installed so far:
   verification-before-completion, systematic-debugging (obra/superpowers), stop-slop, emil-design-eng
   and apple-design (emilkowalski/skills), find-skills (vercel-labs), canvas-design (anthropics), plus the
-  frontend-design and playwright plugins. The user plans to move projects and tools into one `~/Claude`
+  frontend-design and playwright plugins, and the Context7 MCP server (`claude mcp add --transport http
+  --scope user context7 https://mcp.context7.com/mcp`: current library docs, e.g. Expo SDK 58; the
+  lookups go to Upstash, not the code). Declined: git guardrails (blocks every `git push`), Impeccable
+  (downloads a compiled engine and adds edit hooks). The user plans to move projects and tools into one `~/Claude`
   folder: update these paths when that happens.
 - **Explain plainly, give exact steps.** The user is new to Mac, Xcode and native app tooling. Say
   what a term means the first time (e.g. "scaffolding"), give commands to paste as code blocks in

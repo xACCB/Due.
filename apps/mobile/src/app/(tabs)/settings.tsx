@@ -1,8 +1,9 @@
 import { useState, useRef, type ComponentRef } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
-import { LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, SUBJECT_COLOR_PALETTE, type LayoutName } from "@dueplanner/core/constants";
+import { GROUP_BY, LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, SUBJECT_COLOR_PALETTE, type LayoutName } from "@dueplanner/core/constants";
+import { TEXT_SIZES, type TextSize } from "@dueplanner/core/lib/textSize";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { moveQuestion, normalizeQuestionPrefs } from "@dueplanner/core/lib/addQuestions";
 import { recolouredSubjects, renamedSubjects, subjectRename, subjectToAdd, templatesRenamedSubject, withoutSubjectColor } from "@dueplanner/core/lib/taskActions";
@@ -13,7 +14,7 @@ import { useApp } from "../../state/appContext";
 import { requestNotifications } from "../../lib/notifications";
 import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
-import { Row, Section, Segmented, Stepper, ToggleRow } from "../../components/ui";
+import { Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
 import { useDevScroll } from "../../lib/devScroll";
 import { AppHeader } from "../../components/AppHeader";
 
@@ -22,6 +23,8 @@ import { AppHeader } from "../../components/AppHeader";
 // Clear completed. Recently deleted is in History, as on the web.
 const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
 const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
+// The web's Animation speed range: 0.5x to 2x in quarters.
+const ANIM_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 // SF Symbols on iOS, Material Symbols on Android (as the tab bar does).
 const LAYOUT_ICONS: Record<LayoutName, SymbolViewProps["name"]> = {
   list: { ios: "list.bullet", android: "list" }, board: { ios: "square.grid.2x2", android: "grid_view" },
@@ -82,71 +85,107 @@ export default function SettingsScreen() {
       <AppHeader title="Settings" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
 
-        <Section title="Looks" T={T}>
-          <Row label="Appearance" T={T}>
-            <Segmented label="Appearance" T={T} value={s.themeMode} onChange={s.setThemeMode}
-              options={[{ label: "System", value: "auto" }, { label: "Light", value: "light" }, { label: "Dark", value: "dark" }]} />
-          </Row>
-          <Row label="Text size" T={T}>
-            <Segmented label="Text size" T={T} value={s.textSize} onChange={s.setTextSize}
-              options={[{ label: "Small", value: "small" }, { label: "Default", value: "default" }, { label: "Large", value: "large" }]} />
-          </Row>
-          <Row label="Layout" hint="How Home shows your tasks" T={T} />
-          <View style={styles.layouts}>
-            {(Object.entries(LAYOUTS) as [LayoutName, { name: string; desc: string }][]).map(([key, l]) => {
-              const on = s.layout === key;
-              return (
-                <Pressable key={key} onPress={() => s.setLayout(key)} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${l.name}, ${l.desc}`}
-                  style={[styles.layoutBtn, { backgroundColor: on ? T.accent + "22" : "transparent", borderColor: on ? T.accent : T.border }]}>
-                  <SymbolView name={LAYOUT_ICONS[key]} size={20} tintColor={on ? T.accent : T.textFaint} />
-                  <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(10), color: on ? T.accent : T.textMuted }}>{l.name}</Text>
-                  <Text style={{ fontFamily: F.body, fontSize: fz(9), color: on ? T.accent : T.textMuted, opacity: 0.6, textAlign: "center" }}>{l.desc}</Text>
-                </Pressable>
-              );
-            })}
+        <Section title="Looks" gap={20} T={T}>
+          <View>
+            <Label T={T}>Appearance</Label>
+            <Tiles label="Appearance" T={T} columns={3} tall value={s.themeMode} onChange={s.setThemeMode}
+              options={([["light", "Light", "○"], ["dark", "Dark", "●"], ["auto", "System", "◐"]] as const).map(([v, l, g]) => ({
+                value: v, label: l, top: (on: boolean) => <Text style={{ fontSize: fz(15), color: on ? T.accent : T.textMuted }}>{g}</Text>,
+              }))} />
+            {s.themeMode === "auto" && <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint, textAlign: "center" }]}>Following your device, currently {T.light ? "light" : "dark"}</Text>}
           </View>
-          <Row label="Animation speed" hint={s.animSpeed === 1 ? "Normal" : s.animSpeed < 1 ? "Slower" : "Faster"} T={T}>
-            <Stepper value={s.animSpeed} onChange={s.setAnimSpeed} min={0.5} max={2} step={0.25} T={T} label="animation speed" unit="×" />
-          </Row>
-          <ToggleRow label="Urgency color coding" hint="Red, orange and green by how soon a task is due" value={s.colorCodeUrgency} onChange={s.setColorCodeUrgency} T={T} />
+          <View>
+            <Label T={T}>Text size</Label>
+            {/* The sample letters are fixed sizes, so each shows what it gives (the web's). */}
+            <Tiles label="Text size" T={T} columns={3} tall value={s.textSize} onChange={s.setTextSize}
+              options={(Object.keys(TEXT_SIZES) as TextSize[]).map((k, i) => ({
+                value: k, label: TEXT_SIZES[k].name, top: (on: boolean) => <Text style={{ fontFamily: F.body, fontSize: [13, 16, 19][i], lineHeight: 22, color: on ? T.accent : T.textMuted }}>Aa</Text>,
+              }))} />
+          </View>
+          <View>
+            <Label T={T}>{`Layout (${Object.keys(LAYOUTS).length})`}</Label>
+            <View style={styles.layouts}>
+              {(Object.entries(LAYOUTS) as [LayoutName, { name: string; desc: string }][]).map(([key, l]) => {
+                const on = s.layout === key;
+                return (
+                  <Pressable key={key} onPress={() => s.setLayout(key)} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${l.name}, ${l.desc}`}
+                    style={[styles.layoutBtn, { backgroundColor: on ? T.accent + "22" : "transparent", borderColor: on ? T.accent : T.border }]}>
+                    <SymbolView name={LAYOUT_ICONS[key]} size={20} tintColor={on ? T.accent : T.textFaint} />
+                    <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(10), color: on ? T.accent : T.textMuted }}>{l.name}</Text>
+                    <Text style={{ fontFamily: F.body, fontSize: fz(9), color: on ? T.accent : T.textMuted, opacity: 0.6, textAlign: "center" }}>{l.desc}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          <ToggleLine caps label="Urgency Color Coding" hint="Red for urgent, green for not urgent" on={s.colorCodeUrgency} onChange={s.setColorCodeUrgency} T={T} />
+          <View>
+            <Label T={T} right={<Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.text }}>{s.animSpeed}×{s.animSpeed === 1 ? " (normal)" : ""}</Text>}>Animation speed</Label>
+            <Slider label="Animation speed" T={T} value={s.animSpeed} values={ANIM_SPEEDS} onChange={s.setAnimSpeed} valueText={v => `${v} times normal speed`} />
+            <View style={styles.sliderFoot}>
+              <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textFaint }}>Slower</Text>
+              {s.animSpeed !== 1 && (
+                <Pressable onPress={() => s.setAnimSpeed(1)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Reset animation speed">
+                  <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textMuted, textDecorationLine: "underline" }}>Reset</Text>
+                </Pressable>
+              )}
+              <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textFaint }}>Faster</Text>
+            </View>
+          </View>
         </Section>
 
         <Section title="Date & time" T={T}>
-          <Row label="Time format" T={T}>
-            <Segmented label="Time format" T={T} value={s.timeFormat} onChange={s.setTimeFormat} options={[{ label: "12h", value: "12h" }, { label: "24h", value: "24h" }]} />
-          </Row>
-          <Row label="Week starts on" T={T}>
-            <Segmented label="Week starts on" T={T} value={s.weekStart} onChange={s.setWeekStart} options={[{ label: "Sun", value: 0 }, { label: "Mon", value: 1 }]} />
-          </Row>
-          <ToggleRow label="Calendar shows only this month" hint="Off: six full weeks, with the days around it" value={s.calendarMonthOnly} onChange={s.setCalendarMonthOnly} T={T} />
+          <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted }]}>Time format</Text>
+          <Tiles label="Time format" T={T} columns={2} value={s.timeFormat} onChange={s.setTimeFormat}
+            options={[{ value: "12h", label: "12-hour (3:05 PM)" }, { value: "24h", label: "24-hour (15:05)" }]} />
+          <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted, marginTop: 12 }]}>Week starts on</Text>
+          <Tiles label="Week starts on" T={T} columns={2} value={s.weekStart} onChange={s.setWeekStart}
+            options={[{ value: 0, label: "Sunday" }, { value: 1, label: "Monday" }]} />
+          <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted, marginTop: 12 }]}>Calendar shows</Text>
+          <Tiles label="Calendar shows" T={T} columns={2} value={s.calendarMonthOnly} onChange={s.setCalendarMonthOnly}
+            options={[{ value: true, label: "This month only" }, { value: false, label: "Six full weeks" }]} />
         </Section>
 
         <Section title="Focus timer" T={T}>
-          <ToggleRow label="Pomodoro" value={showsPomodoro(s.focusShow)} onChange={on => s.setFocusShow(focusShowFor(on, showsStopwatch(s.focusShow)))} T={T} />
-          <ToggleRow label="Stopwatch" value={showsStopwatch(s.focusShow)} onChange={on => s.setFocusShow(focusShowFor(showsPomodoro(s.focusShow), on))} T={T} />
+          <View style={{ gap: 12, marginBottom: 14 }}>
+            <ToggleLine label="Pomodoro timer" hint="Show it in Focus, above the task" on={showsPomodoro(s.focusShow)} onChange={on => s.setFocusShow(focusShowFor(on, showsStopwatch(s.focusShow)))} T={T} />
+            <ToggleLine label="Stopwatch" hint="Show it in Focus, below the task" on={showsStopwatch(s.focusShow)} onChange={on => s.setFocusShow(focusShowFor(showsPomodoro(s.focusShow), on))} T={T} />
+          </View>
           {showsPomodoro(s.focusShow) && (
             <>
-              <Row label="Focus length" T={T}><Stepper value={s.pomodoroWork} onChange={s.setPomodoroWork} min={5} max={180} step={5} T={T} label="focus length" unit="min" /></Row>
-              <Row label="Break length" T={T}><Stepper value={s.pomodoroBreak} onChange={s.setPomodoroBreak} min={1} max={60} T={T} label="break length" unit="min" /></Row>
-              <ToggleRow label="Start breaks automatically" value={s.pomodoroAutoBreak} onChange={s.setPomodoroAutoBreak} T={T} />
+              <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted }]}>Focus length</Text>
+              <Tiles label="Focus length" T={T} columns={4} value={s.pomodoroWork} onChange={s.setPomodoroWork} options={[15, 25, 45, 60].map(v => ({ value: v, label: `${v} min` }))} />
+              <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted, marginTop: 12 }]}>Break length</Text>
+              <Tiles label="Break length" T={T} columns={4} value={s.pomodoroBreak} onChange={s.setPomodoroBreak} options={[5, 10, 15, 20].map(v => ({ value: v, label: `${v} min` }))} />
+              <View style={{ marginTop: 12 }}>
+                <ToggleLine label="Start breaks automatically" hint="When a focus session ends. After a break, you get a suggestion for what to work on next." on={s.pomodoroAutoBreak} onChange={s.setPomodoroAutoBreak} T={T} />
+              </View>
             </>
           )}
         </Section>
 
         <Section title="New task questions" T={T}>
-          {prefs.map((p, i) => {
-            const name = QUESTIONS.find(q => q.key === p.key)?.name ?? p.key;
-            return (
-              <Row key={p.key} label={name} T={T}>
-                <View style={styles.inline}>
-                  <Arrow glyph="▲" a11y={`Move ${name} up`} disabled={i === 0} T={T} onPress={() => s.setAddQuestions(moveQuestion(prefs, i, -1))} />
-                  <Arrow glyph="▼" a11y={`Move ${name} down`} disabled={i === prefs.length - 1} T={T} onPress={() => s.setAddQuestions(moveQuestion(prefs, i, 1))} />
-                  <Switch value={p.on} accessibilityLabel={`Ask ${name}`} trackColor={{ true: T.light ? "#333333" : "#cccccc", false: T.border }}
-                    onValueChange={on => s.setAddQuestions(prefs.map(x => (x.key === p.key ? { ...x, on } : x)))} />
+          <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint, marginTop: 0, marginBottom: 10 }]}>Asked in this order after the title. Anything you turn off can still be filled in later on the task page.</Text>
+          <View style={{ gap: 6 }}>
+            <View style={[styles.qRow, { backgroundColor: T.surface, borderColor: T.border, paddingVertical: 8 }]}>
+              <Text style={[styles.qNum, { fontSize: fz(10), color: T.textFaint }]}>1</Text>
+              <Text style={{ flex: 1, fontFamily: F.body, fontSize: fz(12), color: T.textMuted }}>Title</Text>
+              <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textFaint }}>Always asked</Text>
+            </View>
+            {prefs.map((p, i) => {
+              const name = QUESTIONS.find(q => q.key === p.key)?.name ?? p.key;
+              const pos = p.on ? prefs.slice(0, i).filter(x => x.on).length + 2 : null;
+              return (
+                <View key={p.key} style={[styles.qRow, { backgroundColor: T.surface, borderColor: T.border, opacity: p.on ? 1 : 0.6 }]}>
+                  <Text style={[styles.qNum, { fontSize: fz(10), color: T.textFaint }]}>{pos ?? "–"}</Text>
+                  <Text style={{ flex: 1, fontFamily: F.body, fontSize: fz(12), color: p.on ? T.text : T.textMuted }}>{name}</Text>
+                  <Arrow glyph="↑" a11y={`Move ${name} earlier`} disabled={i === 0} T={T} onPress={() => s.setAddQuestions(moveQuestion(prefs, i, -1))} />
+                  <Arrow glyph="↓" a11y={`Move ${name} later`} disabled={i === prefs.length - 1} T={T} onPress={() => s.setAddQuestions(moveQuestion(prefs, i, 1))} />
+                  <Toggle on={p.on} onChange={on => s.setAddQuestions(prefs.map(x => (x.key === p.key ? { ...x, on } : x)))} T={T} label={`Ask ${name}`} />
                 </View>
-              </Row>
-            );
-          })}
+              );
+            })}
+          </View>
         </Section>
 
         <Section title="Subjects" T={T}>
@@ -215,28 +254,44 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
-        <Section title="Task list" T={T}>
-          <Row label="Group by" hint="Groups the List layout into headed sections" T={T} />
-          <View style={styles.segRow}>
-            <Segmented label="Group by" T={T} value={s.groupBy} onChange={s.setGroupBy}
-              options={[{ label: "None", value: "none" }, { label: "Subject", value: "subject" }, { label: "Priority", value: "priority" }, { label: "Due date", value: "dueDate" }]} />
+        <Section title="Task list" gap={18} T={T}>
+          <View>
+            <Label T={T}>Group Tasks By</Label>
+            <Tiles label="Group tasks by" T={T} columns={2} tall value={s.groupBy} onChange={s.setGroupBy}
+              options={(Object.entries(GROUP_BY) as [typeof s.groupBy, { name: string }][]).map(([k, g]) => ({ value: k, label: g.name }))} />
+            {s.layout !== "list" && s.groupBy !== "none" && <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint }]}>Grouping only shows in the List layout. You&apos;re using {LAYOUTS[s.layout].name}.</Text>}
           </View>
-          {s.layout !== "list" && s.groupBy !== "none" && <Row label="Grouping only shows in the List layout" T={T} />}
-          <ToggleRow label="Show smart suggestion" hint="The most urgent task, above the list" value={s.showSuggestion} onChange={s.setShowSuggestion} T={T} />
-          <ToggleRow label="Show completed" value={s.showDone} onChange={s.setShowDone} T={T} />
-          <Row label="Auto-archive completed" hint="Done tasks move to Archived after this long. You can still archive any task from its page." T={T} />
-          <View style={styles.segRow}>
-            <Segmented label="Auto-archive completed" T={T} value={s.autoArchiveDays} onChange={s.setAutoArchiveDays}
-              options={[{ label: "Never", value: 0 }, { label: "1 day", value: 1 }, { label: "7 days", value: 7 }, { label: "30 days", value: 30 }]} />
+          <ToggleLine label="Show smart suggestion" hint="Your most urgent task, at the top of the list" on={s.showSuggestion} onChange={s.setShowSuggestion} T={T} />
+          <ToggleLine label="Show completed tasks" hint="Keep done tasks visible" on={s.showDone} onChange={s.setShowDone} T={T} />
+          <View>
+            <Label T={T}>Auto-Archive Completed Tasks</Label>
+            <Tiles label="Auto-archive completed tasks" T={T} columns={4} tall value={s.autoArchiveDays} onChange={s.setAutoArchiveDays}
+              options={[{ value: 0, label: "Never" }, { value: 1, label: "1 day" }, { value: 7, label: "7 days" }, { value: 30, label: "30 days" }]} />
+            <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint }]}>Done tasks move to Archived after this long. You can still archive any task manually from its page.</Text>
           </View>
         </Section>
 
         <Section title="Reminders" T={T}>
-          <ToggleRow label="Reminders" hint="Notifications for due tasks, even with the app closed" value={s.notifications} onChange={on => { setReminders(on).catch(() => {}); }} T={T} />
-          {s.notifications && REMINDER_OFFSETS.map(o => (
-            <ToggleRow key={o.key} label={o.label} value={s.reminderOffsets.includes(o.key)} onChange={on => toggleOffset(o.key, on)} T={T} />
-          ))}
-          {s.notifications && <Row label="Tasks with only a date" hint="Get one reminder at 8 AM on the day" T={T} />}
+          <ToggleLine label="Due date reminders" hint="Notifications for due tasks, even with the app closed" on={s.notifications} onChange={on => { setReminders(on).catch(() => {}); }} T={T} />
+          {s.notifications && (
+            <View style={[styles.remind, { borderTopColor: T.border }]}>
+              <Text style={[styles.remindLabel, { fontSize: fz(10), color: T.textMuted }]}>REMIND ME</Text>
+              <View style={{ gap: 6 }}>
+                {REMINDER_OFFSETS.map(o => {
+                  const on = s.reminderOffsets.includes(o.key);
+                  return (
+                    <Pressable key={o.key} onPress={() => toggleOffset(o.key, !on)} hitSlop={4} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={o.label} style={styles.offset}>
+                      <View style={[styles.box, { borderColor: on ? T.accent : T.textFaint, backgroundColor: on ? T.accent : "transparent" }]}>
+                        {on && <Text style={{ color: contrastColor(T.accent), fontSize: fz(10), fontWeight: "700" }}>✓</Text>}
+                      </View>
+                      <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>{o.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint }]}>Only applies to tasks with a specific due time set (not just a date). A task with only a date gets one reminder at 8 AM on the day.</Text>
+            </View>
+          )}
         </Section>
 
         <Pressable onPress={() => { Linking.openURL(FEEDBACK_URL).catch(() => {}); }} accessibilityRole="link" style={[styles.wide, { borderColor: T.border }]}>
@@ -260,7 +315,7 @@ export default function SettingsScreen() {
 function Arrow({ glyph, a11y, disabled, onPress, T }: { glyph: string; a11y: string; disabled: boolean; onPress: () => void; T: Theme }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} hitSlop={6} accessibilityRole="button" accessibilityLabel={a11y} accessibilityState={{ disabled }} style={[styles.arrow, { borderColor: T.border, opacity: disabled ? 0.3 : 1 }]}>
-      <Text style={[styles.arrowGlyph, { color: T.text }]}>{glyph}</Text>
+      <Text style={[styles.arrowGlyph, { color: T.textMuted }]}>{glyph}</Text>
     </Pressable>
   );
 }
@@ -273,11 +328,11 @@ const styles = StyleSheet.create({
   x: { fontSize: 20, lineHeight: 22, paddingHorizontal: 4 },
   addRow: { padding: 12 },
   input: { fontSize: 16, fontFamily: F.body, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  arrow: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  arrowGlyph: { fontSize: 11 },
-  layouts: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingHorizontal: 14, paddingBottom: 12 },
+  arrow: { width: 28, height: 28, borderRadius: 7, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  arrowGlyph: { fontSize: 12 },
+  layouts: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   layoutBtn: { width: "31%", flexGrow: 1, borderWidth: 1.5, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 7, alignItems: "center", gap: 4 },
-  subjects: { padding: 12, gap: 6 },
+  subjects: { gap: 6 },
   subjectRow: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 9, paddingVertical: 9, paddingHorizontal: 12 },
   subjectEdit: { borderRadius: 9, paddingVertical: 10, paddingHorizontal: 12, gap: 8 },
   dot: { width: 10, height: 10, borderRadius: 5 },
@@ -287,7 +342,15 @@ const styles = StyleSheet.create({
   smallBtn: { borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12 },
   confirm: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   addSubject: { flexDirection: "row", gap: 8, marginTop: 2 },
-  segRow: { paddingHorizontal: 14, paddingBottom: 12, alignItems: "flex-start" },
+  sub: { fontFamily: F.body, marginBottom: 6 },
+  note: { fontFamily: F.body, marginTop: 8 },
+  sliderFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  qRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 9, paddingVertical: 6, paddingLeft: 10, paddingRight: 8 },
+  qNum: { fontFamily: F.body, minWidth: 14 },
+  remind: { marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
+  remindLabel: { fontFamily: F.body, letterSpacing: 0.8, marginBottom: 8 },
+  offset: { flexDirection: "row", alignItems: "center", gap: 8 },
+  box: { width: 16, height: 16, borderRadius: 4, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   wide: { borderWidth: 1, borderRadius: 9, paddingVertical: 10, paddingHorizontal: 14, alignItems: "center", marginBottom: 8 },
   wideText: { fontSize: 12, fontFamily: F.body },
   foot: { fontSize: 11, fontFamily: F.body, textAlign: "center", marginTop: 8 },

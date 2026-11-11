@@ -47,6 +47,17 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   from the `DuePlanner` spelling make Metro fail with `Unable to resolve "@dueplanner/core/..."`.
   Run Expo from the `Dueplanner` path; if it already broke, delete `node_modules\@dueplanner`
   and run `npm install`. The Mac clone doesn't have this problem.
+- **Skills and plugins are checked before they're installed** (the user's choice, 2026-11-10). Only from
+  trustworthy sources (official company repos, well-known authors); download into
+  `~/tools/skill-quarantine/`, scan with NVIDIA SkillSpector
+  (`~/tools/skillspector/.venv/bin/skillspector scan <folder> --no-llm`), read the SKILL.md and every
+  script yourself (the scanner flags plenty of harmless text), then copy just the skill folder into
+  `~/.claude/skills/`. Never `npx skills add` straight in (find-skills suggests it). Anything that
+  changes Claude Code's settings (hooks, MCP servers) is shown to the user first. Installed so far:
+  verification-before-completion, systematic-debugging (obra/superpowers), stop-slop, emil-design-eng
+  and apple-design (emilkowalski/skills), find-skills (vercel-labs), canvas-design (anthropics), plus the
+  frontend-design and playwright plugins. The user plans to move projects and tools into one `~/Claude`
+  folder: update these paths when that happens.
 - **Explain plainly, give exact steps.** The user is new to Mac, Xcode and native app tooling. Say
   what a term means the first time (e.g. "scaffolding"), give commands to paste as code blocks in
   the order to run them, say what output to expect and what to do if it fails, and keep a short

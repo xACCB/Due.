@@ -17,7 +17,7 @@ import { TaskLayout } from "../../components/TaskLayouts";
 import { AddSheet } from "../../components/AddSheet";
 import { UndoToast } from "../../components/UndoToast";
 import { dragDelta } from "../../lib/reorder";
-import { useDevScroll, useDevToggle } from "../../lib/devScroll";
+import { useDevAction, useDevScroll, useDevToggle } from "../../lib/devScroll";
 import { AppHeader } from "../../components/AppHeader";
 
 // The web's filter chips (taskViews' filterTasks). "noest" (no estimate) has
@@ -118,6 +118,10 @@ export default function Home() {
     if (!t.done) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     say(t.done ? `"${t.title}" marked not done` : `"${t.title}" completed`);
   };
+  // Development only: "act":["crash"] makes Home throw, to check the error screen.
+  const [crash, setCrash] = useState(false);
+  useDevAction("crash", () => setCrash(true));
+  if (crash) throw new Error("Development crash (dev remote)");
   // Development only: the dev remote's "toggle" ticks a task the way a tap does.
   useDevToggle(id => { const t = app.tasks.find(x => x.id === id); if (t) toggle(t); });
   const remove = (t: Task) => { glide(); app.remove(t.id); say(`"${t.title}" deleted`); };

@@ -1,4 +1,4 @@
-import { DevSettings } from "react-native";
+import { DevSettings, LogBox } from "react-native";
 import { router, type Href } from "expo-router";
 import { devSampleTasks } from "./devSample";
 import { writeJSON } from "./storage";
@@ -14,7 +14,7 @@ import { devAct, devScrollTo, devToggle } from "./devScroll";
 // scrolls the screen showing (lib/devScroll.ts).
 const URL = "http://localhost:8099/cmd.json";
 
-type Cmd = { n?: number; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean; scroll?: number; toggle?: number; act?: [string, string?] };
+type Cmd = { n?: number; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean; scroll?: number; toggle?: number; act?: [string, string?]; quiet?: boolean };
 
 export function startDevRemote(): () => void {
   let last: number | null = null;
@@ -36,6 +36,7 @@ export function startDevRemote(): () => void {
       if (cmd.push) router.push(cmd.push as Href);
       if (typeof cmd.scroll === "number") devScrollTo(cmd.scroll); // screens using useDevScroll
       if (typeof cmd.toggle === "number") devToggle(cmd.toggle); // Home's toggle (useDevToggle)
+      if (cmd.quiet) { LogBox.ignoreAllLogs(true); LogBox.uninstall(); } // no dev error overlay, to see the app's own error screen
       if (cmd.act) devAct(cmd.act[0], cmd.act[1] ?? ""); // a screen's useDevAction
     } catch { /* no script running: nothing to do */ }
   };

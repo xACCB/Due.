@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type ComponentRef } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, type ErrorBoundaryProps } from "expo-router";
 import type { Priority, Recurrence, Task } from "@dueplanner/core/types";
 import { contrastColor, formatDate, formatDuration, formatTime, ink } from "@dueplanner/core/lib/format";
 import { localDateStr, todayISO } from "@dueplanner/core/lib/dates";
@@ -33,6 +33,23 @@ const REPEATS: { label: string; value: Recurrence }[] = [
 const SNOOZES: [SnoozeKind, string][] = [["later", "In 3 hours"], ["tomorrow", "Tomorrow"], ["week", "Next week"]];
 // The web's order: Auto, then Low to High, each in its priority colour.
 const PRIORITIES: (Priority | null)[] = [null, "low", "medium", "high"];
+
+// A task that fails to render shows this instead of taking the app down (the
+// web's fallback around TaskModal).
+export function ErrorBoundary({ error }: ErrorBoundaryProps) {
+  const { T, fz } = useApp();
+  useEffect(() => { console.error(error); }, [error]);
+  return (
+    <View style={[styles.gone, { backgroundColor: T.bg }]}>
+      <View style={[styles.crashCard, { backgroundColor: T.card, borderColor: T.border }]}>
+        <Text style={{ fontFamily: F.body, fontSize: fz(14), color: T.text, textAlign: "center" }}>This task couldn&apos;t be displayed.</Text>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" style={[styles.crashBtn, { backgroundColor: T.accent }]}>
+          <Text style={{ fontFamily: F.body, fontSize: fz(13), color: contrastColor(T.accent) }}>Close</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 export default function TaskPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -459,6 +476,8 @@ function NumberBox({ value, onChange, onDone, T, label }: { value: string; onCha
 }
 
 const styles = StyleSheet.create({
+  crashCard: { borderWidth: 1, borderRadius: 12, padding: 24, maxWidth: 320, gap: 12 },
+  crashBtn: { borderRadius: 9, paddingVertical: 9, paddingHorizontal: 16, alignItems: "center" },
   snooze: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: -8, marginBottom: 18 },
   snoozeLabel: { fontFamily: F.body, letterSpacing: 0.8, marginRight: 2 },
   snoozeBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },

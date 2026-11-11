@@ -10,11 +10,12 @@ const DONE_GREEN = "#2ED573";
 // A task on a Calendar day or a Deck card (the web's rows there): the check,
 // the title, the subject, and the due time (or the estimate when there's none).
 // `surface`: the Month view's day panel uses the surface colour, the Deck the card colour.
-export function DayTaskRow({ t, surface, onOpen }: { t: Task; surface?: boolean; onOpen: () => void }) {
+// `note`: replaces the due time / estimate on the right (Time left's "Tomorrow · 2h").
+export function DayTaskRow({ t, surface, note, onOpen }: { t: Task; surface?: boolean; note?: string; onOpen: () => void }) {
   const app = useApp();
   const { T, fz, h24 } = app;
   const sc = app.settings.subjectColors[t.subject] || T.accent;
-  const right = t.dueTime ? formatTime(t.dueTime, h24) : t.estMins > 0 ? formatDuration(t.estMins) : "";
+  const right = note ?? (t.dueTime ? formatTime(t.dueTime, h24) : t.estMins > 0 ? formatDuration(t.estMins) : "");
   return (
     <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={`${t.title}${t.done ? ", done" : ""}${t.subject ? `, ${t.subject}` : ""}${right ? `, ${right}` : ""}`}
       style={({ pressed }) => [styles.row, { backgroundColor: pressed ? T.cardAlt : surface ? T.surface : T.card }]}>

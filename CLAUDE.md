@@ -1010,9 +1010,10 @@ pattern, no server involved.
 
 A natively built iPhone (later Android) app in React Native with Expo, sharing `packages/core` with
 the website. Plan and milestones: `docs/mobile-plan.md`. File map and run steps:
-`apps/mobile/README.md`. **Status:** see "Where things stand" above. Everything below was written
-and unit-tested on Windows and has not yet run on a simulator or phone, so expect first-run fixes,
-and correct this section when real behaviour differs.
+`apps/mobile/README.md`. **Status:** see "Where things stand" above. It runs on the Mac's
+Simulator and every screen has been checked there by screenshot; the gestures (swipes, drag to
+reorder, the Deck) haven't been tried by hand yet, so correct this section when real behaviour
+differs.
 
 **Stack (versions matter; Expo changes APIs every SDK).** Expo SDK 58, React Native 0.88.1, React
 19.3.0, TypeScript 6, expo-router 58 (file routes under `src/app/`, `NativeTabs` from
@@ -1021,8 +1022,10 @@ and correct this section when real behaviour differs.
 `@react-native-community/datetimepicker` 9 (`onValueChange`/`onDismiss`; `onChange` is deprecated),
 `expo-notifications`, `expo-keep-awake`, `expo-haptics`, `expo-font` with
 `@expo-google-fonts/dm-serif-display` and `dm-mono`, `expo-splash-screen`, `expo-symbols` (the
-tab bar's Android icons), `react-native-reanimated`
-4 and `react-native-gesture-handler` 3 (installed, not used yet: they're for the swipe gestures).
+tab bar's Android icons), `expo-file-system` (backup files: `File`, `Paths`,
+`File.pickFileAsync`), `react-native-reanimated` 4 and `react-native-gesture-handler` 3 (the card
+swipes: `ReanimatedSwipeable` in `components/Swipe.tsx`; the Deck, drag to reorder and the
+Calendar's month swipe use React Native's own `PanResponder` and `Animated`).
 `app.json` turns on `experiments.reactCompiler` and `typedRoutes`. Expo and React Native need Node
 22.13+, which is why CI uses Node 22. Before using an Expo or React Native API, read the installed
 package's `.d.ts` (or the versioned docs at `docs.expo.dev/versions/v58.0.0/`) rather than relying
@@ -1044,8 +1047,16 @@ component file to export only components. `useApp()` gives:
 - `tasks`, `trash`, `canUndo`/`canRedo`, and actions: `add` (a title or an `AddDraft`), `toggle`,
   `edit(id, patch, label?)` (undoable), `quiet(id, patch)` (not undoable), `duplicate`, `logSession`,
   `remove` (to Recently deleted), `restore`, `undo`, `redo`;
+  plus `removeMany`, `emptyTrash`, `importTasks`, `moveBy` (drag to reorder) and `renameSubject`,
+  with `undoLabel`/`redoLabel` for History (auto-archive runs on its own, as the reducer's
+  `autoArchive` step);
 - `T` (the active theme object: `THEMES.stealth` or `stealthLight`, from the Appearance setting and
   the phone's light/dark mode), `h24`, and `questions` (`askedQuestions(addQuestions)`);
+- `fz(px)` (Text size, core's `scaledPx` from `lib/textSize.ts`: write `fz(n)` for every font size
+  under 20, as on the web) and `ms(n)` (Animation speed: every duration and hold goes through it);
+- Home's filters (`homeFilter`, and `subjectFilter` set from the menu's subjects) and the Focus
+  timers' state (`focus`/`setFocus`), kept here so the header's timer pill and Focus share them;
+  recaps are written by an effect here (a daily `today` tick) for the Inbox;
 - `settings`: every setting's value and setter (below).
 The task logic is `src/state/taskStore.ts`: plain `(store, ...) => store` functions over core
 (`withNewTask`, `setDone` including repeat copies, `patchTask`, `duplicateOf`, `withTrashed`,
@@ -1064,28 +1075,48 @@ clean)` (`src/lib/usePersisted.ts`), with each key, default and cleaner in `src/
 (true), `hw-timeformat` (12h), `hw-weekstart` (0), `hw-calendar-month-only` (true), `hw-showdone`
 (true), `hw-notifications` (false), `hw-reminder-offsets` (["0"]), `hw-pomodoro-work` (25),
 `hw-pomodoro-break` (5), `hw-pomodoro-autobreak` (true), `hw-focus-show` (all), `hw-add-questions`
-(null), `hw-subjects` (the default six), `hw-subjectcolors` (merged over the defaults, like the web).
+(null), `hw-subjects` (the default six), `hw-subjectcolors` (merged over the defaults, like the web),
+`hw-calendar-view` (month), `hw-anim-speed` (1), `hw-text-size` (default), `hw-layout` (list),
+`hw-group` (none), `hw-showsuggestion` (true), `hw-suggestion-hidden` (null), `hw-autoarchive` (7),
+`hw-templates`, `hw-recaps`, `hw-recaps-checked` and `hw-sidebar-subjects-open`.
 `hw-focus-state` (the running timers) is phone-only. A new setting: add it to `SETTINGS` with a
 cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaults like `true` or
 `25` need `as boolean`/`as number`, or the setter only accepts that exact value.
-Not on the phone yet: text size, animation speed, layouts, group by, smart suggestion,
-auto-archive, templates, recaps, Inbox.
 
-**Screens** (`src/app/`; the Stack in `_layout.tsx` holds `(tabs)` and `task/[id]`):
+**Screens** (`src/app/`; each follows the web screen of the same name):
 - `_layout.tsx`: keeps the launch screen up (`SplashScreen.preventAutoHideAsync`) until the fonts
-  load (or fail: a font error must not keep the app hidden), then `AppProvider`, the status bar and
-  the Stack, themed from `T`. The task page has a native header ("Task", back button).
+  load (or fail: a font error must not keep the app hidden), then `GestureHandlerRootView`,
+  `AppProvider`, the status bar and the Stack, themed from `T`, and in development the dev remote
+  (`src/lib/devRemote.ts`). The Stack holds `(tabs)`, then pushed screens with a native header:
+  `task/[id]` ("Task", back reads "Back"), `inbox`, `history` and `import` (back reads "Home");
+  then `menu` and `time-left` as form sheets and `search` as a fading transparent modal.
+- `menu.tsx` (the web's sidebar): Search, Inbox (unread count), History, Import/Export, Settings,
+  and the subjects (`subjectGroups`): the arrow unfolds a subject's open tasks
+  (`hw-sidebar-subjects-open`), the name sets Home's `subjectFilter`.
+- `search.tsx` (`searchTasks`), `time-left.tsx` (`timeLeft`, `dueBucket`; "no estimate" sets the
+  `noest` filter), `inbox.tsx` (recap Messages as `Dropdown`s; the web's Updates aren't shown, since
+  they describe the website), `history.tsx` (undo/redo, Recently deleted with Restore and Empty),
+  `import.tsx` (syllabus scan; backups exported through the share sheet from a file in
+  `Paths.cache`, imported with `File.pickFileAsync` and core's `readBackup`).
 - `(tabs)/_layout.tsx`: `NativeTabs` (iOS draws the real tab bar, so iOS 26 gets Liquid Glass):
   Home (`house`), Calendar (`calendar`), Focus (`timer`), Settings (`gearshape`), as SF Symbols
   (`sf`, iOS), with Material Symbols for Android (`md`: `home`, `calendar_month`, `timer`,
   `settings`), tinted `T.accent`. `md` needs the `expo-symbols` package: without it the names
   aren't type-checked (the type silently becomes `any`) and the icons don't draw. With it, a wrong
   name fails `npm run typecheck:mobile`.
-- `(tabs)/index.tsx` **Home**: header with the open count and Undo/Redo, the filter chips (All,
-  Pending, Done, Archived: core's `filterTasks` over `sortTasks`, honouring Show completed), a
-  "+ Add homework" button as the list header (opens `AddSheet`), `TaskRow`s (tap opens the task page,
-  the circle completes with a success haptic, × deletes), and `UndoToast` ("Completed" / "Deleted"
-  with Undo, 4s, placed above the tab bar).
+- `(tabs)/index.tsx` **Home**: header with the menu button, "Home", the `TimerPill` (a running
+  Pomodoro or stopwatch; opens Focus) and Time left; the smart suggestion (`buildSuggestion`, its ×
+  sets `hw-suggestion-hidden`); the search button; the filter chips (All, Pending, Done, Archived,
+  plus the subject and "No estimate" chips when set: core's `filterTasks` over `sortTasks`, honouring
+  Show completed); "+ Add homework" (opens `AddSheet`, also from `?add=1`) with the templates under
+  it (`startFromTemplate`); then the tasks: `TaskCard` (the web's MiniCard) in the List layout,
+  grouped by `groupTasks` when Group by is set, or `TaskLayouts` (Board, Checklist, Kanban,
+  Progress, Pyramid). Every card swipes (`components/Swipe.tsx`: right completes, left deletes,
+  64px). In the List layout with no grouping, the ⠿ grip drags to reorder (`dragDelta` in
+  `src/lib/reorder.ts`, with the measured card heights). Completing holds the card in place for
+  `ms(640)` (`justDone`, `heldOpen`; the card keeps its grip and badges meanwhile), then the list
+  glides (`LayoutAnimation`, `ms(320)`; reduced motion skips both). `UndoToast` reads "Title"
+  completed / marked not done / deleted, with Undo.
 - `components/AddSheet.tsx` **adding a task**: a native page sheet (`Modal presentationStyle=
   "pageSheet"`, swipe down to cancel) driven by core's `lib/addFlow.ts` (see "Where things live").
   Steps: "What's the assignment?", then each question the user turned on, in their order. Subject:
@@ -1102,20 +1133,30 @@ auto-archive, templates, recaps, Inbox.
   date", "Add a time", "Any time", "No due date"), estimate (digit-only hours and minutes, saved
   on blur; minutes past 59 roll into hours), Repeats and Priority (Auto/High/Medium/Low) as
   segmented controls, subtasks (tick is quiet, add and delete are undoable, capped at
-  `LIMITS.subtasks`), tags (quiet, capped at `LIMITS.tags`/`LIMITS.tag`), time worked, Duplicate and
-  Delete (both go back). Each field saves on its own, so each change is one undo step. The typed
+  `LIMITS.subtasks`), tags (quiet, capped at `LIMITS.tags`/`LIMITS.tag`, with suggestions from
+  other tasks' tags), the work-session timer (Start/End Session, counting up from a fixed start;
+  leaving the page while it runs logs it too, the web's `leaveTaskPage`), "Sessions today", time
+  worked, and at the foot Mark done, Archive/Restore, Duplicate, Save as template and Delete task
+  (Duplicate and Delete go back). Each field saves on its own, so each change is one undo step. The typed
   title and estimate follow the saved values when those change underneath (undo, another screen)
   through React's "adjust state while rendering" pattern (`seen`), not an effect. A deleted task
   shows "This task isn't here any more" with Back.
-- `(tabs)/calendar.tsx` **Calendar** (the web's Month view): `monthOnlyGrid`/`monthGrid` by the
-  Calendar setting, `weekdayLabels(weekStart)`, ‹ › and Today, each day with up to 3 subject-coloured
-  dots for open tasks (`byDueDate`), today ringed, the picked day filled with the accent. Below:
-  that day's tasks (non-archived, done ones included) and "+ Add homework due ...", which opens
-  `AddSheet` with `presetDate`. No swipe between months and no Deck view yet.
-- `(tabs)/focus.tsx` **Focus** (the web's Focus Mode): Pomodoro card (FOCUS/BREAK, big clock,
-  progress bar, Start/Resume/Pause, Reset, Break/Skip), a "Working on" card (the task's title and
-  time so far, plus chips to switch task; defaults to `mostUrgent` of the open tasks), and the
-  stopwatch (Start/Pause, Reset, "Log Xm to task"). Which cards show follows `hw-focus-show`. The
+- `(tabs)/calendar.tsx` **Calendar**: Month or Deck (`hw-calendar-view`). Month (the web's):
+  `monthOnlyGrid`/`monthGrid` by the Calendar setting, `weekdayLabels(weekStart)`, ‹ ›, a sideways
+  swipe on the grid (`PanResponder`) and Today, each day with up to 3 subject-coloured dots for open
+  tasks (`byDueDate`), today ringed, the picked day filled with the accent. Below: that day's tasks
+  (non-archived, done ones included) and "+ Add homework due ...", which opens `AddSheet` with
+  `presetDate`. The web's floating `DayDetail` card isn't ported: the day panel shows the same.
+  Deck: `components/DueDeck.tsx` (the web's `DueDeck`): one card per date that still has an open
+  task or is today or later, four drawn as a stack; swipe the top one left for the next date, right
+  for the one before, or ‹ ›. The top card is tracked by its date (`picked`); the reset or entrance
+  after a swap runs in a layout effect, or the outgoing card flashes for a frame.
+- `(tabs)/focus.tsx` **Focus** (the web's Focus Mode): the Pomodoro as a `Ring` (FOCUS/BREAK,
+  Start/Resume/Pause, Reset, Break/Skip), the task card ("up next" or "focusing on", Change task,
+  Mark done via `creditTask`; defaults to `mostUrgent` of the open tasks), and the stopwatch
+  (Start/Pause, Reset, "Log Xm to task"). A finished Pomodoro shows the web's "Pomodoro done" toast;
+  a finished break shows the "Break's over" card suggesting the task just worked on (else
+  `mostUrgent`) with Start. Which cards show follows `hw-focus-show`. The
   logic is `src/state/focusTimer.ts` (plain functions over core's `lib/timers.ts`, unit-tested):
   **clock-based** like the web (a running Pomodoro is its `endAt`, the stopwatch its `swStartedAt`),
   and saved in `hw-focus-state`, so it stays right through a locked phone or the app being closed.
@@ -1130,14 +1171,18 @@ auto-archive, templates, recaps, Inbox.
   notification permission once, and the phase's end is scheduled as a notification
   (`scheduleFocusEnd`, id `focus-end`), rescheduled after permission is granted and cancelled
   while paused.
-- `(tabs)/settings.tsx` **Settings**: Looks (Appearance System/Light/Dark, Urgency color coding),
-  Date & time (12h/24h, week starts Sun/Mon, Calendar shows only this month), Task list (Show
-  completed), New task questions (▲ ▼ to reorder with core's `moveQuestion`, a switch each), Subjects
-  (colour swatch, × asks before removing; tasks keep their subject; new ones get the next palette
-  colour via `subjectToAdd`; no rename or recolour yet), Focus timer (Pomodoro and Stopwatch switches
-  via `focusShowFor`, lengths, auto-start breaks), Reminders (asks iOS for permission when turned
-  on; if refused, an alert offers Open Settings), Recently deleted (newest first, Restore), and a
-  "DuePlanner 0.1.0, by due. studios" line.
+- `(tabs)/settings.tsx` **Settings**: the web's sections in its order, each a closed dropdown
+  (`Section` in `components/ui.tsx`; in development `"set":["dev-open-section","Subjects"]` opens one
+  for a screenshot): Looks (Appearance, Text size, Layout, Animation speed, Urgency color coding),
+  Date & time (12h/24h, week starts Sun/Mon, Calendar shows only this month), Focus timer (Pomodoro
+  and Stopwatch switches via `focusShowFor`, lengths, auto-start breaks), New task questions (▲ ▼ to
+  reorder with core's `moveQuestion`, a switch each), Subjects (✎ renames and recolours, carried to
+  tasks, Recently deleted and templates; delete asks with a second tap; new ones get the next
+  palette colour via `subjectToAdd`), Task list (Group by, Show smart suggestion, Show completed,
+  Auto-archive), Reminders (asks iOS for permission when turned on; if refused, an alert offers
+  Open Settings). Then Send feedback, Privacy policy (the website's page for now; the phone app
+  needs its own wording before release), Clear completed, and the "DuePlanner 0.1.0, by due.
+  studios" line. Recently deleted is in History, as on the web.
 
 **Reminders (local notifications).** `src/lib/notifications.ts`. `syncReminders()` cancels every
 scheduled notification whose id starts `rem-` and schedules core's `upcomingReminders()` again (at

@@ -63,6 +63,8 @@ function Screens() {
           <Stack.Screen name="task/[id]" options={{ animation: "fade", animationDuration: 200, gestureEnabled: false }} />
           {/* The web's task sheet: slides up over the screen, pulled down to close. */}
           <Stack.Screen name="task-sheet/[id]" options={{ presentation: "modal", contentStyle: { backgroundColor: T.bg } }} />
+          {/* Profile (the web's ProfileModal): over everything, fading in. */}
+          <Stack.Screen name="profile" options={{ presentation: "fullScreenModal", animation: "fade" }} />
           <Stack.Screen name="search" options={{ presentation: "transparentModal", animation: "fade", contentStyle: { backgroundColor: "transparent" } }} />
         </Stack>
       </SidebarHost>

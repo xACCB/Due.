@@ -34,6 +34,9 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
 - **Aim: a mainstream product**, not a hobby project. Treat security, scalability, monitoring and
   reliability as real priorities, but default to free options. Anything that costs money (a
   domain, Firebase Blaze, store accounts) is the user's call, so flag it rather than proceed.
+  The user wants to pay for everything last (2026-11-14): build and test all that's free first
+  (Google sign-in in the Simulator, App Check debug tokens), and leave the Apple Developer
+  Program ($99/yr: Sign in with Apple, App Attest, TestFlight) and other costs until release.
 - **The phone app is React Native with Expo, never Capacitor** or another web-view wrapper: the user
   wants a real app, not "a website". Plan: `docs/mobile-plan.md`; code: `apps/mobile`.
 - **The phone app looks the same as the website** (2026-11-14): the website is the reference for
@@ -64,6 +67,11 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   --scope user context7 https://mcp.context7.com/mcp`: current library docs, e.g. Expo SDK 58; the
   lookups go to Upstash, not the code). Declined: git guardrails (blocks every `git push`), Impeccable
   (downloads a compiled engine and adds edit hooks).
+- **Use the installed skills where they fit** (the user asked, 2026-11-14): verification-before-completion
+  before saying something works or committing, systematic-debugging for any bug or failing check,
+  apple-design and emil-design-eng for motion and gestures (sheets, drawers, swipes), stop-slop for
+  new user-facing text, and the Playwright plugin (Chrome is installed) and Context7 for the website
+  reference and current library docs. Say which one you used in the summary.
 - **Explain plainly, give exact steps.** The user is new to Mac, Xcode and native app tooling. Say
   what a term means the first time (e.g. "scaffolding"), give commands to paste as code blocks in
   the order to run them, say what output to expect and what to do if it fails, and keep a short
@@ -157,6 +165,20 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   optional `in` selector). The file server must send `Access-Control-Allow-Origin: *`, which
   `python3 -m http.server` doesn't. `xcrun simctl launch booted com.apple.mobilesafari` or
   `com.duestudios.dueplanner` brings either to the front. None of this opens a window on the Mac.
+- **Sign-in on the phone (M3, started 2026-11-14):** `src/lib/firebase.ts` (React Native Firebase
+  27: app, auth, firestore, app-check; `@react-native-google-signin/google-signin` 17, its Firebase
+  variant, fetched with SPM like Firebase; `app.json` sets `useFrameworks: "dynamic"`, which
+  Firebase's SPM needs, so a native change means `npx expo prebuild --clean -p ios` then
+  `npx expo run:ios --no-bundler`). `startFirebase()` starts App Check first (enforced on Auth and
+  Firestore): in development the debug provider with `EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN` from
+  `apps/mobile/.env.local` (gitignored; Metro reads it only at start). That token is registered as
+  "Mac Simulator (dev)"; it was registered through the App Check REST API
+  (`POST firebaseappcheck.googleapis.com/v1/projects/<project>/apps/<appId>/debugTokens`) with the
+  Firebase CLI's stored access token (`~/.config/configstore/firebase-tools.json`, refreshed by any
+  CLI command), so no console visit is needed. A new machine needs its own token the same way.
+  Release builds would use App Attest, which waits for the paid Apple program. `useApp()` has
+  `user` and `authReady`; `src/app/profile.tsx` is the web's ProfileModal (sign-in screen, then
+  picture, name, email, Sign out); the sidebar's top row opens it. Sync is the next step.
 - **M3 groundwork:** the iOS app is registered in Firebase (2026-11-14, with the Firebase CLI,
   signed in on the Mac as the project's owner): app id `1:445404835645:ios:a63a01bd9ad17a0b71df54`,
   bundle id `com.duestudios.dueplanner`. Its `apps/mobile/GoogleService-Info.plist` (with

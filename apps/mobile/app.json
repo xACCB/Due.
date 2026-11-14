@@ -11,7 +11,10 @@
     "ios": {
       "bundleIdentifier": "com.duestudios.dueplanner",
       "supportsTablet": true,
-      "infoPlist": { "EXDevMenuShowFloatingActionButton": false }
+      "infoPlist": {
+        "EXDevMenuShowFloatingActionButton": false
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.duestudios.dueplanner"
@@ -28,7 +31,23 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      ["expo-build-properties", { "ios": { "ccacheEnabled": true } }]
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "ccacheEnabled": true,
+            "useFrameworks": "dynamic"
+          }
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosDependencyManager": "spm"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

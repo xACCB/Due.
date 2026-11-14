@@ -16,6 +16,7 @@ import { syncReminders } from "../lib/notifications";
 import { SETTINGS } from "./settings";
 import * as Fx from "./focusTimer";
 import * as S from "./taskStore";
+import { startFirebase, watchUser, type AuthUser } from "../lib/firebase";
 
 type Op =
   | { kind: "add"; input: string | AddDraft }
@@ -144,6 +145,18 @@ export function useAppValue() {
   // The sidebar drawer (components/Sidebar.tsx), opened from any screen's header
   // or a swipe in from the left edge. Not saved: it starts closed.
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Who's signed in (Firebase Auth). `authReady` turns true once Firebase has
+  // said, so a signed-in person doesn't see "Sign in" flash at launch.
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  useEffect(() => {
+    let stop: (() => void) | null = null;
+    let gone = false;
+    startFirebase()
+      .then(() => { if (!gone) stop = watchUser(u => { setUser(u); setAuthReady(true); }); })
+      .catch(() => setAuthReady(true)); // no Firebase (e.g. no config file): stay signed out
+    return () => { gone = true; stop?.(); };
+  }, []);
 
   // Auto-archive, re-checked whenever the tasks or the setting change (the web's effect).
   useEffect(() => {
@@ -167,7 +180,7 @@ export function useAppValue() {
 
   return {
     T, h24, questions, fz, ms,
-    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen,
+    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen, user, authReady,
     tasks: store.tasks,
     trash: store.trash,
     canUndo: store.undo.length > 0,

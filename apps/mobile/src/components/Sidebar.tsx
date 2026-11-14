@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Animated, Image, Easing, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router, usePathname, type Href } from "expo-router";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -104,7 +104,8 @@ function SidebarBody() {
   };
   const openTask = (id: number) => { close(); if (openTaskId != null) router.replace(`/task/${id}`); else router.push(`/task/${id}`); };
   const toggleOpen = (name: string) => s.setOpenSubjects(s.openSubjects.includes(name) ? s.openSubjects.filter(n => n !== name) : [...s.openSubjects, name]);
-  const signIn = () => Alert.alert("Sign in", "Signing in, and syncing with the website, comes in a later update. Until then your tasks are saved on this phone.");
+  const openProfile = () => { close(); router.push("/profile"); };
+  const who = app.user;
 
   // One row (the web's SidebarRow, .sb-row): `current` marks the screen showing.
   const row = (icon: (color: string) => ReactNode, label: string, onPress: () => void, current: boolean, extra?: ReactNode, a11y?: string) => (
@@ -120,14 +121,14 @@ function SidebarBody() {
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.body, { paddingTop: 14 + insets.top, paddingBottom: 12 + insets.bottom }]}>
       <View style={styles.top}>
-        <Pressable onPress={signIn} accessibilityRole="button" accessibilityLabel="Sign in. Sync across devices"
+        <Pressable onPress={openProfile} accessibilityRole="button" accessibilityLabel={who ? `${who.name || "Your account"}. Open Profile` : "Sign in. Sync across devices"}
           style={({ pressed }) => [styles.row, styles.profile, { backgroundColor: pressed ? T.cardAlt : "transparent" }]}>
-          <View style={[styles.avatar, { backgroundColor: T.cardAlt }]}>
-            <IconPerson color={T.textMuted} />
-          </View>
+          {who?.photo
+            ? <Image source={{ uri: who.photo }} style={styles.avatar} accessibilityIgnoresInvertColors />
+            : <View style={[styles.avatar, { backgroundColor: T.cardAlt }]}><IconPerson color={T.textMuted} /></View>}
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(13), color: T.text }}>Sign in</Text>
-            <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(10), marginTop: 1, color: T.textMuted }}>Sync across devices</Text>
+            <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(13), color: T.text }}>{who ? who.name || "Your account" : "Sign in"}</Text>
+            <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(10), marginTop: 1, color: T.textMuted }}>{who ? "Signed in" : "Sync across devices"}</Text>
           </View>
         </Pressable>
         <Pressable onPress={close} hitSlop={6} accessibilityRole="button" accessibilityLabel="Close sidebar" style={styles.closeBtn}>

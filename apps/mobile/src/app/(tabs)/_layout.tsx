@@ -1,29 +1,30 @@
-import { NativeTabs } from "expo-router/native-tabs";
+import { Tabs } from "expo-router/js-tabs";
 import { useApp } from "../../state/appContext";
 
-// iOS draws its own tab bar here (Liquid Glass on iOS 26), as the mobile plan
-// chose. Icons: `sf` is an SF Symbol (Apple's set, iOS), `md` a Material
-// Symbol (Google's set, Android).
-export default function TabsLayout() {
-  const { T } = useApp();
+// The main screens, switched in place like the web's activeTab (no tab bar:
+// the sidebar drawer, components/Sidebar.tsx, is the way between them, as on
+// the web). A short fade on each switch, the web's .sec-body entrance.
+// backBehavior "history" lets Focus Mode's Exit go back to the screen before.
+export default function ScreensLayout() {
+  const { T, ms } = useApp();
   return (
-    <NativeTabs tintColor={T.accent}>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} md="home" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="calendar">
-        <NativeTabs.Trigger.Label>Calendar</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="calendar" md="calendar_month" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="focus">
-        <NativeTabs.Trigger.Label>Focus</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="timer" md="timer" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
-        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} md="settings" />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <Tabs
+      tabBar={() => null}
+      backBehavior="history"
+      screenOptions={{
+        headerShown: false,
+        animation: "fade",
+        transitionSpec: { animation: "timing", config: { duration: ms(200) } },
+        sceneStyle: { backgroundColor: T.bg },
+      }}
+    >
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="calendar" />
+      <Tabs.Screen name="focus" />
+      <Tabs.Screen name="inbox" />
+      <Tabs.Screen name="history" />
+      <Tabs.Screen name="import" />
+      <Tabs.Screen name="settings" />
+    </Tabs>
   );
 }

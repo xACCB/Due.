@@ -20,6 +20,8 @@ import { Chip, Segmented } from "../../components/ui";
 import { DateTimeField } from "../../components/DateTimeField";
 import { UndoToast } from "../../components/UndoToast";
 import { useDevScroll } from "../../lib/devScroll";
+import { AppHeader } from "../../components/AppHeader";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // The task page (the web's TaskModal in its `page` form): every field is open
 // to edit and saves on its own when you leave it, so each change is one undo
@@ -57,12 +59,15 @@ export default function TaskPage() {
   const task = app.tasks.find(t => String(t.id) === id);
   if (!task) {
     return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: app.T.bg }} edges={["top", "left", "right"]}>
+      <AppHeader title="Task" back={{ onPress: () => (router.canGoBack() ? router.back() : router.navigate("/")) }} />
       <View style={[styles.gone, { backgroundColor: app.T.bg }]}>
         <Text style={[styles.label, { color: app.T.textMuted }]}>This task isn&apos;t here any more.</Text>
         <Pressable onPress={() => router.back()} accessibilityRole="button" style={[styles.wideBtn, { borderColor: app.T.border, alignSelf: "stretch" }]}>
           <Text style={[styles.btnText, { color: app.T.text }]}>Back</Text>
         </Pressable>
       </View>
+      </SafeAreaView>
     );
   }
   return <TaskForm task={task} />;
@@ -167,7 +172,11 @@ function TaskForm({ task }: { task: Task }) {
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={100}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+      {/* The web's task page: its header and "‹ Home", which here goes back to
+          the screen the task was opened from. */}
+      <AppHeader title="Task" back={{ onPress: () => (router.canGoBack() ? router.back() : router.navigate("/")) }} />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <TextInput
           value={title}
@@ -421,6 +430,7 @@ function TaskForm({ task }: { task: Task }) {
           </View>
         )}
       </ScrollView>
+      </SafeAreaView>
       {toast && <UndoToast text={toast.text} n={toast.n} T={T} bottom={24} onHide={() => setToast(null)} onUndo={() => { app.undo(); setToast(null); }} />}
     </KeyboardAvoidingView>
   );

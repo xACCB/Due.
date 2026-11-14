@@ -2,12 +2,13 @@ import { useState, useRef, type ComponentRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { recapMessage } from "@dueplanner/core/lib/recaps";
 import { formatDate } from "@dueplanner/core/lib/format";
-import { useApp } from "../state/appContext";
-import { F } from "../theme/fonts";
-import { ScreenTitle } from "../components/ScreenTitle";
-import { Dropdown } from "../components/Dropdown";
-import { MessageCard } from "../components/MessageCard";
-import { useDevAction, useDevScroll } from "../lib/devScroll";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useApp } from "../../state/appContext";
+import { F } from "../../theme/fonts";
+import { AppHeader } from "../../components/AppHeader";
+import { Dropdown } from "../../components/Dropdown";
+import { MessageCard } from "../../components/MessageCard";
+import { useDevAction, useDevScroll } from "../../lib/devScroll";
 
 // Inbox -> Messages (the web's): a recap when a day, week, month or year ends,
 // if something was finished or worked on in it. Tapping one opens it in full
@@ -32,8 +33,9 @@ export default function Inbox() {
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
-      <ScreenTitle title="Inbox" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
+      <AppHeader title="Inbox" back={{}} />
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
       <Dropdown title={`Messages${items.length ? ` (${items.length})` : ""}`} gap={12}>
         {items.length === 0
           ? <Text style={[styles.none, { fontSize: fz(11), color: T.textFaint }]}>No messages yet. A recap arrives here when a day, week, month or year ends, if you finished or worked on something in it.</Text>
@@ -69,12 +71,13 @@ export default function Inbox() {
           onClose={() => setOpenId(null)}
         />
       )}
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 16, paddingBottom: 48 },
+  body: { paddingHorizontal: 14, paddingBottom: 48 },
   none: { fontFamily: F.body, lineHeight: 17 },
   item: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   itemMain: { flex: 1, minWidth: 0 },

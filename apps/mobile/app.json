@@ -10,7 +10,8 @@
     "backgroundColor": "#0a0a0a",
     "ios": {
       "bundleIdentifier": "com.duestudios.dueplanner",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": { "EXDevMenuShowFloatingActionButton": false }
     },
     "android": {
       "package": "com.duestudios.dueplanner"

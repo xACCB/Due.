@@ -27,16 +27,17 @@ Without ccache installed the build still works.
 ## What's where
 
 - `src/app/` (expo-router: every file is a screen)
-  - `_layout.tsx`: fonts, the launch screen, `AppProvider`, the gesture root, and the stack: the
-    tabs, then the pushed screens (task page, Inbox, History, Import/Export, back reads "Home")
-    and the sheets (menu, Time left, Search).
-  - `(tabs)/_layout.tsx`: the native tab bar (iOS draws it; SF Symbol icons).
+  - `_layout.tsx`: fonts, the launch screen, `AppProvider`, the gesture root, the sidebar drawer
+    (`components/Sidebar.tsx`) around the stack: the main screens, the task page, and the
+    sheets (Time left, Search).
+  - `(tabs)/_layout.tsx`: the main screens, switched in place with no tab bar (the sidebar is
+    the way between them, as on the website).
   - `(tabs)/index.tsx` Home (the web's Home: Time left, suggestion, search, chips, the six layouts,
     drag to reorder, templates), `calendar.tsx` (Month and Deck), `focus.tsx` (the web's Focus
-    Mode), `settings.tsx` (the web's dropdown sections).
+    Mode), `settings.tsx` (the web's dropdown sections), `inbox.tsx` (recaps), `history.tsx`,
+    `import.tsx`.
   - `task/[id].tsx` the task page (the web's TaskModal page: fields, session timer, template).
-  - `menu.tsx` (the web's sidebar), `search.tsx`, `time-left.tsx`, `inbox.tsx` (recaps),
-    `history.tsx`, `import.tsx`.
+  - `search.tsx`, `time-left.tsx`.
 - `src/state/`
   - `taskStore.ts`: what each task action does, plus undo/redo (plain functions, unit-tested).
   - `focusTimer.ts`: the Pomodoro and stopwatch (plain functions, unit-tested).

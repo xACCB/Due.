@@ -9,6 +9,7 @@ import { AppProvider } from "../state/AppState";
 import { useApp } from "../state/appContext";
 import { FONT_FILES, F } from "../theme/fonts";
 import { startDevRemote } from "../lib/devRemote";
+import { SidebarHost } from "../components/Sidebar";
 
 // The launch screen (app.json: the dp mark on black, like the web's #splash)
 // stays up until the fonts are ready, so text never shows in a fallback font.
@@ -47,33 +48,23 @@ export default function RootLayout() {
   );
 }
 
-// The tabs, with the task page and the menu's screens pushed over them (back
-// reads "Home", like the web's "‹ Home"), and the menu, Search and Time left
-// as sheets over the current screen.
+// The main screens ((tabs), switched in place), the task page over them
+// (fading in, with the web's header and "‹ Home"), and Search and Time left as
+// sheets over the current screen. The sidebar drawer wraps all of it.
 function Screens() {
   const { T } = useApp();
   return (
     <>
       <StatusBar style={T.light ? "dark" : "light"} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: T.bg },
-          headerStyle: { backgroundColor: T.bg },
-          headerTintColor: T.accent,
-          headerTitleStyle: { fontFamily: F.body, color: T.text },
-          headerShadowVisible: false,
-        }}
-      >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="task/[id]" options={{ headerShown: true, title: "Task", headerBackTitle: "Back" }} />
-        <Stack.Screen name="inbox" options={{ headerShown: true, title: "", headerBackTitle: "Home" }} />
-        <Stack.Screen name="history" options={{ headerShown: true, title: "", headerBackTitle: "Home" }} />
-        <Stack.Screen name="import" options={{ headerShown: true, title: "", headerBackTitle: "Home" }} />
-        <Stack.Screen name="menu" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.8, 1], contentStyle: { backgroundColor: T.bg } }} />
-        <Stack.Screen name="time-left" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.6, 1], contentStyle: { backgroundColor: T.bg } }} />
-        <Stack.Screen name="search" options={{ presentation: "transparentModal", animation: "fade" }} />
-      </Stack>
+      <SidebarHost>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: T.bg } }}>
+          <Stack.Screen name="(tabs)" />
+          {/* No swipe back: a swipe in from the left edge opens the sidebar, as on the web. */}
+          <Stack.Screen name="task/[id]" options={{ animation: "fade", animationDuration: 200, gestureEnabled: false }} />
+          <Stack.Screen name="time-left" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.6, 1], contentStyle: { backgroundColor: T.bg } }} />
+          <Stack.Screen name="search" options={{ presentation: "transparentModal", animation: "fade" }} />
+        </Stack>
+      </SidebarHost>
     </>
   );
 }

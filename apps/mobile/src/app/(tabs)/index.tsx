@@ -238,7 +238,7 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  list: { paddingHorizontal: 16, paddingBottom: 140 },
+  list: { paddingHorizontal: 14, paddingBottom: 48 },
   suggest: { flexDirection: "row", alignItems: "flex-start", gap: 7, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 16 },
   suggestText: { flex: 1, fontFamily: F.body, lineHeight: 18 },
   search: { flexDirection: "row", alignItems: "center", gap: 9, height: 42, borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, marginBottom: 10 },

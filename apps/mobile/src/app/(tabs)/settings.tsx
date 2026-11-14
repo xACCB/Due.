@@ -82,7 +82,7 @@ export default function SettingsScreen() {
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
-      <AppHeader title="Settings" />
+      <AppHeader title="Settings" back={{}} />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
 
         <Section title="Looks" gap={20} T={T}>
@@ -322,7 +322,7 @@ function Arrow({ glyph, a11y, disabled, onPress, T }: { glyph: string; a11y: str
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  body: { padding: 16, paddingBottom: 140 },
+  body: { paddingHorizontal: 14, paddingBottom: 48 },
   inline: { flexDirection: "row", alignItems: "center", gap: 10 },
   swatch: { width: 14, height: 14, borderRadius: 7 },
   x: { fontSize: 20, lineHeight: 22, paddingHorizontal: 4 },

@@ -3,10 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SymbolView } from "expo-symbols";
 import { formatDate } from "@dueplanner/core/lib/format";
 import { localDateStr } from "@dueplanner/core/lib/dates";
-import { useApp } from "../state/appContext";
-import { F } from "../theme/fonts";
-import { ScreenTitle } from "../components/ScreenTitle";
-import { useDevScroll } from "../lib/devScroll";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useApp } from "../../state/appContext";
+import { F } from "../../theme/fonts";
+import { AppHeader } from "../../components/AppHeader";
+import { useDevScroll } from "../../lib/devScroll";
 
 // History (the web's History screen): undo and redo, and Recently deleted
 // (kept 30 days) with Restore and Empty.
@@ -29,8 +30,9 @@ export default function History() {
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
-      <ScreenTitle title="History" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
+      <AppHeader title="History" back={{}} />
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
       <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
         <View style={styles.steps}>
           {stepBtn("Undo", app.canUndo, app.undoLabel, app.undo)}
@@ -71,12 +73,13 @@ export default function History() {
             </View>
           ))}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 16, paddingBottom: 48, gap: 8 },
+  body: { paddingHorizontal: 14, paddingBottom: 48, gap: 8 },
   card: { borderWidth: 1, borderRadius: 12, padding: 14 },
   steps: { flexDirection: "row", gap: 8 },
   step: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderRadius: 9, paddingVertical: 9 },

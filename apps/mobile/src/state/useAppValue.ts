@@ -141,6 +141,9 @@ export function useAppValue() {
   // the Time left sheet can set them (the web's filter / subjectFilter). Not saved.
   const [homeFilter, setHomeFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
+  // The sidebar drawer (components/Sidebar.tsx), opened from any screen's header
+  // or a swipe in from the left edge. Not saved: it starts closed.
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Auto-archive, re-checked whenever the tasks or the setting change (the web's effect).
   useEffect(() => {
@@ -164,7 +167,7 @@ export function useAppValue() {
 
   return {
     T, h24, questions, fz, ms,
-    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus,
+    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen,
     tasks: store.tasks,
     trash: store.trash,
     canUndo: store.undo.length > 0,

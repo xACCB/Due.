@@ -36,6 +36,9 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   domain, Firebase Blaze, store accounts) is the user's call, so flag it rather than proceed.
 - **The phone app is React Native with Expo, never Capacitor** or another web-view wrapper: the user
   wants a real app, not "a website". Plan: `docs/mobile-plan.md`; code: `apps/mobile`.
+- **The phone app looks the same as the website** (2026-11-14): the website is the reference for
+  every screen, so no tab bar or iOS-style navigation bars; compare by screenshot (see "Comparing
+  with the website" below) and match it.
 - **Branding**: the company is Due Studios ("due. studios" in in-app credits), the product is
   DuePlanner. Never bare "Due" (see Branding below).
 - **React Compiler forward references**: in `apps/web/src/App.tsx`'s `HomeworkPlanner`, a function
@@ -106,7 +109,17 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   with notifications allowed; the web's two-tone chime would need a sound file and a native
   build). Light and dark checked by screenshot. Still differs: cards over a dimmed (not blurred)
   screen, since blur needs `expo-blur` and a native build; no Inbox Updates; no Profile/sign-in.
-  **Next:** M3, sign-in and sync (`docs/mobile-plan.md`), after the items below.
+  (Superseded by the 2026-11-14 entry below.)
+- **2026-11-14:** the user asked for the phone app to look the same as the website, with the
+  website as the reference. Done so far: no tab bar (the sidebar drawer, `components/Sidebar.tsx`,
+  replaced it and the old `menu.tsx` sheet), the website's header and "‹ Home" on every screen
+  (no iOS navigation bars), Focus Mode's own heading with Exit, the Pomodoro ring showing the time
+  left (full at the start), and the development gear button hidden. Home, Calendar, Settings,
+  History and Focus Mode were compared with the website by screenshot and match. **Next:** the
+  task page's body still differs (the website has a card with a subject dropdown, date and time
+  fields side by side, estimate fields and a repeats dropdown, then the due line, the
+  estimated/spent pills, Priority, Subtasks, Tags), then Inbox, Import/Export, Search, Time left
+  and the add sheet against the website, then M3.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
   `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with
@@ -1060,8 +1073,8 @@ reorder, the Deck) haven't been tried by hand yet, so correct this section when 
 differs.
 
 **Stack (versions matter; Expo changes APIs every SDK).** Expo SDK 58, React Native 0.88.1, React
-19.3.0, TypeScript 6, expo-router 58 (file routes under `src/app/`, `NativeTabs` from
-`expo-router/native-tabs`), `expo-dev-client` (no Expo Go), `react-native-mmkv` 4 (needs
+19.3.0, TypeScript 6, expo-router 58 (file routes under `src/app/`, JS `Tabs` from
+`expo-router/js-tabs` with no tab bar), `expo-dev-client` (no Expo Go), `react-native-mmkv` 4 (needs
 `react-native-nitro-modules` as a direct dependency so autolinking picks it up),
 `@react-native-community/datetimepicker` 9 (`onValueChange`/`onDismiss`; `onChange` is deprecated),
 `expo-notifications`, `expo-keep-awake`, `expo-haptics`, `expo-font` with
@@ -1073,7 +1086,7 @@ Calendar's month swipe use React Native's own `PanResponder` and `Animated`).
 `app.json` turns on `experiments.reactCompiler` and `typedRoutes`. Expo and React Native need Node
 22.13+, which is why CI uses Node 22. Before using an Expo or React Native API, read the installed
 package's `.d.ts` (or the versioned docs at `docs.expo.dev/versions/v58.0.0/`) rather than relying
-on memory: that's how `NativeTabs.Trigger.Icon sf=...`, the notifications trigger shape
+on memory: that's how the notifications trigger shape
 (`{ type: SchedulableTriggerInputTypes.DATE, date }`) and the `NotificationBehavior` fields
 (`shouldShowBanner`/`shouldShowList`) were confirmed.
 
@@ -1128,27 +1141,45 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
 `25` need `as boolean`/`as number`, or the setter only accepts that exact value.
 
 **Screens** (`src/app/`; each follows the web screen of the same name):
+- **Looks the same as the website** (the user's call, 2026-11-14: "use the web app as the
+  reference"). No tab bar and no iOS navigation bars: the website's header (`AppHeader`, with
+  `back` for its "‹ Home" button) on every screen but Focus Mode, and the sidebar as a drawer.
+  When a screen differs, screenshot the website in the Simulator's Safari (see "Comparing with
+  the website" above) and match it, rather than reaching for a native iOS control.
 - `_layout.tsx`: keeps the launch screen up (`SplashScreen.preventAutoHideAsync`) until the fonts
   load (or fail: a font error must not keep the app hidden), then `GestureHandlerRootView`,
-  `AppProvider`, the status bar and the Stack, themed from `T`, and in development the dev remote
-  (`src/lib/devRemote.ts`). The Stack holds `(tabs)`, then pushed screens with a native header:
-  `task/[id]` ("Task", back reads "Back"), `inbox`, `history` and `import` (back reads "Home");
-  then `menu` and `time-left` as form sheets and `search` as a fading transparent modal.
-- `menu.tsx` (the web's sidebar): Search, Inbox (unread count), History, Import/Export, Settings,
-  and the subjects (`subjectGroups`): the arrow unfolds a subject's open tasks
-  (`hw-sidebar-subjects-open`), the name sets Home's `subjectFilter`.
+  `AppProvider`, the status bar, and `SidebarHost` around the Stack, themed from `T`, and in
+  development the dev remote (`src/lib/devRemote.ts`). The Stack holds `(tabs)`, then `task/[id]`
+  (fades in, no swipe back, since a swipe from the left edge opens the sidebar as on the web), then
+  `time-left` as a form sheet and `search` as a fading transparent modal.
+- `components/Sidebar.tsx` `SidebarHost` (the web's sidebar, `.app-sidebar` in its narrow-screen
+  drawer form, in the same numbers: 260px or 84% of the width, .2s ease-out, a 45% black backdrop):
+  opened by the header's sidebar button (`drawerOpen` in `useApp()`) or a swipe in from the
+  left 20px (`usePanGesture`, gesture-handler 3's hook API, with `hitSlop {left:0,width:20}` so
+  taps underneath still work), closed by a swipe left, the backdrop, its own sidebar button or
+  picking a row. Rows in the web's order: Sign in (no sign-in yet: an alert says it's coming),
+  Search, Home, Calendar, Focus (with a running timer's time), the subjects (`subjectGroups`: the
+  arrow unfolds a subject's open tasks, `hw-sidebar-subjects-open`; the name sets Home's
+  `subjectFilter`), Inbox (unread count), History, Import/Export, Settings, the credit line. The
+  current screen's row is highlighted from `usePathname()`. Icons are SF Symbols close to the web's
+  hand-drawn SVGs (`react-native-svg` would match exactly but needs a native build). Dev remote:
+  `"act":["sidebar","open"]` / `["sidebar","close"]`.
+- `(tabs)/_layout.tsx`: expo-router's JS `Tabs` (`expo-router/js-tabs`) with `tabBar={() => null}`,
+  so the main screens switch in place like the web's `activeTab`, with a .2s fade (the web's
+  `.sec-body`), and stay mounted. `backBehavior="history"` lets Focus Mode's Exit return to the
+  screen before. The group holds Home (`index`), `calendar`, `focus`, `inbox`, `history`, `import`
+  and `settings`; the URLs don't include the group, so `/history` etc. are unchanged.
 - `search.tsx` (`searchTasks`), `time-left.tsx` (`timeLeft`, `dueBucket`; "no estimate" sets the
-  `noest` filter), `inbox.tsx` (recap Messages as `Dropdown`s; the web's Updates aren't shown, since
-  they describe the website), `history.tsx` (undo/redo, Recently deleted with Restore and Empty),
-  `import.tsx` (syllabus scan; backups exported through the share sheet from a file in
-  `Paths.cache`, imported with `File.pickFileAsync` and core's `readBackup`).
-- `(tabs)/_layout.tsx`: `NativeTabs` (iOS draws the real tab bar, so iOS 26 gets Liquid Glass):
-  Home (`house`), Calendar (`calendar`), Focus (`timer`), Settings (`gearshape`), as SF Symbols
-  (`sf`, iOS), with Material Symbols for Android (`md`: `home`, `calendar_month`, `timer`,
-  `settings`), tinted `T.accent`. `md` needs the `expo-symbols` package: without it the names
-  aren't type-checked (the type silently becomes `any`) and the icons don't draw. With it, a wrong
-  name fails `npm run typecheck:mobile`.
-- `(tabs)/index.tsx` **Home**: header with the menu button, "Home", the `TimerPill` (a running
+  `noest` filter), `(tabs)/inbox.tsx` (recap Messages as `Dropdown`s; the web's Updates aren't
+  shown, since they describe the website), `(tabs)/history.tsx` (undo/redo, Recently deleted with
+  Restore and Empty), `(tabs)/import.tsx` (syllabus scan; backups exported through the share sheet
+  from a file in `Paths.cache`, imported with `File.pickFileAsync` and core's `readBackup`).
+- **The development build's gear button** (expo-dev-menu's floating button) is turned off by
+  `EXDevMenuShowFloatingActionButton: false` in `app.json`'s `ios.infoPlist` (from the next
+  native build). On an already-installed build: `xcrun simctl spawn booted defaults write
+  com.duestudios.dueplanner EXDevMenuShowFloatingActionButton -bool false`, then relaunch.
+  Cmd+D still opens the dev menu. Release builds never have it.
+- `(tabs)/index.tsx` **Home**: header with the sidebar button, "Home", the `TimerPill` (a running
   Pomodoro or stopwatch; opens Focus) and Time left; the smart suggestion (`buildSuggestion`, its ×
   sets `hw-suggestion-hidden`); the search button; the filter chips (All, Pending, Done, Archived,
   plus the subject and "No estimate" chips when set: core's `filterTasks` over `sortTasks`, honouring

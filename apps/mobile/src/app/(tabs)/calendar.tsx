@@ -196,7 +196,7 @@ function DayCard({ iso, today, list, onOpen, onAdd, onClose }: {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  body: { paddingHorizontal: 16, paddingBottom: 140 },
+  body: { paddingHorizontal: 14, paddingBottom: 48 },
   switch: { flexDirection: "row", gap: 6, marginBottom: 10 },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
   stack: { gap: 10 },

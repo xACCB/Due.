@@ -9,7 +9,7 @@ const TOAST_MS = 5000; // the web's
 // "Completed · Undo", above the tab bar, gone after a few seconds. `n` changes
 // with every new message, so a repeat of the same text restarts the timer.
 // `bottom`: distance from the safe area's bottom; by default it clears the tab bar.
-export function UndoToast({ text, n, T, bottom = 70, onUndo, onHide }: { text: string; n: number; T: Theme; bottom?: number; onUndo: () => void; onHide: () => void }) {
+export function UndoToast({ text, n, T, bottom = 24, onUndo, onHide }: { text: string; n: number; T: Theme; bottom?: number; onUndo: () => void; onHide: () => void }) {
   const insets = useSafeAreaInsets();
   useEffect(() => {
     const t = setTimeout(onHide, TOAST_MS);

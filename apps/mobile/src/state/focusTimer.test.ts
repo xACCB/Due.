@@ -89,4 +89,13 @@ describe("focus timer", () => {
     expect(r.state.endAt).toBe(s.endAt);
     expect(F.creditTask(r.state, T0 + 10 * min, L, 7).log).toBeUndefined(); // already credited
   });
+
+  it("shows a running timer's time, and nothing while none runs", () => {
+    let s = F.initialFocus(25);
+    expect(F.runningText(s, T0)).toBeNull();
+    s = F.start(s, T0);
+    expect(F.runningText(s, T0 + 61_000)).toBe("23:59");
+    s = F.pause(s, T0 + 61_000);
+    expect(F.runningText(s, T0 + 61_000)).toBeNull();
+  });
 });

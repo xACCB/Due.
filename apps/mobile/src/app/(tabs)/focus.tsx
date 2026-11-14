@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { AppState as RNAppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { useKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
 import { showsPomodoro, showsStopwatch, formatStopwatch, stopwatchMinutes } from "@dueplanner/core/lib/stopwatch";
@@ -117,7 +117,7 @@ export default function FocusScreen() {
 
   const total = Fx.phaseLength(state.phase, L);
   const secs = Math.min(Fx.remaining(state, now), Math.max(total, state.secsLeft));
-  const pct = total ? Math.max(0, Math.min(1, 1 - secs / total)) : 0;
+  const pct = total ? Math.max(0, Math.min(1, secs / total)) : 0; // the time left, full at the start (the web's pomPct)
   const swMs = Fx.stopwatchMs(state, now);
 
   // The task's card (the web's): "up next" while it's the first open task in
@@ -151,10 +151,14 @@ export default function FocusScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       {running && focused && <KeepAwake />}
+      {/* The web's Focus Mode: its own heading and Exit, back to the screen before. */}
       <View style={styles.header}>
-        <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Focus</Text>
+        <Text style={[styles.h1, { color: T.accent }]} accessibilityRole="header">Focus Mode</Text>
+        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.navigate("/"))} accessibilityRole="button" accessibilityLabel="Exit Focus Mode"
+          style={[styles.exit, { borderColor: T.border }]}>
+          <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textMuted }}>Exit</Text>
+        </Pressable>
       </View>
-      <View style={[styles.rule, { backgroundColor: T.accent }]} />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
         {breakEnded && (
           <View style={[styles.breakCard, { backgroundColor: T.card, borderColor: "#2ED57355" }]} accessibilityLiveRegion="polite">
@@ -282,10 +286,10 @@ function KeepAwake() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
-  h1: { fontSize: 26, lineHeight: 30, fontFamily: F.heading },
-  rule: { height: 1, marginBottom: 16 },
-  body: { paddingHorizontal: 16, paddingBottom: 140, gap: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+  h1: { fontSize: 20, lineHeight: 26, fontFamily: F.heading },
+  exit: { borderWidth: 1, borderRadius: 9, paddingVertical: 8, paddingHorizontal: 14 },
+  body: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingBottom: 48, gap: 16 },
   card: { borderWidth: 1, borderRadius: 12, padding: 16, alignItems: "center" },
   kicker: { alignSelf: "flex-start", fontFamily: F.body, letterSpacing: 0.8, paddingBottom: 6 },
   ringBox: { marginVertical: 10 },

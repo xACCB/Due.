@@ -8,10 +8,11 @@ import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { TimerPill } from "./TimerPill";
 
-// The web's header, shared by Home, Calendar and Settings: the menu button
-// (the web's sidebar button), the screen's name, a running timer's pill, and
-// Time left (opens its breakdown), with the accent rule under it.
-export function AppHeader({ title }: { title: string }) {
+// The web's header, on every screen but Focus Mode: the sidebar button, the
+// screen's name, a running timer's pill, and Time left (opens its breakdown),
+// with the accent rule under it. `back` adds the web's "‹ Home" button below
+// (ScreenHeader), as on the menu screens and the task page.
+export function AppHeader({ title, back }: { title: string; back?: { label?: string; onPress?: () => void } }) {
   const app = useApp();
   const { T, fz } = app;
   // "3h 20m", or "0m" (the web header's fmtMins).
@@ -20,8 +21,8 @@ export function AppHeader({ title }: { title: string }) {
     <>
       <View style={styles.header}>
         <View style={styles.left}>
-          <Pressable onPress={() => router.push("/menu")} hitSlop={10} accessibilityRole="button" accessibilityLabel="Open menu" accessibilityHint="Inbox, History, Import/Export and your subjects">
-            <SymbolView name={{ ios: "sidebar.left", android: "left_panel_open" }} size={21} tintColor={T.textMuted} />
+          <Pressable onPress={() => app.setDrawerOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Open sidebar" accessibilityState={{ expanded: app.drawerOpen }}>
+            <SymbolView name={{ ios: "sidebar.left", android: "left_panel_open" }} size={20} tintColor={T.textMuted} />
           </Pressable>
           <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">{title}</Text>
         </View>
@@ -34,17 +35,27 @@ export function AppHeader({ title }: { title: string }) {
         </View>
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
+      {back && (
+        <View style={styles.backRow}>
+          <Pressable onPress={back.onPress ?? (() => router.navigate("/"))} accessibilityRole="button" accessibilityLabel={`Back to ${back.label ?? "Home"}`}
+            style={({ pressed }) => [styles.back, { backgroundColor: T.cardAlt, borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
+            <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>‹ {back.label ?? "Home"}</Text>
+          </Pressable>
+        </View>
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
-  left: { flexDirection: "row", alignItems: "center", gap: 12, flexShrink: 1 },
+  header: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingHorizontal: 14, paddingTop: 20, paddingBottom: 3 },
+  left: { flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 1 },
   h1: { fontSize: 26, lineHeight: 30, fontFamily: F.heading },
   right: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
   timeLeft: { alignItems: "flex-end" },
   tlLabel: { fontFamily: F.body },
   tlValue: { fontFamily: F.heading, fontSize: 20, lineHeight: 24 },
-  rule: { height: 1, marginBottom: 16 },
+  rule: { height: 1, marginHorizontal: 14, marginBottom: 16 },
+  backRow: { flexDirection: "row", paddingHorizontal: 14, marginBottom: 10 },
+  back: { borderWidth: 1, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 12 },
 });

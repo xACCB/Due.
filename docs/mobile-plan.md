@@ -74,7 +74,7 @@ them. Side-by-side check against `main`: every screen's text and the saved data 
 | Need | Choice | Why |
 |---|---|---|
 | App framework | Expo SDK (current), TypeScript, expo-router | File-based screens; EAS builds |
-| Tab bar | expo-router **native tabs** | iOS draws its real tab bar, so iOS 26 gets genuine Liquid Glass (roadmap item "Use Apple's real Liquid Glass tab bar") |
+| Navigation | expo-router JS tabs with **no tab bar**, and the website's sidebar as a drawer | The app looks the same as the website (the user's call, 2026-11-14). Native tabs with Liquid Glass were used until then (roadmap item "Use Apple's real Liquid Glass tab bar") |
 | Firebase | `@react-native-firebase` (app, auth, firestore, app-check, remote-config, crashlytics optional) | Native offline cache; App Check with **App Attest / Play Integrity**, required because App Check is enforced on Firestore and Auth |
 | Google sign-in | `@react-native-google-signin/google-signin` | The web popup flow doesn't work in a native app |
 | Apple sign-in | `expo-apple-authentication` + Firebase Apple provider | Apple requires it when Google sign-in is offered |

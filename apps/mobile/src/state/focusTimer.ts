@@ -5,7 +5,7 @@
 // is core's (lib/timers.ts). A function that finishes work time returns a
 // `log` (minutes for a task) for the caller to record; this file never does.
 import { pomodoroCreditMinutes, pomodoroFinishMinutes, secondsLeft, stopwatchTotal } from "@dueplanner/core/lib/timers";
-import { stopwatchMinutes } from "@dueplanner/core/lib/stopwatch";
+import { formatStopwatch, stopwatchMinutes } from "@dueplanner/core/lib/stopwatch";
 
 export type Phase = "work" | "break";
 
@@ -127,4 +127,15 @@ export function swLog(s: FocusState, now: number, taskId: number | null): Result
   const ms = stopwatchMs(s, now);
   if (taskId == null || ms < 1000) return { state: s };
   return { state: swReset(s), log: { taskId, mins: stopwatchMinutes(ms) } };
+}
+
+const two = (n: number) => String(n).padStart(2, "0");
+
+// What a running timer shows outside Focus (the header pill, the sidebar's
+// Focus row; the web's runningTimer): the Pomodoro's time left while it runs,
+// else the stopwatch's time while that runs, else null.
+export function runningText(s: FocusState, now: number): string | null {
+  if (s.endAt != null) { const r = remaining(s, now); return `${two(Math.floor(r / 60))}:${two(r % 60)}`; }
+  if (s.swStartedAt != null) return formatStopwatch(stopwatchMs(s, now));
+  return null;
 }

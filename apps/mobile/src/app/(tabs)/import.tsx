@@ -6,11 +6,12 @@ import { readBackup, tasksCsv, withImportedColors, withImportedSubjects, withImp
 import { contrastColor, formatDate, ink } from "@dueplanner/core/lib/format";
 import { todayISO } from "@dueplanner/core/lib/dates";
 import { SCHEMA_VERSION } from "@dueplanner/core/lib/migrations";
-import { useApp } from "../state/appContext";
-import { F } from "../theme/fonts";
-import { ScreenTitle } from "../components/ScreenTitle";
-import { Dropdown } from "../components/Dropdown";
-import { useDevScroll } from "../lib/devScroll";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useApp } from "../../state/appContext";
+import { F } from "../../theme/fonts";
+import { AppHeader } from "../../components/AppHeader";
+import { Dropdown } from "../../components/Dropdown";
+import { useDevScroll } from "../../lib/devScroll";
 
 type Found = { title: string; dueDate: string; checked: boolean };
 
@@ -91,8 +92,9 @@ export default function ImportExport() {
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
-    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
-      <ScreenTitle title="Import/Export" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
+      <AppHeader title="Import/Export" back={{}} />
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
 
       <Dropdown title="Import from Syllabus">
         <TextInput
@@ -159,12 +161,13 @@ export default function ImportExport() {
         </View>
         {!!note && <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted, marginTop: 8 }}>{note}</Text>}
       </Dropdown>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 16, paddingBottom: 48, gap: 8 },
+  body: { paddingHorizontal: 14, paddingBottom: 48, gap: 8 },
   area: { minHeight: 100, maxHeight: 200, borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, fontFamily: F.body, textAlignVertical: "top", marginBottom: 10 },
   kicker: { fontFamily: F.body, letterSpacing: 0.7, marginBottom: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 10 },

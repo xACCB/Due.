@@ -255,7 +255,7 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
                 {task.done&&<span style={{background:"#2ED57322",color:ink("#2ED573",T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(11)}}>✓ Done</span>}
               </div>
               {page&&draft
-                ?<input value={draft.title} maxLength={500} aria-label="Title" onChange={e=>setDraft({...draft,title:e.target.value})} onBlur={()=>commitDraft()} onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
+                ?<input className="page-title" value={draft.title} maxLength={500} aria-label="Title" onChange={e=>setDraft({...draft,title:e.target.value})} onBlur={()=>commitDraft()} onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
                   style={{display:"block",width:"100%",boxSizing:"border-box",background:"none",border:"none",borderBottom:`1px solid ${T.borderFaint}`,borderRadius:0,outline:"none",padding:"2px 0 6px",fontFamily:F.heading,fontSize:26,color:T.text,lineHeight:1.2}}/>
                 :<div style={{fontFamily:F.heading,fontSize:22,color:T.text,lineHeight:1.2}}>{task.title}</div>}
             </div>

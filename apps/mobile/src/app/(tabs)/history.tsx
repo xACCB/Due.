@@ -6,7 +6,7 @@ import { localDateStr } from "@dueplanner/core/lib/dates";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../../state/appContext";
 import { F } from "../../theme/fonts";
-import { AppHeader } from "../../components/AppHeader";
+import { AppHeader, BackButton } from "../../components/AppHeader";
 import { useDevScroll } from "../../lib/devScroll";
 
 // History (the web's History screen): undo and redo, and Recently deleted
@@ -31,8 +31,9 @@ export default function History() {
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
-      <AppHeader title="History" back={{}} />
+      <AppHeader title="History" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
+        <BackButton />
       <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
         <View style={styles.steps}>
           {stepBtn("Undo", app.canUndo, app.undoLabel, app.undo)}

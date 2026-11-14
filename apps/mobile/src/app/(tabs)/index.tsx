@@ -206,7 +206,7 @@ export default function Home() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!dragging}
         renderItem={({ item }) => item.kind === "layout"
-          ? <TaskLayout layout={s.layout as Exclude<typeof s.layout, "list">} tasks={shown} now={now} onOpen={t => router.push(`/task/${t.id}`)} onToggle={toggle} onDelete={remove} justDone={justDone} />
+          ? <TaskLayout layout={s.layout as Exclude<typeof s.layout, "list">} tasks={shown} now={now} onOpen={t => router.push(`/task-sheet/${t.id}`)} onToggle={toggle} onDelete={remove} justDone={justDone} />
           : item.kind === "head"
           ? <Text style={[styles.groupHead, { fontSize: fz(10), color: T.textMuted }]} accessibilityRole="header">{item.label.toUpperCase()}</Text>
           : (
@@ -217,7 +217,7 @@ export default function Home() {
               T={T} fz={fz} h24={h24} now={now}
               colorCode={s.colorCodeUrgency}
               subjectColor={s.subjectColors[item.task.subject]}
-              onOpen={() => router.push(`/task/${item.task.id}`)}
+              onOpen={() => router.push(`/task-sheet/${item.task.id}`)}
               onToggle={() => toggle(item.task)}
               onDelete={() => remove(item.task)}
               reorder={canReorder && (!item.task.done || justDone.includes(item.task.id)) ? {

@@ -5,7 +5,7 @@ import { formatDate } from "@dueplanner/core/lib/format";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../../state/appContext";
 import { F } from "../../theme/fonts";
-import { AppHeader } from "../../components/AppHeader";
+import { AppHeader, BackButton } from "../../components/AppHeader";
 import { Dropdown } from "../../components/Dropdown";
 import { MessageCard } from "../../components/MessageCard";
 import { useDevAction, useDevScroll } from "../../lib/devScroll";
@@ -34,8 +34,9 @@ export default function Inbox() {
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
-      <AppHeader title="Inbox" back={{}} />
+      <AppHeader title="Inbox" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
+        <BackButton />
       <Dropdown title={`Messages${items.length ? ` (${items.length})` : ""}`} gap={12}>
         {items.length === 0
           ? <Text style={[styles.none, { fontSize: fz(11), color: T.textFaint }]}>No messages yet. A recap arrives here when a day, week, month or year ends, if you finished or worked on something in it.</Text>

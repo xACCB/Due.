@@ -145,7 +145,7 @@ export function DueDeck() {
               </View>
               <View style={[styles.divider, { backgroundColor: T.border }]} />
               <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.list} scrollEnabled={top}>
-                {list.map(t => <DayTaskRow key={t.id} t={t} onOpen={() => router.push(`/task/${t.id}`)} />)}
+                {list.map(t => <DayTaskRow key={t.id} t={t} onOpen={() => router.push(`/task-sheet/${t.id}`)} />)}
               </ScrollView>
             </Animated.View>
           );

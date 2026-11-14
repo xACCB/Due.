@@ -93,7 +93,7 @@ export default function TimeLeft() {
           kicker={open.startsWith("due:") ? "Time left · by due date" : "Time left · subject"}
           color={open.startsWith("sub:") && open.slice(4) ? subjectColors[open.slice(4)] || T.accent : undefined}
           list={app.tasks.filter(t => !t.archived && !t.done && inOpen(t))}
-          onOpen={t => { setOpen(null); router.push(`/task/${t.id}`); }}
+          onOpen={t => { setOpen(null); router.push(`/task-sheet/${t.id}`); }}
           onClose={() => setOpen(null)}
         />
       )}

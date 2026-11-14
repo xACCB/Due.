@@ -36,7 +36,8 @@ Without ccache installed the build still works.
     drag to reorder, templates), `calendar.tsx` (Month and Deck), `focus.tsx` (the web's Focus
     Mode), `settings.tsx` (the web's dropdown sections), `inbox.tsx` (recaps), `history.tsx`,
     `import.tsx`.
-  - `task/[id].tsx` the task page (the web's TaskModal page: fields, session timer, template).
+  - `task/[id].tsx` the task page (from the sidebar) and `task-sheet/[id].tsx` the task sheet
+    (from everywhere else), both `components/TaskScreen.tsx` (the web's TaskModal).
   - `search.tsx`, `time-left.tsx`.
 - `src/state/`
   - `taskStore.ts`: what each task action does, plus undo/redo (plain functions, unit-tested).

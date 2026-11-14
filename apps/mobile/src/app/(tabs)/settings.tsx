@@ -16,7 +16,7 @@ import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
 import { useDevScroll } from "../../lib/devScroll";
-import { AppHeader } from "../../components/AppHeader";
+import { AppHeader, BackButton } from "../../components/AppHeader";
 
 // Settings, in the web's sections and order (Looks, Date & time, Focus timer,
 // New task questions, Subjects, Task list, Reminders), then feedback and
@@ -82,8 +82,9 @@ export default function SettingsScreen() {
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
-      <AppHeader title="Settings" back={{}} />
+      <AppHeader title="Settings" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <BackButton />
 
         <Section title="Looks" gap={20} T={T}>
           <View>

@@ -139,7 +139,7 @@ function MonthView() {
         </View>
         {dayTasks.length === 0
           ? <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textFaint, marginBottom: 10 }}>Nothing due.</Text>
-          : <View style={styles.rows}>{dayTasks.map(t => <DayTaskRow key={t.id} t={t} surface onOpen={() => router.push(`/task/${t.id}`)} />)}</View>}
+          : <View style={styles.rows}>{dayTasks.map(t => <DayTaskRow key={t.id} t={t} surface onOpen={() => router.push(`/task-sheet/${t.id}`)} />)}</View>}
         <Pressable onPress={() => setAdding(selected)} accessibilityRole="button" style={({ pressed }) => [styles.add, { borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
           <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textMuted }}>
             + Add homework due {selected === today ? "today" : new Date(selected + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
@@ -148,7 +148,7 @@ function MonthView() {
       </View>
       {dayCard && (
         <DayCard iso={dayCard} today={today} list={sortDay(due.get(dayCard) ?? [])}
-          onOpen={t => { setDayCard(null); router.push(`/task/${t.id}`); }}
+          onOpen={t => { setDayCard(null); router.push(`/task-sheet/${t.id}`); }}
           onAdd={() => { setAdding(dayCard); setDayCard(null); }}
           onClose={() => setDayCard(null)} />
       )}

@@ -10,9 +10,8 @@ import { TimerPill } from "./TimerPill";
 
 // The web's header, on every screen but Focus Mode: the sidebar button, the
 // screen's name, a running timer's pill, and Time left (opens its breakdown),
-// with the accent rule under it. `back` adds the web's "‹ Home" button below
-// (ScreenHeader), as on the menu screens and the task page.
-export function AppHeader({ title, back }: { title: string; back?: { label?: string; onPress?: () => void } }) {
+// with the accent rule under it. It stays put while the screen scrolls.
+export function AppHeader({ title }: { title: string }) {
   const app = useApp();
   const { T, fz } = app;
   // "3h 20m", or "0m" (the web header's fmtMins).
@@ -35,15 +34,19 @@ export function AppHeader({ title, back }: { title: string; back?: { label?: str
         </View>
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
-      {back && (
-        <View style={styles.backRow}>
-          <Pressable onPress={back.onPress ?? (() => router.navigate("/"))} accessibilityRole="button" accessibilityLabel={`Back to ${back.label ?? "Home"}`}
-            style={({ pressed }) => [styles.back, { backgroundColor: T.cardAlt, borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
-            <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>‹ {back.label ?? "Home"}</Text>
-          </Pressable>
-        </View>
-      )}
     </>
+  );
+}
+
+// The web's "‹ Home" (ScreenHeader) at the top of a menu screen or the task
+// page, inside its scrolling content so it scrolls away as on the web.
+export function BackButton({ onPress }: { onPress?: () => void }) {
+  const { T, fz } = useApp();
+  return (
+    <Pressable onPress={onPress ?? (() => router.navigate("/"))} accessibilityRole="button" accessibilityLabel="Back to Home"
+      style={({ pressed }) => [styles.back, { backgroundColor: T.cardAlt, borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
+      <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>‹ Home</Text>
+    </Pressable>
   );
 }
 
@@ -56,6 +59,5 @@ const styles = StyleSheet.create({
   tlLabel: { fontFamily: F.body },
   tlValue: { fontFamily: F.heading, fontSize: 20, lineHeight: 24 },
   rule: { height: 1, marginHorizontal: 14, marginBottom: 16 },
-  backRow: { flexDirection: "row", paddingHorizontal: 14, marginBottom: 10 },
-  back: { borderWidth: 1, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 12 },
+  back: { alignSelf: "flex-start", borderWidth: 1, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 12, marginBottom: 10 },
 });

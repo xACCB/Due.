@@ -20,7 +20,7 @@ export default function Search() {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const results = searchTasks(app.tasks, q);
-  const open = (t: Task) => router.replace(`/task/${t.id}`);
+  const open = (t: Task) => router.replace(`/task-sheet/${t.id}`);
 
   const highlight = (title: string) => {
     const at = q ? title.toLowerCase().indexOf(q) : -1;

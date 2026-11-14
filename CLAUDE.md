@@ -115,11 +115,14 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   replaced it and the old `menu.tsx` sheet), the website's header and "‹ Home" on every screen
   (no iOS navigation bars), Focus Mode's own heading with Exit, the Pomodoro ring showing the time
   left (full at the start), and the development gear button hidden. Home, Calendar, Settings,
-  History and Focus Mode were compared with the website by screenshot and match. **Next:** the
-  task page's body still differs (the website has a card with a subject dropdown, date and time
-  fields side by side, estimate fields and a repeats dropdown, then the due line, the
-  estimated/spent pills, Priority, Subtasks, Tags), then Inbox, Import/Export, Search, Time left
-  and the add sheet against the website, then M3.
+  History and Focus Mode were compared with the website by screenshot and match. The task now
+  has the web's two forms, the page (from the sidebar) and the sheet (from everywhere else),
+  both matching the website by screenshot; "‹ Home" scrolls with the page as on the web. The
+  website's own task page title was 16px on phones (its 16px rule for inputs on narrow screens
+  caught it) and is 26px again. **Next:** Inbox, Import/Export, Search, Time left and the add
+  sheet against the website, then M3. The website reference can now be taken in Chrome with the
+  Playwright plugin at 402x874 (installed 2026-11-14), which is quicker than Safari in the
+  Simulator; Safari remains the closer match for how iPhone draws form fields.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
   `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with
@@ -1142,8 +1145,9 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
 
 **Screens** (`src/app/`; each follows the web screen of the same name):
 - **Looks the same as the website** (the user's call, 2026-11-14: "use the web app as the
-  reference"). No tab bar and no iOS navigation bars: the website's header (`AppHeader`, with
-  `back` for its "‹ Home" button) on every screen but Focus Mode, and the sidebar as a drawer.
+  reference"). No tab bar and no iOS navigation bars: the website's header (`AppHeader`, fixed at
+  the top) on every screen but Focus Mode, with its "‹ Home" (`BackButton`, first in the scrolling
+  content, so it scrolls away as on the web) on the menu screens and the task page, and the sidebar as a drawer.
   When a screen differs, screenshot the website in the Simulator's Safari (see "Comparing with
   the website" above) and match it, rather than reaching for a native iOS control.
 - `_layout.tsx`: keeps the launch screen up (`SplashScreen.preventAutoHideAsync`) until the fonts
@@ -1202,20 +1206,27 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   and an "Adding" preview card. `busy` stops a quick second tap adding the task twice. The sheet's
   content is remounted per opening, so each add starts fresh. `presetDate` (from Calendar) opens
   the date question on "what time?".
-- `task/[id].tsx` **task page** (the web's `TaskModal` in its `page` form): title (multiline, saved
-  on blur or Return; can't be emptied), Mark done, Archive/Unarchive, subject chips (tap again to
-  clear; a subject not in the list still shows), due date and time (system pickers, "Add a due
-  date", "Add a time", "Any time", "No due date"), estimate (digit-only hours and minutes, saved
-  on blur; minutes past 59 roll into hours), Repeats and Priority (Auto/High/Medium/Low) as
-  segmented controls, subtasks (tick is quiet, add and delete are undoable, capped at
-  `LIMITS.subtasks`), tags (quiet, capped at `LIMITS.tags`/`LIMITS.tag`, with suggestions from
-  other tasks' tags), the work-session timer (Start/End Session, counting up from a fixed start;
-  leaving the page while it runs logs it too, the web's `leaveTaskPage`), "Sessions today", time
-  worked, and at the foot Mark done, Archive/Restore, Duplicate, Save as template and Delete task
-  (Duplicate and Delete go back). Each field saves on its own, so each change is one undo step. The typed
-  title and estimate follow the saved values when those change underneath (undo, another screen)
-  through React's "adjust state while rendering" pattern (`seen`), not an effect. A deleted task
-  shows "This task isn't here any more" with Back.
+- **A task** (`components/TaskScreen.tsx`, the web's `TaskModal`) in the web's two forms, from two
+  routes: `task/[id]` is the **page** (`page`, opened from the sidebar; the web's header and
+  "‹ Home", which goes back), `task-sheet/[id]` the **sheet** (an iOS modal sheet, opened from
+  Home, Calendar, the Deck, Search and Time left, as the web opens its sheet from those). Top to
+  bottom as on the web: the subject and priority chips ("✓ Done" when done), the title (a 26px
+  field on the page; 22px text in the sheet, with Edit and ×, × hidden while a session runs),
+  the edit card (always open on the page; in the sheet between Edit and Cancel/Save, with a
+  Title field and an accent border), the info row (due date and time with `countdown`, "Xh
+  estimated", "✓ Xm spent today"), Snooze and "Skip this one ↻" (sheet only, not while editing:
+  the user removed Snooze from the web page), Priority, Subtasks, Tags, the work-session timer
+  (counting up from a fixed start; leaving while it runs logs it too, the web's
+  `leaveTaskPage`), Sessions today, then Mark done (closes the sheet), Archive/Restore, Delete
+  (the page goes Home, the sheet closes), Duplicate (goes back) and Save as template. The edit
+  card is the web's form fields (`components/WebFields.tsx`: `SelectField` opens iOS's action
+  sheet, `DateField` the system picker in a card, `TextField`, `ClearLink`), with 16px text as
+  the web uses on touch screens. Its `Draft` (the web's `TaskDraft`) is saved by `commit()` as one
+  undo step of only the changed fields: on the page a choice saves at once and a typed field on
+  blur, and the draft follows the task when its saved values change (undo, another screen) by
+  comparing a stored signature while rendering, not in an effect. Minutes past 59 roll into
+  hours ("Saves as 1h 30m"). A deleted task shows "This task isn't here any more". Dev remote:
+  `"act":["task-edit"]` presses the sheet's Edit.
 - `(tabs)/calendar.tsx` **Calendar**: Month or Deck (`hw-calendar-view`). Month (the web's):
   `monthOnlyGrid`/`monthGrid` by the Calendar setting, `weekdayLabels(weekStart)`, ‹ ›, a sideways
   swipe on the grid (`PanResponder`) and Today, each day with up to 3 subject-coloured dots for open
@@ -1284,9 +1295,10 @@ open.
   root bundles all eight.
 - Text on an accent fill uses `contrastColor(T.accent)`, and coloured text (subjects, the danger
   button) goes through `ink(color, T.light)`, as on the web.
-- Dates and times are picked with `src/components/DateTimeField.tsx`, which stores the web's text
-  (`YYYY-MM-DD`, `HH:MM`, "" for none). iOS draws the system picker in place (`compact` on the task
-  page, `inline` and `spinner` in the add sheet); Android opens its dialog on a tap. Only the time
+- Dates and times are picked with `src/components/DateTimeField.tsx` (the add sheet, drawn in
+  place: `inline` and `spinner`) or `WebFields.tsx`'s `DateField` (the task screen: a web-style
+  field opening the picker in a card). Both store the web's text (`YYYY-MM-DD`, `HH:MM`, "" for
+  none); Android opens its dialog on a tap. Only the time
   picker follows 12h/24h (its locale); dates keep the phone's own order.
 - Shared building blocks are in `src/components/ui.tsx`: `Chip`, `Button` (primary, plain or
   danger), `Section`/`Row`/`ToggleRow` (settings rows), `Segmented`, `Stepper`. Use them rather than

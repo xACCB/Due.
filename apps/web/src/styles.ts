@@ -131,7 +131,7 @@ export function buildCss(T:CssTheme,F:{body:string}):string{
       .app-shell:not(.sb-folded) .sb-open-btn,.app-shell:not(.sb-folded) .timer-pill,.app-shell:not(.sb-folded) .screen-header{display:none!important;}
     }
     @media (max-width:600px){
-      input,textarea{font-size:16px!important;}
+      input:not(.page-title),textarea{font-size:16px!important;}
     }
   `;
 }

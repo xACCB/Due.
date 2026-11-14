@@ -9,7 +9,7 @@ import { SCHEMA_VERSION } from "@dueplanner/core/lib/migrations";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../../state/appContext";
 import { F } from "../../theme/fonts";
-import { AppHeader } from "../../components/AppHeader";
+import { AppHeader, BackButton } from "../../components/AppHeader";
 import { Dropdown } from "../../components/Dropdown";
 import { useDevScroll } from "../../lib/devScroll";
 
@@ -93,8 +93,9 @@ export default function ImportExport() {
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
-      <AppHeader title="Import/Export" back={{}} />
+      <AppHeader title="Import/Export" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+        <BackButton />
 
       <Dropdown title="Import from Syllabus">
         <TextInput

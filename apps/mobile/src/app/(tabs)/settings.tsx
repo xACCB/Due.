@@ -4,7 +4,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import { GROUP_BY, LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, SUBJECT_COLOR_PALETTE, type LayoutName } from "@dueplanner/core/constants";
 import { TEXT_SIZES, type TextSize } from "@dueplanner/core/lib/textSize";
-import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { moveQuestion, normalizeQuestionPrefs } from "@dueplanner/core/lib/addQuestions";
 import { recolouredSubjects, renamedSubjects, subjectRename, subjectToAdd, templatesRenamedSubject, withoutSubjectColor } from "@dueplanner/core/lib/taskActions";
 import { focusShowFor, showsPomodoro, showsStopwatch } from "@dueplanner/core/lib/stopwatch";
@@ -17,6 +16,7 @@ import type { Theme } from "../../theme/types";
 import { Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
 import { useDevScroll } from "../../lib/devScroll";
 import { AppHeader, BackButton } from "../../components/AppHeader";
+import { LayoutIcon } from "../../components/icons";
 
 // Settings, in the web's sections and order (Looks, Date & time, Focus timer,
 // New task questions, Subjects, Task list, Reminders), then feedback and
@@ -25,12 +25,6 @@ const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
 const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
 // The web's Animation speed range: 0.5x to 2x in quarters.
 const ANIM_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-// SF Symbols on iOS, Material Symbols on Android (as the tab bar does).
-const LAYOUT_ICONS: Record<LayoutName, SymbolViewProps["name"]> = {
-  list: { ios: "list.bullet", android: "list" }, board: { ios: "square.grid.2x2", android: "grid_view" },
-  checklist: { ios: "checklist", android: "checklist" }, kanban: { ios: "rectangle.split.3x1", android: "view_kanban" },
-  progress: { ios: "chart.bar.xaxis", android: "bar_chart" }, pyramid: { ios: "triangle", android: "change_history" },
-};
 export default function SettingsScreen() {
   const app = useApp();
   const { T, fz } = app;
@@ -111,7 +105,7 @@ export default function SettingsScreen() {
                 return (
                   <Pressable key={key} onPress={() => s.setLayout(key)} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${l.name}, ${l.desc}`}
                     style={[styles.layoutBtn, { backgroundColor: on ? T.accent + "22" : "transparent", borderColor: on ? T.accent : T.border }]}>
-                    <SymbolView name={LAYOUT_ICONS[key]} size={20} tintColor={on ? T.accent : T.textFaint} />
+                    <LayoutIcon layout={key} dim={on ? T.accent : T.textFaint} />
                     <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(10), color: on ? T.accent : T.textMuted }}>{l.name}</Text>
                     <Text style={{ fontFamily: F.body, fontSize: fz(9), color: on ? T.accent : T.textMuted, opacity: 0.6, textAlign: "center" }}>{l.desc}</Text>
                   </Pressable>
@@ -166,7 +160,7 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="New task questions" T={T}>
-          <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint, marginTop: 0, marginBottom: 10 }]}>Asked in this order after the title. Anything you turn off can still be filled in later on the task page.</Text>
+          <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint, marginTop: 0, marginBottom: 10 }]}>Asked in this order after the title. Anything you turn off can still be filled in later with Edit.</Text>
           <View style={{ gap: 6 }}>
             <View style={[styles.qRow, { backgroundColor: T.surface, borderColor: T.border, paddingVertical: 8 }]}>
               <Text style={[styles.qNum, { fontSize: fz(10), color: T.textFaint }]}>1</Text>

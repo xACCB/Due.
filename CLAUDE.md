@@ -72,6 +72,17 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   apple-design and emil-design-eng for motion and gestures (sheets, drawers, swipes), stop-slop for
   new user-facing text, and the Playwright plugin (Chrome is installed) and Context7 for the website
   reference and current library docs. Say which one you used in the summary.
+- **Window layout when Chrome and the Simulator are both open** (the user asked, 2026-11-14:
+  "arrange it in the best looking order"): three columns on the 1440-wide screen, Terminal left,
+  the Simulator (Device Hub) middle, the Playwright Chrome right, each 480 wide. Rectangle (installed)
+  moves the front window: activate each in turn (`osascript -e 'tell application "Terminal" to
+  activate'`, `open -b com.apple.dt.Devices`, `tell application "Google Chrome" to activate`),
+  check with `osascript` that it really is frontmost (never move the user's own windows by
+  mistake), then `open -g "rectangle://execute-action?name=first-third"` / `center-third` /
+  `last-third`. Chrome then sets its own bounds exactly (`tell application "Google Chrome" to set
+  bounds of front window to {960, 30, 1440, 900}`), since Rectangle leaves it 500 wide. This shell
+  can't move other windows through System Events (no accessibility permission). End with
+  Terminal active again.
 - **Explain plainly, give exact steps.** The user is new to Mac, Xcode and native app tooling. Say
   what a term means the first time (e.g. "scaffolding"), give commands to paste as code blocks in
   the order to run them, say what output to expect and what to do if it fails, and keep a short
@@ -137,6 +148,19 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   the dropdowns and pickers, typing into the add card. The website reference can now be taken in Chrome with the
   Playwright plugin at 402x874 (installed 2026-11-14), which is quicker than Safari in the
   Simulator; Safari remains the closer match for how iPhone draws form fields.
+- **2026-11-14 (later):** Google sign-in works on the Simulator (Profile screen, App Check debug
+  token). A side-by-side visual pass against the website (Playwright Chrome vs Simulator, light and
+  dark) fixed: Board/Kanban cards and columns as tall as their row, the ×'s spacing (the web's
+  button padding), Checklist's full-width strike, the pending count (all open tasks, any filter),
+  the Deck's shadow, height and big date, the Pomodoro ring (SVG, as the web), the layout icons,
+  the web's undo toast (one pill for the whole app, `sayUndo`), blur behind Inbox messages, the
+  History note, New task questions' wording, and cards closing when their screen loses focus.
+  Matched already: all six layouts, grouping, filters, Calendar, Focus with timers and picker,
+  every Settings section, Inbox, Import/Export. **Not yet compared:** the done task's sheet, the
+  sidebar with a subject unfolded, Search with results. **Next:** those, then sync (M3). New dev
+  remote actions: `filter`, `delete` (Home), `focus-start`, `sw-start`, `focus-pick`, `syllabus`,
+  `task-edit`, `time-left`, `sidebar`; `dev-open-section` also opens Inbox/Import dropdowns. In the
+  zsh helper, write line breaks in JSON as `\\n` (zsh's echo turns `\n` into a real newline).
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
   `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with

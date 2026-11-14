@@ -62,13 +62,17 @@ export function CheckGlyph({ size, font, animate, color = "#111" }: { size: numb
 type Line = { x: number; y: number; width: number; height: number };
 
 // A task title that's struck through when `done` (in the text's own colour).
-export function StrikeText({ done, animate, color, style, numberOfLines, children }: {
-  done: boolean; animate: boolean; color: string; style: StyleProp<TextStyle>; numberOfLines?: number; children: ReactNode;
+// `full`: one line across the whole width it's given, not just the text (the
+// web's Checklist, where the title fills the row).
+export function StrikeText({ done, animate, color, style, numberOfLines, full, children }: {
+  done: boolean; animate: boolean; color: string; style: StyleProp<TextStyle>; numberOfLines?: number; full?: boolean; children: ReactNode;
 }) {
   const [lines, setLines] = useState<Line[]>([]);
+  const [box, setBox] = useState<Line | null>(null);
   const p = useDraw(done, animate, 190, 420, true);
+  const drawn = full ? (box ? [box] : []) : lines;
   return (
-    <View style={{ flexShrink: 1 }}>
+    <View style={full ? { flex: 1 } : { flexShrink: 1 }} onLayout={full ? e => { const { width, height } = e.nativeEvent.layout; setBox({ x: 0, y: 0, width, height }); } : undefined}>
       <Text
         numberOfLines={numberOfLines}
         onTextLayout={e => setLines(e.nativeEvent.lines.map(l => ({ x: l.x, y: l.y, width: l.width, height: l.height })))}
@@ -76,7 +80,7 @@ export function StrikeText({ done, animate, color, style, numberOfLines, childre
       >
         {children}
       </Text>
-      {done && lines.map((l, i) => (
+      {done && drawn.map((l, i) => (
         <Animated.View
           key={i}
           pointerEvents="none"

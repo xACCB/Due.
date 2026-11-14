@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { byDueDate, monthGrid, monthOnlyGrid, shiftMonth, monthSwipe, weekdayLabels } from "@dueplanner/core/lib/calendar";
 import { todayISO } from "@dueplanner/core/lib/dates";
 import { contrastColor, formatDuration, ink } from "@dueplanner/core/lib/format";
@@ -56,6 +56,9 @@ function MonthView() {
   // "+ Add homework due ..." goes to Home with that date picked (the web's addHomeworkOn).
   const setAdding = (date: string) => router.navigate(`/?add=1&date=${date}`);
   const [dayCard, setDayCard] = useState<string | null>(null); // the day open in DayCard
+  // Leaving the screen closes the day card (screens stay mounted, so it would stay up).
+  const focused = useIsFocused();
+  if (!focused && dayCard != null) setDayCard(null);
   useDevAction("open-day", iso => { setSelected(iso); setDayCard(iso); }); // development only
 
   const cells = calendarMonthOnly ? monthOnlyGrid(year, month, weekStart) : monthGrid(year, month, weekStart);

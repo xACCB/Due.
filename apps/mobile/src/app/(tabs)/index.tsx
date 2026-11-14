@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, FlatList, KeyboardAvoidingView, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -14,7 +14,6 @@ import { F } from "../../theme/fonts";
 import { TaskCard } from "../../components/TaskCard";
 import { TaskLayout } from "../../components/TaskLayouts";
 import { AddCard } from "../../components/AddCard";
-import { UndoToast } from "../../components/UndoToast";
 import { dragDelta } from "../../lib/reorder";
 import { useDevAction, useDevScroll, useDevToggle } from "../../lib/devScroll";
 import { IconSearch } from "../../components/icons";
@@ -51,9 +50,7 @@ export default function Home() {
     startAdding({ date: date || undefined }); // eslint-disable-line react-hooks/set-state-in-effect -- opening from a link is an outside event
     router.setParams({ add: undefined, date: undefined });
   }, [add, date]);
-  const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
-  const hideToast = useCallback(() => setToast(null), []);
-  const say = (text: string) => setToast(prev => ({ text, n: (prev?.n ?? 0) + 1 }));
+  const say = app.sayUndo; // the app-wide undo toast
 
   const filter = app.homeFilter;
   // A subject filter whose subject no longer has tasks or a row is ignored (the web's subjectFilterOn).
@@ -73,7 +70,8 @@ export default function Home() {
   const allSorted = useMemo(() => sortTasks(app.tasks, justDone), [app.tasks, justDone]);
   const shown = filterTasks(allSorted, { filter, subject: subjectOn, showDone: s.showDone, justDone });
   const pending = allSorted.filter(t => heldOpen(t, justDone));
-  const pendingCount = shown.filter(t => !t.done && !t.archived).length;
+  // Every open task, whatever the filter shows (the web counts visibleTasks, which is all of them).
+  const pendingCount = app.tasks.filter(t => !t.done && !t.archived).length;
 
   // The task the suggestion names (not the list's top, which can be in a
   // hand-made order), so its × hides that one. A task in its completion hold
@@ -125,10 +123,12 @@ export default function Home() {
   // Development only: "act":["crash"] makes Home throw, to check the error screen.
   const [crash, setCrash] = useState(false);
   useDevAction("crash", () => setCrash(true));
+  useDevAction("filter", f => app.setHomeFilter(f)); // development only: a filter chip
   if (crash) throw new Error("Development crash (dev remote)");
   // Development only: the dev remote's "toggle" ticks a task the way a tap does.
   useDevToggle(id => { const t = app.tasks.find(x => x.id === id); if (t) toggle(t); });
   const remove = (t: Task) => { glide(); app.remove(t.id); say(`"${t.title}" deleted`); };
+  useDevAction("delete", id => { const t = app.tasks.find(x => x.id === Number(id)); if (t) remove(t); }); // development only: a card's ×
   const startTemplate = (tpl: TaskTemplate) => {
     const step = startFromTemplate(app.questions, tpl);
     if (step.done) { glide(); app.add(step.done); say(`"${step.done.title}" added`); } else startAdding({ template: tpl });
@@ -255,7 +255,6 @@ export default function Home() {
       />
       </KeyboardAvoidingView>
 
-      {toast && <UndoToast text={toast.text} n={toast.n} T={T} onHide={hideToast} onUndo={() => { app.undo(); hideToast(); }} />}
     </SafeAreaView>
   );
 }

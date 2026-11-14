@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { useColorScheme } from "react-native";
 import type { HistoryAction, Task } from "@dueplanner/core/types";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
@@ -145,6 +145,12 @@ export function useAppValue() {
   // The sidebar drawer (components/Sidebar.tsx), opened from any screen's header
   // or a swipe in from the left edge. Not saved: it starts closed.
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // The undo toast, one for the whole app as on the web (it stays while you
+  // move between screens). `n` changes with every message, so a repeat of the
+  // same text restarts its timer. Drawn by components/UndoToast.tsx.
+  const [undoToast, setUndoToast] = useState<{ text: string; n: number } | null>(null);
+  const sayUndo = useCallback((text: string) => setUndoToast(p => ({ text, n: (p?.n ?? 0) + 1 })), []);
+  const hideUndo = useCallback(() => setUndoToast(null), []);
   // Who's signed in (Firebase Auth). `authReady` turns true once Firebase has
   // said, so a signed-in person doesn't see "Sign in" flash at launch.
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -180,7 +186,7 @@ export function useAppValue() {
 
   return {
     T, h24, questions, fz, ms,
-    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen, user, authReady,
+    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen, user, authReady, undoToast, sayUndo, hideUndo,
     tasks: store.tasks,
     trash: store.trash,
     canUndo: store.undo.length > 0,

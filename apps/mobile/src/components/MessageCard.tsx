@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { WhatsNewItem } from "@dueplanner/core/whatsNew";
 import { contrastColor, longDate } from "@dueplanner/core/lib/format";
+import { Backdrop } from "./Backdrop";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 
@@ -30,7 +31,7 @@ export function MessageCard({ items, index, onIndex, onDismiss, onClose }: {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.wrap} accessibilityViewIsModal>
-        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: T.light ? "rgba(245,245,245,0.86)" : "rgba(0,0,0,0.72)" }]} onPress={onClose} accessibilityLabel="Close" />
+        <Backdrop kind="card" onPress={onClose} />
         <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border, shadowOpacity: T.light ? 0.16 : 0.6 }]}>
           <ScrollView contentContainerStyle={styles.body} bounces={false}>
             <Animated.View style={{ opacity: fade, gap: 14 }}>

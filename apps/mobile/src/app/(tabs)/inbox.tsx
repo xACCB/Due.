@@ -1,3 +1,4 @@
+import { useIsFocused } from "expo-router";
 import { useState, useRef, type ComponentRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { recapMessage } from "@dueplanner/core/lib/recaps";
@@ -19,6 +20,9 @@ export default function Inbox() {
   const { T, fz } = app;
   const { recaps, setRecaps } = app.settings;
   const [openId, setOpenId] = useState<string | null>(null);
+  // Leaving the screen closes an open message (screens stay mounted, so it would stay up).
+  const focused = useIsFocused();
+  if (!focused && openId != null) setOpenId(null);
   const items = recaps.map(r => ({ r, m: recapMessage(r) }));
   const openIndex = openId ? items.findIndex(x => x.m.id === openId) : -1;
 

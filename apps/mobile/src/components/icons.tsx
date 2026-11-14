@@ -106,3 +106,17 @@ export function IconChevron({ color, size = 12 }: P) {
     </Svg>
   );
 }
+
+// The Layout picker's icons (the web's Settings -> Looks -> Layout), each in
+// `dim` (the accent when picked, else faint).
+export function LayoutIcon({ layout, dim }: { layout: "list" | "board" | "checklist" | "kanban" | "progress" | "pyramid"; dim: string }) {
+  const s = { width: 22, height: 22, viewBox: "0 0 22 22", fill: "none" } as const;
+  switch (layout) {
+    case "list": return <Svg {...s}><Rect x="2" y="4" width="18" height="3" rx="1.5" fill={dim} /><Rect x="2" y="9.5" width="18" height="3" rx="1.5" fill={dim} /><Rect x="2" y="15" width="18" height="3" rx="1.5" fill={dim} /></Svg>;
+    case "board": return <Svg {...s}><Rect x="2" y="2" width="8" height="8" rx="2" fill={dim} /><Rect x="12" y="2" width="8" height="8" rx="2" fill={dim} /><Rect x="2" y="12" width="8" height="8" rx="2" fill={dim} /><Rect x="12" y="12" width="8" height="8" rx="2" fill={dim} /></Svg>;
+    case "checklist": return <Svg {...s}><Rect x="2" y="4" width="5" height="5" rx="1.5" stroke={dim} strokeWidth={1.5} /><Path d="M3.5 6.5l1.2 1.2L6.5 5" stroke={dim} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" /><Rect x="9" y="5.5" width="11" height="2" rx="1" fill={dim} /><Rect x="2" y="13" width="5" height="5" rx="1.5" stroke={dim} strokeWidth={1.5} /><Rect x="9" y="14.5" width="11" height="2" rx="1" fill={dim} /></Svg>;
+    case "kanban": return <Svg {...s}><Rect x="2" y="2" width="5" height="18" rx="1.5" fill={dim} opacity={0.4} /><Rect x="9" y="2" width="5" height="13" rx="1.5" fill={dim} opacity={0.7} /><Rect x="16" y="2" width="5" height="9" rx="1.5" fill={dim} /></Svg>;
+    case "progress": return <Svg {...s}><Rect x="2" y="4" width="18" height="3.5" rx="1.75" fill={dim} opacity={0.2} /><Rect x="2" y="4" width="14" height="3.5" rx="1.75" fill={dim} /><Rect x="2" y="10" width="18" height="3.5" rx="1.75" fill={dim} opacity={0.2} /><Rect x="2" y="10" width="9" height="3.5" rx="1.75" fill={dim} /><Rect x="2" y="16" width="18" height="3.5" rx="1.75" fill={dim} opacity={0.2} /><Rect x="2" y="16" width="16" height="3.5" rx="1.75" fill={dim} /></Svg>;
+    case "pyramid": return <Svg {...s}><Rect x="7" y="3" width="8" height="4" rx="1.5" fill={dim} /><Rect x="4" y="9" width="14" height="4" rx="1.5" fill={dim} opacity={0.7} /><Rect x="1" y="15" width="20" height="4" rx="1.5" fill={dim} opacity={0.4} /></Svg>;
+  }
+}

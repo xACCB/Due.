@@ -92,8 +92,7 @@ function TaskForm({ task, page }: { task: Task; page: boolean }) {
   const edit = (patch: Partial<Task>) => app.edit(task.id, patch);
   const quiet = (patch: Partial<Task>) => app.quiet(task.id, patch);
   // The web's toast for Snooze and Skip: what happened, with Undo.
-  const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
-  const say = (text: string) => setToast(t => ({ text, n: (t?.n ?? 0) + 1 }));
+  const say = app.sayUndo; // the app-wide undo toast
   const snooze = (kind: SnoozeKind) => {
     const after = snoozePatch(task, snoozeTarget(kind));
     app.edit(task.id, after, `snooze "${task.title}"`);
@@ -481,7 +480,7 @@ function TaskForm({ task, page }: { task: Task; page: boolean }) {
         )}
       </ScrollView>
       </SafeAreaView>
-      {toast && <UndoToast text={toast.text} n={toast.n} T={T} bottom={24} onHide={() => setToast(null)} onUndo={() => { app.undo(); setToast(null); }} />}
+      {!page && <UndoToast />}
     </KeyboardAvoidingView>
   );
 }

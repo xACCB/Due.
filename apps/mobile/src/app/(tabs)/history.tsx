@@ -39,9 +39,6 @@ export default function History() {
           {stepBtn("Undo", app.canUndo, app.undoLabel, app.undo)}
           {stepBtn("Redo", app.canRedo, app.redoLabel, app.redo)}
         </View>
-        <Text style={[styles.hint, { fontSize: fz(10), color: T.textFaint }]}>
-          {app.undoLabel ? `Undo: ${app.undoLabel}` : "Nothing to undo"}{app.redoLabel ? `   ·   Redo: ${app.redoLabel}` : ""}
-        </Text>
       </View>
 
       <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
@@ -85,7 +82,6 @@ const styles = StyleSheet.create({
   steps: { flexDirection: "row", gap: 8 },
   step: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderRadius: 9, paddingVertical: 9 },
   stepText: { fontFamily: F.body },
-  hint: { fontFamily: F.body, marginTop: 8 },
   trashHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   kicker: { fontFamily: F.body, letterSpacing: 0.7 },
   empty: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },

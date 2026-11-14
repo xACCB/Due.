@@ -12,8 +12,10 @@ const SWIPE_AT = 64;
 
 // A task card's swipe, as in every web layout: right marks it done (or not
 // done), left deletes it, with the web's tinted reveal and label behind.
-export function Swipe({ done, radius, gap = 0, onToggle, onDelete, children }: {
-  done: boolean; radius: number; gap?: number; onToggle: () => void; onDelete: () => void; children: ReactNode;
+// `fill`: the card stretches to the height it's given (a Board row, where the
+// web's grid makes both cards as tall as the taller).
+export function Swipe({ done, radius, gap = 0, fill, onToggle, onDelete, children }: {
+  done: boolean; radius: number; gap?: number; fill?: boolean; onToggle: () => void; onDelete: () => void; children: ReactNode;
 }) {
   const { T, fz } = useApp();
   const swipe = useRef<SwipeableMethods>(null);
@@ -38,7 +40,8 @@ export function Swipe({ done, radius, gap = 0, onToggle, onDelete, children }: {
         swipe.current?.reset();
         if (dir === SwipeDirection.RIGHT) onToggle(); else onDelete();
       }}
-      containerStyle={{ borderRadius: radius, marginBottom: gap }}
+      containerStyle={[{ borderRadius: radius, marginBottom: gap }, fill && { flex: 1 }]}
+      childrenContainerStyle={fill ? { flex: 1 } : undefined}
     >
       {children}
     </ReanimatedSwipeable>

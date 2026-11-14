@@ -11,7 +11,7 @@ import { useApp } from "../../state/appContext";
 import { F } from "../../theme/fonts";
 import { AppHeader, BackButton } from "../../components/AppHeader";
 import { Dropdown } from "../../components/Dropdown";
-import { useDevScroll } from "../../lib/devScroll";
+import { useDevAction, useDevScroll } from "../../lib/devScroll";
 
 type Found = { title: string; dueDate: string; checked: boolean };
 
@@ -32,6 +32,8 @@ export default function ImportExport() {
   const checked = preview?.filter(p => p.checked) ?? [];
 
   const scan = () => { setPreview(parseSyllabus(text).map(f => ({ ...f, checked: true }))); setAdded(null); };
+  // Development only: paste a syllabus and scan it, as a tap would.
+  useDevAction("syllabus", t => { setText(t); setPreview(parseSyllabus(t).map(f => ({ ...f, checked: true }))); setAdded(null); });
   const commit = () => {
     if (!checked.length) return;
     const items = checked.map(({ title, dueDate }) => ({ title, dueDate }));

@@ -45,18 +45,19 @@ export function TaskLayout({ layout, tasks, now, onOpen, onToggle, onDelete, jus
     </CheckPop>
   );
   const del = (t: Task, size = 13) => (
-    <Pressable onPress={() => onDelete(t)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Delete ${t.title}`}>
+    // paddingHorizontal 6: the web's × is a <button>, which browsers pad 6px a side.
+    <Pressable onPress={() => onDelete(t)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Delete ${t.title}`} style={{ paddingHorizontal: 6 }}>
       <Text style={{ fontSize: fz(size), color: T.textFaint, lineHeight: fz(size) + 2 }}>×</Text>
     </Pressable>
   );
-  const title = (t: Task, size: number, heading: boolean, oneLine = false) => (
-    <StrikeText done={t.done} animate={held(t)} color={T.textFaint} numberOfLines={oneLine ? 1 : undefined} style={{ fontFamily: heading ? F.heading : F.body, fontSize: fz(size), color: t.done ? T.textFaint : T.text }}>{t.title}</StrikeText>
+  const title = (t: Task, size: number, heading: boolean, oneLine = false, full = false) => (
+    <StrikeText done={t.done} animate={held(t)} color={T.textFaint} numberOfLines={oneLine ? 1 : undefined} full={full} style={{ fontFamily: heading ? F.heading : F.body, fontSize: fz(size), color: t.done ? T.textFaint : T.text }}>{t.title}</StrikeText>
   );
   const pill = (t: Task) => !!t.subject && (
     <Text style={[styles.pill, { fontSize: fz(10), backgroundColor: sc(t) + "22", color: ink(sc(t), T.light) }]}>{t.subject}</Text>
   );
-  const card = (t: Task, radius: number, gap: number, style: object, children: React.ReactNode) => (
-    <Swipe key={t.id} done={t.done} radius={radius} gap={gap} onToggle={() => onToggle(t)} onDelete={() => onDelete(t)}>
+  const card = (t: Task, radius: number, gap: number, style: object, children: React.ReactNode, fill?: boolean) => (
+    <Swipe key={t.id} done={t.done} radius={radius} gap={gap} fill={fill} onToggle={() => onToggle(t)} onDelete={() => onDelete(t)}>
       <Pressable onPress={() => onOpen(t)} accessibilityRole="button" accessibilityLabel={`${t.title}${t.done ? ", done" : ""}`} accessibilityHint="Opens the task"
         style={({ pressed }) => [{ backgroundColor: pressed ? T.cardAlt : T.card, borderRadius: radius, borderWidth: 1, borderColor: T.border }, style]}>
         {children}
@@ -70,7 +71,7 @@ export function TaskLayout({ layout, tasks, now, onOpen, onToggle, onDelete, jus
         <>
           <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textFaint, minWidth: 18 }}>{String(i + 1).padStart(2, "0")}</Text>
           {check(t, 20, false)}
-          <View style={{ flex: 1 }}>{title(t, 13, false)}</View>
+          <View style={{ flex: 1 }}>{title(t, 13, false, false, true)}</View>
           {!t.done && !!dueText(t) && <Text style={{ fontFamily: F.body, fontSize: fz(10), color: ink(priColor(pr(t), cc), T.light) }}>{dueText(t)}</Text>}
           {del(t, 14)}
         </>
@@ -93,11 +94,12 @@ export function TaskLayout({ layout, tasks, now, onOpen, onToggle, onDelete, jus
                 </Text>
               )}
               <View style={[styles.between, { marginTop: "auto" }]}>
-                <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textMuted }}>{formatDuration(t.estMins)}</Text>
+                {/* No estimate: the check sits at the left, as on the web. */}
+                {t.estMins > 0 && <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textMuted }}>{formatDuration(t.estMins)}</Text>}
                 {check(t, 17)}
               </View>
             </>
-          ))}
+          ), true)}
         </View>
       ))}
     </View>
@@ -189,10 +191,10 @@ const styles = StyleSheet.create({
   checkRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, paddingHorizontal: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5 },
   half: { width: "50%", paddingHorizontal: 5 },
-  boardCard: { padding: 13, gap: 7, minHeight: 130, overflow: "hidden" },
+  boardCard: { flex: 1, padding: 13, gap: 7, minHeight: 130, overflow: "hidden" },
   boardBar: { position: "absolute", top: 0, left: 0, right: 0, height: 3 },
   between: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  column: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
+  column: { flex: 1, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
   kanbanCard: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 9, paddingHorizontal: 10 },
   progressCard: { paddingVertical: 13, paddingHorizontal: 15 },
   rowGap: { flexDirection: "row", alignItems: "center", gap: 8 },

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { byDueDate, deckDates, deckDragX, deckSwipe, deckTop } from "@dueplanner/core/lib/calendar";
 import { todayISO } from "@dueplanner/core/lib/dates";
 import { formatDuration, ink } from "@dueplanner/core/lib/format";
@@ -9,7 +10,6 @@ import { relativeDay, sortDay } from "../lib/day";
 import { F } from "../theme/fonts";
 import { DayTaskRow } from "./DayTaskRow";
 
-const DECK_HEIGHT = 470;
 
 // The Calendar's Deck view (the web's DueDeck): one card per date that still
 // has an open task or is today or later, the date written large and that
@@ -21,7 +21,10 @@ const DECK_HEIGHT = 470;
 export function DueDeck() {
   const app = useApp();
   const { T, fz, ms } = app;
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // The web's height: min(540px, 100dvh - 300px), at least 380.
+  const deckHeight = Math.max(380, Math.min(540, height - insets.top - insets.bottom - 300));
   const today = todayISO();
   const due = useMemo(() => byDueDate(app.tasks.filter(t => !t.archived)), [app.tasks]);
   const dates = useMemo(() => deckDates(due, today), [due, today]);
@@ -110,7 +113,7 @@ export function DueDeck() {
 
   return (
     <View>
-      <View style={styles.deck} accessibilityLabel="Due dates. Swipe left or right, or use the arrows below, to move between days">
+      <View style={[styles.deck, { height: deckHeight }]} accessibilityLabel="Due dates. Swipe left or right, or use the arrows below, to move between days">
         {dates.slice(idx, idx + 4).map((iso, k) => {
           const d = new Date(iso + "T00:00:00");
           const list = sortDay(due.get(iso) ?? []);
@@ -161,15 +164,18 @@ export function DueDeck() {
 }
 
 const styles = StyleSheet.create({
-  deck: { height: DECK_HEIGHT, marginBottom: 42 },
+  deck: { marginBottom: 42 },
   card: {
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderWidth: 1, borderRadius: 24,
-    paddingTop: 22, paddingHorizontal: 20, paddingBottom: 18, overflow: "hidden", transformOrigin: "50% 100%",
+    paddingTop: 22, paddingHorizontal: 20, paddingBottom: 18, transformOrigin: "50% 100%",
     shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowRadius: 16,
   },
   cardHead: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   weekday: { fontFamily: F.body, letterSpacing: 1.4 },
-  bigDate: { fontFamily: F.heading, fontSize: 116, lineHeight: 116, marginTop: 4, marginBottom: 2 },
+  // The web's 116px date at line-height .95, margins 4 and 2. iOS draws DM Serif Display's figures
+  // nearer the top of the line than browsers do, so the margins are shifted to land the
+  // number where the web's sits (measured side by side, 2026-11-14).
+  bigDate: { fontFamily: F.heading, fontSize: 116, lineHeight: 110, marginTop: 24, marginBottom: -21 },
   monthYear: { fontFamily: F.heading, fontSize: 22, lineHeight: 26 },
   cardSide: { alignItems: "flex-end", paddingTop: 2 },
   divider: { height: 1, marginTop: 14, marginBottom: 12 },

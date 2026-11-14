@@ -1,35 +1,24 @@
 import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
+import { Circle, Svg } from "react-native-svg";
 
-// A progress ring (the web's Pomodoro SVG ring) from plain views: each half of
-// the circle is a clipped half-ring rotated into view, the right half first.
-// `pct` 0..1, filled clockwise from the top. `children` sit in the middle.
+// The web's Pomodoro ring, drawn the same way: a track circle and a progress
+// circle of radius 45 on a 100 grid, the progress a 283-long dash with round
+// ends, offset by what's used up, turned so it starts at the top. `pct` 0..1
+// is how much of the ring shows. `children` sit in the middle.
 export function Ring({ pct, size, stroke, color, track, children }: { pct: number; size: number; stroke: number; color: string; track: string; children?: ReactNode }) {
   const p = Math.max(0, Math.min(1, pct));
-  const half = size / 2;
-  const ring = { width: size, height: size, borderRadius: half, borderWidth: stroke, borderColor: color };
-  const right = Math.min(p, 0.5) * 360; // 0..180
-  const left = Math.max(0, p - 0.5) * 360; // 0..180
   return (
     <View style={{ width: size, height: size }}>
-      <View style={[StyleSheet.absoluteFill, { borderRadius: half, borderWidth: stroke, borderColor: track }]} />
-      {/* Right half: a left half-ring turned clockwise into the right side. */}
-      <View style={{ position: "absolute", left: half, top: 0, width: half, height: size, overflow: "hidden" }}>
-        <View style={{ position: "absolute", left: -half, top: 0, width: size, height: size, transform: [{ rotate: `${right}deg` }] }}>
-          <View style={{ position: "absolute", left: 0, top: 0, width: half, height: size, overflow: "hidden" }}>
-            {p > 0 && <View style={ring} />}
-          </View>
-        </View>
-      </View>
-      {/* Left half, past 50%: a right half-ring turned into the left side. */}
-      <View style={{ position: "absolute", left: 0, top: 0, width: half, height: size, overflow: "hidden" }}>
-        <View style={{ position: "absolute", left: 0, top: 0, width: size, height: size, transform: [{ rotate: `${left}deg` }] }}>
-          <View style={{ position: "absolute", left: half, top: 0, width: half, height: size, overflow: "hidden" }}>
-            {p > 0.5 && <View style={[ring, { marginLeft: -half }]} />}
-          </View>
-        </View>
-      </View>
-      <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]}>{children}</View>
+      <Svg width={size} height={size} viewBox="0 0 100 100" style={{ transform: [{ rotate: "-90deg" }] }}>
+        <Circle cx="50" cy="50" r="45" fill="none" stroke={track} strokeWidth={stroke} />
+        {p > 0 && <Circle cx="50" cy="50" r="45" fill="none" stroke={color} strokeWidth={stroke} strokeDasharray="283" strokeDashoffset={283 * (1 - p)} strokeLinecap="round" />}
+      </Svg>
+      <View style={[StyleSheet.absoluteFill, styles.middle]}>{children}</View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  middle: { alignItems: "center", justifyContent: "center" },
+});

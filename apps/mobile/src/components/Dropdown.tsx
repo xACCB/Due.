@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
+import { readJSON } from "../lib/storage";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 
@@ -8,7 +9,8 @@ import { F } from "../theme/fonts";
 // while open. Starts closed, and isn't remembered, as on the web.
 export function Dropdown({ title, children, gap = 0 }: { title: string; children: ReactNode; gap?: number }) {
   const { T, fz, ms } = useApp();
-  const [open, setOpen] = useState(false);
+  // Development only: "dev-open-section" opens the dropdown with that title, as Settings' Section does.
+  const [open, setOpen] = useState(() => __DEV__ && title.startsWith(readJSON<string>("dev-open-section", "\u0000"))); // a count may follow the name
   return (
     <View style={[styles.box, { backgroundColor: T.card, borderColor: T.border }]}>
       <Pressable

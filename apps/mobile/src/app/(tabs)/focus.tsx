@@ -14,7 +14,7 @@ import { cancelFocusEnd, requestNotifications, scheduleFocusEnd } from "../../li
 import * as Fx from "../../state/focusTimer";
 import { F } from "../../theme/fonts";
 import { Ring } from "../../components/Ring";
-import { useDevScroll } from "../../lib/devScroll";
+import { useDevAction, useDevScroll } from "../../lib/devScroll";
 
 // Focus (the web's Focus Mode): the task to work on, the Pomodoro and the
 // stopwatch, as Settings -> Focus timer chooses. Time is logged to the task as
@@ -119,6 +119,10 @@ export default function FocusScreen() {
   const secs = Math.min(Fx.remaining(state, now), Math.max(total, state.secsLeft));
   const pct = total ? Math.max(0, Math.min(1, secs / total)) : 0; // the time left, full at the start (the web's pomPct)
   const swMs = Fx.stopwatchMs(state, now);
+  // Development only: the dev remote's stand-ins for Start, the stopwatch and Change task.
+  useDevAction("focus-start", () => startPomodoro());
+  useDevAction("sw-start", () => { const n = clock(); setNow(n); setState(Fx.swStart(state, n)); });
+  useDevAction("focus-pick", () => setPicking(true));
 
   // The task's card (the web's): "up next" while it's the first open task in
   // your order, "focusing on" once you've picked another.

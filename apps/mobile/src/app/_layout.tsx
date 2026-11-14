@@ -10,6 +10,7 @@ import { useApp } from "../state/appContext";
 import { FONT_FILES, F } from "../theme/fonts";
 import { startDevRemote } from "../lib/devRemote";
 import { SidebarHost } from "../components/Sidebar";
+import { UndoToast } from "../components/UndoToast";
 
 // The launch screen (app.json: the dp mark on black, like the web's #splash)
 // stays up until the fonts are ready, so text never shows in a fallback font.
@@ -67,6 +68,7 @@ function Screens() {
           <Stack.Screen name="profile" options={{ presentation: "fullScreenModal", animation: "fade" }} />
           <Stack.Screen name="search" options={{ presentation: "transparentModal", animation: "fade", contentStyle: { backgroundColor: "transparent" } }} />
         </Stack>
+        <UndoToast />
       </SidebarHost>
     </>
   );

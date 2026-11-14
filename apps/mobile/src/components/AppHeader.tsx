@@ -1,13 +1,13 @@
 import { useRef, useState, type ComponentRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router, useIsFocused } from "expo-router";
-import { SymbolView } from "expo-symbols";
 import { formatDuration } from "@dueplanner/core/lib/format";
 import { timeLeft } from "@dueplanner/core/lib/taskViews";
 import { todayISO } from "@dueplanner/core/lib/dates";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { TimerPill } from "./TimerPill";
+import { IconSidebar } from "./icons";
 import { TimeLeftMenu } from "./TimeLeftMenu";
 import { useDevAction } from "../lib/devScroll";
 
@@ -32,7 +32,7 @@ export function AppHeader({ title }: { title: string }) {
       <View ref={headerRef} style={styles.header}>
         <View style={styles.left}>
           <Pressable onPress={() => app.setDrawerOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Open sidebar" accessibilityState={{ expanded: app.drawerOpen }}>
-            <SymbolView name={{ ios: "sidebar.left", android: "left_panel_open" }} size={20} tintColor={T.textMuted} />
+            <IconSidebar color={T.textMuted} size={20} />
           </Pressable>
           <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">{title}</Text>
         </View>

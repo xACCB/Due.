@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, FlatList, KeyboardAvoidingView, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import type { Task, TaskTemplate } from "@dueplanner/core/types";
 import { filterTasks, groupTasks, heldOpen, sortTasks, withHeldOpen } from "@dueplanner/core/lib/taskViews";
@@ -18,6 +17,7 @@ import { AddCard } from "../../components/AddCard";
 import { UndoToast } from "../../components/UndoToast";
 import { dragDelta } from "../../lib/reorder";
 import { useDevAction, useDevScroll, useDevToggle } from "../../lib/devScroll";
+import { IconSearch } from "../../components/icons";
 import { AppHeader } from "../../components/AppHeader";
 
 // The web's filter chips (taskViews' filterTasks). "noest" (no estimate) has
@@ -155,7 +155,7 @@ export default function Home() {
 
       <Pressable onPress={() => router.push("/search")} accessibilityRole="search" accessibilityLabel="Search tasks"
         style={[styles.search, { backgroundColor: T.card, borderColor: T.border }]}>
-        <SymbolView name={{ ios: "magnifyingglass", android: "search" }} size={15} tintColor={T.textFaint} />
+        <IconSearch color={T.textFaint} />
         <Text style={[styles.searchText, { fontSize: fz(13), color: T.textFaint }]}>Search tasks...</Text>
       </Pressable>
 

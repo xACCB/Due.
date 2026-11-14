@@ -2,13 +2,14 @@ import { useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { SymbolView } from "expo-symbols";
 import type { Task } from "@dueplanner/core/types";
 import { searchTasks } from "@dueplanner/core/lib/taskViews";
 import { daysUntil, getPriority, ink } from "@dueplanner/core/lib/format";
 import { priColor } from "@dueplanner/core/constants";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
+import { IconSearch } from "../components/icons";
+import { Backdrop } from "../components/Backdrop";
 
 // Search (the web's SearchOverlay): a title, subject or tag; archived tasks
 // left out, open ones first, 50 at most (core's searchTasks). Return opens
@@ -40,12 +41,12 @@ export default function Search() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: T.light ? "rgba(245,245,245,0.97)" : "rgba(0,0,0,0.94)" }]} edges={["top", "left", "right"]}>
-      {/* A tap on the page around it closes Search, as the web's backdrop does. */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} accessible={false} />
+    <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
+      {/* The web's blurred backdrop; a tap on it closes Search. */}
+      <Backdrop kind="search" onPress={() => router.back()} label="Close Search" />
       <View style={{ height: barTop }} pointerEvents="none" />
       <View style={[styles.bar, { backgroundColor: T.card, borderColor: T.border }]}>
-        <SymbolView name={{ ios: "magnifyingglass", android: "search" }} size={16} tintColor={T.textMuted} />
+        <IconSearch color={T.textMuted} />
         <TextInput
           value={query}
           onChangeText={setQuery}

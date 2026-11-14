@@ -1,10 +1,10 @@
 import { Pressable, StyleSheet, Text } from "react-native";
 import { router } from "expo-router";
-import { SymbolView } from "expo-symbols";
 import { useApp } from "../state/appContext";
 import { useNow } from "../lib/useNow";
 import * as Fx from "../state/focusTimer";
 import { F } from "../theme/fonts";
+import { IconFocus } from "./icons";
 
 // A running Pomodoro or stopwatch in the header (the web's .timer-pill): the
 // Pomodoro's time left, else the stopwatch's. Opens Focus. Render it only
@@ -16,7 +16,7 @@ export function TimerPill() {
   return (
     <Pressable onPress={() => router.navigate("/focus")} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Timer running, ${text}. Open Focus`}
       style={[styles.pill, { backgroundColor: T.card, borderColor: T.border }]}>
-      <SymbolView name={{ ios: "scope", android: "adjust" }} size={13} tintColor={T.text} />
+      <IconFocus color={T.text} />
       <Text style={[styles.text, { fontSize: fz(11), color: T.text }]}>{text}</Text>
     </Pressable>
   );

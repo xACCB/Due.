@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router, usePathname, type Href } from "expo-router";
-import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { contrastColor, ink } from "@dueplanner/core/lib/format";
@@ -11,6 +10,7 @@ import { useApp } from "../state/appContext";
 import { useDevAction } from "../lib/devScroll";
 import { F } from "../theme/fonts";
 import { TimerText } from "./TimerPill";
+import { IconBell, IconCalendar, IconChevron, IconFocus, IconHistory, IconImport, IconPerson, IconSearch, IconSettings, IconSidebar, IconTasks } from "./icons";
 
 // The web's sidebar, which on a phone-sized screen is a drawer: it slides in
 // from the left over a dimmed page, from the header's sidebar button or a swipe
@@ -107,10 +107,10 @@ function SidebarBody() {
   const signIn = () => Alert.alert("Sign in", "Signing in, and syncing with the website, comes in a later update. Until then your tasks are saved on this phone.");
 
   // One row (the web's SidebarRow, .sb-row): `current` marks the screen showing.
-  const row = (icon: SymbolViewProps["name"], label: string, onPress: () => void, current: boolean, extra?: ReactNode, a11y?: string) => (
+  const row = (icon: (color: string) => ReactNode, label: string, onPress: () => void, current: boolean, extra?: ReactNode, a11y?: string) => (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={a11y ?? label} accessibilityState={{ selected: current }}
       style={({ pressed }) => [styles.row, { backgroundColor: current ? T.card : pressed ? T.cardAlt : "transparent" }]}>
-      <View style={styles.icon}><SymbolView name={icon} size={16} weight="regular" tintColor={current ? T.text : T.textMuted} /></View>
+      <View style={styles.icon}>{icon(current ? T.text : T.textMuted)}</View>
       <Text numberOfLines={1} style={[styles.label, { fontSize: fz(13), color: current ? T.text : T.textMuted }]}>{label}</Text>
       {extra}
     </Pressable>
@@ -123,7 +123,7 @@ function SidebarBody() {
         <Pressable onPress={signIn} accessibilityRole="button" accessibilityLabel="Sign in. Sync across devices"
           style={({ pressed }) => [styles.row, styles.profile, { backgroundColor: pressed ? T.cardAlt : "transparent" }]}>
           <View style={[styles.avatar, { backgroundColor: T.cardAlt }]}>
-            <SymbolView name={{ ios: "person", android: "person" }} size={13} tintColor={T.textMuted} />
+            <IconPerson color={T.textMuted} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(13), color: T.text }}>Sign in</Text>
@@ -131,14 +131,14 @@ function SidebarBody() {
           </View>
         </Pressable>
         <Pressable onPress={close} hitSlop={6} accessibilityRole="button" accessibilityLabel="Close sidebar" style={styles.closeBtn}>
-          <SymbolView name={{ ios: "sidebar.left", android: "left_panel_close" }} size={17} tintColor={T.textMuted} />
+          <IconSidebar color={T.textMuted} />
         </Pressable>
       </View>
-      {row({ ios: "magnifyingglass", android: "search" }, "Search", () => { close(); router.push("/search"); }, false)}
+      {row(c => <IconSearch color={c} />, "Search", () => { close(); router.push("/search"); }, false)}
       {rule}
-      {row({ ios: "list.bullet", android: "list" }, "Home", () => { app.setSubjectFilter(null); go("/"); }, onHome && app.subjectFilter == null)}
-      {row({ ios: "calendar", android: "calendar_month" }, "Calendar", () => go("/calendar"), path === "/calendar")}
-      {row({ ios: "scope", android: "adjust" }, "Focus", () => go("/focus"), path === "/focus",
+      {row(c => <IconTasks color={c} />, "Home", () => { app.setSubjectFilter(null); go("/"); }, onHome && app.subjectFilter == null)}
+      {row(c => <IconCalendar color={c} />, "Calendar", () => go("/calendar"), path === "/calendar")}
+      {row(c => <IconFocus color={c} />, "Focus", () => go("/focus"), path === "/focus",
         timing ? <TimerText color={T.text} size={fz(11)} /> : null)}
 
       {/* Subjects, each unfolding to its open tasks. Picking a name shows only it
@@ -160,7 +160,7 @@ function SidebarBody() {
                   <Pressable onPress={() => toggleOpen(g.name)} hitSlop={{ top: 4, bottom: 4, left: 8 }} accessibilityRole="button" accessibilityState={{ expanded: isOpen }}
                     accessibilityLabel={`${isOpen ? "Hide" : "Show"} ${label} tasks`} style={styles.arrow}>
                     <View style={{ transform: [{ rotate: isOpen ? "90deg" : "0deg" }] }}>
-                      <SymbolView name={{ ios: "chevron.right", android: "chevron_right" }} size={11} weight="semibold" tintColor={T.textMuted} />
+                      <IconChevron color={T.textMuted} />
                     </View>
                   </Pressable>
                   <Pressable onPress={() => pick(g.name)} accessibilityRole="button" accessibilityState={{ selected: picked }} accessibilityLabel={`${label}, ${g.tasks.length} to do`}
@@ -198,12 +198,12 @@ function SidebarBody() {
         </View>
       )}
       {rule}
-      {row({ ios: "bell", android: "notifications" }, "Inbox", () => go("/inbox"), path === "/inbox",
+      {row(c => <IconBell color={c} />, "Inbox", () => go("/inbox"), path === "/inbox",
         unread > 0 ? <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.accent, color: contrastColor(T.accent) }]}>{unread}</Text> : null,
         unread > 0 ? `Inbox, ${unread} unread` : "Inbox")}
-      {row({ ios: "clock", android: "history" }, "History", () => go("/history"), path === "/history")}
-      {row({ ios: "square.and.arrow.down", android: "download" }, "Import/Export", () => go("/import"), path === "/import")}
-      {row({ ios: "gearshape", android: "settings" }, "Settings", () => go("/settings"), path === "/settings")}
+      {row(c => <IconHistory color={c} />, "History", () => go("/history"), path === "/history")}
+      {row(c => <IconImport color={c} />, "Import/Export", () => go("/import"), path === "/import")}
+      {row(c => <IconSettings color={c} />, "Settings", () => go("/settings"), path === "/settings")}
       <View style={{ flex: 1 }} />
       <Text style={[styles.foot, { fontSize: fz(9), color: T.textFaint }]}>DuePlanner, by due. studios</Text>
     </ScrollView>

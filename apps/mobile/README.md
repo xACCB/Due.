@@ -51,7 +51,7 @@ Without ccache installed the build still works.
 - `src/components/`: `TaskCard` (the web's MiniCard), `TaskLayouts` (Board, Checklist, Kanban,
   Progress, Pyramid), `Swipe` (every card's swipe), `MiniTaskRow`, `DayTaskRow`, `DueDeck`, `Ring`
   (the Pomodoro ring), `TimerPill`, `Dropdown`, `AddCard` (the add questions), `TimeLeftMenu`,
-  `TaskScreen` (task page and sheet), `WebFields` (the web's form fields), `Sidebar`, `UndoToast`, `ui.tsx` (chips, buttons, settings sections/rows).
+  `TaskScreen` (task page and sheet), `WebFields` (the web's form fields), `Sidebar`, `icons` (the web's icons), `Backdrop` (the blur), `UndoToast`, `ui.tsx` (chips, buttons, settings sections/rows).
 
 ## Checking screens without tapping (development only)
 

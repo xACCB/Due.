@@ -122,9 +122,11 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   caught it) and is 26px again. Then Time left became the web's dropdown, adding a task the web's card in place at the
   foot of Home (Calendar's "+ Add homework due ..." goes there with the date picked), and Search
   sits where the web's does; Inbox and Import/Export already matched (the phone leaves out the
-  Inbox's Updates on purpose). **Next:** what still differs is the blur behind Search and the
-  sheets (needs `expo-blur` and a native build) and the sidebar's icons (SF Symbols, not the
-  web's drawings; exact copies need `react-native-svg` and a native build); then M3. The website reference can now be taken in Chrome with the
+  Inbox's Updates on purpose). Then the web's icons (`components/icons.tsx`, `react-native-svg`) and the
+  web's blur behind Search and the floating cards (`components/Backdrop.tsx`, `expo-blur`), with a
+  native build; dark mode matched by screenshot too. The iOS app is registered in Firebase (below).
+  **Next:** M3. Still for the user to try by hand: the sidebar swipe, the sheet's drag to close,
+  the dropdowns and pickers, typing into the add card. The website reference can now be taken in Chrome with the
   Playwright plugin at 402x874 (installed 2026-11-14), which is quicker than Safari in the
   Simulator; Safari remains the closer match for how iPhone draws form fields.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
@@ -155,10 +157,17 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   optional `in` selector). The file server must send `Access-Control-Allow-Origin: *`, which
   `python3 -m http.server` doesn't. `xcrun simctl launch booted com.apple.mobilesafari` or
   `com.duestudios.dueplanner` brings either to the front. None of this opens a window on the Mac.
-- **Before M3, flag these to the user:** the iOS app has to be registered in the Firebase console
-  (which gives a `GoogleService-Info.plist`); App Check needs App Attest for iOS and debug tokens
-  for the Simulator, since App Check is enforced; and Sign in with Apple (which Apple requires when
-  Google sign-in is offered) needs the paid Apple Developer Program ($99 a year), the user's call.
+- **M3 groundwork:** the iOS app is registered in Firebase (2026-11-14, with the Firebase CLI,
+  signed in on the Mac as the project's owner): app id `1:445404835645:ios:a63a01bd9ad17a0b71df54`,
+  bundle id `com.duestudios.dueplanner`. Its `apps/mobile/GoogleService-Info.plist` (with
+  `CLIENT_ID`/`REVERSED_CLIENT_ID` for Google sign-in) is gitignored, since it holds the iPhone
+  app's API key and gitleaks allows only the web key; download it again with the command in
+  `.gitignore`. The CLI signs in non-interactively from Claude's shell: `npx firebase-tools login`
+  prints a link and session id, the user signs in and pastes back the code, then
+  `npx firebase-tools login <code>`. Still to flag: App Check needs App Attest for iOS (which needs
+  the Apple team id, so the paid program) and debug tokens for the Simulator, since App Check is
+  enforced; Sign in with Apple (required when Google sign-in is offered) needs the paid Apple
+  Developer Program ($99 a year), the user's call.
 
 ## Commands
 
@@ -1092,7 +1101,8 @@ differs.
 `expo-notifications`, `expo-keep-awake`, `expo-haptics`, `expo-font` with
 `@expo-google-fonts/dm-serif-display` and `dm-mono`, `expo-splash-screen`, `expo-symbols` (the
 tab bar's Android icons), `expo-file-system` (backup files: `File`, `Paths`,
-`File.pickFileAsync`), `react-native-reanimated` 4 and `react-native-gesture-handler` 3 (the card
+`File.pickFileAsync`), `expo-blur` (the web's blurred backdrops, `components/Backdrop.tsx`), `react-native-svg` (the web's
+icons, `components/icons.tsx`), `react-native-reanimated` 4 and `react-native-gesture-handler` 3 (the card
 swipes: `ReanimatedSwipeable` in `components/Swipe.tsx`; the Deck, drag to reorder and the
 Calendar's month swipe use React Native's own `PanResponder` and `Animated`).
 `app.json` turns on `experiments.reactCompiler` and `typedRoutes`. Expo and React Native need Node
@@ -1174,8 +1184,8 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   Search, Home, Calendar, Focus (with a running timer's time), the subjects (`subjectGroups`: the
   arrow unfolds a subject's open tasks, `hw-sidebar-subjects-open`; the name sets Home's
   `subjectFilter`), Inbox (unread count), History, Import/Export, Settings, the credit line. The
-  current screen's row is highlighted from `usePathname()`. Icons are SF Symbols close to the web's
-  hand-drawn SVGs (`react-native-svg` would match exactly but needs a native build). Dev remote:
+  current screen's row is highlighted from `usePathname()`. Icons are the web's own drawings
+  (`components/icons.tsx`, `react-native-svg`, point for point from the web's `icons.tsx`). Dev remote:
   `"act":["sidebar","open"]` / `["sidebar","close"]`.
 - `(tabs)/_layout.tsx`: expo-router's JS `Tabs` (`expo-router/js-tabs`) with `tabBar={() => null}`,
   so the main screens switch in place like the web's `activeTab`, with a .2s fade (the web's
@@ -1183,8 +1193,9 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   screen before. The group holds Home (`index`), `calendar`, `focus`, `inbox`, `history`, `import`
   and `settings`; the URLs don't include the group, so `/history` etc. are unchanged.
 - `search.tsx` (`searchTasks`; the bar sits where the web's does, a third of the way down the
-  space the keyboard leaves, `aimH`; a tap around it closes it; the web blurs the page behind,
-  which here would need `expo-blur` and a native build, so the backdrop is near opaque instead),
+  space the keyboard leaves, `aimH`; a tap around it closes it; the page behind is blurred with
+  `Backdrop kind="search"`, the web's 18px and 80%/74% wash; the screen's `contentStyle` is
+  transparent so the page shows through),
   `components/TimeLeftMenu.tsx` (the header's Time left dropdown, the web's: a 250-wide card 8px
   under the header, measured with `measureInWindow`; `timeLeft`, `dueBucket`; "no estimate" sets
   the `noest` filter; rows open `TimeDetail` in a `PopCard` over it; leaving the screen closes it,

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { localDateStr } from "@dueplanner/core/lib/dates";
 import { formatDate, formatDuration, formatTime, ink, contrastColor } from "@dueplanner/core/lib/format";
@@ -7,14 +7,15 @@ import { LIMITS } from "@dueplanner/core/lib/limits";
 import * as A from "@dueplanner/core/lib/addFlow";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
-import { Button, Chip } from "./ui";
-import { DateTimeField } from "./DateTimeField";
+import { Chip } from "./ui";
+import { DateField } from "./WebFields";
 import type { TaskTemplate } from "@dueplanner/core/types";
 import { useDevAction } from "../lib/devScroll";
 
-// Adding a task: "What's the assignment?", then the questions the New task
+// Adding a task (the web's add card, in place of "+ Add homework" at the foot
+// of Home's list): "What's the assignment?", then the questions the New task
 // questions setting asks, in its order (core's addFlow, like the web wizard).
-// A native page sheet: swipe it down or tap Cancel to drop the task.
+// × drops the task.
 
 const DATE_PICKS = [{ l: "Today", d: 0 }, { l: "Tomorrow", d: 1 }, { l: "3 days", d: 3 }, { l: "Next week", d: 7 }];
 const TIME_PICKS = ["09:00", "15:00", "23:59"];
@@ -29,16 +30,9 @@ function inDays(d: number): string {
 
 // `template`: start from a saved template (only the due date is asked; the
 // caller adds the task directly when that question is off, see Home).
-export function AddSheet({ visible, presetDate, template, onClose }: { visible: boolean; presetDate?: string; template?: TaskTemplate | null; onClose: () => void }) {
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      {/* Remounted per opening (visible), so every add starts fresh. */}
-      {visible && <AddFlowView presetDate={presetDate} template={template ?? null} onClose={onClose} />}
-    </Modal>
-  );
-}
-
-function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; template: TaskTemplate | null; onClose: () => void }) {
+// `presetDate` (from Calendar) opens the date question on "What time?".
+// `onAdded` gets the new task's title, for Home's toast.
+export function AddCard({ presetDate, template, onClose, onAdded }: { presetDate?: string; template: TaskTemplate | null; onClose: () => void; onAdded: (title: string) => void }) {
   const app = useApp();
   const { T, h24, questions, fz } = app;
   const { subjects, subjectColors } = app.settings;
@@ -58,6 +52,7 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
       busy.current = true;
       app.add(next.done);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onAdded(next.done.title);
       onClose();
       return;
     }
@@ -72,24 +67,21 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
   const at = flow.step + 1;
 
   return (
-    <KeyboardAvoidingView style={[styles.root, { backgroundColor: T.bg }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <View style={[styles.card, { backgroundColor: T.card, borderColor: T.borderAccent }]}>
       {/* The web's add card: the step dots centred, × to cancel in the corner. */}
-      <View style={styles.top}>
-        <View style={styles.topSpacer} />
-        <View style={styles.dots} accessible accessibilityLabel={`Step ${at + 1} of ${total}`}>
-          {Array.from({ length: total }, (_, i) => (
-            <View key={i} style={[styles.dot, { width: i === at ? 20 : 6, backgroundColor: i <= at ? T.accent : T.border }]} />
-          ))}
-        </View>
-        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Cancel" style={styles.topSpacer}>
-          <Text style={{ fontSize: 22, lineHeight: 24, color: T.textFaint, textAlign: "right" }}>×</Text>
-        </Pressable>
+      <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Cancel" style={styles.cancel}>
+        <Text style={{ fontSize: 20, lineHeight: 22, color: T.textFaint }}>×</Text>
+      </Pressable>
+      <View style={styles.dots} accessible accessibilityLabel={`Step ${at + 1} of ${total}`}>
+        {Array.from({ length: total }, (_, i) => (
+          <View key={i} style={[styles.dot, { width: i === at ? 20 : 6, backgroundColor: i <= at ? T.accent : T.border }]} />
+        ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {flow.step === -1 && (
           <>
-            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">What&apos;s the assignment?</Text>
+            <Text style={[styles.q, { fontSize: fz(17), color: T.accent }]} accessibilityRole="header">What&apos;s the assignment?</Text>
+            <View style={styles.row}>
             <TextInput
               value={title}
               onChangeText={setTitle}
@@ -101,15 +93,16 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
               maxLength={LIMITS.title}
               returnKeyType="next"
               accessibilityLabel="What's the assignment?"
-              style={[styles.input, { fontSize: fz(16), color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
+              style={[styles.input, { flex: 1, fontSize: 16, color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
             />
-            <Button label={flow.questions.length ? "Next" : "Add"} onPress={() => run(A.submitTitle(flow, title))} disabled={!title.trim()} T={T} style={styles.next} />
+            <Arrow onPress={() => run(A.submitTitle(flow, title))} label={flow.questions.length ? "Next" : "Add"} big />
+            </View>
           </>
         )}
 
         {q?.type === "select" && (
           <>
-            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={[styles.q, { fontSize: fz(17), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
             <View style={styles.wrap}>
               {subjects.map(s => <Chip key={s} label={s} color={subjectColors[s]} T={T} onPress={() => run(A.answer(flow, s))} />)}
             </View>
@@ -119,35 +112,38 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
 
         {q?.type === "date" && flow.pendingDate == null && (
           <>
-            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={[styles.q, { fontSize: fz(17), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
             <View style={styles.wrap}>
               {DATE_PICKS.map(p => <Chip key={p.l} label={p.l} T={T} onPress={() => run(A.pickDate(flow, inDays(p.d)))} />)}
+              <View style={[styles.row, { flexGrow: 1, minWidth: 180 }]}>
+                <View style={{ flex: 1 }}><DateField mode="date" label="Due date" bare value={customDate} onChange={setCustomDate} /></View>
+                <Arrow onPress={() => { if (customDate) run(A.pickDate(flow, customDate)); }} label="Use this date" />
+              </View>
             </View>
-            <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted }]}>Or pick a date</Text>
-            <DateTimeField mode="date" value={customDate} onChange={setCustomDate} T={T} h24={h24} label="Due date" display="inline" />
-            <Button label="Use this date" onPress={() => run(A.pickDate(flow, customDate || localDateStr(new Date())))} T={T} style={styles.next} />
           </>
         )}
 
         {q?.type === "date" && flow.pendingDate != null && (
           <>
-            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">Due {formatDate(flow.pendingDate)}. What time?</Text>
-            <View style={styles.wrap}>
+            <Text style={[styles.q, { fontSize: fz(17), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted, marginBottom: 10 }}>Due {formatDate(flow.pendingDate)}. What time?</Text>
+            <View style={[styles.wrap, { marginBottom: 12 }]}>
               <Chip label="Any time" T={T} onPress={() => run(A.confirmTime(flow, ""))} />
               {TIME_PICKS.map(t => <Chip key={t} label={formatTime(t, h24)} T={T} onPress={() => run(A.confirmTime(flow, t))} />)}
             </View>
-            <Text style={[styles.sub, { fontSize: fz(11), color: T.textMuted }]}>Or pick a time</Text>
-            <DateTimeField mode="time" value={customTime} onChange={setCustomTime} T={T} h24={h24} label="Due time" display="spinner" />
-            <Button label="Set time" onPress={() => run(A.confirmTime(flow, customTime || "09:00"))} T={T} style={styles.next} />
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}><DateField mode="time" label="Due time" bare value={customTime} onChange={setCustomTime} /></View>
+              <Arrow onPress={() => run(A.confirmTime(flow, customTime))} label="Use this time" />
+            </View>
             <Pressable onPress={() => setFlow(A.back(flow))} hitSlop={8} accessibilityRole="button" style={styles.backLink}>
-              <Text style={[styles.note, { fontSize: fz(13), color: T.textMuted }]}>‹ Back to date</Text>
+              <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textFaint }}>‹ Back to date</Text>
             </Pressable>
           </>
         )}
 
         {q?.type === "time" && (
           <>
-            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={[styles.q, { fontSize: fz(17), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
             <View style={styles.wrap}>
               {ESTIMATE_PICKS.map(p => <Chip key={p.l} label={p.l} T={T} onPress={() => run(A.answer(flow, p.m))} />)}
             </View>
@@ -174,7 +170,7 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
 
         {q?.type === "recurrence" && (
           <>
-            <Text style={[styles.q, { fontSize: fz(24), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
+            <Text style={[styles.q, { fontSize: fz(17), color: T.accent }]} accessibilityRole="header">{q.label}</Text>
             <View style={styles.wrap}>
               {REPEAT_PICKS.map(p => <Chip key={p.v} label={p.l} T={T} onPress={() => run(A.answer(flow, p.v))} />)}
             </View>
@@ -206,23 +202,32 @@ function AddFlowView({ presetDate, template, onClose }: { presetDate?: string; t
             )}
           </View>
         )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+// The web's black "→" beside a field.
+function Arrow({ onPress, label, big }: { onPress: () => void; label: string; big?: boolean }) {
+  const { T, fz } = useApp();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}
+      style={({ pressed }) => [styles.arrow, big && styles.arrowBig, { backgroundColor: T.accent, opacity: pressed ? 0.8 : 1 }]}>
+      <Text style={{ fontFamily: F.body, fontSize: fz(13), color: contrastColor(T.accent) }}>→</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
-  topBtn: { fontSize: 14, fontFamily: F.body },
-  topSpacer: { width: 36 },
-  dots: { flexDirection: "row", gap: 5, alignItems: "center" },
+  card: { borderWidth: 1, borderRadius: 16, padding: 18 },
+  cancel: { position: "absolute", top: 10, right: 12, padding: 4, zIndex: 1 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8 },
+  arrow: { borderRadius: 10, paddingHorizontal: 13, alignSelf: "stretch", justifyContent: "center", minHeight: 36 },
+  arrowBig: { paddingHorizontal: 16 },
+  dots: { flexDirection: "row", gap: 5, alignItems: "center", justifyContent: "center", marginBottom: 14 },
   dot: { height: 6, borderRadius: 3 },
-  body: { padding: 20, paddingBottom: 40 },
-  q: { fontSize: 24, fontFamily: F.heading, marginBottom: 16 },
-  input: { fontSize: 16, fontFamily: F.body, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  next: { marginTop: 14 },
-  wrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  q: { fontFamily: F.heading, marginBottom: 12 },
+  input: { fontFamily: F.body, borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 10 },
+  wrap: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   sub: { fontSize: 11, fontFamily: F.body, letterSpacing: 1, textTransform: "uppercase", marginTop: 22, marginBottom: 8 },
   note: { fontSize: 13, fontFamily: F.body, marginTop: 10 },
   backLink: { marginTop: 14, alignSelf: "flex-start" },

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { FlatList, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import type { Task } from "@dueplanner/core/types";
@@ -12,7 +12,8 @@ import { F } from "../theme/fonts";
 
 // Search (the web's SearchOverlay): a title, subject or tag; archived tasks
 // left out, open ones first, 50 at most (core's searchTasks). Return opens
-// the first result; tapping one opens its task page.
+// the first result; tapping one opens its task sheet. The bar sits where the
+// web's does: a third of the way down the space the keyboard leaves.
 export default function Search() {
   const app = useApp();
   const { T, fz } = app;
@@ -21,6 +22,10 @@ export default function Search() {
   const q = query.trim().toLowerCase();
   const results = searchTasks(app.tasks, q);
   const open = (t: Task) => router.replace(`/task-sheet/${t.id}`);
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const aimH = (height - insets.top - insets.bottom) * 0.58; // the web's aimH while a phone keyboard is coming
+  const barTop = Math.max(24, Math.round(aimH * 0.34 - 28));
 
   const highlight = (title: string) => {
     const at = q ? title.toLowerCase().indexOf(q) : -1;
@@ -36,6 +41,9 @@ export default function Search() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.light ? "rgba(245,245,245,0.97)" : "rgba(0,0,0,0.94)" }]} edges={["top", "left", "right"]}>
+      {/* A tap on the page around it closes Search, as the web's backdrop does. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} accessible={false} />
+      <View style={{ height: barTop }} pointerEvents="none" />
       <View style={[styles.bar, { backgroundColor: T.card, borderColor: T.border }]}>
         <SymbolView name={{ ios: "magnifyingglass", android: "search" }} size={16} tintColor={T.textMuted} />
         <TextInput

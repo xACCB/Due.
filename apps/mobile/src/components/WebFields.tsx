@@ -69,7 +69,8 @@ const safariDate = (v: string) => new Date(v + "T00:00:00").toLocaleDateString("
 // A web <input type="date"> or <input type="time"> holding the web's text
 // ("YYYY-MM-DD", "HH:MM", "" for none). A tap opens the system picker in a card;
 // each change saves at once, as the web does on the page.
-export function DateField({ mode, label, value, onChange, disabled }: { mode: "date" | "time"; label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
+// `bare`: no label above it (the add card, where the question is the label).
+export function DateField({ mode, label, value, onChange, disabled, bare }: { mode: "date" | "time"; label: string; value: string; onChange: (v: string) => void; disabled?: boolean; bare?: boolean }) {
   const { T, h24, fz } = useApp();
   const [open, setOpen] = useState(false);
   const shown = !value ? "" : mode === "date" ? safariDate(value) : formatTime(value, h24);
@@ -78,7 +79,7 @@ export function DateField({ mode, label, value, onChange, disabled }: { mode: "d
   const toText = (d: Date) => (mode === "date" ? localDateStr(d) : `${two(d.getHours())}:${two(d.getMinutes())}`);
   return (
     <View>
-      <FieldLabel>{label}</FieldLabel>
+      {!bare && <FieldLabel>{label}</FieldLabel>}
       <Box onPress={() => setOpen(true)} disabled={disabled} a11y={`${label}: ${shown || "none"}`}>
         <Text numberOfLines={1} style={[styles.value, { color: T.text, flex: 1 }]}>{shown}</Text>
       </Box>

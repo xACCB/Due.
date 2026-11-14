@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, FlatList, LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, FlatList, KeyboardAvoidingView, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -14,7 +14,7 @@ import { useNow } from "../../lib/useNow";
 import { F } from "../../theme/fonts";
 import { TaskCard } from "../../components/TaskCard";
 import { TaskLayout } from "../../components/TaskLayouts";
-import { AddSheet } from "../../components/AddSheet";
+import { AddCard } from "../../components/AddCard";
 import { UndoToast } from "../../components/UndoToast";
 import { dragDelta } from "../../lib/reorder";
 import { useDevAction, useDevScroll, useDevToggle } from "../../lib/devScroll";
@@ -39,14 +39,18 @@ export default function Home() {
   const { T, h24, fz } = app;
   const s = app.settings;
   const now = useNow();
-  const [adding, setAdding] = useState<{ template?: TaskTemplate } | null>(null);
-  // dueplanner://?add=1 opens the add sheet (a shortcut into adding).
-  const { add } = useLocalSearchParams<{ add?: string }>();
+  // The add card (the web's: it takes the place of "+ Add homework"). `n`
+  // remounts it per opening, so every add starts fresh.
+  const [adding, setAdding] = useState<{ template?: TaskTemplate; date?: string; n: number } | null>(null);
+  const startAdding = (o: { template?: TaskTemplate; date?: string } = {}) => setAdding(a => ({ ...o, n: (a?.n ?? 0) + 1 }));
+  // ?add=1 opens it (a shortcut into adding); Calendar's "+ Add homework due ..."
+  // sends ?add=1&date=YYYY-MM-DD, as the web switches to Home with the date picked.
+  const { add, date } = useLocalSearchParams<{ add?: string; date?: string }>();
   useEffect(() => {
     if (!add) return;
-    setAdding({}); // eslint-disable-line react-hooks/set-state-in-effect -- opening from a link is an outside event
-    router.setParams({ add: undefined });
-  }, [add]);
+    startAdding({ date: date || undefined }); // eslint-disable-line react-hooks/set-state-in-effect -- opening from a link is an outside event
+    router.setParams({ add: undefined, date: undefined });
+  }, [add, date]);
   const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
   const hideToast = useCallback(() => setToast(null), []);
   const say = (text: string) => setToast(prev => ({ text, n: (prev?.n ?? 0) + 1 }));
@@ -127,7 +131,7 @@ export default function Home() {
   const remove = (t: Task) => { glide(); app.remove(t.id); say(`"${t.title}" deleted`); };
   const startTemplate = (tpl: TaskTemplate) => {
     const step = startFromTemplate(app.questions, tpl);
-    if (step.done) { glide(); app.add(step.done); say(`"${step.done.title}" added`); } else setAdding({ template: tpl });
+    if (step.done) { glide(); app.add(step.done); say(`"${step.done.title}" added`); } else startAdding({ template: tpl });
   };
 
   const chip = (label: string, on: boolean, onPress: () => void, a11y?: string) => (
@@ -167,8 +171,14 @@ export default function Home() {
   const footer = (
     <View>
       {shown.length === 0 && <Text style={[styles.empty, { fontSize: fz(12), color: T.textFaint }]}>{EMPTY[filter] ?? EMPTY.all}</Text>}
+      {adding ? (
+        <View style={styles.addCard}>
+          <AddCard key={adding.n} template={adding.template ?? null} presetDate={adding.date}
+            onClose={() => setAdding(null)} onAdded={() => glide()} />
+        </View>
+      ) : (
       <View style={styles.addArea}>
-        <Pressable onPress={() => setAdding({})} accessibilityRole="button" accessibilityLabel="Add homework"
+        <Pressable onPress={() => startAdding()} accessibilityRole="button" accessibilityLabel="Add homework"
           style={({ pressed }) => [styles.addBtn, { backgroundColor: T.accent, opacity: pressed ? 0.85 : 1 }]}>
           <Text style={[styles.addText, { fontSize: fz(17), color: contrastColor(T.accent) }]}>+ Add homework</Text>
         </Pressable>
@@ -188,16 +198,30 @@ export default function Home() {
           </View>
         )}
       </View>
+      )}
     </View>
   );
 
   const scrollRef = useRef<FlatList<Row>>(null);
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
+  // The underlying scroll view's own scrollToEnd: it knows the real content
+  // height, where FlatList's goes by its estimate, which lags the footer growing.
+  const toEnd = () => scrollRef.current?.getScrollResponder()?.scrollToEnd({ animated: true });
+  // Once the add card has laid out, bring all of it into view.
+  const addN = adding?.n;
+  useEffect(() => {
+    if (addN == null) return;
+    const t = setTimeout(() => toEnd(), 250);
+    return () => clearTimeout(t);
+  }, [addN]);
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <AppHeader title="Home" />
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <FlatList ref={scrollRef}
+        // While adding, keep the card in view: it sits at the foot of the list.
+        onContentSizeChange={() => { if (adding) toEnd(); }}
         data={rows}
         keyExtractor={r => r.key}
         contentContainerStyle={styles.list}
@@ -229,14 +253,15 @@ export default function Home() {
             />
           )}
       />
+      </KeyboardAvoidingView>
 
       {toast && <UndoToast text={toast.text} n={toast.n} T={T} onHide={hideToast} onUndo={() => { app.undo(); hideToast(); }} />}
-      <AddSheet visible={!!adding} template={adding?.template} onClose={() => setAdding(null)} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  addCard: { marginTop: 16 },
   root: { flex: 1 },
   list: { paddingHorizontal: 14, paddingBottom: 48 },
   suggest: { flexDirection: "row", alignItems: "flex-start", gap: 7, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 16 },

@@ -50,7 +50,7 @@ export default function RootLayout() {
 
 // The main screens ((tabs), switched in place), the task page over them
 // (fading in, with the web's header and "‹ Home"), the task sheet, and Search
-// and Time left as sheets over the current screen. The sidebar drawer wraps all of it.
+// over the current screen. The sidebar drawer wraps all of it.
 function Screens() {
   const { T } = useApp();
   return (
@@ -63,7 +63,6 @@ function Screens() {
           <Stack.Screen name="task/[id]" options={{ animation: "fade", animationDuration: 200, gestureEnabled: false }} />
           {/* The web's task sheet: slides up over the screen, pulled down to close. */}
           <Stack.Screen name="task-sheet/[id]" options={{ presentation: "modal", contentStyle: { backgroundColor: T.bg } }} />
-          <Stack.Screen name="time-left" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.6, 1], contentStyle: { backgroundColor: T.bg } }} />
           <Stack.Screen name="search" options={{ presentation: "transparentModal", animation: "fade" }} />
         </Stack>
       </SidebarHost>

@@ -119,8 +119,12 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   has the web's two forms, the page (from the sidebar) and the sheet (from everywhere else),
   both matching the website by screenshot; "‹ Home" scrolls with the page as on the web. The
   website's own task page title was 16px on phones (its 16px rule for inputs on narrow screens
-  caught it) and is 26px again. **Next:** Inbox, Import/Export, Search, Time left and the add
-  sheet against the website, then M3. The website reference can now be taken in Chrome with the
+  caught it) and is 26px again. Then Time left became the web's dropdown, adding a task the web's card in place at the
+  foot of Home (Calendar's "+ Add homework due ..." goes there with the date picked), and Search
+  sits where the web's does; Inbox and Import/Export already matched (the phone leaves out the
+  Inbox's Updates on purpose). **Next:** what still differs is the blur behind Search and the
+  sheets (needs `expo-blur` and a native build) and the sidebar's icons (SF Symbols, not the
+  web's drawings; exact copies need `react-native-svg` and a native build); then M3. The website reference can now be taken in Chrome with the
   Playwright plugin at 402x874 (installed 2026-11-14), which is quicker than Safari in the
   Simulator; Safari remains the closer match for how iPhone draws form fields.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
@@ -135,7 +139,12 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   `"act":["open-day","2026-11-11"]` runs a screen's named action (`useDevAction`: `open-message`,
   `open-day`, `open-time` with `sub:Math` or `due:overdue`, `add-title`, `add-skip`, `crash`);
   `"quiet":true` turns off the red dev error overlay so the app's own error screen shows. After
-  any reload the first command is ignored, so send one twice. A form sheet left open across a
+  any reload the first command is ignored, so send one twice. After `simctl terminate`, launch
+  with `xcrun simctl launch booted com.duestudios.dueplanner --initialUrl http://localhost:8081`:
+  a plain launch stops at the development build's launcher, which needs a tap to connect.
+  `xcrun simctl io booted screenshot` has hung for minutes at times; wrap it as
+  `perl -e 'alarm 20; exec @ARGV' xcrun simctl io booted screenshot <file>` (macOS has no
+  `timeout`). A form sheet left open across a
   reload stays on screen in its old colours: cold-restart (`simctl terminate` + `launch`) before
   trusting a screenshot after a theme change.
 - **Comparing with the website on the same Simulator:** start the web dev server with
@@ -1155,7 +1164,7 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   `AppProvider`, the status bar, and `SidebarHost` around the Stack, themed from `T`, and in
   development the dev remote (`src/lib/devRemote.ts`). The Stack holds `(tabs)`, then `task/[id]`
   (fades in, no swipe back, since a swipe from the left edge opens the sidebar as on the web), then
-  `time-left` as a form sheet and `search` as a fading transparent modal.
+  `task-sheet/[id]` (an iOS modal sheet) and `search` as a fading transparent modal.
 - `components/Sidebar.tsx` `SidebarHost` (the web's sidebar, `.app-sidebar` in its narrow-screen
   drawer form, in the same numbers: 260px or 84% of the width, .2s ease-out, a 45% black backdrop):
   opened by the header's sidebar button (`drawerOpen` in `useApp()`) or a swipe in from the
@@ -1173,8 +1182,13 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   `.sec-body`), and stay mounted. `backBehavior="history"` lets Focus Mode's Exit return to the
   screen before. The group holds Home (`index`), `calendar`, `focus`, `inbox`, `history`, `import`
   and `settings`; the URLs don't include the group, so `/history` etc. are unchanged.
-- `search.tsx` (`searchTasks`), `time-left.tsx` (`timeLeft`, `dueBucket`; "no estimate" sets the
-  `noest` filter), `(tabs)/inbox.tsx` (recap Messages as `Dropdown`s; the web's Updates aren't
+- `search.tsx` (`searchTasks`; the bar sits where the web's does, a third of the way down the
+  space the keyboard leaves, `aimH`; a tap around it closes it; the web blurs the page behind,
+  which here would need `expo-blur` and a native build, so the backdrop is near opaque instead),
+  `components/TimeLeftMenu.tsx` (the header's Time left dropdown, the web's: a 250-wide card 8px
+  under the header, measured with `measureInWindow`; `timeLeft`, `dueBucket`; "no estimate" sets
+  the `noest` filter; rows open `TimeDetail` in a `PopCard` over it; leaving the screen closes it,
+  since screens stay mounted; dev remote `"act":["time-left"]`), `(tabs)/inbox.tsx` (recap Messages as `Dropdown`s; the web's Updates aren't
   shown, since they describe the website), `(tabs)/history.tsx` (undo/redo, Recently deleted with
   Restore and Empty), `(tabs)/import.tsx` (syllabus scan; backups exported through the share sheet
   from a file in `Paths.cache`, imported with `File.pickFileAsync` and core's `readBackup`).
@@ -1187,7 +1201,7 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   Pomodoro or stopwatch; opens Focus) and Time left; the smart suggestion (`buildSuggestion`, its ×
   sets `hw-suggestion-hidden`); the search button; the filter chips (All, Pending, Done, Archived,
   plus the subject and "No estimate" chips when set: core's `filterTasks` over `sortTasks`, honouring
-  Show completed); "+ Add homework" (opens `AddSheet`, also from `?add=1`) with the templates under
+  Show completed); "+ Add homework" (opens `AddCard` in its place, also from `?add=1`) with the templates under
   it (`startFromTemplate`); then the tasks: `TaskCard` (the web's MiniCard) in the List layout,
   grouped by `groupTasks` when Group by is set, or `TaskLayouts` (Board, Checklist, Kanban,
   Progress, Pyramid). Every card swipes (`components/Swipe.tsx`: right completes, left deletes,
@@ -1196,16 +1210,20 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   `ms(640)` (`justDone`, `heldOpen`; the card keeps its grip and badges meanwhile), then the list
   glides (`LayoutAnimation`, `ms(320)`; reduced motion skips both). `UndoToast` reads "Title"
   completed / marked not done / deleted, with Undo.
-- `components/AddSheet.tsx` **adding a task**: a native page sheet (`Modal presentationStyle=
-  "pageSheet"`, swipe down to cancel) driven by core's `lib/addFlow.ts` (see "Where things live").
-  Steps: "What's the assignment?", then each question the user turned on, in their order. Subject:
-  subject chips. Due date: Today / Tomorrow / 3 days / Next week, or an inline calendar, then
-  "What time?": Any time / 9:00 AM / 3:00 PM / 11:59 PM, or a spinner. Estimate: 15 min to 2 hrs, or
-  hours and minutes steppers. Repeats: none, daily, weekly, monthly. Skip and Back on every step
-  (Skip on the estimate means no estimate; Skip on "what time?" keeps the date). A progress-dot row
-  and an "Adding" preview card. `busy` stops a quick second tap adding the task twice. The sheet's
-  content is remounted per opening, so each add starts fresh. `presetDate` (from Calendar) opens
-  the date question on "what time?".
+- `components/AddCard.tsx` **adding a task** (the web's add card): in place of "+ Add homework"
+  at the foot of Home's list (Home's `adding`; the list scrolls it into view through the scroll
+  view's own `scrollToEnd`, since FlatList's goes by an estimate that lags the footer, and sits
+  in a `KeyboardAvoidingView`). Driven by core's `lib/addFlow.ts` (see "Where things live").
+  Steps: "What's the assignment?" (a field and the web's black →), then each question the user
+  turned on, in their order. Subject: subject chips. Due date: Today / Tomorrow / 3 days / Next
+  week, or a date field and →, then "What time?" under the question: Any time / 9:00 AM / 3:00
+  PM / 11:59 PM, or a time field and →, and "‹ Back to date". Estimate: 15 min to 2 hrs, or the
+  ▲/▼ custom time. Repeats: none, daily, weekly, monthly. Skip and Back on every step (Skip on the
+  estimate means no estimate; Skip on "what time?" keeps the date). The step dots, × to cancel,
+  and an "Adding" preview. `busy` stops a quick second tap adding the task twice. Remounted per
+  opening (`adding.n`), so each add starts fresh. `?add=1` opens it; Calendar's "+ Add homework
+  due ..." navigates to `/?add=1&date=...` (the web's `addHomeworkOn`), which opens the date
+  question on "what time?".
 - **A task** (`components/TaskScreen.tsx`, the web's `TaskModal`) in the web's two forms, from two
   routes: `task/[id]` is the **page** (`page`, opened from the sidebar; the web's header and
   "‹ Home", which goes back), `task-sheet/[id]` the **sheet** (an iOS modal sheet, opened from
@@ -1231,8 +1249,8 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   `monthOnlyGrid`/`monthGrid` by the Calendar setting, `weekdayLabels(weekStart)`, ‹ ›, a sideways
   swipe on the grid (`PanResponder`) and Today, each day with up to 3 subject-coloured dots for open
   tasks (`byDueDate`), today ringed, the picked day filled with the accent. Below: that day's tasks
-  (non-archived, done ones included) and "+ Add homework due ...", which opens `AddSheet` with
-  `presetDate`. Tapping a day also opens `DayCard` (the web's DayDetail) in a `PopCard`.
+  (non-archived, done ones included) and "+ Add homework due ...", which goes to Home with the
+  add card open and that date picked. Tapping a day also opens `DayCard` (the web's DayDetail) in a `PopCard`.
   Deck: `components/DueDeck.tsx` (the web's `DueDeck`): one card per date that still has an open
   task or is today or later, four drawn as a stack; swipe the top one left for the next date, right
   for the one before, or ‹ ›. The top card is tracked by its date (`picked`); the reset or entrance
@@ -1295,10 +1313,9 @@ open.
   root bundles all eight.
 - Text on an accent fill uses `contrastColor(T.accent)`, and coloured text (subjects, the danger
   button) goes through `ink(color, T.light)`, as on the web.
-- Dates and times are picked with `src/components/DateTimeField.tsx` (the add sheet, drawn in
-  place: `inline` and `spinner`) or `WebFields.tsx`'s `DateField` (the task screen: a web-style
-  field opening the picker in a card). Both store the web's text (`YYYY-MM-DD`, `HH:MM`, "" for
-  none); Android opens its dialog on a tap. Only the time
+- Dates and times are picked with `WebFields.tsx`'s `DateField` (a web-style field opening the
+  system picker in a card; `bare` drops its label, as in the add card). It stores the web's text
+  (`YYYY-MM-DD`, `HH:MM`, "" for none); Android opens its dialog on a tap. Only the time
   picker follows 12h/24h (its locale); dates keep the phone's own order.
 - Shared building blocks are in `src/components/ui.tsx`: `Chip`, `Button` (primary, plain or
   danger), `Section`/`Row`/`ToggleRow` (settings rows), `Segmented`, `Stepper`. Use them rather than

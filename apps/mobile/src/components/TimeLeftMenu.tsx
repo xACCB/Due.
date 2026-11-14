@@ -1,5 +1,5 @@
-import { useState, useRef, type ComponentRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import type { Task } from "@dueplanner/core/types";
 import { timeLeft } from "@dueplanner/core/lib/taskViews";
@@ -8,16 +8,18 @@ import { todayISO } from "@dueplanner/core/lib/dates";
 import { countdown, formatDate, formatDuration, formatTime, ink } from "@dueplanner/core/lib/format";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
-import { DayTaskRow } from "../components/DayTaskRow";
-import { PopCard } from "../components/PopCard";
+import { DayTaskRow } from "./DayTaskRow";
+import { PopCard } from "./PopCard";
 import { useNow } from "../lib/useNow";
-import { useDevAction, useDevScroll } from "../lib/devScroll";
+import { useDevAction } from "../lib/devScroll";
 
 const fmtMins = (m: number) => formatDuration(m) || "0m";
 
-// The header's "Time left" (the web's dropdown): open time by due date and by
-// subject. Tapping a row opens it in a card (TimeDetail, as on the web).
-export default function TimeLeft() {
+// The header's "Time left" dropdown (the web's): a card under the header's
+// right edge, `top` points from the top of the screen, closed by a tap anywhere
+// else. Open time by due date and by subject; tapping a row opens it in a card
+// (TimeDetail, as on the web) with the dropdown still behind it.
+export function TimeLeftMenu({ top, onClose }: { top: number; onClose: () => void }) {
   const app = useApp();
   const { T, fz } = app;
   const { subjectColors } = app.settings;
@@ -29,12 +31,14 @@ export default function TimeLeft() {
   const inOpen = (t: Task) => !open ? false : open.startsWith("due:") ? dueBucket(t.dueDate, today) === open.slice(4) : (t.subject || "") === open.slice(4);
   const openTitle = !open ? "" : open.startsWith("due:") ? tl.byDue.find(b => "due:" + b.key === open)?.label ?? "Time left" : open.slice(4) || "No subject";
 
-  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
-  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
+  const { width, height } = useWindowDimensions();
+  const go = (fn: () => void) => { setOpen(null); onClose(); fn(); };
   return (
-    <ScrollView ref={scrollRef} style={{ backgroundColor: T.bg }} contentContainerStyle={styles.body}>
-      <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">Time left</Text>
-      <Text style={[styles.total, { color: T.light ? "#000" : "#fff" }]}>{fmtMins(tl.totalMins)}</Text>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close Time left" />
+      <View accessibilityViewIsModal accessibilityLabel="Time left breakdown"
+        style={[styles.menu, { top, width: Math.min(250, width - 28), maxHeight: height - top - 40, backgroundColor: T.card, borderColor: T.border }]}>
+      <ScrollView contentContainerStyle={styles.body} bounces={false}>
 
       <Text style={[styles.kicker, { fontSize: fz(10), color: T.textMuted }]}>BY DUE DATE</Text>
       {tl.byDue.length === 0
@@ -81,7 +85,7 @@ export default function TimeLeft() {
       )}
 
       {tl.noEstimateCount > 0 && (
-        <Pressable onPress={() => { app.setHomeFilter("noest"); router.back(); }} accessibilityRole="button" style={styles.noest}>
+        <Pressable onPress={() => go(() => { app.setHomeFilter("noest"); router.navigate("/"); })} accessibilityRole="button" style={styles.noest}>
           <Text style={[styles.label, { fontSize: fz(11), color: T.textMuted }]}>
             {tl.noEstimateCount} {tl.noEstimateCount === 1 ? "task has" : "tasks have"} no estimate, so the total is low. Show them ›
           </Text>
@@ -93,11 +97,13 @@ export default function TimeLeft() {
           kicker={open.startsWith("due:") ? "Time left · by due date" : "Time left · subject"}
           color={open.startsWith("sub:") && open.slice(4) ? subjectColors[open.slice(4)] || T.accent : undefined}
           list={app.tasks.filter(t => !t.archived && !t.done && inOpen(t))}
-          onOpen={t => { setOpen(null); router.push(`/task-sheet/${t.id}`); }}
+          onOpen={t => go(() => router.push(`/task-sheet/${t.id}`))}
           onClose={() => setOpen(null)}
         />
       )}
-    </ScrollView>
+      </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -155,23 +161,23 @@ const styles = StyleSheet.create({
   detailDot: { width: 12, height: 12, borderRadius: 6 },
   stats: { flexDirection: "row", gap: 8, marginTop: 14 },
   stat: { flex: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 8, alignItems: "center" },
-  body: { padding: 20, paddingBottom: 48 },
-  h1: { fontFamily: F.heading, fontSize: 26, lineHeight: 30 },
-  total: { fontFamily: F.heading, fontSize: 34, lineHeight: 40, marginBottom: 18 },
+  // The web's dropdown: 250 wide, 8px under the header, radius 14, a soft shadow.
+  menu: { position: "absolute", right: 14, borderWidth: 1, borderRadius: 14, shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 17, shadowOffset: { width: 0, height: 10 } },
+  body: { paddingVertical: 12, paddingHorizontal: 14 },
   kicker: { fontFamily: F.body, letterSpacing: 0.8, marginBottom: 10 },
   none: { fontFamily: F.body },
-  row: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
-  subRow: { paddingBottom: 4 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 3.5 },
+  subRow: { paddingVertical: 5 },
   label: { flex: 1, fontFamily: F.body },
   count: { fontFamily: F.body },
   mins: { fontFamily: F.body, minWidth: 52, textAlign: "right" },
   pct: { fontFamily: F.body, width: 34, textAlign: "right" },
   chev: { fontFamily: F.body, width: 12, textAlign: "center" },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  track: { height: 3, borderRadius: 99, marginLeft: 16, overflow: "hidden" },
+  track: { height: 3, borderRadius: 99, marginTop: 2, marginLeft: 16, overflow: "hidden" },
   fill: { height: "100%", borderRadius: 99 },
   spent: { fontFamily: F.body, marginTop: 4, marginLeft: 16 },
-  divider: { height: 1, marginVertical: 14 },
+  divider: { height: 1, marginVertical: 12 },
   tasks: { gap: 6, paddingVertical: 6 },
-  noest: { marginTop: 16 },
+  noest: { marginTop: 12 },
 });

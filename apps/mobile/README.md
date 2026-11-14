@@ -38,7 +38,7 @@ Without ccache installed the build still works.
     `import.tsx`.
   - `task/[id].tsx` the task page (from the sidebar) and `task-sheet/[id].tsx` the task sheet
     (from everywhere else), both `components/TaskScreen.tsx` (the web's TaskModal).
-  - `search.tsx`, `time-left.tsx`.
+  - `search.tsx`.
 - `src/state/`
   - `taskStore.ts`: what each task action does, plus undo/redo (plain functions, unit-tested).
   - `focusTimer.ts`: the Pomodoro and stopwatch (plain functions, unit-tested).
@@ -50,8 +50,8 @@ Without ccache installed the build still works.
   and, development only, `devRemote.ts` + `devSample.ts` (see "Checking screens" below).
 - `src/components/`: `TaskCard` (the web's MiniCard), `TaskLayouts` (Board, Checklist, Kanban,
   Progress, Pyramid), `Swipe` (every card's swipe), `MiniTaskRow`, `DayTaskRow`, `DueDeck`, `Ring`
-  (the Pomodoro ring), `TimerPill`, `Dropdown`, `ScreenTitle`, `AddSheet` (the add questions),
-  `DateTimeField` (system pickers), `UndoToast`, `ui.tsx` (chips, buttons, settings sections/rows).
+  (the Pomodoro ring), `TimerPill`, `Dropdown`, `AddCard` (the add questions), `TimeLeftMenu`,
+  `TaskScreen` (task page and sheet), `WebFields` (the web's form fields), `Sidebar`, `UndoToast`, `ui.tsx` (chips, buttons, settings sections/rows).
 
 ## Checking screens without tapping (development only)
 

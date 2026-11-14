@@ -1,5 +1,6 @@
+import { useRef, useState, type ComponentRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { router } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { formatDuration } from "@dueplanner/core/lib/format";
 import { timeLeft } from "@dueplanner/core/lib/taskViews";
@@ -7,6 +8,8 @@ import { todayISO } from "@dueplanner/core/lib/dates";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { TimerPill } from "./TimerPill";
+import { TimeLeftMenu } from "./TimeLeftMenu";
+import { useDevAction } from "../lib/devScroll";
 
 // The web's header, on every screen but Focus Mode: the sidebar button, the
 // screen's name, a running timer's pill, and Time left (opens its breakdown),
@@ -16,9 +19,17 @@ export function AppHeader({ title }: { title: string }) {
   const { T, fz } = app;
   // "3h 20m", or "0m" (the web header's fmtMins).
   const left = formatDuration(timeLeft(app.tasks, todayISO()).totalMins) || "0m";
+  // The Time left dropdown opens 8px under the header (measured on the screen).
+  const headerRef = useRef<ComponentRef<typeof View>>(null);
+  const [menuTop, setMenuTop] = useState<number | null>(null);
+  const openMenu = () => headerRef.current?.measureInWindow((_x, y, _w, h) => setMenuTop(y + h + 8));
+  const focused = useIsFocused();
+  // Leaving the screen closes it, as on the web (screens stay mounted here).
+  if (!focused && menuTop != null) setMenuTop(null);
+  useDevAction("time-left", () => { if (focused) openMenu(); }); // development only
   return (
     <>
-      <View style={styles.header}>
+      <View ref={headerRef} style={styles.header}>
         <View style={styles.left}>
           <Pressable onPress={() => app.setDrawerOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Open sidebar" accessibilityState={{ expanded: app.drawerOpen }}>
             <SymbolView name={{ ios: "sidebar.left", android: "left_panel_open" }} size={20} tintColor={T.textMuted} />
@@ -27,13 +38,14 @@ export function AppHeader({ title }: { title: string }) {
         </View>
         <View style={styles.right}>
           {(app.focus.endAt != null || app.focus.swStartedAt != null) && <TimerPill />}
-          <Pressable onPress={() => router.push("/time-left")} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Time left: ${left}. Show the breakdown`} style={styles.timeLeft}>
+          <Pressable onPress={openMenu} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Time left: ${left}. Show the breakdown`} accessibilityState={{ expanded: menuTop != null }} style={styles.timeLeft}>
             <Text style={[styles.tlLabel, { fontSize: fz(9), color: T.textFaint }]}>Time left</Text>
             <Text style={[styles.tlValue, { color: T.light ? "#000" : "#fff" }]}>{left}</Text>
           </Pressable>
         </View>
       </View>
       <View style={[styles.rule, { backgroundColor: T.accent }]} />
+      {menuTop != null && <TimeLeftMenu top={menuTop} onClose={() => setMenuTop(null)} />}
     </>
   );
 }

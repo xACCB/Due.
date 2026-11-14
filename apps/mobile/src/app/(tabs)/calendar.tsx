@@ -8,7 +8,6 @@ import { contrastColor, formatDuration, ink } from "@dueplanner/core/lib/format"
 import { priColor } from "@dueplanner/core/constants";
 import { useApp } from "../../state/appContext";
 import { F } from "../../theme/fonts";
-import { AddSheet } from "../../components/AddSheet";
 import { DayTaskRow } from "../../components/DayTaskRow";
 import { DueDeck } from "../../components/DueDeck";
 import { relativeDay, sortDay } from "../../lib/day";
@@ -54,7 +53,8 @@ function MonthView() {
   const today = todayISO();
   const [[year, month], setYM] = useState<[number, number]>(() => [Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1]);
   const [selected, setSelected] = useState(today);
-  const [adding, setAdding] = useState<string | null>(null); // the date a new task gets
+  // "+ Add homework due ..." goes to Home with that date picked (the web's addHomeworkOn).
+  const setAdding = (date: string) => router.navigate(`/?add=1&date=${date}`);
   const [dayCard, setDayCard] = useState<string | null>(null); // the day open in DayCard
   useDevAction("open-day", iso => { setSelected(iso); setDayCard(iso); }); // development only
 
@@ -149,10 +149,9 @@ function MonthView() {
       {dayCard && (
         <DayCard iso={dayCard} today={today} list={sortDay(due.get(dayCard) ?? [])}
           onOpen={t => { setDayCard(null); router.push(`/task-sheet/${t.id}`); }}
-          onAdd={() => { setAdding(dayCard); setDayCard(null); }}
+          onAdd={() => { const d = dayCard; setDayCard(null); if (d) setAdding(d); }}
           onClose={() => setDayCard(null)} />
       )}
-      <AddSheet visible={adding != null} presetDate={adding ?? selected} onClose={() => setAdding(null)} />
     </View>
   );
 }

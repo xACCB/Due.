@@ -10,6 +10,8 @@ import { useApp } from "../state/appContext";
 import { useDevAction } from "../lib/devScroll";
 import { F } from "../theme/fonts";
 import { TimerText } from "./TimerPill";
+import { syncStatusText } from "../lib/syncStatus";
+import { clock } from "../lib/clock";
 import { IconBell, IconCalendar, IconChevron, IconFocus, IconHistory, IconImport, IconPerson, IconSearch, IconSettings, IconSidebar, IconTasks } from "./icons";
 
 // The web's sidebar, which on a phone-sized screen is a drawer: it slides in
@@ -128,7 +130,7 @@ function SidebarBody() {
             : <View style={[styles.avatar, { backgroundColor: T.cardAlt }]}><IconPerson color={T.textMuted} /></View>}
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(13), color: T.text }}>{who ? who.name || "Your account" : "Sign in"}</Text>
-            <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(10), marginTop: 1, color: T.textMuted }}>{who ? "Signed in" : "Sync across devices"}</Text>
+            <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(10), marginTop: 1, color: who && app.sync.error ? ink("#FF4757", T.light) : T.textMuted }}>{!who ? "Sync across devices" : app.sync.error ? "Sync issue" : syncStatusText(app.sync, clock())}</Text>
           </View>
         </Pressable>
         <Pressable onPress={close} hitSlop={6} accessibilityRole="button" accessibilityLabel="Close sidebar" style={styles.closeBtn}>

@@ -1,0 +1,40 @@
+diff --git a/node_modules/@react-native-firebase/firestore/android/src/reactnative/java/io/invertase/firebase/firestore/ReactNativeFirebaseFirestoreSerialize.java b/node_modules/@react-native-firebase/firestore/android/src/reactnative/java/io/invertase/firebase/firestore/ReactNativeFirebaseFirestoreSerialize.java
+index c036e0a..c4b3d23 100644
+--- a/node_modules/@react-native-firebase/firestore/android/src/reactnative/java/io/invertase/firebase/firestore/ReactNativeFirebaseFirestoreSerialize.java
++++ b/node_modules/@react-native-firebase/firestore/android/src/reactnative/java/io/invertase/firebase/firestore/ReactNativeFirebaseFirestoreSerialize.java
+@@ -544,7 +544,13 @@ public class ReactNativeFirebaseFirestoreSerialize {
+         }
+ 
+         if (Objects.requireNonNull(fieldValueType).equals("increment")) {
+-          return FieldValue.increment(fieldValueArray.getDouble(1));
++          // DuePlanner patch (patches/): a whole number goes out as an integer
++          // increment, as the JS SDK does, so an integer field stays an integer.
++          double n = fieldValueArray.getDouble(1);
++          if (n == Math.floor(n) && Math.abs(n) <= 9007199254740991.0) {
++            return FieldValue.increment((long) n);
++          }
++          return FieldValue.increment(n);
+         }
+ 
+         if (Objects.requireNonNull(fieldValueType).equals("delete")) {
+diff --git a/node_modules/@react-native-firebase/firestore/ios/RNFBFirestore/RNFBFirestoreSerialize.m b/node_modules/@react-native-firebase/firestore/ios/RNFBFirestore/RNFBFirestoreSerialize.m
+index 86c801a..03e35ae 100644
+--- a/node_modules/@react-native-firebase/firestore/ios/RNFBFirestore/RNFBFirestoreSerialize.m
++++ b/node_modules/@react-native-firebase/firestore/ios/RNFBFirestore/RNFBFirestoreSerialize.m
+@@ -496,7 +496,15 @@ enum TYPE_MAP {
+       }
+ 
+       if ([fieldValueType isEqualToString:@"increment"]) {
+-        return [FIRFieldValue fieldValueForDoubleIncrement:[fieldValueArray[1] doubleValue]];
++        // DuePlanner patch (patches/): a whole number goes out as an integer
++        // increment, as the JS SDK does, so an integer field stays an integer
++        // (a double increment turns it into a double, which DuePlanner's
++        // Firestore rules refuse for the task counter).
++        double n = [fieldValueArray[1] doubleValue];
++        if (n == floor(n) && fabs(n) <= 9007199254740991.0) {
++          return [FIRFieldValue fieldValueForIntegerIncrement:(int64_t)n];
++        }
++        return [FIRFieldValue fieldValueForDoubleIncrement:n];
+       }
+ 
+       if ([fieldValueType isEqualToString:@"delete"]) {

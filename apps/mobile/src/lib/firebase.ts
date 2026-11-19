@@ -1,6 +1,7 @@
 import { getApp } from "@react-native-firebase/app";
 import { initializeAppCheck, ReactNativeFirebaseAppCheckProvider } from "@react-native-firebase/app-check";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signOut, type User } from "@react-native-firebase/auth";
+import { connectAuthEmulator, getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signOut, type User } from "@react-native-firebase/auth";
+import { connectFirestoreEmulator, getFirestore } from "@react-native-firebase/firestore";
 import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from "@react-native-google-signin/google-signin";
 
 // Firebase for the phone app (the web's apps/web/src/firebase.ts): the same
@@ -14,6 +15,13 @@ import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from "@
 // which needs the paid Apple Developer Program (left until release, the
 // user's choice); until then a release build can't reach Firebase at all.
 
+// Emulator mode (development only): EXPO_PUBLIC_FIREBASE_EMULATORS=1 in
+// apps/mobile/.env.local points Auth and Firestore at the emulators on this
+// Mac (`npx firebase-tools emulators:start --only auth,firestore`), with
+// throwaway data, the same as the web's VITE_FIREBASE_EMULATORS. Never in a
+// release build. Sign-in then uses a pretend Google account, no Google sheet.
+export const USING_EMULATORS = __DEV__ && process.env.EXPO_PUBLIC_FIREBASE_EMULATORS === "1";
+
 let started: Promise<void> | null = null;
 
 export function startFirebase(): Promise<void> {
@@ -24,6 +32,10 @@ export function startFirebase(): Promise<void> {
       android: { provider: __DEV__ ? "debug" : "playIntegrity", debugToken: __DEV__ ? process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN : undefined },
     });
     await initializeAppCheck(getApp(), { provider, isTokenAutoRefreshEnabled: true });
+    if (USING_EMULATORS) {
+      connectAuthEmulator(getAuth(), "http://localhost:9099");
+      connectFirestoreEmulator(getFirestore(), "localhost", 8080);
+    }
     // Client ids come from GoogleService-Info.plist (the sign-in package's Firebase setup).
     GoogleSignin.configure({});
   })();
@@ -39,17 +51,34 @@ export function watchUser(fn: (u: AuthUser | null) => void): () => void {
   return onAuthStateChanged(getAuth(), u => fn(toUser(u)));
 }
 
+// Whether the last sign-in was one the person just made (not a session
+// restored at launch). The first sync after it keeps tasks made while signed
+// out, as on the web (mergeLocalOnSignIn there). Read once.
+let explicit = false;
+export function takeExplicitSignIn(): boolean {
+  const e = explicit;
+  explicit = false;
+  return e;
+}
+
 // Google's own sign-in sheet, then Firebase with its token. Resolves to null
 // when the person cancels; throws a message fit to show when it fails.
 export async function signInWithGoogle(): Promise<AuthUser | null> {
   await startFirebase();
+  explicit = true;
+  if (USING_EMULATORS) {
+    // The Auth emulator takes an unsigned Google token, so no Google sheet.
+    const fake = JSON.stringify({ sub: "emulator-user", email: "emulator@dueplanner.test", email_verified: true, name: "Emulator user" });
+    return toUser((await signInWithCredential(getAuth(), GoogleAuthProvider.credential(fake))).user);
+  }
   try {
     const res = await GoogleSignin.signIn();
-    if (!isSuccessResponse(res)) return null;
+    if (!isSuccessResponse(res)) { explicit = false; return null; }
     if (!res.data.idToken) throw new Error("no id token");
     const cred = await signInWithCredential(getAuth(), GoogleAuthProvider.credential(res.data.idToken));
     return toUser(cred.user);
   } catch (e) {
+    explicit = false;
     if (isErrorWithCode(e) && e.code === statusCodes.IN_PROGRESS) return null;
     throw new Error(signInMessage(e), { cause: e });
   }
@@ -65,5 +94,6 @@ function signInMessage(e: unknown): string {
 
 export async function signOutEverywhere(): Promise<void> {
   await GoogleSignin.signOut().catch(() => {});
-  await signOut(getAuth());
+  // Already signed out (a second tap): nothing to do.
+  await signOut(getAuth()).catch(e => { if ((e as { code?: string })?.code !== "auth/no-current-user") throw e; });
 }

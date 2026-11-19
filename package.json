@@ -20,7 +20,8 @@
     "audit:contrast": "node --experimental-strip-types scripts/check-theme-contrast.ts",
     "prepare": "husky",
     "mobile": "npm run start -w @dueplanner/mobile",
-    "typecheck:mobile": "npm run typecheck -w @dueplanner/mobile"
+    "typecheck:mobile": "npm run typecheck -w @dueplanner/mobile",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -33,6 +34,7 @@
     "globals": "^17.6.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
+    "patch-package": "8.0.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vitest": "^5.0.1"

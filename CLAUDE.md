@@ -81,8 +81,12 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   mistake), then `open -g "rectangle://execute-action?name=first-third"` / `center-third` /
   `last-third`. Chrome then sets its own bounds exactly (`tell application "Google Chrome" to set
   bounds of front window to {960, 30, 1440, 900}`), since Rectangle leaves it 500 wide. This shell
-  can't move other windows through System Events (no accessibility permission). End with
-  Terminal active again.
+  can't move other windows through System Events (no accessibility permission), but Terminal and
+  Chrome take `set bounds of front window` themselves. If Terminal is in full screen (its own
+  desktop, so nothing else can share the screen; `get value of attribute "AXFullScreen" of window
+  1` is true), `set value of attribute "AXFullScreen" of window 1 to false` through System Events
+  does work. The Simulator's window may also be closed while the Simulator runs: `open -b
+  com.apple.dt.Devices` brings it back. End with Terminal active again.
 - **Explain plainly, give exact steps.** The user is new to Mac, Xcode and native app tooling. Say
   what a term means the first time (e.g. "scaffolding"), give commands to paste as code blocks in
   the order to run them, say what output to expect and what to do if it fails, and keep a short
@@ -164,6 +168,15 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   remote actions: `filter`, `delete` (Home), `focus-start`, `sw-start`, `focus-pick`, `syllabus`,
   `task-edit`, `time-left`, `sidebar`, `search` (types a query); `dev-open-section` also opens Inbox/Import dropdowns. In the
   zsh helper, write line breaks in JSON as `\\n` (zsh's echo turns `\n` into a real newline).
+- **2026-11-18 (evening), stopped mid-test:** sync works phone to cloud (8 tasks and the counter
+  uploaded to the emulator after the increment patch) and the website (emulator mode, same pretend
+  user) shows them. Then the phone's screen went black after `"back":true` closed Profile (app
+  process still alive, no error in Metro). **Next:** find that first (systematic-debugging: does
+  closing the `fullScreenModal` Profile leave nothing under it?), then confirm a task added on the
+  website ("Made on the website", already in the emulator) appears on the phone, an edit both ways,
+  and a delete. Then subjects/settings sync, Devices. The app is still in emulator mode
+  (`.env.local`), signed in as the emulator user, and the emulators must be restarted (data is lost
+  when they stop).
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
   `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with
@@ -205,7 +218,37 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   CLI command), so no console visit is needed. A new machine needs its own token the same way.
   Release builds would use App Attest, which waits for the paid Apple program. `useApp()` has
   `user` and `authReady`; `src/app/profile.tsx` is the web's ProfileModal (sign-in screen, then
-  picture, name, email, Sign out); the sidebar's top row opens it. Sync is the next step.
+  picture, name, email, sync status, Sign out); the sidebar's top row opens it.
+- **Task sync on the phone (M3, 2026-11-18):** the web's engine moved out to core as
+  `createTaskSync` (`packages/core/src/lib/taskSync.ts`, unit-tested with an in-memory cloud and
+  two devices in `taskSync.test.ts`): both listeners, `reconcile`, the 400ms debounced one-batch-
+  per-task writes with the counter, the in-flight guard, the stale-write retry, newer-app data
+  never written back, keeping tasks made while signed out on an explicit sign-in. The web still
+  runs its own copy in `HomeworkPlanner`; moving it onto this engine is a later step (prove it the
+  usual way). The phone's adapter is `apps/mobile/src/lib/cloudSync.ts` (also creates the counter
+  and tells a brand-new account by the missing profile doc, as the web's prepare effect does; it
+  leaves the very old one-field task list to the website). `useAppValue` starts it for the signed-in
+  uid, feeds it every change to the store, takes merges as `{kind:"cloud"}` (not an undo step) and
+  exposes `sync` (`ready`, `pending`, `syncedAt`, `error`) and `signOut()` (flush capped at 3s, then
+  clear the phone, except when the first sync never finished). Recaps wait for the first sync.
+  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Not yet: subjects and
+  settings (the profile doc), Devices, account deletion, an offline indicator.
+  **Emulator mode:** `EXPO_PUBLIC_FIREBASE_EMULATORS=1` in `apps/mobile/.env.local` (then restart
+  Metro) points the phone at `npx firebase-tools emulators:start --only auth,firestore` (Java on
+  PATH, see above; run from the repo root without `--project`, so data sits under the real
+  project id like the web's emulator mode). "Continue with Google" then signs in a pretend
+  "Emulator user" with no Google sheet. The website joins with `VITE_FIREBASE_EMULATORS=1
+  VITE_DEV_REMOTE=1 npx vite` in `apps/web`. Inspect data with the emulator's REST API and
+  `Authorization: Bearer owner` (e.g. a `runQuery` over `allDescendants` tasks), and rule refusals
+  in `firestore-debug.log` ("evaluation error at L243:26" names the rule line).
+  **The increment patch:** React Native Firebase sends every `increment()` as a double on iOS
+  and Android, so the task counter became 1.0 and the rules (`a.n is int`) refused every new task
+  from the phone, which then showed the task-limit message. `patches/@react-native-firebase+
+  firestore+27.1.1.patch` (patch-package, run by the root `postinstall`; CI installs with
+  `--ignore-scripts` and doesn't need it) sends whole numbers as integer increments, as the JS SDK
+  does. On a React Native Firebase upgrade, check whether it's fixed upstream, else re-make the
+  patch (`npx patch-package @react-native-firebase/firestore`); a stale patch fails the install
+  loudly. Native, so it takes a native build.
 - **M3 groundwork:** the iOS app is registered in Firebase (2026-11-14, with the Firebase CLI,
   signed in on the Mac as the project's owner): app id `1:445404835645:ios:a63a01bd9ad17a0b71df54`,
   bundle id `com.duestudios.dueplanner`. Its `apps/mobile/GoogleService-Info.plist` (with

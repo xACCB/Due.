@@ -163,3 +163,16 @@ export function renameSubject(s: TaskStore, old: string, next: string): TaskStor
   if (old === next) return s;
   return { ...s, tasks: tasksRenamedSubject(s.tasks, old, next), trash: trashRenamedSubject(s.trash, old, next) };
 }
+
+// Sync (M3): the tasks and Recently deleted as merged with the cloud (core's
+// createTaskSync). Not an undo step, as on the web, where it's a plain
+// setTasks; the undo steps stay, since each holds whole task states by id.
+export function fromCloud(s: TaskStore, tasks: Task[], trash: TrashEntry[]): TaskStore {
+  return tasks === s.tasks && trash === s.trash ? s : { ...s, tasks, trash };
+}
+
+// Signing out leaves nothing of the account on the phone, as on the web (the
+// tasks are safe in the cloud and come back at the next sign-in).
+export function signedOut(): TaskStore {
+  return emptyStore();
+}

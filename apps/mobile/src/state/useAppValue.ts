@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useColorScheme } from "react-native";
 import type { HistoryAction, Task } from "@dueplanner/core/types";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
@@ -16,7 +16,9 @@ import { syncReminders } from "../lib/notifications";
 import { SETTINGS } from "./settings";
 import * as Fx from "./focusTimer";
 import * as S from "./taskStore";
-import { startFirebase, watchUser, type AuthUser } from "../lib/firebase";
+import { signOutEverywhere, startFirebase, takeExplicitSignIn, watchUser, type AuthUser } from "../lib/firebase";
+import { startTaskSync, type TaskSync } from "../lib/cloudSync";
+import { SYNC_MESSAGES } from "@dueplanner/core/lib/taskSync";
 
 type Op =
   | { kind: "add"; input: string | AddDraft }
@@ -34,7 +36,9 @@ type Op =
   | { kind: "renameSubject"; old: string; next: string }
   | { kind: "import"; build: (tasks: Task[]) => Task[] }
   | { kind: "undo" }
-  | { kind: "redo" };
+  | { kind: "redo" }
+  | { kind: "cloud"; tasks: Task[]; trash: TrashEntry[] }
+  | { kind: "signedOut" };
 
 function reduce(s: S.TaskStore, op: Op): S.TaskStore {
   switch (op.kind) {
@@ -54,6 +58,8 @@ function reduce(s: S.TaskStore, op: Op): S.TaskStore {
     case "import": return S.importTasks(s, op.build(s.tasks));
     case "undo": return S.undo(s);
     case "redo": return S.redo(s);
+    case "cloud": return S.fromCloud(s, op.tasks, op.trash);
+    case "signedOut": return S.signedOut();
   }
 }
 
@@ -122,21 +128,6 @@ export function useAppValue() {
   const [recapsChecked, setRecapsChecked] = useSetting("recapsChecked");
   const [openSubjects, setOpenSubjects] = useSetting("openSubjects");
 
-  // Recaps, as on the web: when a day, week, month or year has ended since the
-  // last check, write its snapshot (skipped when nothing was finished or worked
-  // on). Checked on launch, on every change to the tasks, and each minute, so
-  // a recap appears soon after midnight with the app open.
-  const [today, setToday] = useState(todayISO);
-  useEffect(() => {
-    const id = setInterval(() => setToday(todayISO()), 60000);
-    return () => clearInterval(id);
-  }, []);
-  useEffect(() => {
-    if (recapsChecked === today) return;
-    const fresh = newRecaps(store.tasks, recapsChecked, today, weekStart);
-    if (fresh.length) setRecaps(prev => mergeRecaps(prev, fresh));
-    setRecapsChecked(today);
-  }, [store.tasks, recapsChecked, today, weekStart, setRecaps, setRecapsChecked]);
 
   // Home's filter chip and subject filter, shared so the menu's subjects and
   // the Time left sheet can set them (the web's filter / subjectFilter). Not saved.
@@ -164,6 +155,73 @@ export function useAppValue() {
     return () => { gone = true; stop?.(); };
   }, []);
 
+  // Task sync (M3): while signed in, core's engine (lib/cloudSync.ts over
+  // createTaskSync) keeps the tasks and Recently deleted in step with the
+  // cloud, as the website does. It reads the store through a ref, and hears
+  // about every local change from the effect below.
+  const [syncReadyFor, setSyncReadyFor] = useState<string | null>(null);
+  const [syncState, setSyncState] = useState<{ pending: boolean; syncedAt: number | null }>({ pending: false, syncedAt: null });
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [newerData, setNewerData] = useState(false);
+  const storeRef = useRef(store);
+  useEffect(() => { storeRef.current = store; });
+  const syncRef = useRef<TaskSync | null>(null);
+  const uid = user?.uid ?? null;
+  useEffect(() => {
+    if (!uid) return;
+    let gone = false;
+    let engine: TaskSync | null = null;
+    startTaskSync(uid, {
+      merged: (tasks, trash) => dispatch({ kind: "cloud", tasks, trash }),
+      ready: () => setSyncReadyFor(uid),
+      status: st => setSyncState(prev => ({ pending: st.pending, syncedAt: st.syncedAt ?? prev.syncedAt })),
+      error: setSyncError,
+      newer: setNewerData,
+    }, { getLocal: () => ({ tasks: storeRef.current.tasks, trash: storeRef.current.trash }), mergeLocal: takeExplicitSignIn() })
+      .then(e => { if (gone) e.stop(); else { engine = e; syncRef.current = e; } })
+      .catch(() => { if (!gone) setSyncError("Couldn't prepare cloud sync. Please try again."); });
+    return () => { gone = true; engine?.stop(); syncRef.current = null; };
+  }, [uid]);
+  useEffect(() => { syncRef.current?.localChanged(store.tasks, store.trash); }, [store.tasks, store.trash]);
+
+  // Signing out (Profile -> Sign out), as on the web: send a waiting write first
+  // (capped at 3s: offline it would wait for the server), then leave nothing
+  // of the account on the phone, since it's safe in the cloud. Unlike the web,
+  // if the first sync never finished the tasks stay, since they may not have
+  // reached the cloud. Subjects stay too until they sync (the next step).
+  const signOut = useCallback(async () => {
+    const engine = syncRef.current;
+    const synced = engine?.isReady() ?? false;
+    try { await Promise.race([engine?.flush(), new Promise(r => setTimeout(r, 3000))]); } catch { /* shown as a sync error already */ }
+    engine?.stop();
+    syncRef.current = null;
+    await signOutEverywhere();
+    if (synced) dispatch({ kind: "signedOut" });
+    setRecaps([]);
+    setRecapsChecked(null);
+    setSyncReadyFor(null);
+    setSyncState({ pending: false, syncedAt: null });
+    setSyncError(null);
+    setNewerData(false);
+  }, [setRecaps, setRecapsChecked]);
+
+  // Recaps, as on the web: when a day, week, month or year has ended since the
+  // last check, write its snapshot (skipped when nothing was finished or worked
+  // on). Checked on launch, on every change to the tasks, and each minute, so
+  // a recap appears soon after midnight with the app open.
+  const [today, setToday] = useState(todayISO);
+  useEffect(() => {
+    const id = setInterval(() => setToday(todayISO()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (recapsChecked === today) return;
+    if (uid && syncReadyFor !== uid) return; // signed in: wait for the first sync, as the web does
+    const fresh = newRecaps(store.tasks, recapsChecked, today, weekStart);
+    if (fresh.length) setRecaps(prev => mergeRecaps(prev, fresh));
+    setRecapsChecked(today);
+  }, [store.tasks, recapsChecked, today, weekStart, setRecaps, setRecapsChecked, uid, syncReadyFor]);
+
   // Auto-archive, re-checked whenever the tasks or the setting change (the web's effect).
   useEffect(() => {
     if (autoArchiveDays > 0) dispatch({ kind: "autoArchive", cutoff: Date.now() - autoArchiveDays * 86400000 });
@@ -186,7 +244,9 @@ export function useAppValue() {
 
   return {
     T, h24, questions, fz, ms,
-    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen, user, authReady, undoToast, sayUndo, hideUndo,
+    homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen, user, authReady, undoToast, sayUndo, hideUndo, signOut,
+    // Where sync stands, for Profile and the sidebar (the web's syncStatus/syncError).
+    sync: { ready: !!uid && syncReadyFor === uid, pending: syncState.pending, syncedAt: syncState.syncedAt, error: syncError ?? (newerData ? SYNC_MESSAGES.newer : null) },
     tasks: store.tasks,
     trash: store.trash,
     canUndo: store.undo.length > 0,

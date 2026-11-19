@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { withSyllabusTasks } from "@dueplanner/core/lib/backup";
-import { addTask, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, moveTask, renameSubject, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX } from "./taskStore";
+import { addTask, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, moveTask, renameSubject, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX, fromCloud, signedOut } from "./taskStore";
 
 describe("taskStore", () => {
   it("adds a trimmed one-line task and ignores a blank title", () => {
@@ -170,4 +170,19 @@ describe("taskStore", () => {
     expect(s.tasks.map(t => t.subject)).toEqual(["Math", "Art"]);
     expect(s.trash[0].task.subject).toBe("Math");
   });
+
+  it("takes the cloud's tasks without an undo step, and keeps the undo history", () => {
+    let s = addTask(emptyStore(), "Essay");
+    const before = s.undo.length;
+    const cloudTask = { ...s.tasks[0], title: "Essay (edited on the web)" };
+    s = fromCloud(s, [cloudTask], []);
+    expect(s.tasks[0].title).toBe("Essay (edited on the web)");
+    expect(s.undo.length).toBe(before);
+  });
+
+  it("clears everything on sign-out", () => {
+    const s = signedOut();
+    expect(s).toEqual({ tasks: [], trash: [], undo: [], redo: [] });
+  });
 });
+

@@ -6,7 +6,10 @@ import { Path, Svg } from "react-native-svg";
 import { ink } from "@dueplanner/core/lib/format";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
-import { signInWithGoogle, signOutEverywhere } from "../lib/firebase";
+import { signInWithGoogle } from "../lib/firebase";
+import { syncStatusText } from "../lib/syncStatus";
+import { useNow } from "../lib/useNow";
+import { useDevAction } from "../lib/devScroll";
 import { IconPerson } from "../components/icons";
 
 const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
@@ -16,7 +19,8 @@ const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
 // Google". Signed in: picture, name, email and Sign out. The web's stats,
 // Devices and Storage cards come with sync.
 export default function Profile() {
-  const { T, fz, user, authReady } = useApp();
+  const { T, fz, user, authReady, sync, signOut } = useApp();
+  const now = useNow(30000);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const close = () => (router.canGoBack() ? router.back() : router.navigate("/"));
@@ -27,6 +31,8 @@ export default function Profile() {
     setError(null);
     try { await signInWithGoogle(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
+  // Development only: the dev remote's stand-ins for the two buttons.
+  useDevAction("profile", what => { if (what === "sign-in") void signIn(); else void signOut(); });
 
   const closeBtn = (
     <Pressable onPress={close} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
@@ -91,13 +97,14 @@ export default function Profile() {
             : <View style={[styles.avatar, styles.noPhoto, { backgroundColor: T.surface, borderColor: T.border }]}><IconPerson color={T.textMuted} size={34} /></View>}
           <Text style={[styles.name, { color: T.text }]}>{user.name || "Your account"}</Text>
           {!!user.email && <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textFaint, marginBottom: 8 }}>{user.email}</Text>}
-          {/* Sync is the next step (M3); until then the phone keeps its own tasks. */}
-          <View style={[styles.pill, { backgroundColor: T.cardAlt, borderColor: T.border }]}>
-            <View style={[styles.pillDot, { backgroundColor: T.textFaint }]} />
-            <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted }}>Syncing comes in the next update</Text>
+          {/* The web's sync pill: green while syncing, red with the reason when not. */}
+          <View style={[styles.pill, { backgroundColor: sync.error ? "#FF475722" : "#2ED57322", borderColor: sync.error ? "#FF475744" : "#2ED57344" }]}>
+            <View style={[styles.pillDot, { backgroundColor: sync.error ? "#FF4757" : "#2ED573" }]} />
+            <Text style={{ fontFamily: F.body, fontSize: fz(11), color: ink(sync.error ? "#FF4757" : "#2ED573", T.light) }}>{sync.error ? "Sync issue" : syncStatusText(sync, now)}</Text>
           </View>
+          {!!sync.error && <Text style={[styles.note, { fontSize: fz(11), color: ink("#FF4757", T.light), marginTop: 8, maxWidth: 280 }]}>{sync.error}</Text>}
         </View>
-        <Pressable onPress={async () => { await signOutEverywhere().catch(() => {}); close(); }} accessibilityRole="button"
+        <Pressable onPress={async () => { await signOut().catch(() => {}); close(); }} accessibilityRole="button"
           style={({ pressed }) => [styles.signOut, { opacity: pressed ? 0.7 : 1 }]}>
           <Text style={{ fontFamily: F.body, fontSize: fz(13), color: ink("#FF4757", T.light) }}>Sign out</Text>
         </Pressable>

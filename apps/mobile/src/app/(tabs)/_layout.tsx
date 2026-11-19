@@ -20,7 +20,9 @@ export default function ScreensLayout() {
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="calendar" />
-      <Tabs.Screen name="focus" />
+      {/* Loaded at launch, not on first visit: its tick finishes a Pomodoro or break that ran
+          out while the app was closed, wherever you are, as the web's timer does. */}
+      <Tabs.Screen name="focus" options={{ lazy: false }} />
       <Tabs.Screen name="inbox" />
       <Tabs.Screen name="history" />
       <Tabs.Screen name="import" />

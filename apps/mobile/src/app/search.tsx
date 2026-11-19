@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { useEffect, useState } from "react";
+import { AccessibilityInfo, FlatList, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import type { Task } from "@dueplanner/core/types";
@@ -8,6 +8,7 @@ import { daysUntil, getPriority, ink } from "@dueplanner/core/lib/format";
 import { priColor } from "@dueplanner/core/constants";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
+import { useDevAction } from "../lib/devScroll";
 import { IconSearch } from "../components/icons";
 import { Backdrop } from "../components/Backdrop";
 
@@ -20,9 +21,14 @@ export default function Search() {
   const { T, fz } = app;
   const { subjectColors, colorCodeUrgency } = app.settings;
   const [query, setQuery] = useState("");
+  useDevAction("search", q => setQuery(q)); // development only: typing a query
+  const [typing, setTyping] = useState(false); // the field has the cursor: the web's ring
   const q = query.trim().toLowerCase();
   const results = searchTasks(app.tasks, q);
   const open = (t: Task) => router.replace(`/task-sheet/${t.id}`);
+  // "3 tasks found" is for screen readers only, as on the web (its .sr-only line).
+  const found = q && results.length ? `${results.length} ${results.length === 1 ? "task" : "tasks"} found` : "";
+  useEffect(() => { if (found) AccessibilityInfo.announceForAccessibility(found); }, [found]);
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const aimH = (height - insets.top - insets.bottom) * 0.58; // the web's aimH while a phone keyboard is coming
@@ -45,6 +51,8 @@ export default function Search() {
       {/* The web's blurred backdrop; a tap on it closes Search. */}
       <Backdrop kind="search" onPress={() => router.back()} label="Close Search" />
       <View style={{ height: barTop }} pointerEvents="none" />
+      {/* The web's ring while the field has the cursor: 2px of accent, 2px outside the bar. */}
+      <View style={[styles.ring, { borderColor: typing ? T.accent : "transparent" }]}>
       <View style={[styles.bar, { backgroundColor: T.card, borderColor: T.border }]}>
         <IconSearch color={T.textMuted} />
         <TextInput
@@ -57,11 +65,14 @@ export default function Search() {
           returnKeyType="search"
           autoCorrect={false}
           onSubmitEditing={() => { if (results[0]) open(results[0]); }}
+          onFocus={() => setTyping(true)}
+          onBlur={() => setTyping(false)}
           style={[styles.input, { color: T.text, fontSize: fz(16) }]}
         />
         <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cancel">
           <Text style={[styles.cancel, { fontSize: fz(11), color: T.textMuted }]}>Cancel</Text>
         </Pressable>
+      </View>
       </View>
       <FlatList
         data={results}
@@ -83,9 +94,11 @@ export default function Search() {
           );
         }}
         ListFooterComponent={
-          <Text style={[styles.note, { fontSize: fz(11), color: T.textMuted }]} accessibilityLiveRegion="polite">
-            {!q ? "Type a title, subject or tag" : results.length === 0 ? `No tasks match "${query.trim()}"` : `${results.length} ${results.length === 1 ? "task" : "tasks"} found`}
-          </Text>
+          found ? undefined : (
+            <Text style={[styles.note, { fontSize: fz(11), color: T.textMuted }]} accessibilityLiveRegion="polite">
+              {!q ? "Type a title, subject or tag" : `No tasks match "${query.trim()}"`}
+            </Text>
+          )
         }
       />
     </SafeAreaView>
@@ -94,7 +107,8 @@ export default function Search() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 16 },
-  bar: { flexDirection: "row", alignItems: "center", gap: 9, height: 54, borderWidth: 1, borderRadius: 12, paddingLeft: 15, paddingRight: 8, marginTop: 24 },
+  ring: { marginTop: 22, padding: 2, borderWidth: 2, borderRadius: 16, marginHorizontal: -4 },
+  bar: { flexDirection: "row", alignItems: "center", gap: 9, height: 54, borderWidth: 1, borderRadius: 12, paddingLeft: 15, paddingRight: 8 },
   input: { flex: 1, fontFamily: F.body, paddingVertical: 9 },
   cancel: { fontFamily: F.body, padding: 6 },
   list: { paddingTop: 10, gap: 6, paddingBottom: 40 },

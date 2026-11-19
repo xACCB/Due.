@@ -156,10 +156,13 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   the web's undo toast (one pill for the whole app, `sayUndo`), blur behind Inbox messages, the
   History note, New task questions' wording, and cards closing when their screen loses focus.
   Matched already: all six layouts, grouping, filters, Calendar, Focus with timers and picker,
-  every Settings section, Inbox, Import/Export. **Not yet compared:** the done task's sheet, the
-  sidebar with a subject unfolded, Search with results. **Next:** those, then sync (M3). New dev
+  every Settings section, Inbox, Import/Export, a done task's sheet, the sidebar with a subject
+  unfolded, and Search (2026-11-18: Search got the web's 2px ring while typing, and "N tasks found"
+  is now only announced to VoiceOver, as the web's is .sr-only). Focus loads at launch
+  (`lazy: false`), so a timer that ran out while the app was closed finishes wherever you are,
+  not only on the Focus screen. **Next:** sync (M3), built against the Firestore emulator first. New dev
   remote actions: `filter`, `delete` (Home), `focus-start`, `sw-start`, `focus-pick`, `syllabus`,
-  `task-edit`, `time-left`, `sidebar`; `dev-open-section` also opens Inbox/Import dropdowns. In the
+  `task-edit`, `time-left`, `sidebar`, `search` (types a query); `dev-open-section` also opens Inbox/Import dropdowns. In the
   zsh helper, write line breaks in JSON as `\\n` (zsh's echo turns `\n` into a real newline).
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads

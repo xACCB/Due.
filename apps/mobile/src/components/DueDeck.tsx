@@ -175,7 +175,10 @@ const styles = StyleSheet.create({
   // The web's 116px date at line-height .95, margins 4 and 2. iOS draws DM Serif Display's figures
   // nearer the top of the line than browsers do, so the margins are shifted to land the
   // number where the web's sits (measured side by side, 2026-11-14).
-  bigDate: { fontFamily: F.heading, fontSize: 116, lineHeight: 110, marginTop: 24, marginBottom: -21 },
+  // The web's line is 110px and its digits spill above it; iOS cuts off what
+  // spills, so the line is 150px (iOS adds the extra above the digits) and the
+  // margins put the digits and the month where the web has them.
+  bigDate: { fontFamily: F.heading, fontSize: 116, lineHeight: 150, marginTop: -12, marginBottom: -20 },
   monthYear: { fontFamily: F.heading, fontSize: 22, lineHeight: 26 },
   cardSide: { alignItems: "flex-end", paddingTop: 2 },
   divider: { height: 1, marginTop: 14, marginBottom: 12 },

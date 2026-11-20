@@ -13,11 +13,13 @@ import { todayISO } from "@dueplanner/core/lib/dates";
 import { readJSON, writeJSON } from "../lib/storage";
 import { usePersisted } from "../lib/usePersisted";
 import { syncReminders } from "../lib/notifications";
-import { SETTINGS } from "./settings";
+import { SETTINGS, cleanSubjectColors, cleanSubjects } from "./settings";
 import * as Fx from "./focusTimer";
 import * as S from "./taskStore";
 import { signOutEverywhere, startFirebase, takeExplicitSignIn, watchUser, type AuthUser } from "../lib/firebase";
-import { startTaskSync, type TaskSync } from "../lib/cloudSync";
+import { startProfileSync, startTaskSync, type ProfileSync, type TaskSync } from "../lib/cloudSync";
+import type { Profile } from "@dueplanner/core/lib/profile";
+import { DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, type LayoutName } from "@dueplanner/core/constants";
 import { SYNC_MESSAGES } from "@dueplanner/core/lib/taskSync";
 
 type Op =
@@ -163,14 +165,32 @@ export function useAppValue() {
   const [syncState, setSyncState] = useState<{ pending: boolean; syncedAt: number | null }>({ pending: false, syncedAt: null });
   const [syncError, setSyncError] = useState<string | null>(null);
   const [newerData, setNewerData] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [newerProfile, setNewerProfile] = useState(false);
   const storeRef = useRef(store);
   useEffect(() => { storeRef.current = store; });
   const syncRef = useRef<TaskSync | null>(null);
+  // The profile fields (users/{uid}), synced by core's createProfileSync:
+  // what the website calls the profile, here six of the settings.
+  const profile = useMemo<Profile>(() => ({ layout, colorCodeUrgency, subjects, subjectColors, timeFormat, weekStart: weekStart === 1 ? 1 : 0 }),
+    [layout, colorCodeUrgency, subjects, subjectColors, timeFormat, weekStart]);
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; });
+  const profileSyncRef = useRef<ProfileSync | null>(null);
+  const applyProfile = useCallback((p: Partial<Profile>) => {
+    if (p.layout !== undefined) setLayout(p.layout as LayoutName);
+    if (p.colorCodeUrgency !== undefined) setColorCodeUrgency(p.colorCodeUrgency);
+    if (p.subjects !== undefined) setSubjects(cleanSubjects(p.subjects));
+    if (p.subjectColors !== undefined) setSubjectColors(cleanSubjectColors(p.subjectColors));
+    if (p.timeFormat !== undefined) setTimeFormat(p.timeFormat);
+    if (p.weekStart !== undefined) setWeekStart(p.weekStart);
+  }, [setLayout, setColorCodeUrgency, setSubjects, setSubjectColors, setTimeFormat, setWeekStart]);
   const uid = user?.uid ?? null;
   useEffect(() => {
     if (!uid) return;
     let gone = false;
     let engine: TaskSync | null = null;
+    let profileEngine: ProfileSync | null = null;
     startTaskSync(uid, {
       merged: (tasks, trash) => dispatch({ kind: "cloud", tasks, trash }),
       ready: () => setSyncReadyFor(uid),
@@ -178,32 +198,47 @@ export function useAppValue() {
       error: setSyncError,
       newer: setNewerData,
     }, { getLocal: () => ({ tasks: storeRef.current.tasks, trash: storeRef.current.trash }), mergeLocal: takeExplicitSignIn() })
-      .then(e => { if (gone) e.stop(); else { engine = e; syncRef.current = e; } })
+      .then(e => {
+        if (gone) { e.stop(); return; }
+        engine = e; syncRef.current = e;
+        // After the task engine's preparation, which reads whether the profile doc exists.
+        profileEngine = startProfileSync(uid, { apply: applyProfile, error: setProfileError, newer: setNewerProfile }, profileRef.current);
+        profileSyncRef.current = profileEngine;
+      })
       .catch(() => { if (!gone) setSyncError("Couldn't prepare cloud sync. Please try again."); });
-    return () => { gone = true; engine?.stop(); syncRef.current = null; };
-  }, [uid]);
+    return () => { gone = true; engine?.stop(); profileEngine?.stop(); syncRef.current = null; profileSyncRef.current = null; };
+  }, [uid, applyProfile]);
   useEffect(() => { syncRef.current?.localChanged(store.tasks, store.trash); }, [store.tasks, store.trash]);
+  useEffect(() => { profileSyncRef.current?.localChanged(profile); }, [profile]);
 
   // Signing out (Profile -> Sign out), as on the web: send a waiting write first
   // (capped at 3s: offline it would wait for the server), then leave nothing
-  // of the account on the phone, since it's safe in the cloud. Unlike the web,
-  // if the first sync never finished the tasks stay, since they may not have
-  // reached the cloud. Subjects stay too until they sync (the next step).
+  // of the account on the phone, since it's safe in the cloud: its tasks,
+  // Recently deleted, subjects and their colours. Unlike the web, if the first
+  // sync never finished they stay, since they may not have reached the cloud.
   const signOut = useCallback(async () => {
-    const engine = syncRef.current;
-    const synced = engine?.isReady() ?? false;
-    try { await Promise.race([engine?.flush(), new Promise(r => setTimeout(r, 3000))]); } catch { /* shown as a sync error already */ }
+    const engine = syncRef.current, profileEngine = profileSyncRef.current;
+    const synced = (engine?.isReady() ?? false) && (profileEngine?.isReady() ?? false);
+    try { await Promise.race([Promise.all([engine?.flush(), profileEngine?.flush()]), new Promise(r => setTimeout(r, 3000))]); } catch { /* shown as a sync error already */ }
     engine?.stop();
+    profileEngine?.stop();
     syncRef.current = null;
+    profileSyncRef.current = null;
     await signOutEverywhere();
-    if (synced) dispatch({ kind: "signedOut" });
+    if (synced) {
+      dispatch({ kind: "signedOut" });
+      setSubjects([...DEFAULT_SUBJECTS]);
+      setSubjectColors({ ...DEFAULT_SUBJECT_COLORS });
+    }
     setRecaps([]);
     setRecapsChecked(null);
     setSyncReadyFor(null);
     setSyncState({ pending: false, syncedAt: null });
     setSyncError(null);
     setNewerData(false);
-  }, [setRecaps, setRecapsChecked]);
+    setProfileError(null);
+    setNewerProfile(false);
+  }, [setRecaps, setRecapsChecked, setSubjects, setSubjectColors]);
 
   // Recaps, as on the web: when a day, week, month or year has ended since the
   // last check, write its snapshot (skipped when nothing was finished or worked
@@ -246,7 +281,7 @@ export function useAppValue() {
     T, h24, questions, fz, ms,
     homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen, user, authReady, undoToast, sayUndo, hideUndo, signOut,
     // Where sync stands, for Profile and the sidebar (the web's syncStatus/syncError).
-    sync: { ready: !!uid && syncReadyFor === uid, pending: syncState.pending, syncedAt: syncState.syncedAt, error: syncError ?? (newerData ? SYNC_MESSAGES.newer : null) },
+    sync: { ready: !!uid && syncReadyFor === uid, pending: syncState.pending, syncedAt: syncState.syncedAt, error: syncError ?? profileError ?? (newerData || newerProfile ? SYNC_MESSAGES.newer : null) },
     tasks: store.tasks,
     trash: store.trash,
     canUndo: store.undo.length > 0,

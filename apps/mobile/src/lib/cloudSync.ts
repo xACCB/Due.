@@ -1,5 +1,7 @@
 import { collection, doc, getDoc, getDocFromServer, getFirestore, increment, deleteField, onSnapshot, setDoc, writeBatch, type DocumentReference } from "@react-native-firebase/firestore";
 import { createTaskSync, type TaskSyncAdapter, type TaskSyncEvents, type TaskSyncOptions } from "@dueplanner/core/lib/taskSync";
+import { createProfileSync, type ProfileSyncEvents } from "@dueplanner/core/lib/profileSync";
+import type { Profile } from "@dueplanner/core/lib/profile";
 import { startFirebase } from "./firebase";
 
 // Task sync for the phone: core's createTaskSync (the web's engine, moved
@@ -72,6 +74,27 @@ export async function startTaskSync(uid: string, events: TaskSyncEvents, opts: O
   await startFirebase();
   const { isNewAccount } = await prepare(uid);
   const engine = createTaskSync(adapter(uid), events, { ...opts, isNewAccount });
+  engine.start();
+  return engine;
+}
+
+export type ProfileSync = ReturnType<typeof createProfileSync>;
+
+// Starts syncing the profile fields (layout, urgency colours, subjects and
+// their colours, 12h/24h, week start) with users/{uid}: core's
+// createProfileSync over @react-native-firebase. Start it after
+// startTaskSync has resolved, since that reads whether the profile doc exists
+// (a brand-new account) before this writes it.
+export function startProfileSync(uid: string, events: ProfileSyncEvents, initial: Profile): ProfileSync {
+  const ref = doc(getFirestore(), "users", uid);
+  const engine = createProfileSync({
+    listen: (next, error) => onSnapshot(ref, { includeMetadataChanges: true }, snap => {
+      next(snap.exists() ? (snap.data() ?? null) : null, { pending: snap.metadata.hasPendingWrites });
+    }, error),
+    write: data => setDoc(ref, data, { merge: true }),
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    clearTimer: t => clearTimeout(t as ReturnType<typeof setTimeout>),
+  }, events, initial);
   engine.start();
   return engine;
 }

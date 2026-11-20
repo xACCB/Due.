@@ -14,7 +14,7 @@ import { requestNotifications } from "../../lib/notifications";
 import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
-import { useDevScroll } from "../../lib/devScroll";
+import { useDevAction, useDevScroll } from "../../lib/devScroll";
 import { AppHeader, BackButton } from "../../components/AppHeader";
 import { LayoutIcon } from "../../components/icons";
 
@@ -74,6 +74,13 @@ export default function SettingsScreen() {
 
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   useDevScroll(scrollRef); // development only: the dev remote's "scroll"
+  // Development only: change a setting without a reload, as a tap would, e.g.
+  // "act":["setting","[\"setWeekStart\",0]"] (a reload would let the cloud's value win).
+  useDevAction("setting", arg => {
+    const [name, value] = JSON.parse(arg) as [string, unknown];
+    const set = (app.settings as Record<string, unknown>)[name];
+    if (typeof set === "function") (set as (v: unknown) => void)(value);
+  });
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <AppHeader title="Settings" />

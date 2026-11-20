@@ -168,15 +168,18 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   remote actions: `filter`, `delete` (Home), `focus-start`, `sw-start`, `focus-pick`, `syllabus`,
   `task-edit`, `time-left`, `sidebar`, `search` (types a query); `dev-open-section` also opens Inbox/Import dropdowns. In the
   zsh helper, write line breaks in JSON as `\\n` (zsh's echo turns `\n` into a real newline).
-- **2026-11-18 (evening), stopped mid-test:** sync works phone to cloud (8 tasks and the counter
-  uploaded to the emulator after the increment patch) and the website (emulator mode, same pretend
-  user) shows them. Then the phone's screen went black after `"back":true` closed Profile (app
-  process still alive, no error in Metro). **Next:** find that first (systematic-debugging: does
-  closing the `fullScreenModal` Profile leave nothing under it?), then confirm a task added on the
-  website ("Made on the website", already in the emulator) appears on the phone, an edit both ways,
-  and a delete. Then subjects/settings sync, Devices. The app is still in emulator mode
-  (`.env.local`), signed in as the emulator user, and the emulators must be restarted (data is lost
-  when they stop).
+- **2026-11-20:** task sync checked end to end against the emulators, phone and website on one
+  account: an add, an edit and a delete each way, Recently deleted on both, the counter right
+  (7 tasks, 2 deleted). Then the profile fields sync (below: subjects, colours, layout, urgency
+  colours, 12h/24h, week start), checked both ways and live, plus sign-out clearing the account's
+  subjects and sign-in bringing them back. The black screen of 2026-11-18 didn't come back:
+  opening and closing Profile, and a reload with it open, all work. It followed a dev-remote
+  `seed` (a reload) with Profile open and three red errors on screen; if it happens again,
+  cold-restart. **Next:** Devices on the phone (register in `meta/devices`, core's
+  `deviceAction`, the Profile card, sign out when removed), then account deletion and an offline
+  indicator. The app is still in emulator mode (`.env.local`); restart the emulators each session
+  (data is lost when they stop) and sign in again from Profile (`"go":"/profile"`, then
+  `"act":["profile","sign-in"]`).
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
   `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with
@@ -188,6 +191,8 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   `"toggle":1003` ticks a task through Home's own toggle (the completion animation runs);
   `"act":["open-day","2026-11-11"]` runs a screen's named action (`useDevAction`: `open-message`,
   `open-day`, `open-time` with `sub:Math` or `due:overdue`, `add-title`, `add-skip`, `crash`);
+  `"act":["setting","[\"setWeekStart\",1]"]` calls a settings setter without a reload (Settings
+  must have been opened once; a `"set"` reloads, and then the cloud's value wins when signed in);
   `"quiet":true` turns off the red dev error overlay so the app's own error screen shows. After
   any reload the first command is ignored, so send one twice. After `simctl terminate`, launch
   with `xcrun simctl launch booted com.duestudios.dueplanner --initialUrl http://localhost:8081`:
@@ -205,6 +210,9 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   optional `in` selector). The file server must send `Access-Control-Allow-Origin: *`, which
   `python3 -m http.server` doesn't. `xcrun simctl launch booted com.apple.mobilesafari` or
   `com.duestudios.dueplanner` brings either to the front. None of this opens a window on the Mac.
+  For sync, quicker: `node scripts/web-device.mjs <step>` is the website as a second device in a
+  headless Chrome (no window), signed in as the phone's emulator user: `list`, `add`, `high`,
+  `done`, `delete` a task by title, or `settings "Monday|24-hour"`, then prints what it holds.
 - **Sign-in on the phone (M3, started 2026-11-14):** `src/lib/firebase.ts` (React Native Firebase
   27: app, auth, firestore, app-check; `@react-native-google-signin/google-signin` 17, its Firebase
   variant, fetched with SPM like Firebase; `app.json` sets `useFrameworks: "dynamic"`, which
@@ -231,8 +239,19 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   uid, feeds it every change to the store, takes merges as `{kind:"cloud"}` (not an undo step) and
   exposes `sync` (`ready`, `pending`, `syncedAt`, `error`) and `signOut()` (flush capped at 3s, then
   clear the phone, except when the first sync never finished). Recaps wait for the first sync.
-  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Not yet: subjects and
-  settings (the profile doc), Devices, account deletion, an offline indicator.
+  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Not yet: Devices,
+  account deletion, an offline indicator.
+  **Profile fields (2026-11-20):** core's `createProfileSync` (`lib/profileSync.ts`, with
+  `readProfile`/`profileDoc`/`sameProfile` in `lib/profile.ts`; tested in `profileSync.test.ts`)
+  syncs `users/{uid}` as the website's two profile effects do: the first reading wins at sign-in, no
+  doc means a new account so this device's values are written, later changes go up 400ms after the
+  last one as one merge write of every field. Better than the web in two ways: a field changed here
+  and not yet written keeps this device's value when another device's snapshot lands, and our own
+  pending echo is ignored by `hasPendingWrites` rather than by a flag. The phone starts it with
+  `startProfileSync` (`cloudSync.ts`) after the task engine's preparation, since that reads whether
+  the doc exists; `useAppValue` feeds it the six settings and applies what comes back through the
+  settings' own cleaners. Sign-out flushes it too and resets subjects and colours to the defaults,
+  as the web does. The web still has its own inline copy (`App.tsx`'s profile effects).
   **Emulator mode:** `EXPO_PUBLIC_FIREBASE_EMULATORS=1` in `apps/mobile/.env.local` (then restart
   Metro) points the phone at `npx firebase-tools emulators:start --only auth,firestore` (Java on
   PATH, see above; run from the repo root without `--project`, so data sits under the real

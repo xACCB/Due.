@@ -10,6 +10,8 @@ import { TimerPill } from "./TimerPill";
 import { IconSidebar } from "./icons";
 import { TimeLeftMenu } from "./TimeLeftMenu";
 import { useDevAction } from "../lib/devScroll";
+import { ink } from "@dueplanner/core/lib/format";
+import { OFFLINE_TEXT } from "../lib/syncStatus";
 
 // The web's header, on every screen but Focus Mode: the sidebar button, the
 // screen's name, a running timer's pill, and Time left (opens its breakdown),
@@ -34,7 +36,13 @@ export function AppHeader({ title }: { title: string }) {
           <Pressable onPress={() => app.setDrawerOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Open sidebar" accessibilityState={{ expanded: app.drawerOpen }}>
             <IconSidebar color={T.textMuted} size={20} />
           </Pressable>
-          <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">{title}</Text>
+          <View>
+            <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">{title}</Text>
+            {/* The web's note under the title while signed in and offline. */}
+            {!!app.user && app.sync.offline && (
+              <Text accessibilityLabel={OFFLINE_TEXT} style={{ fontFamily: F.body, fontSize: fz(9), color: ink("#FFA502", T.light), marginTop: 3 }}>offline</Text>
+            )}
+          </View>
         </View>
         <View style={styles.right}>
           {(app.focus.endAt != null || app.focus.swStartedAt != null) && <TimerPill />}

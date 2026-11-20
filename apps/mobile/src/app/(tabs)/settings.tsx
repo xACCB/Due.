@@ -304,6 +304,8 @@ export default function SettingsScreen() {
           <Text style={[styles.wideText, { fontSize: fz(11), color: ink("#FF4757", T.light) }]}>{doneCount ? `Clear ${doneCount} task${doneCount === 1 ? "" : "s"} completed` : "No completed tasks to clear"}</Text>
         </Pressable>
 
+        {app.user && <DangerZone T={T} />}
+
         {/* The web's foot: the version, then the privacy policy as a link. */}
         <Text style={[styles.foot, { fontSize: fz(9), color: T.textFaint }]}>
           DuePlanner v{Constants.expoConfig?.version ?? ""} ·{" "}
@@ -311,6 +313,56 @@ export default function SettingsScreen() {
         </Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// Settings -> Danger Zone (signed in only), the web's: a button, then the
+// warning, a field to type DELETE in, Cancel and Delete forever.
+function DangerZone({ T }: { T: Theme }) {
+  const { fz, deleteAccount } = useApp();
+  const [asking, setAsking] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ready = typed === "DELETE";
+  const red = ink("#FF4757", T.light);
+  const go = () => { if (ready && !busy) void del(); };
+  const del = async () => {
+    setBusy(true);
+    setError(null);
+    try { await deleteAccount(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  // Development only: the dev remote's stand-in for typing DELETE, and with "go" pressing Delete forever.
+  useDevAction("delete-account", what => { setAsking(true); setTyped("DELETE"); if (what === "go") void del(); });
+  return (
+    <Section title="Danger Zone" danger T={T}>
+      {!asking ? (
+        <Pressable onPress={() => { setAsking(true); setTyped(""); setError(null); }} accessibilityRole="button"
+          style={({ pressed }) => [styles.wide, { borderColor: "#FF475744", opacity: pressed ? 0.7 : 1, marginBottom: 0 }]}>
+          <Text style={[styles.wideText, { fontSize: fz(11), color: red }]}>Delete my account & all data</Text>
+        </Pressable>
+      ) : (
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted, lineHeight: Math.round(fz(11) * 1.5) }}>
+            This permanently deletes your account, every task, and all settings, on this device and in the cloud. This can't be undone. Type <Text style={{ fontFamily: F.bodyMedium }}>DELETE</Text> to confirm.
+          </Text>
+          <TextInput value={typed} onChangeText={t => setTyped(t.slice(0, 20))} placeholder="DELETE" placeholderTextColor={T.textFaint}
+            autoCapitalize="characters" autoCorrect={false} accessibilityLabel="Type DELETE to confirm"
+            style={[styles.dangerInput, { backgroundColor: T.surface, borderColor: T.border, color: T.text }]} />
+          {!!error && <Text accessibilityLiveRegion="polite" style={{ fontFamily: F.body, fontSize: fz(11), color: red }}>{error}</Text>}
+          <View style={{ flexDirection: "row", gap: 7 }}>
+            <Pressable onPress={() => setAsking(false)} accessibilityRole="button"
+              style={[styles.dangerBtn, { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border }]}>
+              <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted }}>Cancel</Text>
+            </Pressable>
+            <Pressable onPress={go} disabled={!ready || busy} accessibilityRole="button" accessibilityState={{ disabled: !ready || busy, busy }}
+              style={[styles.dangerBtn, { backgroundColor: ready ? "#FF4757" : T.surface, opacity: busy ? 0.6 : 1 }]}>
+              <Text style={{ fontFamily: F.body, fontSize: fz(11), color: ready ? "#fff" : T.textFaint }}>{busy ? "Deleting…" : "Delete forever"}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </Section>
   );
 }
 
@@ -324,6 +376,8 @@ function Arrow({ glyph, a11y, disabled, onPress, T }: { glyph: string; a11y: str
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  dangerInput: { borderWidth: 1, borderRadius: 9, paddingVertical: 9, paddingHorizontal: 12, fontFamily: F.body, fontSize: 16 },
+  dangerBtn: { flex: 1, borderRadius: 9, paddingVertical: 9, paddingHorizontal: 4, alignItems: "center" },
   body: { paddingHorizontal: 14, paddingBottom: 48 },
   inline: { flexDirection: "row", alignItems: "center", gap: 10 },
   swatch: { width: 14, height: 14, borderRadius: 7 },

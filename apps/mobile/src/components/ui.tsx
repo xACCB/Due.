@@ -60,13 +60,14 @@ export function Button({ label, onPress, T, kind = "primary", disabled, accessib
 // row toggles it and the body renders only while open. Closed when Settings
 // opens, as on the web.
 // `gap`: space between the open body's children, as the web section's `gap`.
-export function Section({ title, T, gap = 0, children }: { title: string; T: Theme; gap?: number; children: ReactNode }) {
+// `danger`: the web's Danger Zone look, a red title and border.
+export function Section({ title, T, gap = 0, danger = false, children }: { title: string; T: Theme; gap?: number; danger?: boolean; children: ReactNode }) {
   const { fz, ms } = useApp();
   // Development only: the "dev-open-section" key opens one section, so a
   // screenshot can show it (see lib/devRemote.ts).
   const [open, setOpen] = useState(() => __DEV__ && readJSON<string | null>("dev-open-section", null) === title);
   return (
-    <View style={[styles.sectionBody, styles.section, { backgroundColor: T.card, borderColor: T.border }]}>
+    <View style={[styles.sectionBody, styles.section, { backgroundColor: T.card, borderColor: danger ? "#FF475744" : T.border }]}>
       <Pressable
         onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.create(ms(200), "easeOut", "opacity")); setOpen(o => !o); }}
         accessibilityRole="button"
@@ -74,8 +75,8 @@ export function Section({ title, T, gap = 0, children }: { title: string; T: The
         accessibilityLabel={title}
         style={styles.sectionHead}
       >
-        <Text style={[styles.sectionTitle, { fontSize: fz(10), color: T.textMuted }]}>{title.toUpperCase()}</Text>
-        <Text style={{ fontSize: fz(13), color: T.textMuted, transform: [{ rotate: open ? "180deg" : "0deg" }] }}>⌄</Text>
+        <Text style={[styles.sectionTitle, { fontSize: fz(10), color: danger ? ink("#FF4757", T.light) : T.textMuted }]}>{title.toUpperCase()}</Text>
+        <Text style={{ fontSize: fz(13), color: danger ? ink("#FF4757", T.light) : T.textMuted, transform: [{ rotate: open ? "180deg" : "0deg" }] }}>⌄</Text>
       </Pressable>
       {open && <View style={[styles.sectionInner, { gap }]}>{children}</View>}
     </View>

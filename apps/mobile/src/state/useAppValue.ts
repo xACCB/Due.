@@ -10,14 +10,14 @@ import { THEMES } from "@dueplanner/core/themes";
 import { scaledPx } from "@dueplanner/core/lib/textSize";
 import { mergeRecaps, newRecaps } from "@dueplanner/core/lib/recaps";
 import { todayISO } from "@dueplanner/core/lib/dates";
-import { readJSON, writeJSON } from "../lib/storage";
+import { clearAppData, readJSON, writeJSON } from "../lib/storage";
 import { usePersisted } from "../lib/usePersisted";
 import { syncReminders } from "../lib/notifications";
 import { SETTINGS, cleanSubjectColors, cleanSubjects } from "./settings";
 import * as Fx from "./focusTimer";
 import * as S from "./taskStore";
-import { signOutEverywhere, startFirebase, takeExplicitSignIn, watchUser, type AuthUser } from "../lib/firebase";
-import { forgetThisDevice, signOutDevice as removeDevice, signOutOtherDevices as keepOnlyThisDevice, startProfileSync, startTaskSync, watchDevices, type ProfileSync, type TaskSync } from "../lib/cloudSync";
+import { confirmIdentity, deleteSignInAccount, signOutEverywhere, startFirebase, takeExplicitSignIn, watchUser, type AuthUser } from "../lib/firebase";
+import { deleteCloudData, forgetThisDevice, signOutDevice as removeDevice, signOutOtherDevices as keepOnlyThisDevice, startProfileSync, startTaskSync, watchDevices, type ProfileSync, type TaskSync } from "../lib/cloudSync";
 import { listDevices, type DeviceMap } from "@dueplanner/core/lib/devices";
 import { thisDeviceId } from "../lib/thisDevice";
 import { router } from "expo-router";
@@ -90,7 +90,7 @@ function useSetting<K extends keyof typeof SETTINGS>(name: K) {
 
 // Everything the screens share: the tasks (with undo), the settings and the
 // active theme. Held once, by AppProvider (AppState.tsx).
-export function useAppValue() {
+export function useAppValue(restart: () => void = () => {}) {
   const [store, dispatch] = useReducer(reduce, undefined, load);
 
   useEffect(() => {
@@ -165,7 +165,25 @@ export function useAppValue() {
   // cloud, as the website does. It reads the store through a ref, and hears
   // about every local change from the effect below.
   const [syncReadyFor, setSyncReadyFor] = useState<string | null>(null);
+  // Bumped to start sync again after it was stopped for an account deletion that failed.
+  const [syncRun, setSyncRun] = useState(0);
   const [syncState, setSyncState] = useState<{ pending: boolean; syncedAt: number | null }>({ pending: false, syncedAt: null });
+  // Offline: the task listeners have had only the phone's cache for 3s
+  // (Firestore can't reach the cloud). The wait keeps it from flashing up
+  // while the app starts and connects. The web uses the browser's own
+  // online/offline events instead, which the phone doesn't have without a
+  // native package.
+  const [offline, setOffline] = useState(false);
+  const offlineTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cacheOnly = useCallback((fromCache: boolean) => {
+    if (!fromCache) {
+      if (offlineTimer.current) clearTimeout(offlineTimer.current);
+      offlineTimer.current = null;
+      setOffline(false);
+    } else if (!offlineTimer.current) {
+      offlineTimer.current = setTimeout(() => setOffline(true), 3000);
+    }
+  }, []);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [newerData, setNewerData] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -197,7 +215,7 @@ export function useAppValue() {
     startTaskSync(uid, {
       merged: (tasks, trash) => dispatch({ kind: "cloud", tasks, trash }),
       ready: () => setSyncReadyFor(uid),
-      status: st => setSyncState(prev => ({ pending: st.pending, syncedAt: st.syncedAt ?? prev.syncedAt })),
+      status: st => { setSyncState(prev => ({ pending: st.pending, syncedAt: st.syncedAt ?? prev.syncedAt })); cacheOnly(st.fromCache); },
       error: setSyncError,
       newer: setNewerData,
     }, { getLocal: () => ({ tasks: storeRef.current.tasks, trash: storeRef.current.trash }), mergeLocal: takeExplicitSignIn() })
@@ -209,8 +227,8 @@ export function useAppValue() {
         profileSyncRef.current = profileEngine;
       })
       .catch(() => { if (!gone) setSyncError("Couldn't prepare cloud sync. Please try again."); });
-    return () => { gone = true; engine?.stop(); profileEngine?.stop(); syncRef.current = null; profileSyncRef.current = null; };
-  }, [uid, applyProfile]);
+    return () => { gone = true; engine?.stop(); profileEngine?.stop(); syncRef.current = null; profileSyncRef.current = null; cacheOnly(false); };
+  }, [uid, applyProfile, cacheOnly, syncRun]);
   useEffect(() => { syncRef.current?.localChanged(store.tasks, store.trash); }, [store.tasks, store.trash]);
   useEffect(() => { profileSyncRef.current?.localChanged(profile); }, [profile]);
 
@@ -274,7 +292,40 @@ export function useAppValue() {
     });
     stopDevicesRef.current = stop;
     return () => { stop(); if (stopDevicesRef.current === stop) stopDevicesRef.current = null; };
-  }, [uid]);
+  }, [uid, syncRun]);
+
+  // Settings -> Danger Zone -> Delete forever, the web's deleteAccountForever:
+  // prove it's them (a recent sign-in, Firebase's rule), stop syncing so the
+  // deletes aren't read back as changes, delete the cloud data and the
+  // sign-in account, then everything on the phone, and start the app over on Home.
+  // Resolves false when they cancel the Google check; throws a message to show.
+  const deleteAccount = useCallback(async (): Promise<boolean> => {
+    if (!uid) return false;
+    if (!(await confirmIdentity())) return false;
+    stopDevicesRef.current?.();
+    stopDevicesRef.current = null;
+    syncRef.current?.stop();
+    profileSyncRef.current?.stop();
+    syncRef.current = null;
+    profileSyncRef.current = null;
+    try {
+      await deleteCloudData(uid);
+      await deleteSignInAccount();
+    } catch (e) {
+      setSyncRun(n => n + 1); // still signed in: sync again
+      const code = (e as { code?: string })?.code ?? "unknown";
+      throw new Error(
+        code === "auth/requires-recent-login" ? "For your security, please sign out, sign back in, and try again."
+          : code === "firestore/unavailable" ? "You're offline. Connect to the internet and try again."
+            : `Couldn't delete your account (${code}). Please try again.`,
+        { cause: e },
+      );
+    }
+    clearAppData();
+    restart();
+    router.navigate("/"); // the web reloads onto Home
+    return true;
+  }, [uid, restart]);
   const devices = useMemo(() => (uid && deviceMap?.uid === uid && deviceMap.map ? listDevices(deviceMap.map, thisDeviceId()) : null), [uid, deviceMap]);
   const signOutDevice = useCallback((id: string) => {
     if (uid && id !== thisDeviceId()) removeDevice(uid, id).catch(() => {});
@@ -324,9 +375,9 @@ export function useAppValue() {
   return {
     T, h24, questions, fz, ms,
     homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen, user, authReady, undoToast, sayUndo, hideUndo, signOut,
-    devices, signOutDevice, signOutOtherDevices, signInNote, clearSignInNote: () => setSignInNote(null),
+    devices, signOutDevice, signOutOtherDevices, deleteAccount, signInNote, clearSignInNote: () => setSignInNote(null),
     // Where sync stands, for Profile and the sidebar (the web's syncStatus/syncError).
-    sync: { ready: !!uid && syncReadyFor === uid, pending: syncState.pending, syncedAt: syncState.syncedAt, error: syncError ?? profileError ?? (newerData || newerProfile ? SYNC_MESSAGES.newer : null) },
+    sync: { ready: !!uid && syncReadyFor === uid, pending: syncState.pending, syncedAt: syncState.syncedAt, offline: !!uid && offline, error: syncError ?? profileError ?? (newerData || newerProfile ? SYNC_MESSAGES.newer : null) },
     tasks: store.tasks,
     trash: store.trash,
     canUndo: store.undo.length > 0,

@@ -50,8 +50,10 @@ export interface TaskSyncEvents {
   // The first merge for this account has happened; local changes now sync.
   ready(): void;
   // pending: writes not yet on the server. syncedAt: when everything was last
-  // confirmed by the server (null until it has been).
-  status(s: { pending: boolean; syncedAt: number | null }): void;
+  // confirmed by the server (null until it has been). fromCache: what's shown
+  // came from this device's cache, not the server, which is Firestore's way
+  // of saying it can't reach the cloud (offline) or hasn't yet (starting up).
+  status(s: { pending: boolean; syncedAt: number | null; fromCache: boolean }): void;
   // A message to show, or null when the last problem has cleared.
   error(message: string | null): void;
   // Whether any task was saved by a newer version of the app.
@@ -159,7 +161,8 @@ export function createTaskSync<R>(adapter: TaskSyncAdapter<R>, events: TaskSyncE
 
   function status() {
     const p = tasksMeta.pending || trashMeta.pending;
-    events.status({ pending: p, syncedAt: !p && !tasksMeta.fromCache && !trashMeta.fromCache ? adapter.now() : null });
+    const fromCache = tasksMeta.fromCache || trashMeta.fromCache;
+    events.status({ pending: p, syncedAt: !p && !fromCache ? adapter.now() : null, fromCache });
   }
 
   function start() {

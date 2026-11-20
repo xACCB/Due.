@@ -32,3 +32,6 @@ coverage
 # The iPhone app's Firebase config (holds its API key). Download it with:
 # npx firebase-tools apps:sdkconfig IOS 1:445404835645:ios:a63a01bd9ad17a0b71df54 --project ai-homework-planner-92260 -o apps/mobile/GoogleService-Info.plist
 apps/mobile/GoogleService-Info.plist
+
+# The Playwright plugin's page snapshots and console logs
+.playwright-mcp/

@@ -13,3 +13,9 @@ export function readJSON<T>(key: string, fallback: T): T {
 export function writeJSON(key: string, value: unknown): void {
   store.set(key, JSON.stringify(value));
 }
+
+// Every hw-* key on this phone (account deletion: "delete my data" means all
+// of it, as on the web, which clears its hw-* localStorage keys).
+export function clearAppData(): void {
+  for (const key of store.getAllKeys()) if (key.startsWith("hw-")) store.remove(key);
+}

@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocFromServer, getFirestore, increment, deleteField, onSnapshot, setDoc, updateDoc, writeBatch, type DocumentReference } from "@react-native-firebase/firestore";
+import { collection, doc, getDoc, getDocFromServer, getDocsFromServer, getFirestore, increment, deleteField, onSnapshot, setDoc, updateDoc, writeBatch, type DocumentReference } from "@react-native-firebase/firestore";
 import { getAuth } from "@react-native-firebase/auth";
 import { deviceAction, pruneDevices, type DeviceEntry, type DeviceMap } from "@dueplanner/core/lib/devices";
 import { LIMITS } from "@dueplanner/core/lib/limits";
@@ -158,4 +158,27 @@ export function signOutOtherDevices(uid: string, mine: DeviceEntry): Promise<voi
 export async function forgetThisDevice(uid: string): Promise<void> {
   try { await Promise.race([updateDoc(devicesRef(uid), { [`d.${thisDeviceId()}`]: deleteField() }), new Promise(r => setTimeout(r, 2000))]); } catch { /* not listed, or no list */ }
   setRegisteredFor(null);
+}
+
+// Account deletion (Settings -> Danger Zone), the website's
+// deleteAccountForever: every task and Recently deleted entry, then the device
+// list (on its own and allowed to fail, so it can never block the rest), then
+// the profile doc last, so an interrupted run can simply be run again. Read
+// from the server, so offline it fails at once rather than queueing deletes.
+// The task counter (meta/counts) can't be deleted, by the rules' design, and
+// holds only numbers. In chunks: a batch holds at most 500 writes.
+export async function deleteCloudData(uid: string): Promise<void> {
+  const db = getFirestore();
+  const [tasks, trash] = await Promise.all([
+    getDocsFromServer(collection(db, "users", uid, "tasks")),
+    getDocsFromServer(collection(db, "users", uid, "trash")),
+  ]);
+  const refs = [...tasks.docs, ...trash.docs].map(d => d.ref);
+  for (let i = 0; i < refs.length; i += 450) {
+    const batch = writeBatch(db);
+    refs.slice(i, i + 450).forEach(r => batch.delete(r));
+    await batch.commit();
+  }
+  try { await writeBatch(db).delete(devicesRef(uid)).commit(); } catch { /* no list */ }
+  await writeBatch(db).delete(doc(db, "users", uid)).commit();
 }

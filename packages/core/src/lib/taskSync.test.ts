@@ -95,6 +95,24 @@ function device(cloud: FakeCloud, opts: { tasks?: Task[]; isNewAccount?: boolean
 // Lets timers, commits and listener callbacks run until things settle.
 const settle = () => new Promise(r => setTimeout(r, 30));
 
+describe("task sync status", () => {
+  it("says when it's reading from the cache (offline) and when the server is back", async () => {
+    const cloud = new FakeCloud();
+    const seen: { fromCache: boolean; syncedAt: number | null }[] = [];
+    const engine = createTaskSync(adapter(cloud), { merged() {}, ready() {}, status: s => seen.push(s), error() {}, newer() {} },
+      { getLocal: () => ({ tasks: [], trash: [] }), isNewAccount: false, mergeLocal: false, debounceMs: 0 });
+    engine.start();
+    await settle();
+    expect(seen.at(-1)).toMatchObject({ fromCache: false });
+    expect(seen.at(-1)?.syncedAt).not.toBeNull();
+    for (const l of cloud.listeners.tasks) l(cloud.list("tasks"), { pending: false, fromCache: true, changed: false });
+    expect(seen.at(-1)).toEqual({ pending: false, syncedAt: null, fromCache: true });
+    cloud.notify();
+    expect(seen.at(-1)).toMatchObject({ fromCache: false });
+    engine.stop();
+  });
+});
+
 describe("task sync between two devices", () => {
   it("sends a new task to the other device and counts it", async () => {
     const cloud = new FakeCloud();

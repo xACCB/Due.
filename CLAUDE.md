@@ -72,7 +72,8 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   apple-design and emil-design-eng for motion and gestures (sheets, drawers, swipes), stop-slop for
   new user-facing text, and the Playwright plugin (Chrome is installed) and Context7 for the website
   reference and current library docs. Say which one you used in the summary.
-- **Window layout when Chrome and the Simulator are both open** (the user asked, 2026-11-14:
+- **Window layout when Chrome and the Simulator are both open** (asked again 2026-11-20: "use
+  rectangle to split screen all three to make it look good") (the user asked, 2026-11-14:
   "arrange it in the best looking order"): three columns on the 1440-wide screen, Terminal left,
   the Simulator (Device Hub) middle, the Playwright Chrome right, each 480 wide. Rectangle (installed)
   moves the front window: activate each in turn (`osascript -e 'tell application "Terminal" to
@@ -177,9 +178,11 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   `seed` (a reload) with Profile open and three red errors on screen; if it happens again,
   cold-restart. Then Devices (below), checked the same way: the phone registers, the website
   signs it out and it signs itself out with the web's message, it re-registers on sign-in, "Sign
-  out all other devices" leaves only it, its own sign-out takes it off the list. **Next:** account
-  deletion and an offline indicator on the phone, the rest of the web's Profile (stats cards,
-  This device), then moving the website onto core's `createTaskSync`/`createProfileSync`. The app is still in emulator mode (`.env.local`); restart the emulators each session
+  out all other devices" leaves only it, its own sign-out takes it off the list. Then account
+  deletion and the offline indicator (below), checked against the emulators with the website open
+  in Chrome on the same account (which signed itself out when the device list went). **Next:** the
+  rest of the web's Profile on the phone (stats cards, This device), then moving the website onto
+  core's `createTaskSync`/`createProfileSync`. The app is still in emulator mode (`.env.local`); restart the emulators each session
   (data is lost when they stop) and sign in again from Profile (`"go":"/profile"`, then
   `"act":["profile","sign-in"]`).
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
@@ -243,8 +246,29 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   uid, feeds it every change to the store, takes merges as `{kind:"cloud"}` (not an undo step) and
   exposes `sync` (`ready`, `pending`, `syncedAt`, `error`) and `signOut()` (flush capped at 3s, then
   clear the phone, except when the first sync never finished). Recaps wait for the first sync.
-  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Not yet: account
-  deletion, an offline indicator, Profile's stats cards and This device.
+  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Not yet: Profile's
+  stats cards and This device.
+  **Offline (2026-11-20):** `createTaskSync`'s status now carries `fromCache` (the listeners have
+  only the device's cache: Firestore can't reach the cloud). `useAppValue` turns `sync.offline` on
+  after 3s of that (so starting up doesn't flash it) and off at the next server snapshot; the
+  header shows the web's orange "offline" under the title and the status line reads "Offline.
+  Changes will sync when you're back online". The web uses the browser's online/offline events;
+  the phone would need `@react-native-community/netinfo` (native) for the same, and Firestore's
+  own view is closer to what the message means. Coming back can take up to a minute (Firestore's
+  reconnect backoff). Tested by stopping the emulators; to keep their data across that, run
+  `npx firebase-tools emulators:export <dir>` first and start them again with `--import <dir>`.
+  **Account deletion (2026-11-20):** Settings -> Danger Zone (signed in only; `DangerZone` in
+  `settings.tsx`, `Section danger`), the web's panel and wording. `deleteAccount` in `useAppValue`:
+  `confirmIdentity()` first (`firebase.ts`: Google's silent sign-in, else its sheet, then
+  `reauthenticateWithCredential`, since Firebase requires a recent sign-in; the web only shows a
+  "sign out and back in" message afterwards), then stops sync and the device watcher,
+  `deleteCloudData` (`cloudSync.ts`, the web's order: tasks and trash read from the server in
+  chunks of 450, the device list allowed to fail, the profile doc last; the counter stays, by the
+  rules), `deleteSignInAccount`, `clearAppData()` (every `hw-*` key, `storage.ts`), then
+  `restart()` (`AppState.tsx` remounts the provider with a new `key`, the phone's page reload) and
+  Home. If a step fails nothing more is deleted, sync starts again (`syncRun`) and the message is
+  shown (offline, it fails at the identity check: "Couldn't reach Google ..."). Dev remote:
+  `"act":["delete-account"]` opens the panel with DELETE typed, `["delete-account","go"]` deletes.
   **Devices (2026-11-20):** `watchDevices` in `cloudSync.ts` is the website's Devices effect with
   the same safety rules (server snapshots only, `hw-device-registered` written only after the
   server accepted the entry, no list means nothing happens); `useAppValue` runs it while signed in

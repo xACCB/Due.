@@ -1,8 +1,8 @@
 import { getApp } from "@react-native-firebase/app";
 import { initializeAppCheck, ReactNativeFirebaseAppCheckProvider } from "@react-native-firebase/app-check";
-import { connectAuthEmulator, getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signOut, type User } from "@react-native-firebase/auth";
+import { connectAuthEmulator, deleteUser, getAuth, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, signInWithCredential, signOut, type User } from "@react-native-firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "@react-native-firebase/firestore";
-import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from "@react-native-google-signin/google-signin";
+import { GoogleSignin, isErrorWithCode, isNoSavedCredentialFoundResponse, isSuccessResponse, statusCodes } from "@react-native-google-signin/google-signin";
 
 // Firebase for the phone app (the web's apps/web/src/firebase.ts): the same
 // project, configured from GoogleService-Info.plist (app.json, gitignored).
@@ -82,6 +82,44 @@ export async function signInWithGoogle(): Promise<AuthUser | null> {
     if (isErrorWithCode(e) && e.code === statusCodes.IN_PROGRESS) return null;
     throw new Error(signInMessage(e), { cause: e });
   }
+}
+
+// Deleting the account needs a recent sign-in (Firebase's rule), so before
+// anything is deleted the person proves it's them again: silently when
+// Google still has them signed in on this phone, else Google's sheet.
+// Resolves false when they cancel. Throws a message fit to show.
+export async function confirmIdentity(): Promise<boolean> {
+  const user = getAuth().currentUser;
+  if (!user) throw new Error("You're not signed in.");
+  try {
+    let idToken: string | null;
+    if (USING_EMULATORS) {
+      idToken = JSON.stringify({ sub: "emulator-user", email: "emulator@dueplanner.test", email_verified: true, name: "Emulator user" });
+    } else {
+      const quiet = await GoogleSignin.signInSilently();
+      if (isNoSavedCredentialFoundResponse(quiet)) {
+        const res = await GoogleSignin.signIn();
+        if (!isSuccessResponse(res)) return false;
+        idToken = res.data.idToken;
+      } else idToken = quiet.data.idToken;
+    }
+    if (!idToken) throw new Error("no id token");
+    await reauthenticateWithCredential(user, GoogleAuthProvider.credential(idToken));
+    return true;
+  } catch (e) {
+    if (isErrorWithCode(e) && e.code === statusCodes.IN_PROGRESS) return false;
+    if ((e as { code?: string })?.code === "auth/user-mismatch") throw new Error("That's a different Google account. Choose the one you're signed in with.", { cause: e });
+    throw new Error(signInMessage(e), { cause: e });
+  }
+}
+
+// The last step of deleting the account: the sign-in account itself, then
+// Google's own sign-in on this phone.
+export async function deleteSignInAccount(): Promise<void> {
+  const user = getAuth().currentUser;
+  if (!user) return;
+  await deleteUser(user);
+  await GoogleSignin.signOut().catch(() => {});
 }
 
 function signInMessage(e: unknown): string {

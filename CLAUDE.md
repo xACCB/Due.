@@ -37,6 +37,9 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   The user wants to pay for everything last (2026-11-14): build and test all that's free first
   (Google sign-in in the Simulator, App Check debug tokens), and leave the Apple Developer
   Program ($99/yr: Sign in with Apple, App Attest, TestFlight) and other costs until release.
+- **Unsure? Say so and keep going** (2026-11-20): when something is unclear during a longer job,
+  tell the user what and why in the update, and carry on with the rest rather than stopping or
+  silently skipping it. Small fixes are fine to make; reworks need the user's go-ahead.
 - **No phone at home, no landing page yet** (2026-11-20): the user can't use their phone at home,
   so test the phone app in the Simulator (by hand or with a tool) rather than asking for the
   iPhone. A landing page waits until the user buys a custom domain.

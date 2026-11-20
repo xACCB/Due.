@@ -18,6 +18,7 @@ export const LIMITS = {
   trash: 500,         // Recently deleted entries per account (the app keeps 200)
   devices: 20,        // signed-in devices listed per account; the longest idle drop off
   schemaVersion: 1000, // highest data version a doc may claim (src/lib/migrations.ts)
+  grade: 20,          // characters in a task's grade ("A-", "92%", "18/20")
 } as const;
 
 // The fields a synced document may hold. firestore.rules refuses a new task
@@ -30,7 +31,7 @@ export const LIMITS = {
 const TASK_FIELD_MAP: Record<keyof Task, true> = {
   id: true, title: true, subject: true, dueDate: true, dueTime: true, estMins: true, done: true, order: true,
   subtasks: true, recurrence: true, archived: true, completedAt: true, tags: true, priorityOverride: true,
-  sessions: true, spawnedNextId: true,
+  sessions: true, spawnedNextId: true, difficulty: true, grade: true, pinned: true,
 };
 // updatedAt and schemaVersion are sync's own (when the edit happened, which
 // shape the doc holds: src/lib/migrations.ts); a trash entry adds deletedAt.
@@ -53,6 +54,7 @@ export function syncedChanges(changes: Record<string, unknown>, removed: unknown
 
 const RECURRENCES = ["none", "daily", "weekly", "monthly"];
 const PRIORITIES = ["high", "medium", "low"];
+const DIFFICULTY_KEYS = ["easy", "medium", "hard"];
 
 // Text as a one-line field would hold it: line breaks become spaces. The rules
 // refuse a tag or subject name with a line break in it (see allText() there).
@@ -89,5 +91,8 @@ export function sanitizeTask<T extends Record<string, unknown>>(t: T): T {
   }
   if ("recurrence" in t && !RECURRENCES.includes(t.recurrence as string)) delete out.recurrence;
   if ("priorityOverride" in t && !PRIORITIES.includes(t.priorityOverride as string)) delete out.priorityOverride;
+  if ("difficulty" in t && !DIFFICULTY_KEYS.includes(t.difficulty as string)) delete out.difficulty;
+  if ("grade" in t) { if (typeof t.grade === "string" && t.grade.trim()) out.grade = oneLine(t.grade).trim().slice(0, LIMITS.grade); else delete out.grade; }
+  if ("pinned" in t) { if (t.pinned === true) out.pinned = true; else delete out.pinned; }
   return out as T;
 }

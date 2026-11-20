@@ -13,6 +13,14 @@ describe("addSession", () => {
 });
 
 describe("sanitizeTask", () => {
+  it("keeps a valid difficulty, grade and pin, and drops bad ones", () => {
+    const base = { id: 1, title: "t", subject: "", dueDate: "", dueTime: "", estMins: 0, done: true, order: 0 };
+    const ok = sanitizeTask({ ...base, difficulty: "hard", grade: "  A-\n ", pinned: true });
+    expect([ok.difficulty, ok.grade, ok.pinned]).toEqual(["hard", "A-", true]);
+    const bad = sanitizeTask({ ...base, difficulty: "insane", grade: "", pinned: "yes" } as Record<string, unknown>);
+    expect(["difficulty", "grade", "pinned"].filter(k => k in bad)).toEqual([]);
+    expect(sanitizeTask({ ...base, grade: "x".repeat(50) }).grade).toHaveLength(LIMITS.grade);
+  });
   const base = { id: 1, title: "Essay", subject: "English", dueDate: "2026-09-22", dueTime: "09:00", estMins: 30, done: false, order: 0 };
   it("puts a tag with line breaks on one line", () => {
     expect(sanitizeTask({ ...base, tags: ["two\nlines", "win\r\ndows"] }).tags).toEqual(["two lines", "win dows"]);

@@ -150,7 +150,8 @@ describe("task sync metadata", () => {
 // Mirrors packages/core/src/lib/limits.ts -- the app stays inside these, the rules enforce them.
 describe("size caps", () => {
   const full = { ...validTask, subtasks:[{ id:"a", text:"x", done:false }], recurrence:"weekly", archived:false,
-    completedAt:null, tags:["exam"], priorityOverride:"high", sessions:[{ mins:25, at:1 }], spawnedNextId:null, updatedAt:1 };
+    completedAt:null, tags:["exam"], priorityOverride:"high", sessions:[{ mins:25, at:1 }], spawnedNextId:null, updatedAt:1,
+    difficulty:"hard", grade:"A-", pinned:true };
   const list = (n:number, f:(i:number)=>unknown) => Array.from({ length:n }, (_, i) => f(i));
   it("accepts a task using every optional field the app writes", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
@@ -183,6 +184,18 @@ describe("size caps", () => {
     await assertFails(setDoc(ref, { ...validTask, priorityOverride:"urgent" }));
     await assertFails(setDoc(ref, { ...validTask, tags:"a,b" }));
     await assertFails(setDoc(ref, { ...validTask, archived:"yes" }));
+  });
+  it("accepts a difficulty, grade and pin of the right kind, and refuses others", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/tasks/1");
+    for (const d of ["easy", "medium", "hard"]) await assertSucceeds(setDoc(ref, { ...validTask, difficulty:d }));
+    await assertFails(setDoc(ref, { ...validTask, difficulty:"extreme" }));
+    await assertFails(setDoc(ref, { ...validTask, difficulty:null }));
+    await assertSucceeds(setDoc(ref, { ...validTask, grade:"x".repeat(20) }));
+    await assertFails(setDoc(ref, { ...validTask, grade:"x".repeat(21) }));
+    await assertFails(setDoc(ref, { ...validTask, grade:92 }));
+    await assertSucceeds(setDoc(ref, { ...validTask, pinned:false }));
+    await assertFails(setDoc(ref, { ...validTask, pinned:"yes" }));
   });
   it("rejects a task padded with lots of extra fields", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode, type ComponentRef } from "
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams, type ErrorBoundaryProps } from "expo-router";
 import type { Priority, Recurrence, Task } from "@dueplanner/core/types";
+import { DIFFICULTIES } from "@dueplanner/core/types";
 import { contrastColor, countdown, formatDate, formatDuration, formatTime, getPriority, ink } from "@dueplanner/core/lib/format";
 import { localDateStr, todayISO } from "@dueplanner/core/lib/dates";
 import { secondsSince, sessionMinutes } from "@dueplanner/core/lib/timers";
@@ -201,6 +202,7 @@ function TaskForm({ task, page }: { task: Task; page: boolean }) {
               {!!task.subject && <Text style={[styles.chip, { fontSize: fz(11), backgroundColor: sc + "22", color: ink(sc, T.light) }]}>{task.subject}</Text>}
               {!task.done && <Text style={[styles.chip, { fontSize: fz(11), backgroundColor: prColor + "22", color: ink(prColor, T.light) }]}>{pr[0].toUpperCase() + pr.slice(1)} priority{task.priorityOverride ? " (set manually)" : ""}</Text>}
               {task.done && <Text style={[styles.chip, { fontSize: fz(11), backgroundColor: "#2ED57322", color: ink("#2ED573", T.light) }]}>✓ Done</Text>}
+              {!!task.pinned && !task.done && <Text style={[styles.chip, { fontSize: fz(11), backgroundColor: T.accent + "18", color: T.text }]}>★ Pinned</Text>}
             </View>
             {page && draft
               ? <TextInput value={draft.title} onChangeText={v => setDraft({ ...draft, title: v })} onBlur={() => commit()} onSubmitEditing={() => commit()}
@@ -318,6 +320,38 @@ function TaskForm({ task, page }: { task: Task; page: boolean }) {
             })}
           </View>
         </Field>
+
+        {/* Difficulty: how hard, separate from how long. The chosen one again clears it. */}
+        <Field label="Difficulty" card T={T} fz={fz}>
+          <View style={styles.prioRow} accessibilityRole="radiogroup" accessibilityLabel="Difficulty">
+            {DIFFICULTIES.map(d => {
+              const active = task.difficulty === d;
+              return (
+                <Pressable key={d} onPress={() => quiet({ difficulty: active ? undefined : d })} accessibilityRole="radio" accessibilityState={{ checked: active }}
+                  style={[styles.prio, { backgroundColor: active ? T.accent + "22" : T.surface, borderColor: active ? T.accent : T.border }]}>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(11), color: active ? T.text : T.textMuted }}>{d[0].toUpperCase() + d.slice(1)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Field>
+
+        {/* Grade: for a finished task, whatever the teacher gave ("A-", "92%", "18/20"). */}
+        {task.done && (
+          <Field label="Grade" card T={T} fz={fz}>
+            <TextInput
+              key={task.grade ?? ""}
+              defaultValue={task.grade ?? ""}
+              onEndEditing={e => { const g = oneLine(e.nativeEvent.text).trim().slice(0, LIMITS.grade); if (g !== (task.grade ?? "")) quiet({ grade: g || undefined }); }}
+              placeholder="e.g. A-, 92%, 18/20"
+              placeholderTextColor={T.textMuted}
+              maxLength={LIMITS.grade}
+              returnKeyType="done"
+              accessibilityLabel="Grade"
+              style={[styles.addInput, { fontSize: 16, color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
+            />
+          </Field>
+        )}
 
         <Field label="Subtasks" card T={T} fz={fz} right={subtasks.length ? `${subtasks.filter(s => s.done).length}/${subtasks.length}` : undefined}>
           {subtasks.map(s => (
@@ -458,6 +492,12 @@ function TaskForm({ task, page }: { task: Task; page: boolean }) {
         <Pressable onPress={() => { app.duplicate(task.id); close(); }} accessibilityRole="button" style={[styles.wideBtn, { borderColor: T.border }]}>
           <Text style={[styles.btnText, { fontSize: fz(11), color: T.textMuted }]}>Duplicate task</Text>
         </Pressable>
+        {!task.done && (
+          <Pressable onPress={() => quiet({ pinned: task.pinned ? undefined : true })} accessibilityRole="button" accessibilityState={{ selected: !!task.pinned }}
+            style={[styles.wideBtn, { borderColor: T.border }]}>
+            <Text style={[styles.btnText, { fontSize: fz(11), color: T.textMuted }]}>{task.pinned ? "Unpin" : "★ Pin to top"}</Text>
+          </Pressable>
+        )}
         {templateName === null ? (
           <Pressable onPress={() => { setTemplateSaved(false); setTemplateName(task.title); }} accessibilityRole="button" style={[styles.wideBtn, { borderColor: T.border }]}>
             <Text style={[styles.btnText, { fontSize: fz(11), color: T.textMuted }]}>{templateSaved ? "✓ Saved. Find it under \"+ Add homework\"" : "Save as template"}</Text>

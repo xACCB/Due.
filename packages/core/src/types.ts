@@ -17,7 +17,13 @@ export interface Task {
   priorityOverride?: Priority; // manual override for getPriority()'s auto-computed value, cleared to go back to "Auto"
   sessions?: {mins:number; at:number}[]; // work sessions logged from the task modal's timer (at = ms timestamp when it ended)
   spawnedNextId?: number|null; // recurring tasks: id of the next occurrence created when this one was marked done, so un-marking it can take that copy back
+  difficulty?: Difficulty; // how hard it is, separate from how long (estMins); removed to clear
+  grade?: string; // the grade received, free text ("A-", "92%", "18/20"), for a finished task; removed to clear
+  pinned?: boolean; // kept at the top of the list (sortTasks), above the user's own order
 }
+
+export type Difficulty = "easy" | "medium" | "hard";
+export const DIFFICULTIES: readonly Difficulty[] = ["easy", "medium", "hard"];
 
 // Reusable task shape -- local-only (localStorage), not synced to Firestore.
 // Deliberate scope call: templates are a personal productivity convenience,

@@ -26,6 +26,9 @@ export function sortTasks(tasks: Task[], justDone: number[]): Task[] {
   return [...tasks].sort((a, b) => {
     const ad = isSettled(a, justDone), bd = isSettled(b, justDone);
     if (ad !== bd) return ad ? 1 : -1;
+    // Pinned open tasks come first, in their own order.
+    const ap = !ad && !!a.pinned, bp = !bd && !!b.pinned;
+    if (ap !== bp) return ap ? -1 : 1;
     return a.order - b.order;
   });
 }

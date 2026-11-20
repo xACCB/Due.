@@ -76,6 +76,7 @@ export function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colo
           <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
             {isTop&&<span className="rb" style={{background:T.accent+"33",color:T.accent}}>do first</span>}
             {isNext&&<span className="rb" style={{background:T.text+"11",color:T.text}}>next up</span>}
+            {task.pinned&&!task.done&&<span title="Pinned to the top" aria-label="Pinned" style={{color:T.textMuted,fontSize:fz(12)}}>★</span>}
             <span role="button" tabIndex={0} onKeyDown={activateOnKey} className={"title-btn"+(task.done?(justDone?" strike strike-anim":" strike"):"")} aria-haspopup={selectionMode?undefined:"dialog"} style={{fontFamily:F.heading,fontSize:fz(15),color:task.done?T.textFaint:T.text,transition:"color .2s ease-out"}}>{task.title}</span>
             {task.recurrence&&task.recurrence!=="none"&&<span title={`Repeats ${task.recurrence}`} style={{color:T.textMuted,fontSize:fz(12)}}>↻</span>}
             {task.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"2px 8px",fontFamily:F.body,fontSize:fz(10)}}>{task.subject}</span>}
@@ -85,6 +86,8 @@ export function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colo
           <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
             {task.dueDate&&<span style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>{formatDate(task.dueDate)}{task.dueTime?` ${formatTime(task.dueTime,h24)}`:""}</span>}
             {task.estMins>0&&<span style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>{formatDuration(task.estMins)}</span>}
+            {task.difficulty&&<span style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>{task.difficulty[0].toUpperCase()+task.difficulty.slice(1)}</span>}
+            {task.done&&task.grade&&<span style={{fontFamily:F.body,fontSize:fz(11),color:T.text,background:T.text+"11",borderRadius:999,padding:"0 8px"}}>Grade {task.grade}</span>}
             {live&&dm&&<span style={{fontFamily:F.body,fontSize:fz(11),color:ink(priColor(pr,colorCodeUrgency),T.light),fontWeight:500}}>{dm}</span>}
           </div>
           {!!task.subtasks?.length&&(

@@ -2141,6 +2141,7 @@ export default function HomeworkPlanner() {
           onSnooze={kind=>snoozeTask(selectedTask.id,kind)}
           onSkipOccurrence={()=>skipOccurrence(selectedTask.id)}
           onSetPriorityOverride={override=>setPriorityOverride(selectedTask.id,override)}
+          onQuietPatch={patch=>setTasks(prev=>patchTask(prev,selectedTask.id,patch))}
           onSetTags={tags=>setTaskTags(selectedTask.id,tags)}
           onSaveAsTemplate={name=>saveAsTemplate(tasks.find(t=>t.id===selectedTask.id)||selectedTask,name)}
         />

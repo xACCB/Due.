@@ -63,7 +63,7 @@ export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subj
       <Pressable
         onPress={onOpen}
         accessibilityRole="button"
-        accessibilityLabel={`${task.title}${task.done ? ", done" : ""}${task.subject ? `, ${task.subject}` : ""}${due ? `, due ${due}` : ""}`}
+        accessibilityLabel={`${task.title}${task.done ? ", done" : ""}${task.pinned && !task.done ? ", pinned" : ""}${task.subject ? `, ${task.subject}` : ""}${due ? `, due ${due}` : ""}`}
         accessibilityHint="Opens the task. Swipe right to mark it done, left to delete it."
         // VoiceOver reads the card as one element, which hides the check, the ×
         // and the reorder grip inside it, so their jobs are the card's actions.
@@ -126,6 +126,7 @@ export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subj
             <View style={styles.titleLine}>
               {isTop && <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.accent + "33", color: T.accent }]}>do first</Text>}
               {isNext && <Text style={[styles.badge, { fontSize: fz(10), backgroundColor: T.text + "11", color: T.text }]}>next up</Text>}
+              {!!task.pinned && !task.done && <Text style={{ color: T.textMuted, fontSize: fz(12) }} accessibilityLabel="Pinned">★</Text>}
               <StrikeText done={task.done} animate={!!holding} color={T.textFaint} style={[styles.title, { fontSize: fz(15), color: task.done ? T.textFaint : T.text }]}>{task.title}</StrikeText>
               {!!task.recurrence && task.recurrence !== "none" && <Text style={{ color: T.textMuted, fontSize: fz(12) }} accessibilityLabel={`Repeats ${task.recurrence}`}>↻</Text>}
               {!!task.subject && <Text style={[styles.pill, { fontSize: fz(10), backgroundColor: sc + "22", color: ink(sc, T.light) }]}>{task.subject}</Text>}
@@ -138,6 +139,8 @@ export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subj
               <View style={styles.metaLine}>
                 {!!due && <Text style={[styles.meta, { fontSize: fz(11), color: T.textMuted }]}>{due}</Text>}
                 {task.estMins > 0 && <Text style={[styles.meta, { fontSize: fz(11), color: T.textMuted }]}>{formatDuration(task.estMins)}</Text>}
+                {!!task.difficulty && <Text style={[styles.meta, { fontSize: fz(11), color: T.textMuted }]}>{task.difficulty[0].toUpperCase() + task.difficulty.slice(1)}</Text>}
+                {task.done && !!task.grade && <Text style={[styles.meta, { fontSize: fz(11), color: T.text, backgroundColor: T.text + "11", borderRadius: 999, paddingHorizontal: 8, overflow: "hidden" }]}>Grade {task.grade}</Text>}
                 {live && !!dm && <Text style={[styles.metaStrong, { fontSize: fz(11), color: ink(priColor(pr, colorCode), T.light) }]}>{dm}</Text>}
               </View>
             )}

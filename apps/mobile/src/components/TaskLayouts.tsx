@@ -87,7 +87,8 @@ export function TaskLayout({ layout, tasks, now, onOpen, onToggle, onDelete, jus
             <>
               <View style={[styles.boardBar, { backgroundColor: priColor(pr(t), cc) }]} />
               <View style={styles.between}>{pill(t)}<View style={{ marginLeft: "auto" }}>{del(t)}</View></View>
-              {title(t, 14, true)}
+              {/* Full width: on the web the title is a flex item, so its strike spans the card. */}
+              {title(t, 14, true, false, true)}
               {!!t.dueDate && (
                 <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textMuted }}>
                   {formatDate(t.dueDate)}{!t.done && !!dueText(t) && <Text style={{ color: ink(priColor(pr(t), cc), T.light) }}> · {dueText(t)}</Text>}

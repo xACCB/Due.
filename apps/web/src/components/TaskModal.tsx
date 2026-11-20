@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import type { Priority, Recurrence, Subtask, Task } from "@dueplanner/core/types";
+import { DIFFICULTIES } from "@dueplanner/core/types";
 import { priColor } from "@dueplanner/core/constants";
 import type { SnoozeKind } from "@dueplanner/core/lib/tasks";
 import type { ThemeObj } from "@dueplanner/core/themes";
@@ -8,7 +9,7 @@ import { nextId } from "@dueplanner/core/lib/id";
 import { animationRate } from "../lib/animSpeed";
 import { contrastColor, getPriority, formatDate, formatTime, formatDuration, countdown, ink } from "@dueplanner/core/lib/format";
 import { stepSpring, springSettled, rubberBand, releaseVelocity, shouldDismiss } from "@dueplanner/core/lib/spring";
-import { LIMITS } from "@dueplanner/core/lib/limits";
+import { LIMITS, oneLine } from "@dueplanner/core/lib/limits";
 import { FONT } from "@dueplanner/core/fonts";
 import { fz } from "../lib/textSize";
 
@@ -27,7 +28,7 @@ function taskDraft(task:Task):TaskDraft{
 // `page`: shown as a whole screen (a task opened from the sidebar) instead of a
 // bottom sheet. No overlay, focus trap or drag, and no Edit button: the fields
 // are always there and save as you go (see commitDraft).
-export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSkipOccurrence,onSetPriorityOverride,onSetTags,onSaveAsTemplate}:{
+export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency,now,h24,sessionActive,sessionSecs,allTags,onClose,onStartSession,onEndSession,onToggleDone,onDelete,onUpdateSubtasks,onArchive,onRestore,onDuplicate,onUpdateTask,onSnooze,onSkipOccurrence,onSetPriorityOverride,onSetTags,onSaveAsTemplate,onQuietPatch}:{
   page?:boolean;
   task:Task; T:ThemeObj; F:typeof FONT; subjects:string[]; subjectColors:Record<string,string>; colorCodeUrgency:boolean; now:number; h24:boolean;
   sessionActive:boolean; sessionSecs:number;
@@ -37,6 +38,8 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
   onUpdateTask:(patch:Partial<Task>)=>void; onSnooze:(kind:SnoozeKind)=>void; onSkipOccurrence:()=>void;
   onSetPriorityOverride:(override:Priority|null)=>void; onSetTags:(tags:string[])=>void;
   onSaveAsTemplate:(name:string)=>void;
+  // A change that isn't an undo step (difficulty, grade, pin), like the priority override.
+  onQuietPatch:(patch:Partial<Task>)=>void;
 }){
   const pr=getPriority(task.dueDate,task.estMins,task.priorityOverride);
   const sc=subjectColors[task.subject]||T.accent;
@@ -253,6 +256,7 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
                 {task.subject&&<span style={{background:sc+"22",color:ink(sc,T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(11)}}>{task.subject}</span>}
                 {!task.done&&<span style={{background:priColor(pr,colorCodeUrgency)+"22",color:ink(priColor(pr,colorCodeUrgency),T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(11)}}>{pr[0].toUpperCase()+pr.slice(1)} priority{task.priorityOverride?" (set manually)":""}</span>}
                 {task.done&&<span style={{background:"#2ED57322",color:ink("#2ED573",T.light),borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(11)}}>✓ Done</span>}
+                {task.pinned&&!task.done&&<span style={{background:T.accent+"18",color:T.text,borderRadius:999,padding:"3px 10px",fontFamily:F.body,fontSize:fz(11)}}>★ Pinned</span>}
               </div>
               {page&&draft
                 ?<input className="page-title" value={draft.title} maxLength={500} aria-label="Title" onChange={e=>setDraft({...draft,title:e.target.value})} onBlur={()=>commitDraft()} onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
@@ -368,6 +372,33 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
               })}
             </div>
           </div>
+
+          {/* Difficulty: how hard, separate from how long. The chosen one again clears it. */}
+          <div data-tour="task-difficulty" style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
+            <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Difficulty</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+              {DIFFICULTIES.map(d=>{
+                const active=task.difficulty===d;
+                return <button key={d} aria-pressed={active} onClick={()=>onQuietPatch({difficulty:active?undefined:d})}
+                  style={{background:active?T.accent+"22":T.surface,border:`1.5px solid ${active?T.accent:T.border}`,borderRadius:9,padding:"8px 4px",cursor:"pointer",color:active?T.accent:T.textMuted,fontFamily:F.body,fontSize:fz(11)}}>
+                  {d[0].toUpperCase()+d.slice(1)}
+                </button>;
+              })}
+            </div>
+          </div>
+
+          {/* Grade: for a finished task, whatever the teacher gave ("A-", "92%", "18/20"). */}
+          {task.done&&(
+            <div data-tour="task-grade" style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
+              <label style={{display:"block"}}>
+                <span style={{display:"block",fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Grade</span>
+                <input key={task.grade??""} className="edit-field" defaultValue={task.grade??""} maxLength={LIMITS.grade} placeholder="e.g. A-, 92%, 18/20"
+                  onBlur={e=>{const g=oneLine(e.target.value).trim().slice(0,LIMITS.grade);if(g!==(task.grade??""))onQuietPatch({grade:g||undefined});}}
+                  onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
+                  style={{width:"100%",boxSizing:"border-box",background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontFamily:F.body,fontSize:fz(12),outline:"none"}}/>
+              </label>
+            </div>
+          )}
 
           {/* Subtasks */}
           <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
@@ -485,6 +516,10 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
             style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>
             Duplicate task
           </button>
+          {!task.done&&<button data-tour="task-pin" aria-pressed={!!task.pinned} onClick={()=>onQuietPatch({pinned:task.pinned?undefined:true})}
+            style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>
+            {task.pinned?"Unpin":"★ Pin to top"}
+          </button>}
           {templateName===null&&<button onClick={()=>{setTemplateSaved(false);setTemplateName(task.title);}}
             style={{width:"100%",marginTop:8,background:"none",border:`1px solid ${T.border}`,borderRadius:11,padding:"10px",color:T.textMuted,fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>
             {templateSaved?"✓ Saved. Find it under \"+ Add homework\"":"Save as template"}

@@ -33,6 +33,10 @@ describe("sortTasks", () => {
     const list = [task(1, { order: 3 }), task(2, { order: 0, done: true }), task(3, { order: 1 }), task(4, { order: 2, done: true })];
     expect(ids(sortTasks(list, []))).toEqual([3, 1, 2, 4]);
   });
+  it("pinned open tasks come first, in their own order; a pinned done task doesn't", () => {
+    const list = [task(1, { order: 0 }), task(2, { order: 1, pinned: true }), task(3, { order: 2 }), task(4, { order: 3, pinned: true }), task(5, { order: 4, pinned: true, done: true })];
+    expect(ids(sortTasks(list, []))).toEqual([2, 4, 1, 3, 5]);
+  });
   it("a just-ticked task keeps its place", () => {
     const list = [task(1, { order: 0, done: true }), task(2, { order: 1 })];
     expect(ids(sortTasks(list, [1]))).toEqual([1, 2]);

@@ -1,7 +1,7 @@
 import { DevSettings, LogBox } from "react-native";
 import { router, type Href } from "expo-router";
 import { devSampleTasks } from "./devSample";
-import { writeJSON } from "./storage";
+import { clearAppData, writeJSON } from "./storage";
 import { devAct, devScrollTo, devToggle } from "./devScroll";
 
 // Development only: lets a script on the Mac move the Simulator's app around,
@@ -14,7 +14,7 @@ import { devAct, devScrollTo, devToggle } from "./devScroll";
 // scrolls the screen showing (lib/devScroll.ts).
 const URL = "http://localhost:8099/cmd.json";
 
-type Cmd = { n?: number; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean; scroll?: number; toggle?: number; act?: [string, string?]; quiet?: boolean };
+type Cmd = { n?: number; state?: Record<string, unknown>; go?: string; push?: string; back?: boolean; seed?: boolean; reset?: boolean; set?: [string, unknown]; reload?: boolean; scroll?: number; toggle?: number; act?: [string, string?]; quiet?: boolean };
 
 export function startDevRemote(): () => void {
   let last: number | null = null;
@@ -27,6 +27,10 @@ export function startDevRemote(): () => void {
       const first = last === null;
       last = cmd.n;
       if (first) return; // what was there before the app started isn't new
+      // A whole starting state: every hw-* key cleared, then these written, then
+      // a reload (the side-by-side check with the website loads the same state
+      // into both apps).
+      if (cmd.state) { clearAppData(); for (const [k, v] of Object.entries(cmd.state)) writeJSON(k, v); DevSettings.reload(); return; }
       if (cmd.seed) { writeJSON("hw-tasks", devSampleTasks(Date.now())); writeJSON("hw-trash", []); DevSettings.reload(); return; }
       if (cmd.reset) { writeJSON("hw-tasks", []); writeJSON("hw-trash", []); DevSettings.reload(); return; }
       if (cmd.set) { writeJSON(cmd.set[0], cmd.set[1]); DevSettings.reload(); return; }

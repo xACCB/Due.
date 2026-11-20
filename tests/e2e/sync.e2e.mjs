@@ -76,6 +76,19 @@ try {
   check("the two devices agree", finalA && finalB && finalA.dueDate === finalB.dueDate && finalA.priorityOverride === finalB.priorityOverride && finalA.title === finalB.title);
   await A.closeSheet(); await B.closeSheet();
 
+  // ---- Settings (the profile doc) reach the other device ----
+  const setting = (d, key) => d.ev(`localStorage.getItem(${JSON.stringify(key)})`);
+  await A.ev(`document.querySelector("[data-tour=sidebar-open]")?.click()`); await sleep(300);
+  check("A opens Settings", await A.click("nav", "^Settings$"));
+  await sleep(600);
+  await A.click("main", "^Date & time"); await sleep(400);
+  check("A sets the week to start on Monday", await A.click("main", "^Monday$"));
+  check("the week start reaches B", await waitFor(() => setting(B, "hw-weekstart"), v => v === "1", 20000) === "1");
+  await A.click("main", "^Sunday$");
+  check("and back to Sunday", await waitFor(() => setting(B, "hw-weekstart"), v => v === "0", 20000) === "0");
+  await A.ev(`document.querySelector("[data-tour=sidebar-open]")?.click()`); await sleep(300);
+  await A.click("nav", "^Home$"); await sleep(600);
+
   // ---- A delete on one device reaches the other ----
   await A.ev(`[...document.querySelectorAll("main [aria-label^='Delete ']")].find(x=>x.getAttribute("aria-label")===${JSON.stringify("Delete " + title)}).click()`);
   check("deleting on A removes it on B", !(await waitFor(() => B.tasks(), ts => !ts.some(t => t.title === title), 20000)).some(t => t.title === title));

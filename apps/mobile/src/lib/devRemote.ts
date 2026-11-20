@@ -32,7 +32,9 @@ export function startDevRemote(): () => void {
       if (cmd.set) { writeJSON(cmd.set[0], cmd.set[1]); DevSettings.reload(); return; }
       if (cmd.reload) { DevSettings.reload(); return; }
       if (cmd.back && router.canGoBack()) router.back();
-      if (cmd.go) router.navigate(cmd.go as Href);
+      // Close an open sheet or Profile first: navigating to a main screen from
+      // over one stacks a second copy of the main screens as a sheet.
+      if (cmd.go) { if (router.canDismiss()) router.dismissAll(); router.navigate(cmd.go as Href); }
       if (cmd.push) router.push(cmd.push as Href);
       if (typeof cmd.scroll === "number") devScrollTo(cmd.scroll); // screens using useDevScroll
       if (typeof cmd.toggle === "number") devToggle(cmd.toggle); // Home's toggle (useDevToggle)

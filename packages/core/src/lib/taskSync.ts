@@ -58,6 +58,8 @@ export interface TaskSyncEvents {
   error(message: string | null): void;
   // Whether any task was saved by a newer version of the app.
   newer(any: boolean): void;
+  // The error behind a message, for an error report (the web's Sentry).
+  report?(err: unknown, where: "read" | "save"): void;
 }
 
 export const SYNC_MESSAGES = {
@@ -171,14 +173,14 @@ export function createTaskSync<R>(adapter: TaskSyncAdapter<R>, events: TaskSyncE
       if (!cloudTasks || meta.changed) { cloudTasks = toMap(docs, false); apply(); }
       status();
       setError(null);
-    }, e => { void e; setError(SYNC_MESSAGES.read); }));
+    }, e => { events.report?.(e, "read"); setError(SYNC_MESSAGES.read); }));
     unsubs.push(adapter.listen("trash", (docs, meta) => {
       trashMeta = { pending: meta.pending, fromCache: meta.fromCache };
       if (!cloudTrash || meta.changed) { cloudTrash = toMap(docs, true); apply(); }
       status();
     }, e => {
       // Don't let a trash problem hold up syncing the tasks themselves.
-      void e;
+      events.report?.(e, "read");
       setError(SYNC_MESSAGES.read);
       trashMeta = { pending: false, fromCache: false };
       if (!cloudTrash) { cloudTrash = new Map(); apply(); }
@@ -243,7 +245,7 @@ export function createTaskSync<R>(adapter: TaskSyncAdapter<R>, events: TaskSyncE
       if (commits.length === 0) return Promise.resolve();
       return Promise.all(commits)
         .then(() => { if (lastError !== SYNC_MESSAGES.limit) setError(null); })
-        .catch(() => { if (lastError !== SYNC_MESSAGES.limit) setError(SYNC_MESSAGES.save); });
+        .catch(err => { events.report?.(err, "save"); if (lastError !== SYNC_MESSAGES.limit) setError(SYNC_MESSAGES.save); });
     };
     pending = run;
     timer = adapter.setTimer(() => { void run(); }, debounce);

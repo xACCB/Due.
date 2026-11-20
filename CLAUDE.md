@@ -182,8 +182,12 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   deletion and the offline indicator (below), checked against the emulators with the website open
   in Chrome on the same account (which signed itself out when the device list went). Then the
   rest of the web's Profile on the phone (completion ring, time and By subject cards, This
-  device), matched by screenshot against the website's. **Next:** moving the website onto core's
-  `createTaskSync`/`createProfileSync`. The app is still in emulator mode (`.env.local`); restart the emulators each session
+  device), matched by screenshot against the website's. Then the website moved onto core's
+  `createTaskSync`/`createProfileSync` (see "Sync engines" below), and `tests/e2e` gained a
+  settings check. **Next:** needs the user: trying the app on their own iPhone (free with an
+  Apple ID in Xcode, re-signed every 7 days; needs its own App Check debug token), then the paid
+  steps (Sign in with Apple, App Attest, TestFlight). Free but not started: the Android build
+  (no Android SDK on the Mac yet), a phone version of the privacy policy, a phone What's New. The app is still in emulator mode (`.env.local`); restart the emulators each session
   (data is lost when they stop) and sign in again from Profile (`"go":"/profile"`, then
   `"act":["profile","sign-in"]`).
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
@@ -239,9 +243,10 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   `createTaskSync` (`packages/core/src/lib/taskSync.ts`, unit-tested with an in-memory cloud and
   two devices in `taskSync.test.ts`): both listeners, `reconcile`, the 400ms debounced one-batch-
   per-task writes with the counter, the in-flight guard, the stale-write retry, newer-app data
-  never written back, keeping tasks made while signed out on an explicit sign-in. The web still
-  runs its own copy in `HomeworkPlanner`; moving it onto this engine is a later step (prove it the
-  usual way). The phone's adapter is `apps/mobile/src/lib/cloudSync.ts` (also creates the counter
+  never written back, keeping tasks made while signed out on an explicit sign-in. Both apps run it
+  (the website since 2026-11-20: `apps/web/src/lib/cloudSync.ts` binds it to the JS SDK; proved by
+  `npm run test:e2e` before and after, plus the phone and website syncing each other, sign-out,
+  and an explicit sign-in keeping a signed-out task). The phone's adapter is `apps/mobile/src/lib/cloudSync.ts` (also creates the counter
   and tells a brand-new account by the missing profile doc, as the web's prepare effect does; it
   leaves the very old one-field task list to the website). `useAppValue` starts it for the signed-in
   uid, feeds it every change to the store, takes merges as `{kind:"cloud"}` (not an undo step) and
@@ -292,7 +297,7 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   `startProfileSync` (`cloudSync.ts`) after the task engine's preparation, since that reads whether
   the doc exists; `useAppValue` feeds it the six settings and applies what comes back through the
   settings' own cleaners. Sign-out flushes it too and resets subjects and colours to the defaults,
-  as the web does. The web still has its own inline copy (`App.tsx`'s profile effects).
+  as the web does. The website runs the same engine (`startProfileSync` in its `cloudSync.ts`).
   **Emulator mode:** `EXPO_PUBLIC_FIREBASE_EMULATORS=1` in `apps/mobile/.env.local` (then restart
   Metro) points the phone at `npx firebase-tools emulators:start --only auth,firestore` (Java on
   PATH, see above; run from the repo root without `--project`, so data sits under the real
@@ -350,7 +355,9 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
 - `npm run test:e2e` -- two headless Chromes as two devices on one account, against the Auth and
   Firestore emulators and the dev server in emulator mode (`tests/e2e/`, no extra dependency: it
   drives Chrome over the DevTools protocol; set `CHROME_PATH` if Chrome isn't found). Covers real
-  sign-in, sync between devices, an edit conflict, a delete, and the device list. Needs Java.
+  sign-in, sync between devices, an edit conflict, a setting, a delete, and the device list. Needs
+  Java. With emulators already running, `node tests/e2e/run.mjs` uses them (its accounts are new
+  each run).
 - `npm run test:stress` -- one account filled to the 5,000 task cap on the emulator with the app's
   own write builder; timings go to `coverage/stress.txt`. Slow, not in CI. `STRESS_TASKS=300` for a
   quick run.
@@ -522,8 +529,9 @@ written (`stamp()`), the profile save writes it, and `cloudRecord()` splits it o
 `migrateTask` on the way in. This device's `hw-tasks` has its version in `hw-schema`; a JSON export
 records `schemaVersion` and `readBackup` migrates from it. A step must be safe to run again on
 current data (an older app can rewrite a doc without the field, which then reads as version 0). A doc
-from a newer app (`isFromNewerApp`) is read but never written back (`newerIdsRef`/`newerProfileRef`
-in `HomeworkPlanner`), and the sync note asks for a reload (`shownSyncError`). **Changing a task or
+from a newer app (`isFromNewerApp`) is read but never written back (the sync engines' `newer`
+sets, reported as `newerData` in `HomeworkPlanner`), and the sync note asks for a reload
+(`shownSyncError`). **Changing a task or
 profile shape:** bump `SCHEMA_VERSION`, add the step, and still follow "Known fields only" below for
 any new field. The rules accept `schemaVersion` as a whole number 0..1000 (`validVersion()`,
 `LIMITS.schemaVersion`), never required.
@@ -533,8 +541,8 @@ require rewriting a user's entire history:
 - `users/{uid}` — small "profile" fields only: `layout`, `colorCodeUrgency`, `subjects`,
   `subjectColors`, `timeFormat` (`"12h"`/`"24h"`), `weekStart` (0 = Sunday, 1 = Monday) (a legacy `scratchpad` field may still exist on old docs; nothing reads it now that
   the Tools tab is gone). Synced as a whole document
-  (it's small and doesn't grow unboundedly), gated behind `profileSyncedForUid` so the first write
-  after sign-in can't race ahead of the first read. `themeName` isn't a field here (or in
+  (it's small and doesn't grow unboundedly) by core's `createProfileSync`, whose first reading
+  wins, so a write after sign-in can't race ahead of it. `themeName` isn't a field here (or in
   `firestore.rules`'s `isValidProfile`) -- see Design-system constants below: it's a derived value
   now, not independent state, so there's nothing to sync.
 - `users/{uid}/tasks/{taskId}` — one document per live task (`taskId` is `String(task.id)`), plus
@@ -544,8 +552,16 @@ require rewriting a user's entire history:
   reappearing. Emptying the trash / the 30-day cleanup deletes the doc for real.
 - `users/{uid}/meta/devices` — the devices signed in to the account, as one map
   (`{ d: { deviceId: { name, createdAt, lastSeen } } }`), capped at 20 by the rules. See Devices below.
-- **Conflict handling** (`packages/core/src/lib/sync.ts`, unit-tested): `baseRef` holds what we last knew the cloud
-  held per task, `dirtyAtRef` when this device last changed a task it hasn't written yet. Incoming
+- **Sync engines.** Since 2026-11-20 the website and the phone run the same code from core:
+  `createTaskSync` (`lib/taskSync.ts`) and `createProfileSync` (`lib/profileSync.ts`), each with a
+  small adapter per SDK (`apps/web/src/lib/cloudSync.ts`, `apps/mobile/src/lib/cloudSync.ts`).
+  `HomeworkPlanner` starts both once its prepare effect has run (`readyForUid`; the counter, the
+  legacy task list, `isNewAccountForUid`), feeds them every change to `tasks`/`trash` and the
+  profile fields, and stops them on sign-out after flushing (before clearing the device's tasks,
+  or a running engine would read the empty list as every task deleted). The names below
+  (base, dirtyAt, inFlight) are the engine's internals.
+- **Conflict handling** (`packages/core/src/lib/sync.ts`, unit-tested): `base` holds what we last knew the cloud
+  held per task, `dirtyAt` when this device last changed a task it hasn't written yet. Incoming
   snapshots (both collections; merging waits until each has arrived once) are merged, not applied
   wholesale: an untouched task takes the cloud version; one changed on both sides is merged field
   by field (a field only one side changed takes that side; a field both changed takes the newer
@@ -553,8 +569,9 @@ require rewriting a user's entire history:
   arriving within the 400ms write delay overwrote an unsaved edit. Writes are one small
   `writeBatch` per changed task (so one rejected write can't sink the rest), and an edit to an
   existing task is a merge write of only its changed fields (removed fields -> `deleteField()`).
-  `baseRef` is updated optimistically at write time -- Firestore applies the write to its cache
-  immediately and retries it. `syncUidRef` resets this state when the account changes.
+  `base` is updated optimistically at write time -- Firestore applies the write to its cache
+  immediately and retries it. A new engine starts for every sign-in, so another account never
+  inherits this state.
 - Sync status: both listeners use `includeMetadataChanges` so `lastSyncedAt`/`hasPendingWrites`
   track when writes reach the server; with `online` (browser online/offline events) they drive
   `syncStatus` ("Synced 2m ago" / "Saving..." / "Offline ...") inside the Profile screen (no longer under Profile in the title menu, which only shows a sync error), plus
@@ -574,7 +591,7 @@ require rewriting a user's entire history:
 - The outbound tasks write is debounced 400ms behind local state, since drag-to-reorder calls `setTasks()` once per card the dragged item passes over --
   without this, a single reorder drag would fire one Firestore write per intermediate step instead
   of one at the end. Local state and `localStorage` stay instant regardless; only the cloud write
-  is delayed. The pending write is kept in `pendingTasksWrite` so `signOutFirebase` can flush it
+  is delayed. The engine keeps the pending write so `signOutFirebase` can `flush()` it
   before signing out (capped at 3s, since offline a write only resolves once it reaches the
   server) -- sign-out then clears local tasks/subjects from the device (they come back
   from the cloud on the next sign-in), since signed-out use is local-only.
@@ -639,9 +656,9 @@ require rewriting a user's entire history:
 - **In-flight writes vs. the two listeners.** One batch can touch tasks/ and trash/ (moving a task
   to Recently deleted), but the two `onSnapshot` listeners hear about it separately, so for a
   moment the task looks gone from both -- which the merge used to read as a remote delete, wiping
-  the trash entry locally and then in the cloud. `inFlightRef` counts un-acked writes per task id;
-  while one is pending the merge uses what we wrote instead of the cloud's in-between state, and
-  `applyRef` re-merges when it lands. -- a second layer beyond
+  the trash entry locally and then in the cloud. The engine's `inFlight` counts un-acked writes per
+  task id; while one is pending the merge uses what we wrote instead of the cloud's in-between
+  state, and it re-merges when the write lands. -- a second layer beyond
   auth-based ownership, since `firebaseConfig` being public means anyone could otherwise script
   requests directly against the project, bounded only by whatever the rules allow.
 - Firestore is initialized with `persistentLocalCache`/`persistentMultipleTabManager` for
@@ -778,8 +795,8 @@ that will reuse them; keep adding logic here, not in the component):
   file exports only components (the react-refresh lint rule); helpers and constants go in `packages/core/src/lib/`
   or `packages/core/src/constants.ts`.
 Still inside `HomeworkPlanner`, to move later, each a change of structure rather than a move: the
-timers as state machines (or a `useFocusTimer` hook), one wrapper for the storage calls, and the
-sync engine.
+timers as state machines (or a `useFocusTimer` hook) and one wrapper for the storage calls. (The
+sync engine moved out on 2026-11-20: core's `createTaskSync`/`createProfileSync`.)
 When moving more, prove it the same way: build `main` and the branch side by side and compare what
 each shows (the page text per view, the saved data after each action) for identical output.
 

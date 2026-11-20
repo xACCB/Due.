@@ -37,6 +37,8 @@ export interface ProfileSyncEvents {
   error?(message: string | null): void;
   // Whether the doc was saved by a newer app (shown as SYNC_MESSAGES.newer).
   newer?(newer: boolean): void;
+  // The error behind a message, for an error report (the web's Sentry).
+  report?(err: unknown, where: "read" | "save"): void;
 }
 
 const WRITE_DELAY = 400;
@@ -62,7 +64,7 @@ export function createProfileSync(adapter: ProfileSyncAdapter, events: ProfileSy
     cloud = { ...local }; // optimistic: Firestore applies it to its cache at once and retries it
     const p = adapter.write(profileDoc(local))
       .then(() => events.error?.(null))
-      .catch(() => events.error?.(SYNC_MESSAGES.save))
+      .catch(e => { events.report?.(e, "save"); events.error?.(SYNC_MESSAGES.save); })
       .finally(() => { if (writing === p) writing = null; });
     writing = p;
     return p;
@@ -93,7 +95,7 @@ export function createProfileSync(adapter: ProfileSyncAdapter, events: ProfileSy
 
   return {
     start() {
-      unsub = adapter.listen(onSnapshot, () => events.error?.(SYNC_MESSAGES.read));
+      unsub = adapter.listen(onSnapshot, e => { events.report?.(e, "read"); events.error?.(SYNC_MESSAGES.read); });
     },
     stop() {
       unsub?.(); unsub = null;

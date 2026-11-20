@@ -2,16 +2,15 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut as fbSignOut, onAuthStateChanged, deleteUser } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { doc, getDoc, getDocFromServer, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot } from "firebase/firestore";
-import type { QueryDocumentSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, onSnapshot } from "firebase/firestore";
 import type { Priority, Subtask, Task, TaskTemplate, HistoryAction } from "@dueplanner/core/types";
 import { LAYOUTS, GROUP_BY, DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, SUBJECT_COLOR_PALETTE, priColor, REMINDER_OFFSETS, QUESTIONS, QUESTION_KEYS, askedQuestions, SCREEN_TITLES } from "@dueplanner/core/constants";
 import type { LayoutName } from "@dueplanner/core/constants";
 import { WHATS_NEW, kindRank, LEGACY_WHATSNEW_IDS } from "@dueplanner/core/whatsNew";
 import type { WhatsNewItem } from "@dueplanner/core/whatsNew";
-import { LEGACY_EXAMPLE_TASKS, isUntouchedExample, buildSuggestion, suggestedTask, dateInDays, snoozeTarget, setDone } from "@dueplanner/core/lib/tasks";
+import { isUntouchedExample, buildSuggestion, suggestedTask, dateInDays, snoozeTarget, setDone } from "@dueplanner/core/lib/tasks";
 import type { SnoozeKind } from "@dueplanner/core/lib/tasks";
-import { trashEntries, pruneTrash, localRecords } from "@dueplanner/core/lib/trash";
+import { trashEntries, pruneTrash } from "@dueplanner/core/lib/trash";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
 import { secondsLeft, secondsSince, stopwatchTotal, pomodoroFinishMinutes, pomodoroCreditMinutes, lengthChangeResetsTimer, sessionMinutes, withSession } from "@dueplanner/core/lib/timers";
 import { dailySummary, offsetReminders } from "@dueplanner/core/lib/reminders";
@@ -31,15 +30,16 @@ import { contrastColor, getPriority, formatDate, formatTime, daysUntil, formatDu
 import { DUE_BUCKETS, dueBucket, mostUrgent } from "@dueplanner/core/lib/timeLeft";
 import { subjectGroups } from "@dueplanner/core/lib/sidebarSubjects";
 import { releaseVelocity } from "@dueplanner/core/lib/spring";
-import { reconcile, same } from "@dueplanner/core/lib/sync";
-import type { SyncRecord, CloudRecord } from "@dueplanner/core/lib/sync";
-import { addTaskWrite, addTaskWriteFromActual } from "./lib/taskWrites";
+import { same } from "@dueplanner/core/lib/sync";
+import { addTaskWrite } from "./lib/taskWrites";
+import { startProfileSync, startTaskSync, type ProfileSync, type TaskSync } from "./lib/cloudSync";
+import type { Profile } from "@dueplanner/core/lib/profile";
 import { diffTasks, applyTaskStates } from "@dueplanner/core/lib/history";
 import { downloadFile } from "./lib/download";
 import { LIMITS } from "@dueplanner/core/lib/limits";
 import { reportError } from "./lib/report";
 import { useFlags } from "./hooks/useFlags";
-import { SCHEMA_VERSION, isFromNewerApp, migrateProfile, migrateTask, migrateTasks } from "@dueplanner/core/lib/migrations";
+import { SCHEMA_VERSION, isFromNewerApp, migrateTasks } from "@dueplanner/core/lib/migrations";
 import { describeDevice, deviceAction, listDevices, pruneDevices } from "@dueplanner/core/lib/devices";
 import type { DeviceEntry, DeviceMap } from "@dueplanner/core/lib/devices";
 import { usePersistedState } from "./hooks/usePersistedState";
@@ -63,19 +63,6 @@ import { ProfileModal } from "./components/ProfileModal";
 import { buildCss } from "./styles";
 import { TEXT_SIZES, applyTextSize, fz, textSizeOf } from "./lib/textSize";
 import type { TextSize } from "./lib/textSize";
-
-// A tasks/ or trash/ doc as a cloud record. updatedAt/deletedAt/schemaVersion
-// are sync metadata, not task fields, so they're split off here, and a doc of
-// an older shape is brought up to date (src/lib/migrations.ts). A doc written
-// by a newer app than this one goes into `newer`, so it isn't written back.
-function cloudRecord(d:QueryDocumentSnapshot,deleted:boolean,newer:Set<number>):CloudRecord<Task>|null{
-  const {updatedAt,deletedAt,schemaVersion,...raw}=d.data();
-  if(typeof raw.id!=="number"||typeof raw.title!=="string")return null; // shape guard, see profile sync
-  if(isFromNewerApp(schemaVersion))newer.add(raw.id);
-  const rec:CloudRecord<Task>={task:migrateTask(raw,schemaVersion),updatedAt:typeof updatedAt==="number"?updatedAt:0};
-  if(deleted)rec.deletedAt=typeof deletedAt==="number"?deletedAt:0;
-  return rec;
-}
 
 // A timestamp for the card glide's capture (see captureTaskRects). Module scope
 // for the same React Compiler purity reason as dateInDays above.
@@ -348,13 +335,10 @@ export default function HomeworkPlanner() {
   // dropped connection meant edits just never reached the cloud with no way
   // for the user to know their data wasn't actually syncing.
   const [syncError,setSyncError]=useState<string|null>(null);
-  const isSyncingProfile=useRef(false);
-  // Data saved by a newer version of the app than this one (a doc whose
-  // schemaVersion is above SCHEMA_VERSION): ids per collection, and whether
-  // the profile is. None of it is written back from here, so fields this
-  // version doesn't know can't be stripped; the sync note asks for a reload.
-  const newerIdsRef=useRef<{tasks:Set<number>;trash:Set<number>}>({tasks:new Set(),trash:new Set()});
-  const newerProfileRef=useRef(false);
+  // Whether data was saved by a newer version of the app than this one (a doc
+  // whose schemaVersion is above SCHEMA_VERSION), among the tasks and in the
+  // profile. The sync engines never write it back, so fields this version
+  // doesn't know can't be stripped; the sync note asks for a reload.
   const [newerData,setNewerData]=useState({tasks:false,profile:false});
   const shownSyncError=syncError??(newerData.tasks||newerData.profile?"A newer version of DuePlanner saved some of your data on another device. Reload this page to update. Until then, changes to that data stay on this device.":null);
   // Sync status, for the "Synced 2m ago" line and the offline indicator.
@@ -366,46 +350,9 @@ export default function HomeworkPlanner() {
     window.addEventListener("online",on); window.addEventListener("offline",off);
     return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
   },[]);
-  // Guards each "save TO Firestore" effect below from firing before we've
-  // heard back from Firestore, for THIS uid specifically, even once. Without
-  // this, signing in on a device that still has different local/default data
-  // races the outbound save against the inbound read -- if the save's
-  // isSyncing window covers the moment the real snapshot arrives, that
-  // snapshot gets dropped and the stale local data gets written over the
-  // user's actual cloud data instead of the other way around. Storing the uid
-  // we've synced (not just a boolean) means a direct switch from one
-  // signed-in account to another -- or a sign-out/sign-back-in as the same
-  // account -- can't leave a stale "synced" flag pointing at the wrong (or
-  // now-outdated) snapshot. Reactive state, not a ref -- an empty result
-  // (nothing to apply) still needs to flip this via a re-render, and a ref
-  // mutation alone wouldn't trigger that.
-  const [profileSyncedForUid,setProfileSyncedForUid]=useState<string|null>(null);
+  // Which account the task engine has finished its first merge for (recaps
+  // wait for it, so one isn't written from a half-loaded list).
   const [tasksSyncedForUid,setTasksSyncedForUid]=useState<string|null>(null);
-  // Task sync (users/{uid}/tasks for live tasks, users/{uid}/trash for
-  // Recently deleted). baseRef is what we last knew the cloud held, per task
-  // id; dirtyAtRef is when this device last changed a task it hasn't written
-  // yet. An incoming snapshot is merged against both (src/lib/sync.ts) rather
-  // than replacing local state, so an edit made in the 400ms before it's
-  // written can't be wiped by another device's change arriving first, and the
-  // save effect writes only the fields that changed. Before this, tasks were
-  // one array field on users/{uid} -- see migrateLegacyTasks below for why
-  // that stopped scaling.
-  const baseRef=useRef<Map<number,SyncRecord<Task>>>(new Map());
-  const dirtyAtRef=useRef<Map<number,number>>(new Map());
-  const prevLocalRef=useRef<Map<number,SyncRecord<Task>>>(new Map());
-  // Latest snapshot of each collection; merging waits until both have arrived.
-  const cloudTasksRef=useRef<Map<number,CloudRecord<Task>>|null>(null);
-  const cloudTrashRef=useRef<Map<number,CloudRecord<Task>>|null>(null);
-  const syncUidRef=useRef<string|null>(null);
-  // Task ids with a write of ours still on its way to the server (count per
-  // id). One write can touch both tasks/ and trash/ (e.g. moving a task to
-  // Recently deleted), but the two listeners below hear about it separately --
-  // for a moment the task looks gone from both, which the merge would read as
-  // "deleted on another device" and wipe. So while a write is in flight, the
-  // merge uses what we wrote instead of the cloud's in-between state, and
-  // re-merges (applyRef) once it lands.
-  const inFlightRef=useRef<Map<number,number>>(new Map());
-  const applyRef=useRef<(()=>void)|null>(null);
   // Set only for an explicit sign-in (not a restored session): the first
   // cloud snapshot after it keeps any tasks created while signed out instead
   // of replacing them. Limited to explicit sign-ins because on a normal page
@@ -435,7 +382,7 @@ export default function HomeworkPlanner() {
       setFbUser(user);
       setAuthPending(false);
       if(user) { localStorage.removeItem("hw-signin-redirect-pending"); localStorage.setItem("hw-signed-in","1"); }
-      else { localStorage.removeItem("hw-signed-in"); setProfileSyncedForUid(null); setTasksSyncedForUid(null); setReadyForUid(null); setIsNewAccountForUid(null); }
+      else { localStorage.removeItem("hw-signed-in"); setTasksSyncedForUid(null); setReadyForUid(null); setIsNewAccountForUid(null); }
     });
     // Only relevant if signInWithFirebase had to fall back to the redirect
     // method below (e.g. a browser that blocks/mishandles the popup) -- this
@@ -522,218 +469,62 @@ export default function HomeworkPlanner() {
     return ()=>{cancelled=true;};
   },[fbUser]);
 
-  // Sync the small "profile" fields (not tasks -- those live in their own
-  // subcollection, synced separately below) FROM Firestore.
-  useEffect(()=>{
-    if(!fbUser||readyForUid!==fbUser.uid)return;
-    const ref=doc(db,"users",fbUser.uid);
-    const unsub=onSnapshot(ref,snap=>{
-      const newer=snap.exists()&&isFromNewerApp(snap.data().schemaVersion);
-      newerProfileRef.current=newer;
-      setNewerData(n=>n.profile===newer?n:{...n,profile:newer});
-      if(snap.exists()&&!isSyncingProfile.current){
-        const data=migrateProfile(snap.data(),snap.data().schemaVersion);
-        // Firestore data is untyped (DocumentData) -- a malformed or legacy
-        // document (e.g. from an older buggy version, or a manual edit in the
-        // console) could otherwise inject a wrong-shaped value straight into
-        // state and crash a render. Cheap shape checks before applying.
-        if(typeof data.layout==="string"&&data.layout in LAYOUTS) setLayout(data.layout as LayoutName);
-        if(typeof data.colorCodeUrgency==="boolean") setColorCodeUrgency(data.colorCodeUrgency);
-        if(data.timeFormat==="12h"||data.timeFormat==="24h") setTimeFormat(data.timeFormat);
-        if(data.weekStart===0||data.weekStart===1) setWeekStart(data.weekStart);
-        if(Array.isArray(data.subjects)&&data.subjects.every((s:unknown)=>typeof s==="string")) setSubjects(data.subjects);
-        if(data.subjectColors&&typeof data.subjectColors==="object"&&Object.values(data.subjectColors).every(v=>typeof v==="string")) setSubjectColors({...DEFAULT_SUBJECT_COLORS,...data.subjectColors});
-      }
-      setProfileSyncedForUid(fbUser.uid);
-      setSyncError(null);
-    },err=>{
-      console.error(err); reportError(err,"sync-profile-read");
-      setSyncError("Couldn't sync with the cloud. Your changes are saved on this device, but may not reach your other devices until this is resolved.");
-    });
-    return unsub;
-  },[fbUser,readyForUid,setLayout,setColorCodeUrgency,setSubjects,setTimeFormat,setWeekStart]);
-
-  // Save the profile fields TO Firestore whenever they change. Gated on
-  // profileSyncedForUid matching the current user so the very first write
-  // can't fire before we know what's actually in the user's cloud doc.
-  useEffect(()=>{
-    if(!fbUser||profileSyncedForUid!==fbUser.uid)return;
-    if(newerProfileRef.current)return; // saved by a newer app: leave it be (see newerIdsRef)
-    isSyncingProfile.current=true;
-    const ref=doc(db,"users",fbUser.uid);
-    setDoc(ref,{layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart,schemaVersion:SCHEMA_VERSION},{merge:true})
-      .then(()=>setSyncError(null))
-      .catch(err=>{
-        console.error(err); reportError(err,"sync-profile-save");
-        setSyncError("Couldn't save to the cloud. Your changes are safe on this device, but won't reach your other devices until this is resolved.");
-      })
-      .finally(()=>{isSyncingProfile.current=false;});
-  },[layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart,fbUser,profileSyncedForUid]);
-
-  // Sync tasks FROM the tasks and trash subcollections.
+  // Sync, once the prepare effect above has run for this account: core's
+  // engines (createTaskSync, createProfileSync) over the JS SDK
+  // (src/lib/cloudSync.ts), the same code the phone app runs. The task engine
+  // listens to tasks/ and trash/, merges what arrives with this device's tasks
+  // (reconcile in core's sync.ts, so an edit not yet written survives), and
+  // writes changes 400ms after the last one, one batch per task with the
+  // counter; the profile engine keeps the profile fields in step with
+  // users/{uid}. See their files for the details and guards.
+  const taskSyncRef=useRef<TaskSync|null>(null);
+  const profileSyncRef=useRef<ProfileSync|null>(null);
+  const profile=useMemo<Profile>(()=>({layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart:weekStart===1?1:0}),[layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart]);
+  const profileRef=useRef(profile);
+  useEffect(()=>{profileRef.current=profile;});
   useEffect(()=>{
     if(!fbUser||readyForUid!==fbUser.uid)return;
     const uid=fbUser.uid;
-    // A different account than the one baseRef/dirtyAtRef describe: start clean.
-    if(syncUidRef.current!==uid){ baseRef.current=new Map(); dirtyAtRef.current=new Map(); prevLocalRef.current=new Map(); inFlightRef.current=new Map(); newerIdsRef.current={tasks:new Set(),trash:new Set()}; syncUidRef.current=uid; }
-    cloudTasksRef.current=null; cloudTrashRef.current=null;
-    const apply=()=>{
-      const cloudTasks=cloudTasksRef.current, cloudTrash=cloudTrashRef.current;
-      if(!cloudTasks||!cloudTrash)return;
-      const cloud=new Map([...cloudTrash,...cloudTasks]);
-      for(const id of inFlightRef.current.keys()){
-        const mine=baseRef.current.get(id);
-        if(mine) cloud.set(id,{...mine,updatedAt:cloud.get(id)?.updatedAt??0}); else cloud.delete(id);
-      }
-      // An empty cloud is ambiguous on its own: a brand-new account with
-      // nothing synced yet vs. a returning account that legitimately has zero
-      // tasks. isNewAccountForUid (set by the migration effect above, from
-      // whether a profile doc existed at all) tells them apart -- for a new
-      // account, leave local state (tasks added while signed out) alone so
-      // the save effect pushes it up as the first write.
-      if(cloud.size===0&&isNewAccountForUid===uid&&baseRef.current.size===0){ mergeLocalOnSignIn.current=false; setTasksSyncedForUid(uid); return; }
-      const local=localRecords(tasksRef.current,trashRef.current);
-      if(mergeLocalOnSignIn.current){
-        // Explicit sign-in: keep tasks created while signed out (marking them
-        // as unsaved local changes) instead of letting the cloud replace them.
-        const isStarter=(t:Task)=>!t.done&&LEGACY_EXAMPLE_TASKS.some(d=>d.id===t.id&&d.title===t.title);
-        const at=Date.now();
-        for(const [id,r] of local) if(!cloud.has(id)&&r.deletedAt===undefined&&!isStarter(r.task)) dirtyAtRef.current.set(id,at);
-        mergeLocalOnSignIn.current=false;
-      }
-      const merged=reconcile(baseRef.current,local,cloud,dirtyAtRef.current);
-      baseRef.current=new Map([...cloud].map(([id,r])=>[id,r.deletedAt!==undefined?{task:r.task,deletedAt:r.deletedAt}:{task:r.task}]));
-      for(const id of [...dirtyAtRef.current.keys()]) if(same(merged.get(id),baseRef.current.get(id))) dirtyAtRef.current.delete(id);
-      // Keep the current on-screen order of existing tasks; new ones go last.
-      const pos=new Map(tasksRef.current.map((t,i)=>[t.id,i]));
-      const live:Task[]=[], deleted:TrashEntry[]=[];
-      for(const r of merged.values()) if(r.deletedAt!==undefined) deleted.push({task:r.task,deletedAt:r.deletedAt}); else live.push(r.task);
-      live.sort((x,y)=>(pos.get(x.id)??Infinity)-(pos.get(y.id)??Infinity));
-      deleted.sort((x,y)=>y.deletedAt-x.deletedAt);
-      if(!same(live,tasksRef.current)) setTasks(live);
-      if(!same(deleted,trashRef.current)) setTrash(deleted);
-      setTasksSyncedForUid(uid);
-    };
-    applyRef.current=apply;
-    let tasksMeta={pending:false,fromCache:true}, trashMeta={pending:false,fromCache:true};
-    const status=()=>{
-      const pending=tasksMeta.pending||trashMeta.pending;
-      setHasPendingWrites(pending);
-      if(!pending&&!tasksMeta.fromCache&&!trashMeta.fromCache) setLastSyncedAt(Date.now());
-    };
-    const onErr=(err:unknown)=>{
-      console.error(err); reportError(err,"sync-tasks-read");
-      setSyncError("Couldn't sync with the cloud. Your changes are saved on this device, but may not reach your other devices until this is resolved.");
-    };
-    const toMap=(docs:QueryDocumentSnapshot[],deleted:boolean)=>{
-      const m=new Map<number,CloudRecord<Task>>();
-      const newer=new Set<number>();
-      for(const d of docs){const r=cloudRecord(d,deleted,newer);if(r)m.set(r.task.id,r);}
-      newerIdsRef.current={...newerIdsRef.current,[deleted?"trash":"tasks"]:newer};
-      const any=newerIdsRef.current.tasks.size>0||newerIdsRef.current.trash.size>0;
-      setNewerData(n=>n.tasks===any?n:{...n,tasks:any});
-      return m;
-    };
-    // includeMetadataChanges: also hear when pending writes reach the server
-    // (for "Synced just now"); docChanges() leaves those out, so they skip the merge.
-    const unsubTasks=onSnapshot(collection(db,"users",uid,"tasks"),{includeMetadataChanges:true},snap=>{
-      tasksMeta={pending:snap.metadata.hasPendingWrites,fromCache:snap.metadata.fromCache};
-      if(!cloudTasksRef.current||snap.docChanges().length>0){ cloudTasksRef.current=toMap(snap.docs,false); apply(); }
-      status(); setSyncError(null);
-    },onErr);
-    const unsubTrash=onSnapshot(collection(db,"users",uid,"trash"),{includeMetadataChanges:true},snap=>{
-      trashMeta={pending:snap.metadata.hasPendingWrites,fromCache:snap.metadata.fromCache};
-      if(!cloudTrashRef.current||snap.docChanges().length>0){ cloudTrashRef.current=toMap(snap.docs,true); apply(); }
-      status();
-    },err=>{
-      // Don't let a trash problem hold up syncing the tasks themselves.
-      onErr(err);
-      trashMeta={pending:false,fromCache:false};
-      if(!cloudTrashRef.current){ cloudTrashRef.current=new Map(); apply(); }
+    const tasksEngine=startTaskSync(uid,{
+      merged:(live,deleted)=>{
+        if(!same(live,tasksRef.current)) setTasks(live);
+        if(!same(deleted,trashRef.current)) setTrash(deleted);
+      },
+      ready:()=>{setTasksSyncedForUid(uid);setSyncError(null);},
+      status:st=>{setHasPendingWrites(st.pending);if(st.syncedAt!=null)setLastSyncedAt(st.syncedAt);},
+      error:setSyncError,
+      newer:any=>setNewerData(n=>n.tasks===any?n:{...n,tasks:any}),
+      report:(err,where)=>{console.error(err);reportError(err,`sync-tasks-${where}`);},
+    },{
+      getLocal:()=>({tasks:tasksRef.current,trash:trashRef.current}),
+      isNewAccount:isNewAccountForUid===uid,
+      mergeLocal:mergeLocalOnSignIn.current,
     });
-    return()=>{unsubTasks();unsubTrash();applyRef.current=null;};
-  },[fbUser,readyForUid,isNewAccountForUid,setTrash]);
-
-  // Save tasks TO the cloud whenever they change -- only the tasks that differ
-  // from baseRef, and for an edited task only its changed fields (a merge
-  // write), so a save can't overwrite fields another device just changed.
-  // Each doc carries updatedAt (when the edit happened) for conflict merging.
-  // A deleted task moves from tasks/ to trash/ (with deletedAt); emptying the
-  // trash or the 30-day cleanup deletes the doc for real. Trash is its own
-  // collection rather than a flag on tasks/ docs so older app versions still
-  // open on another device see a plain delete instead of the task coming back.
-  //
-  // Debounced so a burst of rapid local changes collapses into one write --
-  // most notably, drag-to-reorder calls setTasks() on every card the dragged
-  // item passes over. Local state (and localStorage) still update instantly.
-  const tasksSaveTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  // The not-yet-sent debounced write, if any -- lets sign-out push it through
-  // immediately instead of losing the last edit made within 400ms of signing out.
-  const pendingTasksWrite=useRef<(()=>Promise<void>)|null>(null);
-  useEffect(()=>{
-    if(!fbUser||tasksSyncedForUid!==fbUser.uid)return;
-    const uid=fbUser.uid;
-    // Note when each task changed, for conflict merging.
-    const local=localRecords(tasks,trash);
-    const at=Date.now();
-    for(const id of new Set([...local.keys(),...baseRef.current.keys()])){
-      const r=local.get(id);
-      if(same(r,baseRef.current.get(id))) dirtyAtRef.current.delete(id);
-      else if(!dirtyAtRef.current.has(id)||!same(r,prevLocalRef.current.get(id))) dirtyAtRef.current.set(id,at);
-    }
-    prevLocalRef.current=local;
-    clearTimeout(tasksSaveTimer.current);
-    const run=():Promise<void>=>{
-      pendingTasksWrite.current=null;
-      const base=baseRef.current;
-      const commits:Promise<void>[]=[];
-      for(const id of new Set([...local.keys(),...base.keys()])){
-        const L=local.get(id), B=base.get(id);
-        if(same(L,B))continue;
-        if(newerIdsRef.current.tasks.has(id)||newerIdsRef.current.trash.has(id))continue; // a newer app's data, see newerIdsRef
-        const updatedAt=dirtyAtRef.current.get(id)??Date.now();
-        const refs={task:doc(db,"users",uid,"tasks",String(id)),trash:doc(db,"users",uid,"trash",String(id)),counts:doc(db,"users",uid,"meta","counts")};
-        const counted=true; // the rules require the task counter on every create (firestore.rules)
-        // One batch per task, so one rejected write can't take others down with it.
-        const batch=writeBatch(db);
-        addTaskWrite(batch,refs,id,L,B,updatedAt,counted);
-        const inFlight=inFlightRef.current;
-        inFlight.set(id,(inFlight.get(id)??0)+1);
-        commits.push(batch.commit().catch(async err=>{
-          // Rejected -- most often because B was stale (another device moved
-          // or deleted this task first, so the counter change didn't match).
-          // Retry once from what actually exists in the cloud right now.
-          if((err as {code?:string})?.code!=="permission-denied")throw err;
-          const [tk,tr]=await Promise.all([getDocFromServer(refs.task),getDocFromServer(refs.trash)]);
-          const retry=writeBatch(db);
-          addTaskWriteFromActual(retry,refs,id,L,{tasks:tk.exists(),trash:tr.exists()},updatedAt,counted);
-          await retry.commit().catch(err2=>{
-            // Still refused while adding: most likely the per-account cap.
-            if(L&&!tk.exists()&&!tr.exists())setSyncError(`You've reached the limit of ${LIMITS.tasks.toLocaleString()} tasks (including archived and recently deleted ones). New tasks are saved on this device, but won't sync until you delete some.`);
-            throw err2;
-          });
-        }).finally(()=>{
-          const left=(inFlight.get(id)??1)-1;
-          if(left>0)inFlight.set(id,left); else inFlight.delete(id);
-          applyRef.current?.();
-        }));
-        // Optimistic: Firestore applies the write to its local cache right
-        // away and retries it until the server accepts or rejects it.
-        if(L) base.set(id,L); else base.delete(id);
-        dirtyAtRef.current.delete(id);
-      }
-      if(commits.length===0)return Promise.resolve();
-      return Promise.all(commits)
-        .then(()=>setSyncError(null))
-        .catch(err=>{
-          console.error(err); reportError(err,"sync-tasks-save");
-          setSyncError(prev=>prev?.startsWith("You've reached the limit")?prev:"Couldn't save to the cloud. Your changes are safe on this device, but won't reach your other devices until this is resolved.");
-        });
+    mergeLocalOnSignIn.current=false;
+    const profileEngine=startProfileSync(uid,{
+      apply:p=>{
+        if(p.layout!==undefined) setLayout(p.layout as LayoutName);
+        if(p.colorCodeUrgency!==undefined) setColorCodeUrgency(p.colorCodeUrgency);
+        if(p.subjects!==undefined) setSubjects(p.subjects);
+        if(p.subjectColors!==undefined) setSubjectColors(p.subjectColors);
+        if(p.timeFormat!==undefined) setTimeFormat(p.timeFormat);
+        if(p.weekStart!==undefined) setWeekStart(p.weekStart);
+      },
+      error:setSyncError,
+      newer:b=>setNewerData(n=>n.profile===b?n:{...n,profile:b}),
+      report:(err,where)=>{console.error(err);reportError(err,`sync-profile-${where}`);},
+    },profileRef.current);
+    taskSyncRef.current=tasksEngine;
+    profileSyncRef.current=profileEngine;
+    return()=>{
+      tasksEngine.stop();profileEngine.stop();
+      if(taskSyncRef.current===tasksEngine)taskSyncRef.current=null;
+      if(profileSyncRef.current===profileEngine)profileSyncRef.current=null;
     };
-    pendingTasksWrite.current=run;
-    tasksSaveTimer.current=setTimeout(run,400);
-    return ()=>clearTimeout(tasksSaveTimer.current);
-  },[tasks,trash,fbUser,tasksSyncedForUid]);
+  },[fbUser,readyForUid,isNewAccountForUid,setTrash,setLayout,setColorCodeUrgency,setSubjects,setTimeFormat,setWeekStart]);
+  // Every local change goes to the engines; they write what differs from the cloud.
+  useEffect(()=>{taskSyncRef.current?.localChanged(tasks,trash);},[tasks,trash]);
+  useEffect(()=>{profileSyncRef.current?.localChanged(profile);},[profile]);
 
   async function signInWithFirebase(){
     setSignInError(null);
@@ -788,10 +579,15 @@ export default function HomeworkPlanner() {
   const signingOut=useRef(false);
   async function signOutFirebase(){
     signingOut.current=true;
-    clearTimeout(tasksSaveTimer.current);
-    // Capped: offline, a write only resolves once it reaches the server, and
-    // Firestore keeps it queued anyway -- sign-out shouldn't hang on that.
-    try{ await Promise.race([pendingTasksWrite.current?.(),new Promise(r=>setTimeout(r,3000))]); }catch{/* already surfaced via syncError */}
+    // Send a waiting write first. Capped: offline, a write only resolves once
+    // it reaches the server, and Firestore keeps it queued anyway -- sign-out
+    // shouldn't hang on that.
+    const tasksEngine=taskSyncRef.current, profileEngine=profileSyncRef.current;
+    try{ await Promise.race([Promise.all([tasksEngine?.flush(),profileEngine?.flush()]),new Promise(r=>setTimeout(r,3000))]); }catch{/* already surfaced via syncError */}
+    // Then stop syncing, before the tasks are cleared below: a running engine
+    // would read the empty list as every task deleted.
+    tasksEngine?.stop(); profileEngine?.stop();
+    taskSyncRef.current=null; profileSyncRef.current=null;
     // Take this device off the account's device list. Best effort and capped
     // like the flush above; it fails harmlessly if the device isn't listed.
     if(fbUser){
@@ -803,7 +599,6 @@ export default function HomeworkPlanner() {
     // Signed-out use is local-only, so don't leave this account's tasks and
     // subjects sitting on the device (possibly a shared one) after signing
     // out -- they're safe in the cloud and come back on the next sign-in.
-    baseRef.current=new Map(); dirtyAtRef.current=new Map(); prevLocalRef.current=new Map();
     setLastSyncedAt(null);
     setTasks([]);
     setSubjects(DEFAULT_SUBJECTS);

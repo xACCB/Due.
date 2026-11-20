@@ -1,0 +1,12 @@
+# Maestro's settings for this folder: which files are tests, and their order.
+# Each test leaves the app as it found it (Home, unscrolled, sample tasks).
+flows:
+  - "*.yaml"
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - home-swipes
+    - sidebar
+    - task-sheet
+    - reorder
+    - deck

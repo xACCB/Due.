@@ -1,0 +1,24 @@
+# Home: a task card swiped right is completed, swiped left is deleted, and
+# the undo toast puts each back. Swipes need duration 1000: Maestro's quicker
+# default reached the card's edge before the swipe had counted.
+appId: com.duestudios.dueplanner
+name: Home swipes
+---
+- assertVisible: "Lab report,.*"
+- swipe:
+    from:
+      text: "Lab report,.*"
+    direction: RIGHT
+    duration: 1000
+- assertVisible: '"Lab report" completed'
+- tapOn: "Undo .*"
+- assertNotVisible: '"Lab report" completed'
+- swipe:
+    from:
+      text: "Lab report,.*"
+    direction: LEFT
+    duration: 1000
+- assertVisible: '"Lab report" deleted'
+- assertNotVisible: "Lab report,.*"
+- tapOn: "Undo .*"
+- assertVisible: "Lab report,.*"

@@ -1,0 +1,29 @@
+# Calendar -> Deck: swiping the top card left shows the next date, right
+# brings the earlier one back (components/DueDeck.tsx). Leaves the Calendar
+# on Month and goes back Home.
+appId: com.duestudios.dueplanner
+name: Deck swipes
+---
+- tapOn: "Open sidebar"
+- tapOn: "Calendar"
+- tapOn: "Deck"
+- copyTextFrom:
+    text: "\\d+ of \\d+"
+- evalScript: ${output.first = maestro.copiedText}
+- swipe:
+    start: 80%, 40%
+    end: 10%, 40%
+    duration: 800
+- copyTextFrom:
+    text: "\\d+ of \\d+"
+- assertTrue: ${maestro.copiedText != output.first}
+- swipe:
+    start: 10%, 40%
+    end: 85%, 40%
+    duration: 800
+- copyTextFrom:
+    text: "\\d+ of \\d+"
+- assertTrue: ${maestro.copiedText == output.first}
+- tapOn: "Month"
+- tapOn: "Open sidebar"
+- tapOn: "Home"

@@ -1,0 +1,17 @@
+# The sidebar: a swipe in from the screen's left edge opens it, a swipe to
+# the left closes it (components/Sidebar.tsx, the 20px edge strip).
+appId: com.duestudios.dueplanner
+name: Sidebar swipe
+---
+- assertNotVisible: "Inbox"
+- swipe:
+    start: 1%, 55%
+    end: 75%, 55%
+    duration: 800
+- assertVisible: "Inbox"
+- assertVisible: "Import/Export"
+- swipe:
+    start: 60%, 55%
+    end: 5%, 55%
+    duration: 800
+- assertNotVisible: "Inbox"

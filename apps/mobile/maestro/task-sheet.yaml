@@ -1,0 +1,14 @@
+# A task's sheet (task-sheet/[id], an iOS sheet): tapping a card opens it,
+# dragging it down closes it.
+appId: com.duestudios.dueplanner
+name: Task sheet drag to close
+---
+- tapOn: "Problem set 4,.*"
+- assertVisible: "Edit task"
+- assertVisible: "Snooze tomorrow"
+- swipe:
+    start: 50%, 12%
+    end: 50%, 95%
+    duration: 800
+- assertNotVisible: "Edit task"
+- assertVisible: "Problem set 4,.*"

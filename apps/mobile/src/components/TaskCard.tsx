@@ -65,8 +65,22 @@ export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subj
         accessibilityRole="button"
         accessibilityLabel={`${task.title}${task.done ? ", done" : ""}${task.subject ? `, ${task.subject}` : ""}${due ? `, due ${due}` : ""}`}
         accessibilityHint="Opens the task. Swipe right to mark it done, left to delete it."
-        accessibilityActions={[{ name: "toggle", label: task.done ? "Mark not done" : "Mark done" }, { name: "delete", label: "Delete" }]}
-        onAccessibilityAction={e => (e.nativeEvent.actionName === "toggle" ? onToggle() : onDelete())}
+        // VoiceOver reads the card as one element, which hides the check, the ×
+        // and the reorder grip inside it, so their jobs are the card's actions.
+        accessibilityActions={[
+          { name: "toggle", label: task.done ? "Mark not done" : "Mark done" },
+          { name: "delete", label: "Delete" },
+          ...(reorder && live ? [{ name: "moveUp", label: "Move up" }, { name: "moveDown", label: "Move down" }] : []),
+        ]}
+        onAccessibilityAction={e => {
+          const a = e.nativeEvent.actionName;
+          if (a === "toggle") onToggle();
+          else if (a === "delete") onDelete();
+          else if (reorder && (a === "moveUp" || a === "moveDown")) {
+            reorder.moveBy(a === "moveUp" ? -1 : 1);
+            AccessibilityInfo.announceForAccessibility(a === "moveUp" ? "Moved up" : "Moved down");
+          }
+        }}
         style={({ pressed }) => [
           styles.card,
           {

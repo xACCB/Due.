@@ -11,6 +11,8 @@
 //   done "<title>"             tick the task done
 //   delete "<title>"           delete it with its × button
 //   settings ["Monday|24-hour"] Settings -> Date & time: press those two buttons
+//   signout "<device name>"    Profile -> Devices: sign that device out
+//   devices                    print the device list as Profile shows it
 import { browser, sleep, waitFor } from "../tests/e2e/browser.mjs";
 
 const [step, title] = process.argv.slice(2);
@@ -42,6 +44,11 @@ try {
     await sleep(500);
     const [day, clock] = (title || "Monday|24-hour").split("|");
     console.log(day, await click("main", `^${day}$`), clock, await click("main", `^${clock}`));
+  } else if (step === "signout" || step === "devices") {
+    await b.ev(`document.querySelector("[data-tour=profile-row]").click()`); await sleep(1200);
+    if (step === "signout") console.log("clicked:", await click("body", `^Sign out ${title}$`));
+    await sleep(1500);
+    console.log(await b.ev(`document.querySelector("[data-tour=profile-devices]")?.innerText`));
   } else if (step === "done") {
     console.log("clicked:", await click("main", `^Mark ${title} done$`));
   } else if (step === "delete") {

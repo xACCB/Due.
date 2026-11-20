@@ -3,7 +3,8 @@ import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, T
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Path, Svg } from "react-native-svg";
-import { ink } from "@dueplanner/core/lib/format";
+import { formatAgo, ink } from "@dueplanner/core/lib/format";
+import { LIMITS } from "@dueplanner/core/lib/limits";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { signInWithGoogle } from "../lib/firebase";
@@ -16,10 +17,11 @@ const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
 
 // Profile (the web's ProfileModal), over everything, opened from the
 // sidebar's top row. Signed out: the web's sign-in screen, "Continue with
-// Google". Signed in: picture, name, email and Sign out. The web's stats,
-// Devices and Storage cards come with sync.
+// Google". Signed in: picture, name, email, the sync status, the web's
+// Devices and Storage cards, and Sign out. Still to come from the web: the
+// stats cards and This device.
 export default function Profile() {
-  const { T, fz, user, authReady, sync, signOut } = useApp();
+  const { T, fz, user, authReady, sync, signOut, devices, signOutDevice, signOutOtherDevices, signInNote, clearSignInNote, tasks, trash } = useApp();
   const now = useNow(30000);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,10 +31,11 @@ export default function Profile() {
     if (busy) return;
     setBusy(true);
     setError(null);
+    clearSignInNote();
     try { await signInWithGoogle(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
-  // Development only: the dev remote's stand-ins for the two buttons.
-  useDevAction("profile", what => { if (what === "sign-in") void signIn(); else void signOut(); });
+  // Development only: the dev remote's stand-ins for the buttons ("sign-in", "sign-out", "others").
+  useDevAction("profile", what => { if (what === "sign-in") void signIn(); else if (what === "others") signOutOtherDevices(); else void signOut(); });
 
   const closeBtn = (
     <Pressable onPress={close} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
@@ -70,7 +73,7 @@ export default function Profile() {
               {busy ? <ActivityIndicator color={T.textMuted} /> : <GoogleLogo />}
               <Text style={{ fontFamily: F.body, fontSize: fz(13), color: T.text }}>Continue with Google</Text>
             </Pressable>
-            {!!error && <Text style={[styles.note, { fontSize: fz(11), color: ink("#FF4757", T.light), marginBottom: 12 }]} accessibilityLiveRegion="polite">{error}</Text>}
+            {!!(error || signInNote) && <Text style={[styles.note, { fontSize: fz(11), color: ink("#FF4757", T.light), marginBottom: 12 }]} accessibilityLiveRegion="polite">{error || signInNote}</Text>}
             <Text style={[styles.note, { fontSize: fz(11), color: T.textFaint }]}>
               Signing in syncs your homework across your devices. We never sell your data or use it for ads. See the{" "}
               <Text style={{ color: T.textMuted, textDecorationLine: "underline" }} onPress={() => Linking.openURL(PRIVACY_URL)} accessibilityRole="link">privacy policy</Text>
@@ -104,6 +107,59 @@ export default function Profile() {
           </View>
           {!!sync.error && <Text style={[styles.note, { fontSize: fz(11), color: ink("#FF4757", T.light), marginTop: 8, maxWidth: 280 }]}>{sync.error}</Text>}
         </View>
+        {/* Devices signed in to this account. Signing one out removes its entry;
+            that device signs itself out when it next has the app open and
+            online (lib/cloudSync.ts watchDevices), which the note says plainly. */}
+        <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
+          <Text style={[styles.cardLabel, { fontSize: fz(10), color: T.textMuted }]} accessibilityRole="header">Devices</Text>
+          {!devices || devices.length === 0
+            ? <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textFaint }}>{devices ? "Getting this device ready…" : "The device list isn't available right now."}</Text>
+            : <>
+              {devices.map(d => (
+                <View key={d.id} style={styles.deviceRow}>
+                  <View style={{ flexShrink: 1 }}>
+                    <Text numberOfLines={1} style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>{d.entry.name}</Text>
+                    <Text style={{ fontFamily: F.body, fontSize: fz(10), marginTop: 2, color: d.current ? ink("#2ED573", T.light) : T.textFaint }}>{d.current ? "This device" : `Active ${formatAgo(d.entry.lastSeen, now)}`}</Text>
+                  </View>
+                  {!d.current && (
+                    <Pressable onPress={() => signOutDevice(d.id)} accessibilityRole="button" accessibilityLabel={`Sign out ${d.entry.name}`}
+                      style={({ pressed }) => [styles.smallBtn, { borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
+                      <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.text }}>Sign out</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+              {devices.some(d => !d.current) && devices.some(d => d.current) && (
+                <Pressable onPress={signOutOtherDevices} accessibilityRole="button"
+                  style={({ pressed }) => [styles.othersBtn, { opacity: pressed ? 0.7 : 1 }]}>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(12), color: ink("#FF4757", T.light) }}>Sign out all other devices</Text>
+                </Pressable>
+              )}
+              <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textFaint, lineHeight: 15 }}>A device signs out the next time it has DuePlanner open and online. If you think someone else can get into your Google account, change your Google password as well.</Text>
+            </>}
+        </View>
+
+        {/* Storage: the tasks on this phone against the account's caps (LIMITS). */}
+        <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
+          <Text style={[styles.cardLabel, { fontSize: fz(10), color: T.textMuted }]} accessibilityRole="header">Storage</Text>
+          {[{ label: "Tasks", used: tasks.length, max: LIMITS.tasks }, { label: "Recently deleted", used: trash.length, max: LIMITS.trash }].map(r => {
+            const pct = Math.min(100, r.used / r.max * 100), nearlyFull = pct >= 90;
+            return (
+              <View key={r.label} style={{ marginBottom: 10 }}>
+                <View style={styles.storageTop}>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>{r.label}</Text>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(11), color: nearlyFull ? ink("#FF4757", T.light) : T.textFaint }}>{r.used.toLocaleString("en-US")} of {r.max.toLocaleString("en-US")}</Text>
+                </View>
+                <View accessibilityRole="progressbar" accessibilityLabel={`${r.label} storage used`} accessibilityValue={{ min: 0, max: r.max, now: Math.min(r.used, r.max) }}
+                  style={[styles.bar, { backgroundColor: T.border }]}>
+                  <View style={[styles.barFill, { width: `${r.used > 0 ? Math.max(pct, 1.5) : 0}%`, backgroundColor: nearlyFull ? "#FF4757" : T.accent }]} />
+                </View>
+              </View>
+            );
+          })}
+          <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textFaint, lineHeight: 15 }}>Finished and archived tasks count too. Deleting tasks frees up room.</Text>
+        </View>
+
         <Pressable onPress={async () => { await signOut().catch(() => {}); close(); }} accessibilityRole="button"
           style={({ pressed }) => [styles.signOut, { opacity: pressed ? 0.7 : 1 }]}>
           <Text style={{ fontFamily: F.body, fontSize: fz(13), color: ink("#FF4757", T.light) }}>Sign out</Text>
@@ -146,5 +202,13 @@ const styles = StyleSheet.create({
   name: { fontFamily: F.heading, fontSize: 24, lineHeight: 30, marginBottom: 4 },
   pill: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
   pillDot: { width: 6, height: 6, borderRadius: 3 },
+  card: { borderRadius: 14, padding: 16, borderWidth: 1, marginBottom: 14 },
+  cardLabel: { fontFamily: F.body, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 12 },
+  deviceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 },
+  smallBtn: { borderWidth: 1, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 12, flexShrink: 0 },
+  othersBtn: { borderWidth: 1, borderColor: "#FF475744", borderRadius: 9, padding: 9, alignItems: "center", marginBottom: 10 },
+  storageTop: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  bar: { height: 5, borderRadius: 999 },
+  barFill: { height: "100%", borderRadius: 999 },
   signOut: { borderWidth: 1, borderColor: "#FF475744", borderRadius: 12, paddingVertical: 13, alignItems: "center" },
 });

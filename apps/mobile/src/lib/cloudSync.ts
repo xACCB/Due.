@@ -1,4 +1,8 @@
-import { collection, doc, getDoc, getDocFromServer, getFirestore, increment, deleteField, onSnapshot, setDoc, writeBatch, type DocumentReference } from "@react-native-firebase/firestore";
+import { collection, doc, getDoc, getDocFromServer, getFirestore, increment, deleteField, onSnapshot, setDoc, updateDoc, writeBatch, type DocumentReference } from "@react-native-firebase/firestore";
+import { getAuth } from "@react-native-firebase/auth";
+import { deviceAction, pruneDevices, type DeviceEntry, type DeviceMap } from "@dueplanner/core/lib/devices";
+import { LIMITS } from "@dueplanner/core/lib/limits";
+import { registeredFor, setRegisteredFor, thisDeviceId, thisDeviceName } from "./thisDevice";
 import { createTaskSync, type TaskSyncAdapter, type TaskSyncEvents, type TaskSyncOptions } from "@dueplanner/core/lib/taskSync";
 import { createProfileSync, type ProfileSyncEvents } from "@dueplanner/core/lib/profileSync";
 import type { Profile } from "@dueplanner/core/lib/profile";
@@ -97,4 +101,61 @@ export function startProfileSync(uid: string, events: ProfileSyncEvents, initial
   }, events, initial);
   engine.start();
   return engine;
+}
+
+// ---- Devices (Profile -> Devices), the website's Devices effect. This phone
+// keeps an entry in users/{uid}/meta/devices and watches that doc; core's
+// deviceAction() says what a snapshot means. Signing a device out is removing
+// its entry, and that device signs itself out when it next sees the server's
+// list without it. The safety rules, each there so no one is signed out wrongly:
+// - Only a snapshot straight from the server counts (not the cache, not one
+//   holding our own unsaved write), so being offline can't sign the phone out.
+// - hw-device-registered is written only once the server has accepted this
+//   phone's entry; without it a missing entry means "add me".
+// - If the list can't be read, nothing happens: there's no list.
+// - Once it has decided to sign out, or stop() is called, it reacts to nothing more.
+
+const devicesRef = (uid: string) => doc(getFirestore(), "users", uid, "meta", "devices");
+
+export function watchDevices(uid: string, events: { list(map: DeviceMap | null): void; signedOut(): void }): () => void {
+  const ref = devicesRef(uid), id = thisDeviceId();
+  let done = false, registering = false;
+  const unsub = onSnapshot(ref, { includeMetadataChanges: true }, snap => {
+    if (done) return;
+    const map = ((snap.exists() ? snap.data()?.d : null) ?? {}) as DeviceMap;
+    events.list(map);
+    if (snap.metadata.fromCache || snap.metadata.hasPendingWrites) return;
+    const action = deviceAction(registeredFor() === uid, map[id], Date.now());
+    if (action === "register" && !registering) {
+      registering = true;
+      const at = Date.now();
+      const d: Record<string, unknown> = { [id]: { name: thisDeviceName(), createdAt: at, lastSeen: at } satisfies DeviceEntry };
+      for (const old of pruneDevices(map, id, LIMITS.devices)) d[old] = deleteField();
+      // Resolves only when the server has accepted it; only then is this phone "registered".
+      setDoc(ref, { d }, { merge: true })
+        .then(() => { if (!done && getAuth().currentUser?.uid === uid) setRegisteredFor(uid); })
+        .catch(() => { /* refused or offline: tried again on the next snapshot */ })
+        .finally(() => { registering = false; });
+    }
+    if (action === "touch") updateDoc(ref, { [`d.${id}.lastSeen`]: Date.now() }).catch(() => { /* best effort */ });
+    if (action === "signOut") { done = true; events.signedOut(); }
+  }, () => events.list(null));
+  return () => { done = true; unsub(); };
+}
+
+// Signs one other device out (Profile -> Devices -> Sign out).
+export function signOutDevice(uid: string, id: string): Promise<void> {
+  return updateDoc(devicesRef(uid), { [`d.${id}`]: deleteField() });
+}
+
+// Leaves only this phone's own entry (Sign out all other devices).
+export function signOutOtherDevices(uid: string, mine: DeviceEntry): Promise<void> {
+  return setDoc(devicesRef(uid), { d: { [thisDeviceId()]: mine } });
+}
+
+// This phone signing out: off the list (best effort, capped at 2s, since
+// offline a write only resolves at the server) and its note forgotten.
+export async function forgetThisDevice(uid: string): Promise<void> {
+  try { await Promise.race([updateDoc(devicesRef(uid), { [`d.${thisDeviceId()}`]: deleteField() }), new Promise(r => setTimeout(r, 2000))]); } catch { /* not listed, or no list */ }
+  setRegisteredFor(null);
 }

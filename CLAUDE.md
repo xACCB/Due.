@@ -175,9 +175,11 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   subjects and sign-in bringing them back. The black screen of 2026-11-18 didn't come back:
   opening and closing Profile, and a reload with it open, all work. It followed a dev-remote
   `seed` (a reload) with Profile open and three red errors on screen; if it happens again,
-  cold-restart. **Next:** Devices on the phone (register in `meta/devices`, core's
-  `deviceAction`, the Profile card, sign out when removed), then account deletion and an offline
-  indicator. The app is still in emulator mode (`.env.local`); restart the emulators each session
+  cold-restart. Then Devices (below), checked the same way: the phone registers, the website
+  signs it out and it signs itself out with the web's message, it re-registers on sign-in, "Sign
+  out all other devices" leaves only it, its own sign-out takes it off the list. **Next:** account
+  deletion and an offline indicator on the phone, the rest of the web's Profile (stats cards,
+  This device), then moving the website onto core's `createTaskSync`/`createProfileSync`. The app is still in emulator mode (`.env.local`); restart the emulators each session
   (data is lost when they stop) and sign in again from Profile (`"go":"/profile"`, then
   `"act":["profile","sign-in"]`).
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
@@ -212,7 +214,9 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   `com.duestudios.dueplanner` brings either to the front. None of this opens a window on the Mac.
   For sync, quicker: `node scripts/web-device.mjs <step>` is the website as a second device in a
   headless Chrome (no window), signed in as the phone's emulator user: `list`, `add`, `high`,
-  `done`, `delete` a task by title, or `settings "Monday|24-hour"`, then prints what it holds.
+  `done`, `delete` a task by title, `settings "Monday|24-hour"`, `devices`, or `signout "<device
+  name>"` from Profile's Devices card, then prints what it holds. Each run adds a "Chrome on Mac"
+  device that never signs out; the phone's "others" clears them.
 - **Sign-in on the phone (M3, started 2026-11-14):** `src/lib/firebase.ts` (React Native Firebase
   27: app, auth, firestore, app-check; `@react-native-google-signin/google-signin` 17, its Firebase
   variant, fetched with SPM like Firebase; `app.json` sets `useFrameworks: "dynamic"`, which
@@ -239,8 +243,19 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   uid, feeds it every change to the store, takes merges as `{kind:"cloud"}` (not an undo step) and
   exposes `sync` (`ready`, `pending`, `syncedAt`, `error`) and `signOut()` (flush capped at 3s, then
   clear the phone, except when the first sync never finished). Recaps wait for the first sync.
-  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Not yet: Devices,
-  account deletion, an offline indicator.
+  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Not yet: account
+  deletion, an offline indicator, Profile's stats cards and This device.
+  **Devices (2026-11-20):** `watchDevices` in `cloudSync.ts` is the website's Devices effect with
+  the same safety rules (server snapshots only, `hw-device-registered` written only after the
+  server accepted the entry, no list means nothing happens); `useAppValue` runs it while signed in
+  and exposes `devices` (core's `listDevices`), `signOutDevice`, `signOutOtherDevices` and
+  `signInNote`. When the list loses this phone it signs out, opens Profile and shows "This device
+  was signed out from another device". Its own sign-out stops the watcher first, then
+  `forgetThisDevice` (capped at 2s). The id and name are `lib/thisDevice.ts`: React Native has no
+  `crypto.getRandomValues`, so the 24-hex id uses `Math.random` (it must be unique, not secret);
+  the name is "DuePlanner app on iPhone/iPad/Android". No Remote Config kill switch on the phone
+  (the web's `devicesAutoSignOut`). Profile shows the web's Devices and Storage cards. Dev remote:
+  `"act":["profile","others"]` presses Sign out all other devices.
   **Profile fields (2026-11-20):** core's `createProfileSync` (`lib/profileSync.ts`, with
   `readProfile`/`profileDoc`/`sameProfile` in `lib/profile.ts`; tested in `profileSync.test.ts`)
   syncs `users/{uid}` as the website's two profile effects do: the first reading wins at sign-in, no

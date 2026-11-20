@@ -17,7 +17,10 @@ import { SETTINGS, cleanSubjectColors, cleanSubjects } from "./settings";
 import * as Fx from "./focusTimer";
 import * as S from "./taskStore";
 import { signOutEverywhere, startFirebase, takeExplicitSignIn, watchUser, type AuthUser } from "../lib/firebase";
-import { startProfileSync, startTaskSync, type ProfileSync, type TaskSync } from "../lib/cloudSync";
+import { forgetThisDevice, signOutDevice as removeDevice, signOutOtherDevices as keepOnlyThisDevice, startProfileSync, startTaskSync, watchDevices, type ProfileSync, type TaskSync } from "../lib/cloudSync";
+import { listDevices, type DeviceMap } from "@dueplanner/core/lib/devices";
+import { thisDeviceId } from "../lib/thisDevice";
+import { router } from "expo-router";
 import type { Profile } from "@dueplanner/core/lib/profile";
 import { DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, type LayoutName } from "@dueplanner/core/constants";
 import { SYNC_MESSAGES } from "@dueplanner/core/lib/taskSync";
@@ -216,7 +219,18 @@ export function useAppValue() {
   // of the account on the phone, since it's safe in the cloud: its tasks,
   // Recently deleted, subjects and their colours. Unlike the web, if the first
   // sync never finished they stay, since they may not have reached the cloud.
+  // The account's device list (Profile -> Devices): the server's map, or null
+  // while there's none to show. The watcher (lib/cloudSync.ts watchDevices)
+  // is stopped before this phone signs itself out, so removing its own entry
+  // isn't read as another device signing it out.
+  const [deviceMap, setDeviceMap] = useState<{ uid: string; map: DeviceMap | null } | null>(null);
+  const stopDevicesRef = useRef<(() => void) | null>(null);
+  // Shown on the sign-in screen after another device signed this one out.
+  const [signInNote, setSignInNote] = useState<string | null>(null);
+
   const signOut = useCallback(async () => {
+    stopDevicesRef.current?.();
+    stopDevicesRef.current = null;
     const engine = syncRef.current, profileEngine = profileSyncRef.current;
     const synced = (engine?.isReady() ?? false) && (profileEngine?.isReady() ?? false);
     try { await Promise.race([Promise.all([engine?.flush(), profileEngine?.flush()]), new Promise(r => setTimeout(r, 3000))]); } catch { /* shown as a sync error already */ }
@@ -224,6 +238,7 @@ export function useAppValue() {
     profileEngine?.stop();
     syncRef.current = null;
     profileSyncRef.current = null;
+    if (uid) await forgetThisDevice(uid);
     await signOutEverywhere();
     if (synced) {
       dispatch({ kind: "signedOut" });
@@ -238,7 +253,36 @@ export function useAppValue() {
     setNewerData(false);
     setProfileError(null);
     setNewerProfile(false);
-  }, [setRecaps, setRecapsChecked, setSubjects, setSubjectColors]);
+    setDeviceMap(null);
+  }, [uid, setRecaps, setRecapsChecked, setSubjects, setSubjectColors]);
+
+  // Watch the device list while signed in. When the server's list no longer
+  // holds this phone, someone signed it out from another device: sign out
+  // here too and say so on the sign-in screen.
+  const signOutRef = useRef(signOut);
+  useEffect(() => { signOutRef.current = signOut; });
+  useEffect(() => {
+    if (!uid) return;
+    const stop = watchDevices(uid, {
+      list: map => setDeviceMap({ uid, map }),
+      signedOut: () => {
+        stopDevicesRef.current = null;
+        signOutRef.current()
+          .then(() => { setSignInNote("This device was signed out from another device. Sign in again to keep syncing."); router.navigate("/profile"); })
+          .catch(() => {});
+      },
+    });
+    stopDevicesRef.current = stop;
+    return () => { stop(); if (stopDevicesRef.current === stop) stopDevicesRef.current = null; };
+  }, [uid]);
+  const devices = useMemo(() => (uid && deviceMap?.uid === uid && deviceMap.map ? listDevices(deviceMap.map, thisDeviceId()) : null), [uid, deviceMap]);
+  const signOutDevice = useCallback((id: string) => {
+    if (uid && id !== thisDeviceId()) removeDevice(uid, id).catch(() => {});
+  }, [uid]);
+  const signOutOtherDevices = useCallback(() => {
+    const mine = uid && deviceMap?.uid === uid ? deviceMap.map?.[thisDeviceId()] : undefined;
+    if (uid && mine) keepOnlyThisDevice(uid, mine).catch(() => {}); // not confirmed in the list yet: nothing safe to keep
+  }, [uid, deviceMap]);
 
   // Recaps, as on the web: when a day, week, month or year has ended since the
   // last check, write its snapshot (skipped when nothing was finished or worked
@@ -280,6 +324,7 @@ export function useAppValue() {
   return {
     T, h24, questions, fz, ms,
     homeFilter, setHomeFilter, subjectFilter, setSubjectFilter, focus, setFocus, drawerOpen, setDrawerOpen, user, authReady, undoToast, sayUndo, hideUndo, signOut,
+    devices, signOutDevice, signOutOtherDevices, signInNote, clearSignInNote: () => setSignInNote(null),
     // Where sync stands, for Profile and the sidebar (the web's syncStatus/syncError).
     sync: { ready: !!uid && syncReadyFor === uid, pending: syncState.pending, syncedAt: syncState.syncedAt, error: syncError ?? profileError ?? (newerData || newerProfile ? SYNC_MESSAGES.newer : null) },
     tasks: store.tasks,

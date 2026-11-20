@@ -66,7 +66,7 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   changes Claude Code's settings (hooks, MCP servers) is shown to the user first. Installed so far:
   verification-before-completion, systematic-debugging (obra/superpowers), stop-slop, emil-design-eng
   and apple-design (emilkowalski/skills), find-skills (vercel-labs), canvas-design (anthropics), plus the
-  frontend-design and playwright plugins, and the Context7 MCP server (`claude mcp add --transport http
+  frontend-design and playwright plugins, Maestro (phone UI tests, see `npm run test:ui`), and the Context7 MCP server (`claude mcp add --transport http
   --scope user context7 https://mcp.context7.com/mcp`: current library docs, e.g. Expo SDK 58; the
   lookups go to Upstash, not the code). Declined: git guardrails (blocks every `git push`), Impeccable
   (downloads a compiled engine and adds edit hooks).
@@ -187,7 +187,10 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   rest of the web's Profile on the phone (completion ring, time and By subject cards, This
   device), matched by screenshot against the website's. Then the website moved onto core's
   `createTaskSync`/`createProfileSync` (see "Sync engines" below), and `tests/e2e` gained a
-  settings check. **Next:** needs the user: trying the app on their own iPhone (free with an
+  settings check. Then Maestro (`npm run test:ui`) tried the gestures for the first time: card
+  swipes, the sidebar swipe, the sheet's drag to close, drag to reorder and the Deck all work in
+  the Simulator; VoiceOver's card actions gained Move up/Move down (the grip inside the card was
+  unreachable). **Next:** needs the user: trying the app on their own iPhone (free with an
   Apple ID in Xcode, re-signed every 7 days; needs its own App Check debug token), then the paid
   steps (Sign in with Apple, App Attest, TestFlight). Free but not started: the Android build
   (no Android SDK on the Mac yet), a phone version of the privacy policy, a phone What's New. The app is still in emulator mode (`.env.local`); restart the emulators each session
@@ -361,6 +364,17 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   sign-in, sync between devices, an edit conflict, a setting, a delete, and the device list. Needs
   Java. With emulators already running, `node tests/e2e/run.mjs` uses them (its accounts are new
   each run).
+- `npm run test:ui` (Mac only) -- Maestro, real taps and swipes in the booted Simulator against
+  the development build with Metro running: `apps/mobile/maestro/*.yaml` (card swipes with Undo,
+  the sidebar's edge swipe, the task sheet's drag to close, drag to reorder, the Deck), about a
+  minute. Start from Home, unscrolled, signed out, with the sample tasks (dev remote `"seed":true`;
+  signed in, the cloud brings back whatever a test changed). Each test leaves the app as it found
+  it. `apps/mobile/maestro/maestro.sh hierarchy` prints what Maestro sees. Notes: swipes need
+  `duration: 1000` (the default was too quick to count); a task card is one element to VoiceOver
+  and so to Maestro, so the reorder grip is aimed at by position. Installed with Homebrew
+  (`mobile-dev-inc/tap/maestro`, 2026-11-20, checked first: an Apache-2.0 release zip from its
+  GitHub with a checksum); the script turns off its usage data (`MAESTRO_CLI_NO_ANALYTICS`).
+  It updated Homebrew's openjdk to 27, which the Firebase emulators also use.
 - `npm run test:stress` -- one account filled to the 5,000 task cap on the emulator with the app's
   own write builder; timings go to `coverage/stress.txt`. Slow, not in CI. `STRESS_TASKS=300` for a
   quick run.

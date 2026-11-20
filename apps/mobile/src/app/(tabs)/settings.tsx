@@ -1,5 +1,5 @@
 import { useState, useRef, type ComponentRef } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import { GROUP_BY, LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, SUBJECT_COLOR_PALETTE, type LayoutName } from "@dueplanner/core/constants";
@@ -10,7 +10,7 @@ import { focusShowFor, showsPomodoro, showsStopwatch } from "@dueplanner/core/li
 import { contrastColor, ink } from "@dueplanner/core/lib/format";
 import { LIMITS } from "@dueplanner/core/lib/limits";
 import { useApp } from "../../state/appContext";
-import { requestNotifications } from "../../lib/notifications";
+import { turnReminders } from "../../lib/reminderSwitch";
 import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
@@ -57,14 +57,7 @@ export default function SettingsScreen() {
     }
     setEditing(null);
   };
-  const setReminders = async (on: boolean) => {
-    if (!on) { s.setNotifications(false); return; }
-    if (await requestNotifications()) { s.setNotifications(true); return; }
-    Alert.alert("Notifications are off", "Allow notifications for DuePlanner in the iPhone's Settings to get reminders.", [
-      { text: "Not now", style: "cancel" },
-      { text: "Open Settings", onPress: () => { Linking.openSettings().catch(() => {}); } },
-    ]);
-  };
+  const setReminders = (on: boolean) => turnReminders(on, s.setNotifications);
   const toggleOffset = (key: string, on: boolean) =>
     s.setReminderOffsets(REMINDER_OFFSETS.map(o => o.key as string).filter(k => (k === key ? on : s.reminderOffsets.includes(k))));
 

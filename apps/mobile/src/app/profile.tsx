@@ -1,31 +1,44 @@
-import { useState } from "react";
+import { useRef, useState, type ComponentRef } from "react";
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { Path, Svg } from "react-native-svg";
-import { formatAgo, ink } from "@dueplanner/core/lib/format";
+import { Circle, Path, Svg } from "react-native-svg";
+import { formatAgo, formatDuration, ink } from "@dueplanner/core/lib/format";
+import { completionStats, timeLeft } from "@dueplanner/core/lib/taskViews";
+import { priColor } from "@dueplanner/core/constants";
+import { todayISO } from "@dueplanner/core/lib/dates";
+import { turnReminders } from "../lib/reminderSwitch";
 import { LIMITS } from "@dueplanner/core/lib/limits";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 import { signInWithGoogle } from "../lib/firebase";
 import { syncStatusText } from "../lib/syncStatus";
 import { useNow } from "../lib/useNow";
-import { useDevAction } from "../lib/devScroll";
+import { useDevAction, useDevScroll } from "../lib/devScroll";
 import { IconPerson } from "../components/icons";
 
 const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
+const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
 
 // Profile (the web's ProfileModal), over everything, opened from the
 // sidebar's top row. Signed out: the web's sign-in screen, "Continue with
-// Google". Signed in: picture, name, email, the sync status, the web's
-// Devices and Storage cards, and Sign out. Still to come from the web: the
-// stats cards and This device.
+// Google". Signed in, as the web: picture, name, email and the sync status,
+// then the completion ring, time and By subject cards, Devices, Storage, This
+// device, and Sign out.
 export default function Profile() {
-  const { T, fz, user, authReady, sync, signOut, devices, signOutDevice, signOutOtherDevices, signInNote, clearSignInNote, tasks, trash } = useApp();
+  const { T, fz, user, authReady, sync, signOut, devices, signOutDevice, signOutOtherDevices, signInNote, clearSignInNote, tasks, trash, settings } = useApp();
   const now = useNow(30000);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const close = () => (router.canGoBack() ? router.back() : router.navigate("/"));
+  // The web's stats, from every task that isn't archived.
+  const shown = tasks.filter(t => !t.archived);
+  const stats = completionStats(shown);
+  const leftMins = timeLeft(shown, todayISO()).totalMins;
+  const doneMins = shown.filter(t => t.done).reduce((a, t) => a + (t.estMins || 0), 0);
+  const bySubject = settings.subjects
+    .map(name => ({ name, count: shown.filter(t => t.subject === name).length, color: settings.subjectColors[name] ?? T.textFaint }))
+    .filter(x => x.count > 0).sort((a, b) => b.count - a.count);
 
   const signIn = async () => {
     if (busy) return;
@@ -34,6 +47,8 @@ export default function Profile() {
     clearSignInNote();
     try { await signInWithGoogle(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useDevScroll(scrollRef); // development only: the dev remote's "scroll"
   // Development only: the dev remote's stand-ins for the buttons ("sign-in", "sign-out", "others").
   useDevAction("profile", what => { if (what === "sign-in") void signIn(); else if (what === "others") signOutOtherDevices(); else void signOut(); });
 
@@ -92,7 +107,7 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]}>
-      <ScrollView contentContainerStyle={styles.page}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.page}>
         {header}
         <View style={styles.who}>
           {user.photo
@@ -107,6 +122,54 @@ export default function Profile() {
           </View>
           {!!sync.error && <Text style={[styles.note, { fontSize: fz(11), color: ink("#FF4757", T.light), marginTop: 8, maxWidth: 280 }]}>{sync.error}</Text>}
         </View>
+        {/* The web's stats, over every task but archived ones. */}
+        <View style={[styles.card, styles.statsCard, { backgroundColor: T.card, borderColor: T.border, borderRadius: 16, padding: 20 }]}>
+          <View style={{ width: 80, height: 80 }}>
+            <Svg width={80} height={80} style={{ transform: [{ rotate: "-90deg" }] }}>
+              <Circle cx={40} cy={40} r={33} fill="none" stroke={T.border} strokeWidth={7} />
+              {stats.pct > 0 && <Circle cx={40} cy={40} r={33} fill="none" stroke={T.accent} strokeWidth={7} strokeDasharray="207" strokeDashoffset={207 * (1 - stats.pct / 100)} strokeLinecap="round" />}
+            </Svg>
+            <View style={[StyleSheet.absoluteFill, styles.center]}>
+              <Text style={{ fontFamily: F.heading, fontSize: fz(18), color: T.text }}>{stats.pct}%</Text>
+            </View>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: F.heading, fontSize: fz(13), color: T.textMuted, marginBottom: 10 }}>Completion</Text>
+            <View style={styles.statGrid}>
+              {[{ l: "Total", v: stats.total, c: T.text }, { l: "Done", v: stats.done, c: "#2ED573" }, { l: "Pending", v: stats.total - stats.done, c: T.accent }, { l: "Urgent", v: stats.urgent, c: priColor("high", settings.colorCodeUrgency) }].map(x => (
+                <View key={x.l} style={styles.statCell} accessible accessibilityLabel={`${x.l}: ${x.v}`}>
+                  <Text style={{ fontFamily: F.heading, fontSize: 20, lineHeight: 24, color: x.c }}>{x.v}</Text>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textFaint }}>{x.l}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+        <View style={styles.timeRow}>
+          {[{ v: formatDuration(leftMins) || "0m", l: "Estimated left" }, { v: formatDuration(doneMins) || "0m", l: "Completed work" }].map(x => (
+            <View key={x.l} style={[styles.card, styles.timeCard, { backgroundColor: T.card, borderColor: T.border }]}>
+              <Text style={{ fontFamily: F.heading, fontSize: 26, lineHeight: 32, color: T.accent }}>{x.v}</Text>
+              <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textFaint, marginTop: 2 }}>{x.l}</Text>
+            </View>
+          ))}
+        </View>
+        {bySubject.length > 0 && (
+          <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
+            <Text style={[styles.cardLabel, { fontSize: fz(10), color: T.textMuted }]} accessibilityRole="header">By subject</Text>
+            {bySubject.map(x => (
+              <View key={x.name} style={{ marginBottom: 10 }}>
+                <View style={styles.storageTop}>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>{x.name}</Text>
+                  <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textFaint }}>{x.count} task{x.count !== 1 ? "s" : ""}</Text>
+                </View>
+                <View style={[styles.bar, { backgroundColor: T.border }]}>
+                  <View style={[styles.barFill, { width: `${Math.round(x.count / stats.total * 100)}%`, backgroundColor: x.color }]} />
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Devices signed in to this account. Signing one out removes its entry;
             that device signs itself out when it next has the app open and
             online (lib/cloudSync.ts watchDevices), which the note says plainly. */}
@@ -160,6 +223,30 @@ export default function Profile() {
           <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textFaint, lineHeight: 15 }}>Finished and archived tasks count too. Deleting tasks frees up room.</Text>
         </View>
 
+        {/* This device: the phone's own settings (reminders are per device),
+            then the feedback form and the privacy policy. The web's "Install
+            DuePlanner" row reads as installed here: this is the app. */}
+        <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
+          <Text style={[styles.cardLabel, { fontSize: fz(10), color: T.textMuted }]} accessibilityRole="header">This device</Text>
+          <View style={styles.deviceLine}>
+            <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>App</Text>
+            <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textFaint }}>Installed on this device</Text>
+          </View>
+          <View style={[styles.deviceLine, { marginTop: 8 }]}>
+            <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.text }}>Reminders</Text>
+            <Pressable onPress={() => { turnReminders(!settings.notifications, settings.setNotifications).catch(() => {}); }}
+              accessibilityRole="button" accessibilityState={{ selected: settings.notifications }}
+              style={({ pressed }) => [styles.smallBtn, { borderColor: T.border, opacity: pressed ? 0.7 : 1 }]}>
+              <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.text }}>{settings.notifications ? "On. Turn off" : "Turn on"}</Text>
+            </Pressable>
+          </View>
+          <View style={[styles.rule, { backgroundColor: T.border + "33" }]} />
+          <View style={styles.links}>
+            <Text onPress={() => { Linking.openURL(FEEDBACK_URL).catch(() => {}); }} accessibilityRole="link" style={{ fontFamily: F.body, fontSize: fz(12), color: T.text, textDecorationLine: "underline" }}>Send feedback or report a bug</Text>
+            <Text onPress={() => { Linking.openURL(PRIVACY_URL).catch(() => {}); }} accessibilityRole="link" style={{ fontFamily: F.body, fontSize: fz(12), color: T.textMuted, textDecorationLine: "underline" }}>Privacy policy</Text>
+          </View>
+        </View>
+
         <Pressable onPress={async () => { await signOut().catch(() => {}); close(); }} accessibilityRole="button"
           style={({ pressed }) => [styles.signOut, { opacity: pressed ? 0.7 : 1 }]}>
           <Text style={{ fontFamily: F.body, fontSize: fz(13), color: ink("#FF4757", T.light) }}>Sign out</Text>
@@ -202,6 +289,15 @@ const styles = StyleSheet.create({
   name: { fontFamily: F.heading, fontSize: 24, lineHeight: 30, marginBottom: 4 },
   pill: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
   pillDot: { width: 6, height: 6, borderRadius: 3 },
+  statsCard: { flexDirection: "row", alignItems: "center", gap: 20 },
+  center: { alignItems: "center", justifyContent: "center" },
+  statGrid: { flexDirection: "row", flexWrap: "wrap", rowGap: 8 },
+  statCell: { width: "50%" },
+  timeRow: { flexDirection: "row", gap: 10 },
+  timeCard: { flex: 1 },
+  deviceLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 32 },
+  rule: { height: 1, marginVertical: 12 },
+  links: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   card: { borderRadius: 14, padding: 16, borderWidth: 1, marginBottom: 14 },
   cardLabel: { fontFamily: F.body, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 12 },
   deviceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 },

@@ -180,9 +180,10 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   signs it out and it signs itself out with the web's message, it re-registers on sign-in, "Sign
   out all other devices" leaves only it, its own sign-out takes it off the list. Then account
   deletion and the offline indicator (below), checked against the emulators with the website open
-  in Chrome on the same account (which signed itself out when the device list went). **Next:** the
-  rest of the web's Profile on the phone (stats cards, This device), then moving the website onto
-  core's `createTaskSync`/`createProfileSync`. The app is still in emulator mode (`.env.local`); restart the emulators each session
+  in Chrome on the same account (which signed itself out when the device list went). Then the
+  rest of the web's Profile on the phone (completion ring, time and By subject cards, This
+  device), matched by screenshot against the website's. **Next:** moving the website onto core's
+  `createTaskSync`/`createProfileSync`. The app is still in emulator mode (`.env.local`); restart the emulators each session
   (data is lost when they stop) and sign in again from Profile (`"go":"/profile"`, then
   `"act":["profile","sign-in"]`).
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
@@ -246,8 +247,9 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   uid, feeds it every change to the store, takes merges as `{kind:"cloud"}` (not an undo step) and
   exposes `sync` (`ready`, `pending`, `syncedAt`, `error`) and `signOut()` (flush capped at 3s, then
   clear the phone, except when the first sync never finished). Recaps wait for the first sync.
-  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Not yet: Profile's
-  stats cards and This device.
+  Profile and the sidebar show the web's status line (`lib/syncStatus.ts`). Profile has all of
+  the web's cards; its This device card shows "Installed on this device" (it is the app) and the
+  reminders switch (`lib/reminderSwitch.ts`, shared with Settings).
   **Offline (2026-11-20):** `createTaskSync`'s status now carries `fromCache` (the listeners have
   only the device's cache: Firestore can't reach the cloud). `useAppValue` turns `sync.offline` on
   after 3s of that (so starting up doesn't flash it) and off at the next server snapshot; the

@@ -1,8 +1,8 @@
 // The synced "profile" fields (users/{uid}): the settings that follow the
 // account rather than the device. The same list as PROFILE_FIELDS in
 // limits.ts and profileFields() in firestore.rules, less schemaVersion.
-// The website's profile listener does these checks inline in App.tsx; the
-// phone (apps/mobile/src/lib/profileSync.ts) uses these.
+// Both apps read and write the profile through these, by way of the shared
+// sync engine (createProfileSync in profileSync.ts). Tested in profile.test.ts.
 import { DEFAULT_SUBJECT_COLORS, LAYOUTS } from "../constants";
 import { migrateProfile, SCHEMA_VERSION } from "./migrations";
 

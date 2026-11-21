@@ -199,6 +199,15 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   (no Android SDK on the Mac yet), a phone version of the privacy policy, a phone What's New. The app is still in emulator mode (`.env.local`); restart the emulators each session
   (data is lost when they stop) and sign in again from Profile (`"go":"/profile"`, then
   `"act":["profile","sign-in"]`).
+- **2026-11-21:** the phone's transitions now match the website's ("Motion on the phone"
+  below), the Expo SDK 58 patch updates are in (a native build; CocoaPods needed `pod update`
+  of the Expo pods only), and **Profiles** were built on the branch `profiles` for both apps
+  (below). **Not merged and its rules not deployed:** waiting for the user to try it and say go.
+  To ship: `npm run test:rules`, deploy the rules (`npx firebase-tools deploy --only
+  firestore:rules`, fill in the changelog's Live date), then merge to `main`. The rules must go
+  first, or every profile save and every task added under a profile is refused. Open
+  question for the user: existing tasks stay under All when the first profile is added (my
+  default); they might prefer them moved into it.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
   `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with

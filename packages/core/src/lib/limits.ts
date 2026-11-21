@@ -19,6 +19,8 @@ export const LIMITS = {
   devices: 20,        // signed-in devices listed per account; the longest idle drop off
   schemaVersion: 1000, // highest data version a doc may claim (src/lib/migrations.ts)
   grade: 20,          // characters in a task's grade ("A-", "92%", "18/20")
+  profiles: 10,       // profiles per account (lib/profiles.ts, the profile doc)
+  profileName: 40,    // characters in a profile's name (and a task's profile)
 } as const;
 
 // The fields a synced document may hold. firestore.rules refuses a new task
@@ -32,12 +34,13 @@ const TASK_FIELD_MAP: Record<keyof Task, true> = {
   id: true, title: true, subject: true, dueDate: true, dueTime: true, estMins: true, done: true, order: true,
   subtasks: true, recurrence: true, archived: true, completedAt: true, tags: true, priorityOverride: true,
   sessions: true, spawnedNextId: true, difficulty: true, grade: true, pinned: true,
+  profile: true,
 };
 // updatedAt and schemaVersion are sync's own (when the edit happened, which
 // shape the doc holds: src/lib/migrations.ts); a trash entry adds deletedAt.
 export const TASK_FIELDS: readonly string[] = [...Object.keys(TASK_FIELD_MAP), "updatedAt", "schemaVersion"];
 export const TRASH_FIELDS: readonly string[] = [...TASK_FIELDS, "deletedAt"];
-export const PROFILE_FIELDS: readonly string[] = ["layout", "colorCodeUrgency", "subjects", "subjectColors", "timeFormat", "weekStart", "schemaVersion"];
+export const PROFILE_FIELDS: readonly string[] = ["layout", "colorCodeUrgency", "subjects", "subjectColors", "timeFormat", "weekStart", "profiles", "schemaVersion"];
 
 // A task as it is sent to the cloud: only the fields the rules accept. A task
 // kept on the device since an early version, or brought in from a backup, can
@@ -94,5 +97,6 @@ export function sanitizeTask<T extends Record<string, unknown>>(t: T): T {
   if ("difficulty" in t && !DIFFICULTY_KEYS.includes(t.difficulty as string)) delete out.difficulty;
   if ("grade" in t) { if (typeof t.grade === "string" && t.grade.trim()) out.grade = oneLine(t.grade).trim().slice(0, LIMITS.grade); else delete out.grade; }
   if ("pinned" in t) { if (t.pinned === true) out.pinned = true; else delete out.pinned; }
+  if ("profile" in t) { if (typeof t.profile === "string" && t.profile.trim()) out.profile = oneLine(t.profile).trim().slice(0, LIMITS.profileName); else delete out.profile; }
   return out as T;
 }

@@ -7,7 +7,7 @@ import { SYNC_MESSAGES } from "./taskSync";
 
 const base: Profile = {
   layout: "list", colorCodeUrgency: true, subjects: ["Math", "English"],
-  subjectColors: { ...DEFAULT_SUBJECT_COLORS }, timeFormat: "12h", weekStart: 0,
+  subjectColors: { ...DEFAULT_SUBJECT_COLORS }, timeFormat: "12h", weekStart: 0, profiles: [],
 };
 
 // One users/{uid} doc shared by any number of devices, with hand-run timers

@@ -33,6 +33,10 @@ const expected: [string, string, number][] = [
   ["Recently deleted entries per account", "a.t", LIMITS.trash],
   ["devices per account", "data.d.size()", LIMITS.devices],
   ["a doc's data version", "data.schemaVersion", LIMITS.schemaVersion],
+  ["a task's grade", "data.grade.size()", LIMITS.grade],
+  ["a task's profile", "data.profile.size()", LIMITS.profileName],
+  ["profiles per account", "data.profiles.size()", LIMITS.profiles],
+  ["profile text per account", "data.profiles.join('').size()", LIMITS.profiles * LIMITS.profileName],
 ];
 
 describe("firestore.rules agrees with LIMITS", () => {

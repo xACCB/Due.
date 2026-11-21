@@ -20,6 +20,7 @@ export interface Task {
   difficulty?: Difficulty; // how hard it is, separate from how long (estMins); removed to clear
   grade?: string; // the grade received, free text ("A-", "92%", "18/20"), for a finished task; removed to clear
   pinned?: boolean; // kept at the top of the list (sortTasks), above the user's own order
+  profile?: string; // the profile it belongs to (lib/profiles.ts); none means it shows only under "All"
 }
 
 export type Difficulty = "easy" | "medium" | "hard";

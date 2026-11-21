@@ -5,6 +5,7 @@
 // sync engine (createProfileSync in profileSync.ts). Tested in profile.test.ts.
 import { DEFAULT_SUBJECT_COLORS, LAYOUTS } from "../constants";
 import { migrateProfile, SCHEMA_VERSION } from "./migrations";
+import { LIMITS } from "./limits";
 
 export type Profile = {
   layout: string;
@@ -13,9 +14,10 @@ export type Profile = {
   subjectColors: Record<string, string>;
   timeFormat: "12h" | "24h";
   weekStart: 0 | 1;
+  profiles: string[]; // lib/profiles.ts: none until the user adds some
 };
 
-export const PROFILE_KEYS = ["layout", "colorCodeUrgency", "subjects", "subjectColors", "timeFormat", "weekStart"] as const satisfies readonly (keyof Profile)[];
+export const PROFILE_KEYS = ["layout", "colorCodeUrgency", "subjects", "subjectColors", "timeFormat", "weekStart", "profiles"] as const satisfies readonly (keyof Profile)[];
 
 // What a cloud profile doc says, brought up to this app's version, keeping
 // only fields of the right shape (the doc is untyped: an old app, a bug or a
@@ -30,6 +32,7 @@ export function readProfile(raw: Record<string, unknown>): Partial<Profile> {
   if (d.timeFormat === "12h" || d.timeFormat === "24h") out.timeFormat = d.timeFormat;
   if (d.weekStart === 0 || d.weekStart === 1) out.weekStart = d.weekStart;
   if (Array.isArray(d.subjects) && d.subjects.every(s => typeof s === "string")) out.subjects = d.subjects as string[];
+  if (Array.isArray(d.profiles) && d.profiles.every(s => typeof s === "string")) out.profiles = (d.profiles as string[]).slice(0, LIMITS.profiles);
   if (d.subjectColors && typeof d.subjectColors === "object" && !Array.isArray(d.subjectColors)
     && Object.values(d.subjectColors).every(v => typeof v === "string")) {
     out.subjectColors = { ...DEFAULT_SUBJECT_COLORS, ...(d.subjectColors as Record<string, string>) };
@@ -42,12 +45,12 @@ export function profileDoc(p: Profile): Record<string, unknown> {
   return {
     layout: p.layout, colorCodeUrgency: p.colorCodeUrgency, subjects: p.subjects,
     subjectColors: p.subjectColors, timeFormat: p.timeFormat, weekStart: p.weekStart,
-    schemaVersion: SCHEMA_VERSION,
+    profiles: p.profiles, schemaVersion: SCHEMA_VERSION,
   };
 }
 
-// Whether two profiles hold the same values. Subjects compare in order
-// (their order is the user's); colours by key, whatever the key order.
+// Whether two profiles hold the same values. Subjects and profiles compare in
+// order (their order is the user's); colours by key, whatever the key order.
 export function sameProfile(a: Partial<Profile>, b: Partial<Profile>): boolean {
   return PROFILE_KEYS.every(k => {
     const x = a[k], y = b[k];
@@ -56,7 +59,7 @@ export function sameProfile(a: Partial<Profile>, b: Partial<Profile>): boolean {
       const keys = new Set([...Object.keys(cx), ...Object.keys(cy)]);
       return x === undefined ? y === undefined : y !== undefined && [...keys].every(c => cx[c] === cy[c]);
     }
-    if (k === "subjects") {
+    if (k === "subjects" || k === "profiles") {
       const sx = x as string[] | undefined, sy = y as string[] | undefined;
       return sx === sy || (!!sx && !!sy && sx.length === sy.length && sx.every((s, i) => s === sy[i]));
     }

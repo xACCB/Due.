@@ -50,6 +50,16 @@ describe("profile doc (users/{uid})", () => {
     await assertFails(setDoc(doc(db, "users/alice"), { subjects:"Math" }, { merge:true }));
     await assertFails(setDoc(doc(db, "users/alice"), { subjects:Array.from({length:201},(_,i)=>`S${i}`) }, { merge:true }));
   });
+  it("accepts up to 10 profiles of text, and refuses more or other kinds", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice");
+    await assertSucceeds(setDoc(ref, { profiles:[] }, { merge:true }));
+    await assertSucceeds(setDoc(ref, { profiles:Array.from({length:10},(_,i)=>`P${i}`.padEnd(40, "x")) }, { merge:true }));
+    await assertFails(setDoc(ref, { profiles:Array.from({length:11},(_,i)=>`P${i}`) }, { merge:true }));
+    await assertFails(setDoc(ref, { profiles:["x".repeat(401)] }, { merge:true }));
+    await assertFails(setDoc(ref, { profiles:"Homework" }, { merge:true }));
+    await assertFails(setDoc(ref, { profiles:["Homework", 2] }, { merge:true }));
+  });
   it("rejects subjectColors that aren't a map", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
     await assertFails(setDoc(doc(db, "users/alice"), { subjectColors:["#FF6B6B"] }, { merge:true }));
@@ -151,7 +161,7 @@ describe("task sync metadata", () => {
 describe("size caps", () => {
   const full = { ...validTask, subtasks:[{ id:"a", text:"x", done:false }], recurrence:"weekly", archived:false,
     completedAt:null, tags:["exam"], priorityOverride:"high", sessions:[{ mins:25, at:1 }], spawnedNextId:null, updatedAt:1,
-    difficulty:"hard", grade:"A-", pinned:true };
+    difficulty:"hard", grade:"A-", pinned:true, profile:"Homework" };
   const list = (n:number, f:(i:number)=>unknown) => Array.from({ length:n }, (_, i) => f(i));
   it("accepts a task using every optional field the app writes", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
@@ -196,6 +206,14 @@ describe("size caps", () => {
     await assertFails(setDoc(ref, { ...validTask, grade:92 }));
     await assertSucceeds(setDoc(ref, { ...validTask, pinned:false }));
     await assertFails(setDoc(ref, { ...validTask, pinned:"yes" }));
+  });
+  it("accepts a profile name of up to 40 characters, and nothing else", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/tasks/1");
+    await assertSucceeds(setDoc(ref, { ...validTask, profile:"x".repeat(40) }));
+    await assertFails(setDoc(ref, { ...validTask, profile:"x".repeat(41) }));
+    await assertFails(setDoc(ref, { ...validTask, profile:["Homework"] }));
+    await assertFails(setDoc(ref, { ...validTask, profile:null }));
   });
   it("rejects a task padded with lots of extra fields", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();

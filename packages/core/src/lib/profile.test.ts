@@ -10,6 +10,7 @@ const full: Profile = {
   subjectColors: { ...DEFAULT_SUBJECT_COLORS, Math: "#123456" },
   timeFormat: "24h",
   weekStart: 1,
+  profiles: ["Homework", "Sports"],
 };
 
 describe("readProfile", () => {
@@ -25,6 +26,7 @@ describe("readProfile", () => {
       subjectColors: ["#fff"],
       timeFormat: "12",
       weekStart: 2,
+      profiles: "Homework",
       schemaVersion: SCHEMA_VERSION,
     });
     expect(read).toEqual({});
@@ -41,6 +43,12 @@ describe("readProfile", () => {
 
   it("reads a doc with no version (an old app) and ignores fields it doesn't know", () => {
     expect(readProfile({ layout: "board", scratchpad: "old notes" })).toEqual({ layout: "board" });
+  });
+
+  it("reads the profile list, refusing one that isn't all text", () => {
+    expect(readProfile({ profiles: ["Homework"] })).toEqual({ profiles: ["Homework"] });
+    expect(readProfile({ profiles: ["Homework", 2] })).toEqual({});
+    expect(readProfile({ profiles: [] })).toEqual({ profiles: [] });
   });
 
   it("keeps an empty subject list (the user deleted them all)", () => {
@@ -61,8 +69,10 @@ describe("sameProfile", () => {
     expect(sameProfile(full, { ...full, subjects: [...full.subjects], subjectColors: { ...full.subjectColors } })).toBe(true);
   });
 
-  it("compares subjects in order: their order is the user's", () => {
+  it("compares subjects and profiles in order: their order is the user's", () => {
     expect(sameProfile({ subjects: ["Math", "English"] }, { subjects: ["English", "Math"] })).toBe(false);
+    expect(sameProfile({ profiles: ["A", "B"] }, { profiles: ["B", "A"] })).toBe(false);
+    expect(sameProfile({ profiles: ["A"] }, { profiles: ["A"] })).toBe(true);
   });
 
   it("compares colours by key, whatever the key order", () => {

@@ -66,6 +66,33 @@ export function offsetReminders(tasks: Task[], enabledOffsets: string[], already
   return { notes, sent, changed };
 }
 
+// ---- Good news: "Nothing due tomorrow" ----
+// The evening before a day with nothing due, at GOOD_NEWS_HOUR, a note saying
+// so (Settings -> Reminders -> Good news). Only while something is still open
+// somewhere: with an empty list, a note every evening would just be noise.
+export const GOOD_NEWS_HOUR = 19;
+export const GOOD_NEWS: ReminderNote = { title: "Nothing due tomorrow", body: "Enjoy your evening." };
+
+// The day after `day` (YYYY-MM-DD), in local time.
+function nextDay(day: string): string {
+  const d = new Date(`${day}T12:00`);
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Whether the evening of `day` should bring the good news about the day after.
+export function goodNewsFor(tasks: Task[], day: string): boolean {
+  const open = tasks.filter(t => !t.done && !t.archived);
+  const tomorrow = nextDay(day);
+  return open.length > 0 && !open.some(t => t.dueDate === tomorrow);
+}
+
+// The website, while open: the good news owed now (it's evening and the note
+// for today hasn't been shown yet), or null. The caller remembers `today`.
+export function goodNewsNow(tasks: Task[], today: string, hour: number, shownFor: string | null): ReminderNote | null {
+  return hour >= GOOD_NEWS_HOUR && shownFor !== today && goodNewsFor(tasks, today) ? GOOD_NEWS : null;
+}
+
 // ---- Scheduled ahead (the phone app) ----
 // A phone can schedule notifications to fire later with the app closed, so
 // instead of "what is owed now" it asks "what will be owed, and when". The
@@ -77,8 +104,9 @@ export function offsetReminders(tasks: Task[], enabledOffsets: string[], already
 // Only future ones, soonest first, at most `max` (iOS keeps 64 pending per app).
 export type ScheduledReminder = ReminderNote & { id: string; at: number };
 
-export function upcomingReminders(tasks: Task[], enabledOffsets: string[], now: number, h24: boolean, opts: { summaryHour?: number; max?: number } = {}): ScheduledReminder[] {
-  const { summaryHour = 8, max = 60 } = opts;
+// With `goodNews`, also the good news above for each of the next 7 evenings.
+export function upcomingReminders(tasks: Task[], enabledOffsets: string[], now: number, h24: boolean, opts: { summaryHour?: number; max?: number; goodNews?: boolean } = {}): ScheduledReminder[] {
+  const { summaryHour = 8, max = 60, goodNews = false } = opts;
   const out: ScheduledReminder[] = [];
   const byDay = new Map<string, Task[]>();
   for (const t of tasks) {
@@ -104,6 +132,14 @@ export function upcomingReminders(tasks: Task[], enabledOffsets: string[], now: 
       title: list.length === 1 ? `"${list[0].title}" is due today` : `${list.length} tasks due today`,
       body: list.slice(0, 3).map(t => t.title).join(", "),
     });
+  }
+  if (goodNews) {
+    const d = new Date(now);
+    let day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    for (let i = 0; i < 7; i++, day = nextDay(day)) {
+      const at = new Date(`${day}T${String(GOOD_NEWS_HOUR).padStart(2, "0")}:00`).getTime();
+      if (at > now && goodNewsFor(tasks, day)) out.push({ id: `rem-free-${day}`, at, ...GOOD_NEWS });
+    }
   }
   return out.sort((a, b) => a.at - b.at).slice(0, max);
 }

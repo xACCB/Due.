@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../types";
-import { dailySummary, dueIn, offsetReminders, upcomingReminders } from "./reminders";
+import { dailySummary, dueIn, GOOD_NEWS, GOOD_NEWS_HOUR, goodNewsFor, goodNewsNow, offsetReminders, upcomingReminders } from "./reminders";
 
 const task = (id: number, extra: Partial<Task> = {}): Task =>
   ({ id, title: `Task ${id}`, subject: "", dueDate: "", dueTime: "", estMins: 0, done: false, order: id, ...extra });
@@ -134,5 +134,38 @@ describe("upcomingReminders", () => {
     const r = upcomingReminders(many, ["1d", "1h", "0"], now, false, { max: 60 });
     expect(r).toHaveLength(60);
     expect(r.every((x, i) => i === 0 || r[i - 1].at <= x.at)).toBe(true);
+  });
+});
+
+describe("good news", () => {
+  const t = (id: number, dueDate: string, extra: Partial<Task> = {}): Task =>
+    ({ id, title: `T${id}`, subject: "", dueDate, dueTime: "", estMins: 0, done: false, order: id, ...extra });
+
+  it("is owed on an evening when nothing open is due the next day", () => {
+    expect(goodNewsFor([t(1, "2026-11-25")], "2026-11-21")).toBe(true);
+    expect(goodNewsFor([t(1, "2026-11-22")], "2026-11-21")).toBe(false);
+    // done and archived tasks don't count either way
+    expect(goodNewsFor([t(1, "2026-11-22", { done: true }), t(2, "")], "2026-11-21")).toBe(true);
+  });
+  it("isn't owed with nothing open at all", () => {
+    expect(goodNewsFor([], "2026-11-21")).toBe(false);
+    expect(goodNewsFor([t(1, "2026-11-25", { done: true })], "2026-11-21")).toBe(false);
+  });
+  it("crosses the end of a month", () => {
+    expect(goodNewsFor([t(1, "2026-12-01")], "2026-11-30")).toBe(false);
+  });
+  it("on the website: from 7pm, once a day", () => {
+    const tasks = [t(1, "2026-11-25")];
+    expect(goodNewsNow(tasks, "2026-11-21", 18, null)).toBeNull();
+    expect(goodNewsNow(tasks, "2026-11-21", GOOD_NEWS_HOUR, null)).toEqual(GOOD_NEWS);
+    expect(goodNewsNow(tasks, "2026-11-21", 21, "2026-11-21")).toBeNull();
+  });
+  it("on the phone: scheduled for the coming evenings that need it, only when asked", () => {
+    const now = new Date("2026-11-21T10:00").getTime();
+    const tasks = [t(1, "2026-11-23")]; // due Monday: no good news on Sunday evening
+    const free = upcomingReminders(tasks, [], now, false, { goodNews: true }).filter(r => r.id.startsWith("rem-free-"));
+    expect(free.map(r => r.id)).toEqual(["rem-free-2026-11-21", "rem-free-2026-11-23", "rem-free-2026-11-24", "rem-free-2026-11-25", "rem-free-2026-11-26", "rem-free-2026-11-27"]);
+    expect(new Date(free[0].at).getHours()).toBe(GOOD_NEWS_HOUR);
+    expect(upcomingReminders(tasks, [], now, false).some(r => r.id.startsWith("rem-free-"))).toBe(false);
   });
 });

@@ -34,17 +34,17 @@ export async function requestNotifications(): Promise<boolean> {
 // to get right than working out which ones changed. Runs one at a time: two
 // overlapping passes could leave a reminder the newer one meant to remove.
 let queue: Promise<void> = Promise.resolve();
-export function syncReminders(tasks: Task[], on: boolean, offsets: string[], h24: boolean): Promise<void> {
-  queue = queue.then(() => resync(tasks, on, offsets, h24)).catch(() => {});
+export function syncReminders(tasks: Task[], on: boolean, offsets: string[], h24: boolean, goodNews = false): Promise<void> {
+  queue = queue.then(() => resync(tasks, on, offsets, h24, goodNews)).catch(() => {});
   return queue;
 }
 
-async function resync(tasks: Task[], on: boolean, offsets: string[], h24: boolean): Promise<void> {
+async function resync(tasks: Task[], on: boolean, offsets: string[], h24: boolean, goodNews: boolean): Promise<void> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(scheduled.filter(n => isReminder(n.identifier)).map(n => Notifications.cancelScheduledNotificationAsync(n.identifier)));
   if (!on || !(await notificationsAllowed())) return;
   // 62, not 64: iOS keeps at most 64 pending per app, and the Focus timer needs one.
-  for (const r of upcomingReminders(tasks, offsets, clock(), h24, { max: 62 })) {
+  for (const r of upcomingReminders(tasks, offsets, clock(), h24, { max: 62, goodNews })) {
     await Notifications.scheduleNotificationAsync({
       identifier: r.id,
       content: { title: r.title, body: r.body },

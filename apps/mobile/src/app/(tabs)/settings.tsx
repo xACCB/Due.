@@ -294,6 +294,9 @@ export default function SettingsScreen() {
                 })}
               </View>
               <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint }]}>Only applies to tasks with a specific due time set (not just a date). A task with only a date gets one reminder at 8 AM on the day.</Text>
+              <View style={{ marginTop: 14 }}>
+                <ToggleLine label="Good news" hint="At 7 PM, when nothing is due the next day" on={s.goodNews} onChange={s.setGoodNews} T={T} />
+              </View>
             </View>
           )}
         </Section>

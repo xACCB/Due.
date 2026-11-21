@@ -13,7 +13,7 @@ import type { SnoozeKind } from "@dueplanner/core/lib/tasks";
 import { trashEntries, pruneTrash } from "@dueplanner/core/lib/trash";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
 import { secondsLeft, secondsSince, stopwatchTotal, pomodoroFinishMinutes, pomodoroCreditMinutes, lengthChangeResetsTimer, sessionMinutes, withSession, cleanGoal, GOAL_MAX } from "@dueplanner/core/lib/timers";
-import { dailySummary, offsetReminders } from "@dueplanner/core/lib/reminders";
+import { dailySummary, goodNewsNow, offsetReminders } from "@dueplanner/core/lib/reminders";
 import type { SentReminders } from "@dueplanner/core/lib/reminders";
 import { tasksCsv, readBackup, withImportedSubjects, withImportedColors, withImportedTemplates, withSyllabusTasks } from "@dueplanner/core/lib/backup";
 import { heldOpen, isSettled, withHeldOpen, allTagsOf, sortTasks, filterTasks, groupTasks, prioritySplit, timeLeft } from "@dueplanner/core/lib/taskViews";
@@ -139,6 +139,8 @@ export default function HomeworkPlanner() {
   const [showSuggestion,setShowSuggestion]=usePersistedState("hw-showsuggestion",true);
   // Home's greeting ("Good evening, 3 things left today"), local like the suggestion's switch.
   const [showGreeting,setShowGreeting]=usePersistedState("hw-greeting",true);
+  // Reminders -> Good news: "Nothing due tomorrow" at 7pm (core's reminders.ts).
+  const [goodNews,setGoodNews]=usePersistedState("hw-good-news",true);
   // The suggestion card's × hides just the current suggestion (by task id);
   // it comes back when a different task becomes the most urgent. Turning
   // suggestions off entirely is the Settings toggle.
@@ -203,6 +205,11 @@ export default function HomeworkPlanner() {
           notify(summary.title,{body:summary.body});
         }
       }
+      // Good news: the evening before a day with nothing due, once.
+      if(goodNews){
+        const note=goodNewsNow(tasks,today,new Date().getHours(),localStorage.getItem("hw-good-news-shown"));
+        if(note){localStorage.setItem("hw-good-news-shown",today);notify(note.title,{body:note.body});}
+      }
       if(enabledOffsets.length===0)return;
       let sent:SentReminders={};
       try{sent=JSON.parse(localStorage.getItem("hw-sent-reminders")||"{}");}catch{/* ignore */}
@@ -216,7 +223,7 @@ export default function HomeworkPlanner() {
     // the tab regains focus, so also re-check periodically while it's open.
     const interval=setInterval(checkDue,60000);
     return ()=>{document.removeEventListener("visibilitychange",checkDue);clearInterval(interval);};
-  },[notificationsEnabled,tasks,enabledOffsets,h24]);
+  },[notificationsEnabled,tasks,enabledOffsets,h24,goodNews]);
 
   // The old Desktop Layout setting (narrow / wide / icon sidebar) is gone: wide
   // screens always get the sidebar now. Its saved choice is cleared once.
@@ -1773,7 +1780,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects","settings-profiles":"profiles","greeting-toggle":"tasklist",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects","settings-profiles":"profiles","greeting-toggle":"tasklist","good-news":"reminders",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -2976,6 +2983,10 @@ export default function HomeworkPlanner() {
                   </div>
                   <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:8}}>
                     Only applies to tasks with a specific due time set (not just a date).
+                  </div>
+                  <div data-tour="good-news" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginTop:14}}>
+                    <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Good news</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>At 7 PM, when nothing is due the next day</div></div>
+                    <Toggle on={goodNews} onChange={setGoodNews} T={T} label="Good news"/>
                   </div>
                 </div>
               )}

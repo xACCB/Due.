@@ -127,6 +127,7 @@ export function useAppValue(restart: () => void = () => {}) {
   const [showSuggestion, setShowSuggestion] = useSetting("showSuggestion");
   const [showGreeting, setShowGreeting] = useSetting("showGreeting");
   const [focusGoal, setFocusGoal] = useSetting("focusGoal");
+  const [goodNews, setGoodNews] = useSetting("goodNews");
   const [hiddenSuggestionFor, setHiddenSuggestionFor] = useSetting("hiddenSuggestionFor");
   const [autoArchiveDays, setAutoArchiveDays] = useSetting("autoArchiveDays");
   const [templates, setTemplates] = useSetting("templates");
@@ -381,9 +382,9 @@ export function useAppValue(restart: () => void = () => {}) {
   // Reminders follow the tasks: rescheduled a moment after any change, so a
   // burst of edits makes one pass, not one per keystroke.
   useEffect(() => {
-    const t = setTimeout(() => { syncReminders(store.tasks, notifications, reminderOffsets, h24).catch(() => {}); }, 800);
+    const t = setTimeout(() => { syncReminders(store.tasks, notifications, reminderOffsets, h24, goodNews).catch(() => {}); }, 800);
     return () => clearTimeout(t);
-  }, [store.tasks, notifications, reminderOffsets, h24]);
+  }, [store.tasks, notifications, reminderOffsets, h24, goodNews]);
 
   return {
     T, h24, questions, fz, ms,
@@ -427,7 +428,7 @@ export function useAppValue(restart: () => void = () => {}) {
       pomodoroWork, setPomodoroWork, pomodoroBreak, setPomodoroBreak, pomodoroAutoBreak, setPomodoroAutoBreak,
       focusShow, setFocusShow, addQuestions, setAddQuestions,
       subjects, setSubjects, subjectColors, setSubjectColors,
-      textSize, setTextSize, animSpeed, setAnimSpeed, layout, setLayout, groupBy, setGroupBy, showSuggestion, setShowSuggestion, showGreeting, setShowGreeting, focusGoal, setFocusGoal, hiddenSuggestionFor, setHiddenSuggestionFor,
+      textSize, setTextSize, animSpeed, setAnimSpeed, layout, setLayout, groupBy, setGroupBy, showSuggestion, setShowSuggestion, showGreeting, setShowGreeting, focusGoal, setFocusGoal, goodNews, setGoodNews, hiddenSuggestionFor, setHiddenSuggestionFor,
       autoArchiveDays, setAutoArchiveDays, templates, setTemplates,
       recaps, setRecaps, openSubjects, setOpenSubjects,
     },

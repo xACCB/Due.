@@ -10,6 +10,7 @@ import { useApp } from "../state/appContext";
 import { useDevAction } from "../lib/devScroll";
 import { F } from "../theme/fonts";
 import { TimerText } from "./TimerPill";
+import { Chip } from "./ui";
 import { syncStatusText } from "../lib/syncStatus";
 import { clock } from "../lib/clock";
 import { IconBell, IconCalendar, IconChevron, IconFocus, IconHistory, IconImport, IconPerson, IconSearch, IconSettings, IconSidebar, IconTasks } from "./icons";
@@ -91,7 +92,7 @@ function SidebarBody() {
   const path = usePathname();
   const today = todayISO();
   const [showAll, setShowAll] = useState<string[]>([]); // which unfolded subjects show every task; not remembered
-  const groups = subjectGroups(app.tasks, s.subjects);
+  const groups = subjectGroups(app.shownTasks, s.subjects);
   const unread = s.recaps.filter(r => !r.read).length;
   const onHome = path === "/";
   const timing = app.focus.endAt != null || app.focus.swStartedAt != null;
@@ -137,6 +138,19 @@ function SidebarBody() {
           <IconSidebar color={T.textMuted} />
         </Pressable>
       </View>
+      {/* Profiles (core's lib/profiles.ts), once there are some: All, each one,
+          and + for Settings -> Profiles. Switching stays on the same screen. */}
+      {app.profiles.length > 0 && (
+        <View style={styles.profiles} accessibilityLabel="Profiles">
+          {[null, ...app.profiles].map(p => (
+            <Chip key={p ?? "All"} small label={p ?? "All"} selected={app.currentProfile === p} T={T}
+              accessibilityLabel={p == null ? "Show all profiles" : `Show ${p}`}
+              onPress={() => { app.setCurrentProfile(p); app.setSubjectFilter(null); close(); }} />
+          ))}
+          <Chip small label="+" accessibilityLabel="Add or delete profiles" T={T}
+            onPress={() => { close(); router.navigate({ pathname: "/settings", params: { open: "Profiles", n: String(clock()) } }); }} />
+        </View>
+      )}
       {row(c => <IconSearch color={c} />, "Search", () => { close(); router.push("/search"); }, false)}
       {rule}
       {row(c => <IconTasks color={c} />, "Home", () => { app.setSubjectFilter(null); go("/"); }, onHome && app.subjectFilter == null)}
@@ -218,6 +232,7 @@ const styles = StyleSheet.create({
   panel: { position: "absolute", top: 0, left: 0, bottom: 0, borderRightWidth: 1, shadowColor: "#000", shadowOpacity: 0.45, shadowRadius: 20, shadowOffset: { width: 0, height: 0 } },
   body: { flexGrow: 1, paddingHorizontal: 10, gap: 2 },
   top: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 6 },
+  profiles: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 8, paddingBottom: 10 },
   profile: { flex: 1, minWidth: 0, paddingVertical: 7, paddingHorizontal: 8 },
   avatar: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   closeBtn: { padding: 8, borderRadius: 8 },

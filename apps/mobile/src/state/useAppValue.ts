@@ -13,7 +13,7 @@ import { todayISO } from "@dueplanner/core/lib/dates";
 import { clearAppData, readJSON, writeJSON } from "../lib/storage";
 import { usePersisted } from "../lib/usePersisted";
 import { syncReminders } from "../lib/notifications";
-import { SETTINGS, cleanSubjectColors, cleanSubjects } from "./settings";
+import { SETTINGS, cleanProfiles, cleanSubjectColors, cleanSubjects } from "./settings";
 import * as Fx from "./focusTimer";
 import * as S from "./taskStore";
 import { confirmIdentity, deleteSignInAccount, signOutEverywhere, startFirebase, takeExplicitSignIn, watchUser, type AuthUser } from "../lib/firebase";
@@ -22,11 +22,13 @@ import { listDevices, type DeviceMap } from "@dueplanner/core/lib/devices";
 import { thisDeviceId } from "../lib/thisDevice";
 import { router } from "expo-router";
 import type { Profile } from "@dueplanner/core/lib/profile";
+import { currentProfile, inProfile, profileToAdd } from "@dueplanner/core/lib/profiles";
 import { DEFAULT_SUBJECTS, DEFAULT_SUBJECT_COLORS, type LayoutName } from "@dueplanner/core/constants";
 import { SYNC_MESSAGES } from "@dueplanner/core/lib/taskSync";
 
 type Op =
-  | { kind: "add"; input: string | AddDraft }
+  | { kind: "add"; input: string | AddDraft; profile: string | null }
+  | { kind: "dropProfile"; name: string }
   | { kind: "toggle"; id: number }
   | { kind: "edit"; id: number; patch: Partial<Task>; label?: string }
   | { kind: "quiet"; id: number; patch: Partial<Task> }
@@ -47,7 +49,8 @@ type Op =
 
 function reduce(s: S.TaskStore, op: Op): S.TaskStore {
   switch (op.kind) {
-    case "add": return S.addTask(s, op.input);
+    case "add": return S.addTask(s, op.input, op.profile);
+    case "dropProfile": return S.dropProfile(s, op.name);
     case "toggle": return S.toggleDone(s, op.id);
     case "edit": return S.editTask(s, op.id, op.patch, op.label);
     case "quiet": return S.quietPatch(s, op.id, op.patch);
@@ -132,6 +135,9 @@ export function useAppValue(restart: () => void = () => {}) {
   const [recaps, setRecaps] = useSetting("recaps");
   const [recapsChecked, setRecapsChecked] = useSetting("recapsChecked");
   const [openSubjects, setOpenSubjects] = useSetting("openSubjects");
+  const [profiles, setProfiles] = useSetting("profiles");
+  const [savedProfile, setCurrentProfile] = useSetting("currentProfile");
+  const current = currentProfile(savedProfile, profiles); // null: "All"
 
 
   // Home's filter chip and subject filter, shared so the menu's subjects and
@@ -192,9 +198,9 @@ export function useAppValue(restart: () => void = () => {}) {
   useEffect(() => { storeRef.current = store; });
   const syncRef = useRef<TaskSync | null>(null);
   // The profile fields (users/{uid}), synced by core's createProfileSync:
-  // what the website calls the profile, here six of the settings.
-  const profile = useMemo<Profile>(() => ({ layout, colorCodeUrgency, subjects, subjectColors, timeFormat, weekStart: weekStart === 1 ? 1 : 0 }),
-    [layout, colorCodeUrgency, subjects, subjectColors, timeFormat, weekStart]);
+  // what the website calls the profile, here six of the settings and the profiles.
+  const profile = useMemo<Profile>(() => ({ layout, colorCodeUrgency, subjects, subjectColors, timeFormat, weekStart: weekStart === 1 ? 1 : 0, profiles }),
+    [layout, colorCodeUrgency, subjects, subjectColors, timeFormat, weekStart, profiles]);
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; });
   const profileSyncRef = useRef<ProfileSync | null>(null);
@@ -205,7 +211,8 @@ export function useAppValue(restart: () => void = () => {}) {
     if (p.subjectColors !== undefined) setSubjectColors(cleanSubjectColors(p.subjectColors));
     if (p.timeFormat !== undefined) setTimeFormat(p.timeFormat);
     if (p.weekStart !== undefined) setWeekStart(p.weekStart);
-  }, [setLayout, setColorCodeUrgency, setSubjects, setSubjectColors, setTimeFormat, setWeekStart]);
+    if (p.profiles !== undefined) setProfiles(cleanProfiles(p.profiles));
+  }, [setLayout, setColorCodeUrgency, setSubjects, setSubjectColors, setTimeFormat, setWeekStart, setProfiles]);
   const uid = user?.uid ?? null;
   useEffect(() => {
     if (!uid) return;
@@ -262,6 +269,8 @@ export function useAppValue(restart: () => void = () => {}) {
       dispatch({ kind: "signedOut" });
       setSubjects([...DEFAULT_SUBJECTS]);
       setSubjectColors({ ...DEFAULT_SUBJECT_COLORS });
+      setProfiles([]);
+      setCurrentProfile(null);
     }
     setRecaps([]);
     setRecapsChecked(null);
@@ -272,7 +281,7 @@ export function useAppValue(restart: () => void = () => {}) {
     setProfileError(null);
     setNewerProfile(false);
     setDeviceMap(null);
-  }, [uid, setRecaps, setRecapsChecked, setSubjects, setSubjectColors]);
+  }, [uid, setRecaps, setRecapsChecked, setSubjects, setSubjectColors, setProfiles, setCurrentProfile]);
 
   // Watch the device list while signed in. When the server's list no longer
   // holds this phone, someone signed it out from another device: sign out
@@ -357,6 +366,8 @@ export function useAppValue(restart: () => void = () => {}) {
     if (autoArchiveDays > 0) dispatch({ kind: "autoArchive", cutoff: Date.now() - autoArchiveDays * 86400000 });
   }, [store.tasks, autoArchiveDays]);
 
+  const shownTasks = useMemo(() => (current == null ? store.tasks : store.tasks.filter(t => inProfile(t, current))), [store.tasks, current]);
+
   const scheme = useColorScheme();
   const light = themeMode === "light" || (themeMode === "auto" && scheme === "light");
   const T = light ? THEMES.stealthLight : THEMES.stealth;
@@ -379,10 +390,18 @@ export function useAppValue(restart: () => void = () => {}) {
     // Where sync stands, for Profile and the sidebar (the web's syncStatus/syncError).
     sync: { ready: !!uid && syncReadyFor === uid, pending: syncState.pending, syncedAt: syncState.syncedAt, offline: !!uid && offline, error: syncError ?? profileError ?? (newerData || newerProfile ? SYNC_MESSAGES.newer : null) },
     tasks: store.tasks,
+    // The tasks the screens show: the current profile's, or all under "All".
+    // Anything that changes tasks still works on `tasks`.
+    shownTasks,
     trash: store.trash,
+    // Profiles (core's lib/profiles.ts): the list, the one showing (null is
+    // "All"), and adding or deleting one. Deleting keeps its tasks.
+    profiles, currentProfile: current, setCurrentProfile,
+    addProfile: (name: string) => { const n = profileToAdd(name, profiles); if (n) setProfiles([...profiles, n]); return n; },
+    deleteProfile: (name: string) => { setProfiles(profiles.filter(p => p !== name)); dispatch({ kind: "dropProfile", name }); },
     canUndo: store.undo.length > 0,
     canRedo: store.redo.length > 0,
-    add: (input: string | AddDraft) => dispatch({ kind: "add", input }),
+    add: (input: string | AddDraft) => dispatch({ kind: "add", input, profile: current }),
     toggle: (id: number) => dispatch({ kind: "toggle", id }),
     edit: (id: number, patch: Partial<Task>, label?: string) => dispatch({ kind: "edit", id, patch, label }),
     quiet: (id: number, patch: Partial<Task>) => dispatch({ kind: "quiet", id, patch }),

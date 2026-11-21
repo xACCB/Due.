@@ -9,8 +9,9 @@ import { readJSON } from "../lib/storage";
 // Small shared pieces, styled from the theme like the web's runtime css
 // (.chip, buttons, settings rows). Components only: this file exports nothing else.
 
-export function Chip({ label, onPress, T, selected, color, accessibilityLabel }: {
-  label: string; onPress: () => void; T: Theme; selected?: boolean; color?: string; accessibilityLabel?: string;
+// `small`: the size of Home's filter chips (the sidebar's profiles).
+export function Chip({ label, onPress, T, selected, color, accessibilityLabel, small = false }: {
+  label: string; onPress: () => void; T: Theme; selected?: boolean; color?: string; accessibilityLabel?: string; small?: boolean;
 }) {
   const { fz } = useApp();
   const fg = color ? ink(color, T.light) : T.text;
@@ -23,10 +24,11 @@ export function Chip({ label, onPress, T, selected, color, accessibilityLabel }:
       accessibilityLabel={accessibilityLabel ?? label}
       style={({ pressed }) => [
         styles.chip,
+        small && styles.chipSmall,
         { borderColor: selected ? T.accent : color ?? T.border, backgroundColor: selected ? T.accent : color ? color + "22" : T.cardAlt, opacity: pressed ? 0.7 : 1 },
       ]}
     >
-      <Text style={[styles.chipText, { fontSize: fz(13), color: selected ? contrastColor(T.accent) : fg }]}>{label}</Text>
+      <Text numberOfLines={1} style={[styles.chipText, { fontSize: fz(small ? 11 : 13), color: selected ? contrastColor(T.accent) : fg }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -61,11 +63,15 @@ export function Button({ label, onPress, T, kind = "primary", disabled, accessib
 // opens, as on the web.
 // `gap`: space between the open body's children, as the web section's `gap`.
 // `danger`: the web's Danger Zone look, a red title and border.
-export function Section({ title, T, gap = 0, danger = false, children }: { title: string; T: Theme; gap?: number; danger?: boolean; children: ReactNode }) {
+// `openKey`: each new value opens the section (a link to it from elsewhere,
+// such as the sidebar's + beside the profiles).
+export function Section({ title, T, gap = 0, danger = false, openKey, children }: { title: string; T: Theme; gap?: number; danger?: boolean; openKey?: string; children: ReactNode }) {
   const { fz, ms } = useApp();
   // Development only: the "dev-open-section" key opens one section, so a
   // screenshot can show it (see lib/devRemote.ts).
-  const [open, setOpen] = useState(() => __DEV__ && readJSON<string | null>("dev-open-section", null) === title);
+  const [open, setOpen] = useState(() => (__DEV__ && readJSON<string | null>("dev-open-section", null) === title) || !!openKey);
+  const [seenKey, setSeenKey] = useState(openKey);
+  if (openKey !== seenKey) { setSeenKey(openKey); if (openKey) setOpen(true); }
   return (
     <View style={[styles.sectionBody, styles.section, { backgroundColor: T.card, borderColor: danger ? "#FF475744" : T.border }]}>
       <Pressable
@@ -284,6 +290,7 @@ const styles = StyleSheet.create({
   track: { height: 4, borderRadius: 999 },
   thumb: { position: "absolute", top: 2, width: 22, height: 22, borderRadius: 11, borderWidth: 2, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  chipSmall: { paddingHorizontal: 11, paddingVertical: 4, maxWidth: 180 },
   chipText: { fontSize: 13, fontFamily: F.body },
   button: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, alignItems: "center", justifyContent: "center" },
   buttonText: { fontSize: 14, fontFamily: F.bodyMedium },

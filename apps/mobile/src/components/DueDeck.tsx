@@ -26,7 +26,7 @@ export function DueDeck() {
   // The web's height: min(540px, 100dvh - 300px), at least 380.
   const deckHeight = Math.max(380, Math.min(540, height - insets.top - insets.bottom - 300));
   const today = todayISO();
-  const due = useMemo(() => byDueDate(app.tasks.filter(t => !t.archived)), [app.tasks]);
+  const due = useMemo(() => byDueDate(app.shownTasks.filter(t => !t.archived)), [app.shownTasks]);
   const dates = useMemo(() => deckDates(due, today), [due, today]);
   const [picked, setPicked] = useState<string | null>(null);
   const current = deckTop(dates, picked, today);

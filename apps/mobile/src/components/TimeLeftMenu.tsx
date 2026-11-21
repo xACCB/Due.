@@ -26,7 +26,7 @@ export function TimeLeftMenu({ top, onClose }: { top: number; onClose: () => voi
   const { T, fz, ms } = app;
   const { subjectColors } = app.settings;
   const today = todayISO();
-  const tl = timeLeft(app.tasks, today);
+  const tl = timeLeft(app.shownTasks, today);
   const [open, setOpen] = useState<string | null>(null);
   const toggle = (key: string) => setOpen(key);
   useDevAction("open-time", key => setOpen(key)); // development only
@@ -99,7 +99,7 @@ export function TimeLeftMenu({ top, onClose }: { top: number; onClose: () => voi
           title={openTitle}
           kicker={open.startsWith("due:") ? "Time left · by due date" : "Time left · subject"}
           color={open.startsWith("sub:") && open.slice(4) ? subjectColors[open.slice(4)] || T.accent : undefined}
-          list={app.tasks.filter(t => !t.archived && !t.done && inOpen(t))}
+          list={app.shownTasks.filter(t => !t.archived && !t.done && inOpen(t))}
           onOpen={t => go(() => router.push(`/task-sheet/${t.id}`))}
           onClose={() => setOpen(null)}
         />

@@ -27,6 +27,19 @@ export function cleanSubjects(raw: unknown): string[] {
   return out.slice(0, LIMITS.subjects);
 }
 
+// Profile names (lib/profiles.ts in core): text on one line, no repeats
+// (ignoring case), at most LIMITS.profiles. None until the user adds some.
+export function cleanProfiles(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const s of raw) {
+    if (typeof s !== "string") continue;
+    const name = oneLine(s).trim().slice(0, LIMITS.profileName);
+    if (name && !out.some(p => p.toLowerCase() === name.toLowerCase())) out.push(name);
+  }
+  return out.slice(0, LIMITS.profiles);
+}
+
 // The web merges saved colours over the defaults (hw-subjectcolors).
 export function cleanSubjectColors(raw: unknown): Record<string, string> {
   const out: Record<string, string> = { ...DEFAULT_SUBJECT_COLORS };
@@ -99,4 +112,8 @@ export const SETTINGS = {
   recapsChecked: { key: "hw-recaps-checked", initial: null as string | null, clean: cleanDate },
   openSubjects: { key: "hw-sidebar-subjects-open", initial: [] as string[], clean: cleanNames },
   subjectColors: { key: "hw-subjectcolors", initial: { ...DEFAULT_SUBJECT_COLORS } as Record<string, string>, clean: cleanSubjectColors },
+  // Profiles: the list syncs with the account; which one is showing is this
+  // device's own (null is "All"; core's currentProfile() checks it's still listed).
+  profiles: { key: "hw-profiles", initial: [] as string[], clean: cleanProfiles },
+  currentProfile: { key: "hw-profile", initial: null as string | null, clean: (raw: unknown) => (typeof raw === "string" ? raw : null) },
 } as const;

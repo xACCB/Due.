@@ -8,7 +8,18 @@ name: Settings switch takes effect
     element: "Worksheet 2.*"
 - tapOn: "Open sidebar"
 - tapOn: "Settings"
-- tapOn: "Task list"
+- scrollUntilVisible:
+    element: "Task list"
+# Open the section unless it already is (Settings stays as it was left).
+- runFlow:
+    when:
+      notVisible:
+        id: "switch Show completed tasks"
+    commands:
+      - tapOn: "Task list"
+- scrollUntilVisible:
+    element:
+      id: "switch Show completed tasks"
 - tapOn:
     id: "switch Show completed tasks"
 - tapOn: "Open sidebar"

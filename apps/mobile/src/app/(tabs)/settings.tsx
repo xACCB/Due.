@@ -2,6 +2,8 @@ import { useState, useRef, type ComponentRef } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
+import { useLocalSearchParams } from "expo-router";
+import { presetsLeft, profileCount } from "@dueplanner/core/lib/profiles";
 import { GROUP_BY, LAYOUTS, QUESTIONS, QUESTION_KEYS, REMINDER_OFFSETS, SUBJECT_COLOR_PALETTE, type LayoutName } from "@dueplanner/core/constants";
 import { TEXT_SIZES, type TextSize } from "@dueplanner/core/lib/textSize";
 import { moveQuestion, normalizeQuestionPrefs } from "@dueplanner/core/lib/addQuestions";
@@ -13,7 +15,7 @@ import { useApp } from "../../state/appContext";
 import { turnReminders } from "../../lib/reminderSwitch";
 import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
-import { Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
+import { Chip, Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
 import { useDevAction, useDevScroll } from "../../lib/devScroll";
 import { ScreenBody } from "../../components/ScreenBody";
 import { AppHeader, BackButton } from "../../components/AppHeader";
@@ -28,6 +30,8 @@ const PRIVACY_URL = "https://dueplanner.vercel.app/privacy.html";
 const ANIM_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 export default function SettingsScreen() {
   const app = useApp();
+  // The sidebar's + beside the profiles opens Profiles (a new `n` each time).
+  const { open: openParam, n: openN } = useLocalSearchParams<{ open?: string; n?: string }>();
   const { T, fz } = app;
   const s = app.settings;
   const [newSubject, setNewSubject] = useState("");
@@ -62,7 +66,7 @@ export default function SettingsScreen() {
   const toggleOffset = (key: string, on: boolean) =>
     s.setReminderOffsets(REMINDER_OFFSETS.map(o => o.key as string).filter(k => (k === key ? on : s.reminderOffsets.includes(k))));
 
-  const done = app.tasks.filter(t => t.done && !t.archived);
+  const done = app.shownTasks.filter(t => t.done && !t.archived); // the profile showing's (all under "All")
   const doneCount = done.length;
   const clearCompleted = () => app.removeMany(done.map(t => t.id));
 
@@ -251,6 +255,8 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <ProfilesSection openKey={openParam === "Profiles" ? openN : undefined} />
+
         <Section title="Task list" gap={18} T={T}>
           <View>
             <Label T={T}>Group Tasks By</Label>
@@ -314,6 +320,64 @@ export default function SettingsScreen() {
 
 // Settings -> Danger Zone (signed in only), the web's: a button, then the
 // warning, a field to type DELETE in, Cancel and Delete forever.
+// Profiles (core's lib/profiles.ts): separate lists in one account. The app
+// starts with none; add one from the ready-made chips or by name. Deleting
+// asks with a second tap and keeps the profile's tasks, which then show under
+// All. Which one is showing is picked at the top of the sidebar.
+function ProfilesSection({ openKey }: { openKey?: string }) {
+  const app = useApp();
+  const { T, fz } = app;
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const full = app.profiles.length >= LIMITS.profiles;
+  const taken = !!name.trim() && app.profiles.some(p => p.toLowerCase() === name.trim().toLowerCase());
+  const add = (n: string) => { if (app.addProfile(n)) { setName(""); setAdding(false); } };
+  const note = { fontFamily: F.body, fontSize: fz(11), lineHeight: Math.round(fz(11) * 1.5), color: T.textMuted };
+  return (
+    <Section title="Profiles" T={T} openKey={openKey}>
+      <View style={styles.subjects}>
+        <Text style={note}>Separate lists, like Homework and Sports. Each shows only its own tasks, and All shows everything. Switch between them at the top of the sidebar.</Text>
+        {app.profiles.map(p => {
+          const confirming = pendingDelete === p;
+          const count = profileCount(app.tasks, p);
+          return (
+            <View key={p} style={[styles.subjectRow, { backgroundColor: T.surface }]}>
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.body, fontSize: fz(12), color: T.text }}>{p}</Text>
+              <Text style={{ fontFamily: F.body, fontSize: fz(10), color: T.textFaint }}>{count} {count === 1 ? "task" : "tasks"}</Text>
+              <Pressable onPress={() => { if (confirming) { app.deleteProfile(p); setPendingDelete(null); } else setPendingDelete(p); }}
+                hitSlop={8} accessibilityRole="button" accessibilityLabel={confirming ? `Confirm deleting ${p}` : `Delete ${p}`} accessibilityHint={confirming ? "Its tasks stay, under All" : undefined}
+                style={confirming ? [styles.confirm, { backgroundColor: "#FF475722" }] : null}>
+                <Text style={{ fontFamily: F.body, fontSize: fz(confirming ? 11 : 15), color: confirming ? "#FF4757" : T.textFaint }}>{confirming ? "Delete?" : "×"}</Text>
+              </Pressable>
+            </View>
+          );
+        })}
+        {pendingDelete != null && <Text style={note}>Its tasks stay, under All.</Text>}
+        {!full && (
+          <View style={styles.profileChips}>
+            {presetsLeft(app.profiles).map(p => <Chip key={p} label={`+ ${p}`} accessibilityLabel={`Add the ${p} profile`} onPress={() => add(p)} T={T} />)}
+            {!adding && <Chip label="+ Add profile" accessibilityLabel="Add a profile with your own name" onPress={() => setAdding(true)} T={T} />}
+          </View>
+        )}
+        {adding && !full && (
+          <View style={styles.addSubject}>
+            <TextInput value={name} onChangeText={setName} onSubmitEditing={() => add(name)} submitBehavior="submit" autoFocus
+              placeholder="Profile name" placeholderTextColor={T.textFaint} maxLength={LIMITS.profileName} returnKeyType="done" accessibilityLabel="Profile name"
+              style={[styles.input, { flex: 1, fontSize: fz(12), color: T.text, backgroundColor: T.surface, borderColor: T.border }]} />
+            <Pressable onPress={() => add(name)} disabled={!name.trim() || taken} accessibilityRole="button" accessibilityState={{ disabled: !name.trim() || taken }}
+              style={[styles.smallBtn, { backgroundColor: T.accent, opacity: name.trim() && !taken ? 1 : 0.5, justifyContent: "center" }]}>
+              <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(12), color: contrastColor(T.accent) }}>Add</Text>
+            </Pressable>
+          </View>
+        )}
+        {taken && <Text style={{ fontFamily: F.body, fontSize: fz(10), color: ink("#FF4757", T.light) }}>There&apos;s already a profile with that name</Text>}
+        {full && <Text style={note}>That&apos;s the most for now: {LIMITS.profiles} profiles.</Text>}
+      </View>
+    </Section>
+  );
+}
+
 function DangerZone({ T }: { T: Theme }) {
   const { fz, deleteAccount } = useApp();
   const [asking, setAsking] = useState(false);
@@ -394,6 +458,7 @@ const styles = StyleSheet.create({
   smallBtn: { borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12 },
   confirm: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   addSubject: { flexDirection: "row", gap: 8, marginTop: 2 },
+  profileChips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 2 },
   sub: { fontFamily: F.body, marginBottom: 6 },
   note: { fontFamily: F.body, marginTop: 8 },
   sliderFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

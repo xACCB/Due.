@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { withSyllabusTasks } from "@dueplanner/core/lib/backup";
-import { addTask, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, moveTask, renameSubject, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX, fromCloud, signedOut } from "./taskStore";
+import { addTask, dropProfile, autoArchive, deleteTask, deleteTasks, emptyTrash, importTasks, moveTask, renameSubject, duplicateTask, editTask, emptyStore, logSession, quietPatch, redo, restoreTask, toggleDone, undo, UNDO_MAX, fromCloud, signedOut } from "./taskStore";
 
 describe("taskStore", () => {
   it("adds a trimmed one-line task and ignores a blank title", () => {
@@ -8,6 +8,25 @@ describe("taskStore", () => {
     expect(s.tasks).toHaveLength(1);
     expect(s.tasks[0]).toMatchObject({ title: "Essay draft", done: false, estMins: 0, dueDate: "" });
     expect(addTask(s, "   ")).toBe(s);
+  });
+
+  it("gives a new task the profile showing, and none under All", () => {
+    let s = addTask(emptyStore(), "Practice", "Sports");
+    expect(s.tasks[0].profile).toBe("Sports");
+    s = addTask(s, "Essay");
+    expect("profile" in s.tasks.find(t => t.title === "Essay")!).toBe(false);
+  });
+
+  it("deleting a profile keeps its tasks and trash entries, without the profile, and isn't undoable", () => {
+    let s = addTask(addTask(emptyStore(), "Practice", "Sports"), "Game", "Sports");
+    s = addTask(s, "Essay", "Homework");
+    s = deleteTask(s, s.tasks.find(t => t.title === "Game")!.id);
+    const undoSteps = s.undo.length;
+    const after = dropProfile(s, "Sports");
+    expect(after.tasks.map(t => [t.title, t.profile])).toEqual(expect.arrayContaining([["Practice", undefined], ["Essay", "Homework"]]));
+    expect(after.trash[0].task.profile).toBeUndefined();
+    expect(after.undo.length).toBe(undoSteps);
+    expect(dropProfile(after, "Sports")).toBe(after); // nothing left to change
   });
 
   it("completes and undoes, then redoes", () => {

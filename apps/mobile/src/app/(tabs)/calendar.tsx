@@ -65,7 +65,7 @@ function MonthView() {
   useDevAction("open-day", iso => { setSelected(iso); setDayCard(iso); }); // development only
 
   const cells = calendarMonthOnly ? monthOnlyGrid(year, month, weekStart) : monthGrid(year, month, weekStart);
-  const due = useMemo(() => byDueDate(app.tasks.filter(t => !t.archived)), [app.tasks]);
+  const due = useMemo(() => byDueDate(app.shownTasks.filter(t => !t.archived)), [app.shownTasks]);
   const dayTasks = sortDay(due.get(selected) ?? []);
   const openMins = dayTasks.filter(t => !t.done).reduce((n, t) => n + (t.estMins || 0), 0);
   const monthName = new Date(year, month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });

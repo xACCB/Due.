@@ -12,6 +12,9 @@ appId: com.duestudios.dueplanner
     text: "Close Search"
     optional: true
 - assertVisible: "Open sidebar"
+# Home, whichever screen a failed run ended on.
+- tapOn: "Open sidebar"
+- tapOn: "Home"
 # Two long pulls down bring Home's list to the top. (scrollUntilVisible on
 # "Search tasks" passed while the field sat scrolled up behind the header:
 # Maestro counts an element inside the screen as visible even when clipped.)

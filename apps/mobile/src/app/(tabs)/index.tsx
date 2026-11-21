@@ -56,7 +56,7 @@ export default function Home() {
 
   const filter = app.homeFilter;
   // A subject filter whose subject no longer has tasks or a row is ignored (the web's subjectFilterOn).
-  const subjectOn = app.subjectFilter != null && (s.subjects.includes(app.subjectFilter) || app.tasks.some(t => t.subject === app.subjectFilter)) ? app.subjectFilter : null;
+  const subjectOn = app.subjectFilter != null && (s.subjects.includes(app.subjectFilter) || app.shownTasks.some(t => t.subject === app.subjectFilter)) ? app.subjectFilter : null;
   // Completing a task (the web's justDone): the card holds its place for 640ms
   // while its check fills and its title strikes, then glides to its new spot
   // (LayoutAnimation). Reduced motion skips the hold and the glide.
@@ -69,17 +69,17 @@ export default function Home() {
   }, []);
   const glide = () => { if (!reduced) LayoutAnimation.configureNext(LayoutAnimation.create(app.ms(320), "easeInEaseOut", "opacity")); };
 
-  const allSorted = useMemo(() => sortTasks(app.tasks, justDone), [app.tasks, justDone]);
+  const allSorted = useMemo(() => sortTasks(app.shownTasks, justDone), [app.shownTasks, justDone]);
   const shown = filterTasks(allSorted, { filter, subject: subjectOn, showDone: s.showDone, justDone });
   const pending = allSorted.filter(t => heldOpen(t, justDone));
   // Every open task, whatever the filter shows (the web counts visibleTasks, which is all of them).
-  const pendingCount = app.tasks.filter(t => !t.done && !t.archived).length;
+  const pendingCount = app.shownTasks.filter(t => !t.done && !t.archived).length;
 
   // The task the suggestion names (not the list's top, which can be in a
   // hand-made order), so its × hides that one. A task in its completion hold
   // still counts as open, as on the web, so the card doesn't change at the
   // tick and shift the list twice.
-  const heldTasks = withHeldOpen(app.tasks, justDone);
+  const heldTasks = withHeldOpen(app.shownTasks, justDone);
   const suggestionTask = suggestedTask(heldTasks);
   const showSuggestionCard = !!suggestionTask && s.showSuggestion && s.hiddenSuggestionFor !== suggestionTask.id;
 

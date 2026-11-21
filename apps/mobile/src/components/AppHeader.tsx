@@ -20,7 +20,7 @@ export function AppHeader({ title }: { title: string }) {
   const app = useApp();
   const { T, fz } = app;
   // "3h 20m", or "0m" (the web header's fmtMins).
-  const left = formatDuration(timeLeft(app.tasks, todayISO()).totalMins) || "0m";
+  const left = formatDuration(timeLeft(app.shownTasks, todayISO()).totalMins) || "0m";
   // The Time left dropdown opens 8px under the header (measured on the screen).
   const headerRef = useRef<ComponentRef<typeof View>>(null);
   const [menuTop, setMenuTop] = useState<number | null>(null);
@@ -39,6 +39,11 @@ export function AppHeader({ title }: { title: string }) {
           <View>
             <Text style={[styles.h1, { color: T.text }]} accessibilityRole="header">{title}</Text>
             {/* The web's note under the title while signed in and offline. */}
+            {/* The profile showing (core's lib/profiles.ts), so a shorter list
+                never looks like missing tasks. Nothing under "All". */}
+            {app.currentProfile != null && (
+              <Text numberOfLines={1} accessibilityLabel={`Profile: ${app.currentProfile}`} style={{ fontFamily: F.body, fontSize: fz(9), color: T.textMuted, marginTop: 3, letterSpacing: 0.6 }}>{app.currentProfile.toUpperCase()}</Text>
+            )}
             {!!app.user && app.sync.offline && (
               <Text accessibilityLabel={OFFLINE_TEXT} style={{ fontFamily: F.body, fontSize: fz(9), color: ink("#FFA502", T.light), marginTop: 3 }}>offline</Text>
             )}

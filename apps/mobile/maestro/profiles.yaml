@@ -1,0 +1,71 @@
+# Profiles: add Homework and Sports from Settings' chips, switch to Sports in
+# the sidebar (Home shows only its tasks, the header says SPORTS), add a task
+# there, see it under All and not under Homework, then delete the task and
+# both profiles (the app starts with none, and so does the next test).
+appId: com.duestudios.dueplanner
+name: Profiles
+---
+- runFlow: common/start.yaml
+- tapOn: "Open sidebar"
+- tapOn: "Settings"
+- scrollUntilVisible:
+    element: "Profiles"
+# Open the section unless it already is (Settings stays as it was left).
+- runFlow:
+    when:
+      notVisible: "Add the Homework profile"
+    commands:
+      - tapOn: "Profiles"
+- tapOn: "Add the Homework profile"
+- tapOn: "Add the Sports profile"
+- assertVisible: "Delete Sports"
+# Switch to Sports and add a task there.
+- tapOn: "Open sidebar"
+- tapOn: "Show Sports"
+- tapOn: "Open sidebar"
+- tapOn: "Home"
+- assertVisible: "Profile: Sports"
+- assertNotVisible: "Chapter 3 reading.*"
+- tapOn: "Add homework"
+- tapOn: "What's the assignment\\?"
+- inputText: "Soccer practice"
+- tapOn: "Next"
+- tapOn:
+    text: "PE"
+    below: "What subject\\?"
+- tapOn: "Tomorrow"
+- tapOn: "Any time"
+- tapOn: "45 min"
+- tapOn: "Weekly"
+- assertVisible: "Soccer practice,.*"
+# Homework doesn't show it; All does, with the rest.
+- tapOn: "Open sidebar"
+- tapOn: "Show Homework"
+- assertVisible: "Profile: Homework"
+- assertNotVisible: "Soccer practice,.*"
+- tapOn: "Open sidebar"
+- tapOn: "Show all profiles"
+- assertNotVisible: "Profile:.*"
+- assertVisible: "Chapter 3 reading.*"
+- scrollUntilVisible:
+    element: "Soccer practice,.*"
+- swipe:
+    from:
+      text: "Soccer practice,.*"
+    direction: LEFT
+    duration: 1000
+- assertVisible: '"Soccer practice" deleted'
+# Delete both profiles (a second tap confirms); the switcher goes with them.
+- tapOn: "Open sidebar"
+- tapOn: "Add or delete profiles"
+- tapOn: "Delete Homework"
+- tapOn: "Confirm deleting Homework"
+- tapOn: "Delete Sports"
+- tapOn: "Confirm deleting Sports"
+- assertVisible: "Add the Homework profile"
+- tapOn: "Open sidebar"
+- assertNotVisible: "Show all profiles"
+- tapOn: "Home"
+- scrollUntilVisible:
+    element: "Home"
+    direction: UP

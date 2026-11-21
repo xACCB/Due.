@@ -9,6 +9,7 @@
 import type { HistoryAction, Task } from "@dueplanner/core/types";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
 import type { AddDraft } from "@dueplanner/core/lib/addFlow";
+import { profileFor, withoutProfile } from "@dueplanner/core/lib/profiles";
 import { trashEntries } from "@dueplanner/core/lib/trash";
 import { applyTaskStates, diffTasks } from "@dueplanner/core/lib/history";
 import { setDone } from "@dueplanner/core/lib/tasks";
@@ -42,8 +43,9 @@ function changed(s: TaskStore, next: Task[], label: string): TaskStore {
   return { ...s, tasks: next, ...pushUndo(s, { type: "change", before, after, label }) };
 }
 
-// A new task from a title, or from the add questions' answers.
-export function addTask(s: TaskStore, input: string | AddDraft): TaskStore {
+// A new task from a title, or from the add questions' answers. It belongs to
+// the profile showing (none under "All", lib/profiles.ts in core).
+export function addTask(s: TaskStore, input: string | AddDraft, profile: string | null = null): TaskStore {
   const d: AddDraft = typeof input === "string" ? { title: input, subject: "", dueDate: "", dueTime: "", estMins: 0 } : input;
   const title = oneLine(d.title).trim().slice(0, LIMITS.title);
   if (!title) return s;
@@ -52,6 +54,7 @@ export function addTask(s: TaskStore, input: string | AddDraft): TaskStore {
     estMins: d.estMins, done: false, order: 0,
     ...(d.recurrence && d.recurrence !== "none" ? { recurrence: d.recurrence } : {}),
     ...(d.subtasks?.length ? { subtasks: freshSubtasks(d.subtasks) } : {}),
+    ...profileFor(profile),
   };
   return changed(s, withNewTask(s.tasks, task), "Added");
 }
@@ -162,6 +165,17 @@ export function moveTask(s: TaskStore, id: number, delta: number): TaskStore {
 export function renameSubject(s: TaskStore, old: string, next: string): TaskStore {
   if (old === next) return s;
   return { ...s, tasks: tasksRenamedSubject(s.tasks, old, next), trash: trashRenamedSubject(s.trash, old, next) };
+}
+
+// Deleting a profile (Settings -> Profiles) keeps its tasks, and those in
+// Recently deleted: they just no longer belong to it, so they show under
+// "All". Not an undo step, like a subject rename.
+export function dropProfile(s: TaskStore, name: string): TaskStore {
+  const tasks = withoutProfile(s.tasks, name);
+  const trash = s.trash.some(e => e.task.profile === name)
+    ? s.trash.map(e => (e.task.profile === name ? { ...e, task: withoutProfile([e.task], name)[0] } : e))
+    : s.trash;
+  return tasks.every((t, i) => t === s.tasks[i]) && trash === s.trash ? s : { ...s, tasks, trash };
 }
 
 // Sync (M3): the tasks and Recently deleted as merged with the cloud (core's

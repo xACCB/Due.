@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SUBJECTS } from "@dueplanner/core/constants";
-import { bool, cleanDate, cleanHiddenFor, cleanNames, cleanOffsets, cleanRecaps, cleanSubjectColors, cleanSubjects, cleanTemplates, int, oneOf, SETTINGS } from "./settings";
+import { bool, cleanDate, cleanHiddenFor, cleanNames, cleanOffsets, cleanProfiles, cleanRecaps, cleanSubjectColors, cleanSubjects, cleanTemplates, int, oneOf, SETTINGS } from "./settings";
 
 describe("settings cleaners", () => {
   it("keep valid values and fall back on anything else", () => {
@@ -18,6 +18,9 @@ describe("settings cleaners", () => {
   it("subjects: text only, one line, no repeats; defaults when not a list", () => {
     expect(cleanSubjects(["Math", "Math", 3, " Art\n2 ", ""])).toEqual(["Math", "Art 2"]);
     expect(cleanSubjects(null)).toEqual(DEFAULT_SUBJECTS);
+    expect(cleanProfiles(["Homework", "homework", 3, " Band\npractice ", ""])).toEqual(["Homework", "Band practice"]);
+    expect(cleanProfiles(null)).toEqual([]);
+    expect(cleanProfiles(Array.from({ length: 12 }, (_, i) => `P${i}`))).toHaveLength(10);
     expect(cleanSubjects([])).toEqual([]);
   });
 

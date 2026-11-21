@@ -39,7 +39,7 @@ export default function FocusScreen() {
 
   // The first open task in your own order, as on the web (topTask), unless
   // you've picked another.
-  const openSorted = sortTasks(app.tasks, []).filter(t => !t.done && !t.archived);
+  const openSorted = sortTasks(app.shownTasks, []).filter(t => !t.done && !t.archived);
   const topTask = openSorted[0];
   const task = openSorted.find(t => t.id === state.taskId) ?? topTask;
   const [picking, setPicking] = useState(false);

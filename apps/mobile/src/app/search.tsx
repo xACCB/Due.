@@ -90,7 +90,7 @@ export default function Search() {
   useDevAction("search", q => setQuery(q)); // development only: typing a query
   const [typing, setTyping] = useState(false); // the field has the cursor: the web's ring
   const q = query.trim().toLowerCase();
-  const results = searchTasks(app.tasks, q);
+  const results = searchTasks(app.shownTasks, q);
   const open = (t: Task) => { leaving.current = true; router.replace(`/task-sheet/${t.id}`); };
   // "3 tasks found" is for screen readers only, as on the web (its .sr-only line).
   const found = q && results.length ? `${results.length} ${results.length === 1 ? "task" : "tasks"} found` : "";

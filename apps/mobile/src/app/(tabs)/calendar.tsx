@@ -187,7 +187,7 @@ function DayCard({ iso, today, list, onOpen, onAdd, onClose }: {
         ? <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textFaint, marginBottom: 12 }}>Nothing due.</Text>
         : (
           <ScrollView style={{ flexGrow: 0, marginBottom: 12 }} contentContainerStyle={{ gap: 6 }}>
-            {list.map(t => <DayTaskRow key={t.id} t={t} surface onOpen={() => onOpen(t)} />)}
+            {list.map(t => <DayTaskRow key={t.id} t={t} onOpen={() => onOpen(t)} />)}
           </ScrollView>
         )}
       <Pressable onPress={onAdd} accessibilityRole="button" style={({ pressed }) => [styles.add, { borderColor: T.border, opacity: pressed ? 0.7 : 1, marginTop: 0 }]}>

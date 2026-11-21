@@ -127,7 +127,7 @@ function TimeDetail({ title, kicker, color, list, onOpen, onClose }: {
     return `${when} · ${formatDuration(t.estMins) || "no estimate"}`;
   };
   const stat = (label: string, value: string) => (
-    <View style={[styles.stat, { backgroundColor: T.surface }]}>
+    <View style={[styles.stat, { backgroundColor: T.card }]}>
       <Text numberOfLines={1} style={{ fontFamily: F.heading, fontSize: fz(18), color: T.text }}>{value}</Text>
       <Text style={{ fontFamily: F.body, fontSize: fz(9), color: T.textFaint, marginTop: 2, letterSpacing: 0.5 }}>{label.toUpperCase()}</Text>
     </View>
@@ -152,7 +152,7 @@ function TimeDetail({ title, kicker, color, list, onOpen, onClose }: {
         ? <Text style={{ fontFamily: F.body, fontSize: fz(12), color: T.textFaint }}>Nothing left here.</Text>
         : (
           <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6 }}>
-            {sorted.map(t => <DayTaskRow key={t.id} t={t} surface note={noteFor(t)} onOpen={() => onOpen(t)} />)}
+            {sorted.map(t => <DayTaskRow key={t.id} t={t} note={noteFor(t)} onOpen={() => onOpen(t)} />)}
           </ScrollView>
         )}
     </PopCard>

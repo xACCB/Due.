@@ -1075,6 +1075,32 @@ phone's `shownTasks` from `useApp()`; anything that changes tasks still uses the
 Recaps, export and Recently deleted stay account-wide. Decisions to revisit with the user: no
 rename yet, existing tasks stay under All, deleting doesn't ask about moving tasks, max 10.
 
+**Smaller features on the same branch** (2026-11-21, the user's picks 2, 3, 6, 8 and 10 from a
+list of ideas; 5 "choose when the daily summary arrives" and 7 "choose what swipes do" wait for
+the user; 1, 4 and 9 were turned down):
+- **Greeting** (`lib/greeting.ts`): above Home's list, "Good evening, 3 things left today", or
+  "Good evening, Aaron. 3 things left today" signed in (first word of the display name). Counts
+  open tasks due today or overdue in the profile showing. Settings -> Task list -> Show greeting
+  (`hw-greeting`, local, on).
+- **Session goal** (`cleanGoal` in `lib/timers.ts`): a field on Focus Mode's Pomodoro card
+  during focus, shown as "Goal: ..." during the break and under "Pomodoro done". Local
+  (`hw-focus-goal`), kept until changed.
+- **Progress** (`Task.progress`, a whole percent 1 to 100, removed at 0; a synced field, in the
+  rules on this branch): a slider in steps of 10 on a task without subtasks and not done
+  (the phone's `Slider` gained `fill`), and a bar with "40%" on its card. Not an undo step, like
+  subtask ticks. A task with subtasks keeps counting them instead.
+- **Good news** (`goodNewsFor`/`goodNewsNow` and `upcomingReminders`'s `goodNews` in
+  `lib/reminders.ts`): at 7 PM (`GOOD_NEWS_HOUR`), "Nothing due tomorrow. Enjoy your evening.",
+  only while something is open. The phone schedules the next 7 evenings with the reminders
+  (`rem-free-<day>`); the website shows it once a day while open (`hw-good-news-shown`).
+  Settings -> Reminders -> Good news (`hw-good-news`, local, on; shown once reminders are on).
+- **Sound when done** (off by default, `hw-done-sound`, local): Settings -> Task list. Two soft
+  notes (C6, G6). The website synthesizes them (`playDone` in `apps/web/src/lib/dom.ts`); the
+  phone plays `assets/sounds/done.wav`, rendered from the same notes, with `expo-audio`
+  (`lib/doneSound.ts`; a native package, added 2026-11-21) set to follow the silent switch and
+  mix with other audio. Played from `useApp().toggle` and the web's `toggleDone`, so every way of
+  completing a task makes it; switching it on plays it once as a preview.
+
 **Urgency color coding** (`colorCodeUrgency` state, "Urgency Color Coding" toggle in Options ->
 Looks, default on) gates every place `PRIORITY_COLORS` (red/orange/green) would otherwise show.
 Rather than each call site branching on the setting itself, they all go through

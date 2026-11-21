@@ -2,7 +2,8 @@
 # next one, and dragging it back up restores the order. Reordering isn't an
 # undo step, so the flow puts it back itself. The grip is inside the card,
 # which VoiceOver (and so Maestro) reads as one element, so the drags aim at
-# its spot: the top-left of the first card on an unscrolled Home.
+# its spot: the top-left of the first card on an unscrolled Home, below the
+# greeting (Settings -> Task list -> Show greeting, on by default).
 appId: com.duestudios.dueplanner
 name: Drag to reorder
 ---
@@ -11,15 +12,15 @@ name: Drag to reorder
     text: "Problem set 4,.*"
     below: "Chapter 3 reading,.*"
 - swipe:
-    start: 42, 330
-    end: 42, 450
+    start: 42, 358
+    end: 42, 478
     duration: 2000
 - assertVisible:
     text: "Chapter 3 reading,.*"
     below: "Problem set 4,.*"
 - swipe:
-    start: 42, 475
-    end: 42, 320
+    start: 42, 503
+    end: 42, 348
     duration: 2000
 - assertVisible:
     text: "Problem set 4,.*"

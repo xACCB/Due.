@@ -13,6 +13,7 @@ import { contrastColor, ink } from "@dueplanner/core/lib/format";
 import { LIMITS } from "@dueplanner/core/lib/limits";
 import { useApp } from "../../state/appContext";
 import { turnReminders } from "../../lib/reminderSwitch";
+import { playDone } from "../../lib/doneSound";
 import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Chip, Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
@@ -266,6 +267,7 @@ export default function SettingsScreen() {
           </View>
           <ToggleLine label="Show smart suggestion" hint="Your most urgent task, at the top of the list" on={s.showSuggestion} onChange={s.setShowSuggestion} T={T} />
           <ToggleLine label="Show greeting" hint={"\"Good evening\" and what's left for today, above the list"} on={s.showGreeting} onChange={s.setShowGreeting} T={T} />
+          <ToggleLine label="Sound when done" hint="A short sound as you check a task off" on={s.doneSound} onChange={on => { s.setDoneSound(on); if (on) playDone(); }} T={T} />
           <ToggleLine label="Show completed tasks" hint="Keep done tasks visible" on={s.showDone} onChange={s.setShowDone} T={T} />
           <View>
             <Label T={T}>Auto-Archive Completed Tasks</Label>

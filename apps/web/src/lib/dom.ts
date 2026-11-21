@@ -66,6 +66,27 @@ export function notify(title:string,options?:NotificationOptions){
   catch{ navigator.serviceWorker?.ready.then(reg=>reg.showNotification(title,options)).catch(()=>{}); }
 }
 
+// Settings -> Task list -> Sound when done: two quick soft notes (C6 then G6)
+// as a task is checked off. The phone plays the same notes from a file
+// (apps/mobile/assets/sounds/done.wav). Best effort, like playChime().
+export function playDone(){
+  try{
+    const Ctx=window.AudioContext||(window as unknown as {webkitAudioContext:typeof AudioContext}).webkitAudioContext;
+    const ctx=new Ctx();
+    [[1046.5,0],[1568,0.07]].forEach(([freq,delay])=>{
+      const osc=ctx.createOscillator(), gain=ctx.createGain();
+      osc.type="sine"; osc.frequency.value=freq;
+      const start=ctx.currentTime+delay;
+      gain.gain.setValueAtTime(0.0001,start);
+      gain.gain.exponentialRampToValueAtTime(0.15,start+0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001,start+0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start); osc.stop(start+0.4);
+    });
+    setTimeout(()=>{ctx.close().catch(()=>{});},1000);
+  }catch{/* audio unavailable */}
+}
+
 // Short two-note chime for the end of a Pomodoro -- synthesized with Web Audio
 // so there's no sound file to ship. Best-effort: silently does nothing if
 // audio is unavailable or blocked.

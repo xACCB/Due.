@@ -111,6 +111,8 @@ export const SETTINGS = {
   focusGoal: { key: "hw-focus-goal", initial: "" as string, clean: cleanGoal },
   // Reminders -> Good news: "Nothing due tomorrow" at 7pm (core's reminders.ts).
   goodNews: { key: "hw-good-news", initial: true as boolean, clean: bool(true) },
+  // Task list -> Sound when done (lib/doneSound.ts), off by default.
+  doneSound: { key: "hw-done-sound", initial: false as boolean, clean: bool(false) },
   hiddenSuggestionFor: { key: "hw-suggestion-hidden", initial: null as number | null, clean: cleanHiddenFor },
   autoArchiveDays: { key: "hw-autoarchive", initial: 7 as number, clean: (raw: unknown) => ((AUTO_ARCHIVE_DAYS as readonly unknown[]).includes(raw) ? (raw as number) : 7) },
   templates: { key: "hw-templates", initial: [] as TaskTemplate[], clean: cleanTemplates },

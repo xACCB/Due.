@@ -13,6 +13,7 @@ import { todayISO } from "@dueplanner/core/lib/dates";
 import { clearAppData, readJSON, writeJSON } from "../lib/storage";
 import { usePersisted } from "../lib/usePersisted";
 import { syncReminders } from "../lib/notifications";
+import { playDone } from "../lib/doneSound";
 import { SETTINGS, cleanProfiles, cleanSubjectColors, cleanSubjects } from "./settings";
 import * as Fx from "./focusTimer";
 import * as S from "./taskStore";
@@ -128,6 +129,7 @@ export function useAppValue(restart: () => void = () => {}) {
   const [showGreeting, setShowGreeting] = useSetting("showGreeting");
   const [focusGoal, setFocusGoal] = useSetting("focusGoal");
   const [goodNews, setGoodNews] = useSetting("goodNews");
+  const [doneSound, setDoneSound] = useSetting("doneSound");
   const [hiddenSuggestionFor, setHiddenSuggestionFor] = useSetting("hiddenSuggestionFor");
   const [autoArchiveDays, setAutoArchiveDays] = useSetting("autoArchiveDays");
   const [templates, setTemplates] = useSetting("templates");
@@ -405,7 +407,10 @@ export function useAppValue(restart: () => void = () => {}) {
     canUndo: store.undo.length > 0,
     canRedo: store.redo.length > 0,
     add: (input: string | AddDraft) => dispatch({ kind: "add", input, profile: current }),
-    toggle: (id: number) => dispatch({ kind: "toggle", id }),
+    toggle: (id: number) => {
+      if (doneSound && store.tasks.some(t => t.id === id && !t.done)) playDone(); // completing, not un-completing
+      dispatch({ kind: "toggle", id });
+    },
     edit: (id: number, patch: Partial<Task>, label?: string) => dispatch({ kind: "edit", id, patch, label }),
     quiet: (id: number, patch: Partial<Task>) => dispatch({ kind: "quiet", id, patch }),
     duplicate: (id: number) => dispatch({ kind: "duplicate", id }),
@@ -428,7 +433,7 @@ export function useAppValue(restart: () => void = () => {}) {
       pomodoroWork, setPomodoroWork, pomodoroBreak, setPomodoroBreak, pomodoroAutoBreak, setPomodoroAutoBreak,
       focusShow, setFocusShow, addQuestions, setAddQuestions,
       subjects, setSubjects, subjectColors, setSubjectColors,
-      textSize, setTextSize, animSpeed, setAnimSpeed, layout, setLayout, groupBy, setGroupBy, showSuggestion, setShowSuggestion, showGreeting, setShowGreeting, focusGoal, setFocusGoal, goodNews, setGoodNews, hiddenSuggestionFor, setHiddenSuggestionFor,
+      textSize, setTextSize, animSpeed, setAnimSpeed, layout, setLayout, groupBy, setGroupBy, showSuggestion, setShowSuggestion, showGreeting, setShowGreeting, focusGoal, setFocusGoal, goodNews, setGoodNews, doneSound, setDoneSound, hiddenSuggestionFor, setHiddenSuggestionFor,
       autoArchiveDays, setAutoArchiveDays, templates, setTemplates,
       recaps, setRecaps, openSubjects, setOpenSubjects,
     },

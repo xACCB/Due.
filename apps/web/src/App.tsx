@@ -51,7 +51,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { auth, db, googleProvider, isStorageBlockedError, STORAGE_BLOCKED_MESSAGE } from "./firebase";
 import { FONT } from "@dueplanner/core/fonts";
 import { IconTasks, IconImport, IconCalendar, IconFocus, IconSidebar, IconBell, IconHistory, IconSearch, IconSettings, CheckMark } from "./components/icons";
-import { activateOnKey, isWideScreen, flashTarget, notify, playChime } from "./lib/dom";
+import { activateOnKey, isWideScreen, flashTarget, notify, playChime, playDone } from "./lib/dom";
 import { thisDeviceId, isStandalone } from "./lib/thisDevice";
 import { TaskModal } from "./components/TaskModal";
 import { SidebarRow, SidebarSubjects, ScreenHeader } from "./components/Sidebar";
@@ -141,6 +141,8 @@ export default function HomeworkPlanner() {
   const [showGreeting,setShowGreeting]=usePersistedState("hw-greeting",true);
   // Reminders -> Good news: "Nothing due tomorrow" at 7pm (core's reminders.ts).
   const [goodNews,setGoodNews]=usePersistedState("hw-good-news",true);
+  // Task list -> Sound when done (off by default), this device only.
+  const [doneSound,setDoneSound]=usePersistedState("hw-done-sound",false);
   // The suggestion card's × hides just the current suggestion (by task id);
   // it comes back when a different task becomes the most urgent. Turning
   // suggestions off entirely is the Settings toggle.
@@ -1306,6 +1308,7 @@ export default function HomeworkPlanner() {
   function toggleDone(id:number){
     const task=tasks.find(t=>t.id===id);
     if(!task)return;
+    if(!task.done&&doneSound)playDone();
     changeTasks(prev=>setDone(prev,[id],!task.done),`${task.done?"uncheck":"complete"} "${task.title}"`,
       task.done?`"${task.title}" marked not done`:`"${task.title}" completed`);
     // Completing: the card holds its place while the check draws in and the
@@ -1780,7 +1783,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects","settings-profiles":"profiles","greeting-toggle":"tasklist","good-news":"reminders",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects","settings-profiles":"profiles","greeting-toggle":"tasklist","good-news":"reminders","done-sound":"tasklist",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -2942,6 +2945,10 @@ export default function HomeworkPlanner() {
             <div data-tour="greeting-toggle" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Show greeting</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>"Good evening" and what's left for today, above the list</div></div>
               <Toggle on={showGreeting} onChange={setShowGreeting} T={T} label="Show greeting"/>
+            </div>
+            <div data-tour="done-sound" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+              <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Sound when done</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>A short sound as you check a task off</div></div>
+              <Toggle on={doneSound} onChange={v=>{setDoneSound(v);if(v)playDone();}} T={T} label="Sound when done"/>
             </div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Show completed tasks</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>Keep done tasks visible</div></div>

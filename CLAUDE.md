@@ -199,6 +199,15 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   (no Android SDK on the Mac yet), a phone version of the privacy policy, a phone What's New. The app is still in emulator mode (`.env.local`); restart the emulators each session
   (data is lost when they stop) and sign in again from Profile (`"go":"/profile"`, then
   `"act":["profile","sign-in"]`).
+- **2026-11-21:** the phone's transitions now match the website's ("Motion on the phone"
+  below), the Expo SDK 58 patch updates are in (a native build; CocoaPods needed `pod update`
+  of the Expo pods only), and **Profiles** were built on the branch `profiles` for both apps
+  (below). **Not merged and its rules not deployed:** waiting for the user to try it and say go.
+  To ship: `npm run test:rules`, deploy the rules (`npx firebase-tools deploy --only
+  firestore:rules`, fill in the changelog's Live date), then merge to `main`. The rules must go
+  first, or every profile save and every task added under a profile is refused. Open
+  question for the user: existing tasks stay under All when the first profile is added (my
+  default); they might prefer them moved into it.
 - **Checking screens without tapping (dev only):** with Metro running (`npx expo start
   --dev-client`, never with `CI=1`, which turns off file watching), the app reads
   `http://localhost:8099/cmd.json` every second (`src/lib/devRemote.ts`): serve a folder with
@@ -1048,6 +1057,24 @@ list used once to migrate the old whole-feed `hw-whatsnew` key, and must not be 
 **Subjects** are managed in Settings (not Profile), so they work signed out; they and their colors
 sync via the profile doc when signed in.
 
+**Profiles** (branch `profiles`, 2026-11-21; the user's spec: "it comes with no profiles... when
+adding there should be buttons like the subjects... in settings you should be able to delete the
+profiles... stay simple for now, and add more as we go"). Separate lists in one account, logic in
+`packages/core/src/lib/profiles.ts` (unit-tested). The list is `profiles` in the profile doc
+(synced like subjects, `hw-profiles`, at most `LIMITS.profiles` 10 names of `LIMITS.profileName` 40
+characters); which one is showing is per device (`hw-profile`, null is "All", read through
+`currentProfile()` so a name deleted elsewhere falls back to All). A task holds the name in
+`profile` (none: it shows only under All). Settings -> Profiles adds them (chips for the presets
+`PROFILE_PRESETS`, Homework and Sports, plus "+ Add profile" for a name of your own) and deletes
+them (a second tap confirms; `withoutProfile` keeps the tasks, and those in Recently deleted,
+under All; not undoable, like a subject rename). Once there are some, the top of the sidebar has
+chips for All and each one, and a + that opens Settings -> Profiles; the header shows the name
+under the title. A new task (the add card, a template, a syllabus import via `newTasksJoin`)
+joins the profile showing. The screens read the filtered list: the web's `visibleTasks`, the
+phone's `shownTasks` from `useApp()`; anything that changes tasks still uses the full `tasks`.
+Recaps, export and Recently deleted stay account-wide. Decisions to revisit with the user: no
+rename yet, existing tasks stay under All, deleting doesn't ask about moving tasks, max 10.
+
 **Urgency color coding** (`colorCodeUrgency` state, "Urgency Color Coding" toggle in Options ->
 Looks, default on) gates every place `PRIORITY_COLORS` (red/orange/green) would otherwise show.
 Rather than each call site branching on the setting itself, they all go through
@@ -1319,7 +1346,10 @@ from `package-lock.json` and reinstall: that's what fixed it the first time.
 `useAppValue()` (`src/state/useAppValue.ts`) and read anywhere with `useApp()`
 (`src/state/appContext.ts`). It's three files because the react-refresh lint rule allows a
 component file to export only components. `useApp()` gives:
-- `tasks`, `trash`, `canUndo`/`canRedo`, and actions: `add` (a title or an `AddDraft`), `toggle`,
+- `tasks`, `shownTasks` (the profile showing's; what screens list, see Profiles), `profiles`,
+  `currentProfile`/`setCurrentProfile`, `addProfile`/`deleteProfile`,
+  `trash`, `canUndo`/`canRedo`, and actions: `add` (a title or an `AddDraft`, joining the
+  profile showing), `toggle`,
   `edit(id, patch, label?)` (undoable), `quiet(id, patch)` (not undoable), `duplicate`, `logSession`,
   `remove` (to Recently deleted), `restore`, `undo`, `redo`;
   plus `removeMany`, `emptyTrash`, `importTasks`, `moveBy` (drag to reorder) and `renameSubject`,

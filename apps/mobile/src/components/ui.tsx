@@ -14,7 +14,8 @@ export function Chip({ label, onPress, T, selected, color, accessibilityLabel, s
   label: string; onPress: () => void; T: Theme; selected?: boolean; color?: string; accessibilityLabel?: string; small?: boolean;
 }) {
   const { fz } = useApp();
-  const fg = color ? ink(color, T.light) : T.text;
+  // Small chips look like Home's filter chips: see-through, muted text.
+  const fg = color ? ink(color, T.light) : small ? T.textMuted : T.text;
   return (
     <Pressable
       onPress={onPress}
@@ -25,7 +26,7 @@ export function Chip({ label, onPress, T, selected, color, accessibilityLabel, s
       style={({ pressed }) => [
         styles.chip,
         small && styles.chipSmall,
-        { borderColor: selected ? T.accent : color ?? T.border, backgroundColor: selected ? T.accent : color ? color + "22" : T.cardAlt, opacity: pressed ? 0.7 : 1 },
+        { borderColor: selected ? T.accent : color ?? T.border, backgroundColor: selected ? T.accent : color ? color + "22" : small ? "transparent" : T.cardAlt, opacity: pressed ? 0.7 : 1 },
       ]}
     >
       <Text numberOfLines={1} style={[styles.chipText, { fontSize: fz(small ? 11 : 13), color: selected ? contrastColor(T.accent) : fg }]}>{label}</Text>

@@ -46,6 +46,14 @@ export function profileFor(current: string | null): { profile?: string } {
   return current == null ? {} : { profile: current };
 }
 
+// Tasks added in bulk (a syllabus import) join the profile showing too: those
+// in `next` that weren't in `prev` get it.
+export function newTasksJoin(prev: readonly Task[], next: Task[], current: string | null): Task[] {
+  if (current == null) return next;
+  const had = new Set(prev.map(t => t.id));
+  return next.map(t => (had.has(t.id) ? t : { ...t, profile: current }));
+}
+
 // Deleting a profile: its tasks keep everything but the profile.
 export function withoutProfile<T extends Pick<Task, "profile">>(tasks: T[], name: string): T[] {
   return tasks.map(t => {

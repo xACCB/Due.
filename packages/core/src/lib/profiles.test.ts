@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../types";
 import { LIMITS } from "./limits";
-import { currentProfile, inProfile, presetsLeft, profileCount, profileFor, profileToAdd, withoutProfile } from "./profiles";
+import { currentProfile, inProfile, newTasksJoin, presetsLeft, profileCount, profileFor, profileToAdd, withoutProfile } from "./profiles";
 
 const task = (id: number, profile?: string): Task => ({
   id, title: `T${id}`, subject: "", dueDate: "", dueTime: "", estMins: 0, done: false, order: id, ...(profile ? { profile } : {}),
@@ -67,5 +67,16 @@ describe("withoutProfile and profileCount", () => {
   });
   it("counts a profile's tasks", () => {
     expect(profileCount([task(1, "Sports"), task(2, "Sports"), task(3)], "Sports")).toBe(2);
+  });
+});
+
+describe("newTasksJoin", () => {
+  it("gives only the newly added tasks the profile showing", () => {
+    const prev = [task(1)];
+    const next = [...prev, task(2), task(3)];
+    const out = newTasksJoin(prev, next, "Homework");
+    expect(out[0]).toBe(prev[0]);
+    expect(out.slice(1).map(t => t.profile)).toEqual(["Homework", "Homework"]);
+    expect(newTasksJoin(prev, next, null)).toBe(next);
   });
 });

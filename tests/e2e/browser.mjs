@@ -49,6 +49,7 @@ export async function browser(label) {
   await send("Page.enable");
   return {
     label, ev,
+    send, // any DevTools protocol command (e.g. Page.captureScreenshot)
     goto: async (url, settleMs = 4000) => { await send("Page.navigate", { url }); await sleep(settleMs); },
     close: () => { try { ws.close(); } catch { /* already closed */ } proc.kill(); setTimeout(() => { try { rmSync(profile, { recursive: true, force: true }); } catch { /* still locked */ } }, 500); },
   };

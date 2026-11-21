@@ -34,6 +34,7 @@ import { same } from "@dueplanner/core/lib/sync";
 import { addTaskWrite } from "./lib/taskWrites";
 import { startProfileSync, startTaskSync, type ProfileSync, type TaskSync } from "./lib/cloudSync";
 import type { Profile } from "@dueplanner/core/lib/profile";
+import { currentProfile as profileShowing, inProfile, newTasksJoin, presetsLeft, profileCount, profileFor, profileToAdd, withoutProfile } from "@dueplanner/core/lib/profiles";
 import { diffTasks, applyTaskStates } from "@dueplanner/core/lib/history";
 import { downloadFile } from "./lib/download";
 import { LIMITS } from "@dueplanner/core/lib/limits";
@@ -248,6 +249,11 @@ export default function HomeworkPlanner() {
   const addQuestionPrefs=normalizeQuestionPrefs(savedAddQuestions,QUESTION_KEYS);
   const askQuestions=useMemo(()=>askedQuestions(savedAddQuestions),[savedAddQuestions]);
   const [subjects,setSubjects]=usePersistedState<string[]>("hw-subjects",DEFAULT_SUBJECTS);
+  // Profiles (core's lib/profiles.ts): the list syncs with the account like
+  // subjects; which one is showing is this device's own. null is "All".
+  const [profiles,setProfiles]=usePersistedState<string[]>("hw-profiles",[]);
+  const [savedProfile,setSavedProfile]=usePersistedState<string|null>("hw-profile",null);
+  const currentProfile=profileShowing(savedProfile,profiles);
   // Only the ids the user dismissed are stored, and the feed itself always
   // comes from WHATS_NEW -- storing the whole feed (the old approach) meant a
   // returning user never saw any entry added after their first visit.
@@ -311,6 +317,19 @@ export default function HomeworkPlanner() {
   function removeSubject(name:string){
     setSubjects(prev=>prev.filter(s=>s!==name));
     setSubjectColors(prev=>withoutSubjectColor(prev,name));
+  }
+  // Settings -> Profiles. Deleting one keeps its tasks (and those in Recently
+  // deleted): they no longer belong to it, so they show under All. Not undoable,
+  // like a subject rename.
+  function addProfile(name:string):boolean{
+    const n=profileToAdd(name,profiles);
+    if(n)setProfiles([...profiles,n]);
+    return !!n;
+  }
+  function deleteProfile(name:string){
+    setProfiles(prev=>prev.filter(p=>p!==name));
+    setTasks(prev=>withoutProfile(prev,name));
+    setTrash(prev=>prev.some(e=>e.task.profile===name)?prev.map(e=>e.task.profile===name?{...e,task:withoutProfile([e.task],name)[0]}:e):prev);
   }
 
   useEffect(()=>{localStorage.setItem("hw-tasks",JSON.stringify(tasks));},[tasks]);
@@ -479,7 +498,7 @@ export default function HomeworkPlanner() {
   // users/{uid}. See their files for the details and guards.
   const taskSyncRef=useRef<TaskSync|null>(null);
   const profileSyncRef=useRef<ProfileSync|null>(null);
-  const profile=useMemo<Profile>(()=>({layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart:weekStart===1?1:0}),[layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart]);
+  const profile=useMemo<Profile>(()=>({layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart:weekStart===1?1:0,profiles}),[layout,colorCodeUrgency,subjects,subjectColors,timeFormat,weekStart,profiles]);
   const profileRef=useRef(profile);
   useEffect(()=>{profileRef.current=profile;});
   useEffect(()=>{
@@ -509,6 +528,7 @@ export default function HomeworkPlanner() {
         if(p.subjectColors!==undefined) setSubjectColors(p.subjectColors);
         if(p.timeFormat!==undefined) setTimeFormat(p.timeFormat);
         if(p.weekStart!==undefined) setWeekStart(p.weekStart);
+        if(p.profiles!==undefined) setProfiles(p.profiles);
       },
       error:setSyncError,
       newer:b=>setNewerData(n=>n.profile===b?n:{...n,profile:b}),
@@ -521,7 +541,7 @@ export default function HomeworkPlanner() {
       if(taskSyncRef.current===tasksEngine)taskSyncRef.current=null;
       if(profileSyncRef.current===profileEngine)profileSyncRef.current=null;
     };
-  },[fbUser,readyForUid,isNewAccountForUid,setTrash,setLayout,setColorCodeUrgency,setSubjects,setTimeFormat,setWeekStart]);
+  },[fbUser,readyForUid,isNewAccountForUid,setTrash,setLayout,setColorCodeUrgency,setSubjects,setTimeFormat,setWeekStart,setProfiles]);
   // Every local change goes to the engines; they write what differs from the cloud.
   useEffect(()=>{taskSyncRef.current?.localChanged(tasks,trash);},[tasks,trash]);
   useEffect(()=>{profileSyncRef.current?.localChanged(profile);},[profile]);
@@ -603,6 +623,7 @@ export default function HomeworkPlanner() {
     setTasks([]);
     setSubjects(DEFAULT_SUBJECTS);
     setSubjectColors(DEFAULT_SUBJECT_COLORS);
+    setProfiles([]);setSavedProfile(null);
     setTrash([]);
     setRecaps([]);setRecapsChecked(null);
     setDeviceList(null);
@@ -752,6 +773,9 @@ export default function HomeworkPlanner() {
   // (at the user's request), so it isn't remembered; the old saved list
   // ("hw-settings-open") is cleared once.
   const [openSettings,setOpenSettings]=useState<string[]>([]);
+  const [addingProfile,setAddingProfile]=useState(false);
+  const [newProfileText,setNewProfileText]=useState("");
+  const [pendingProfileDelete,setPendingProfileDelete]=useState<string|null>(null);
   useEffect(()=>{localStorage.removeItem("hw-settings-open");},[]);
   // Reset while rendering when the screen changes (React's pattern for
   // adjusting state to a changed value), not in an effect.
@@ -785,7 +809,7 @@ export default function HomeworkPlanner() {
     const subject=importSubjectEff;
     const toAdd=importPreview.filter(it=>it.checked);
     if(toAdd.length===0)return;
-    setTasks(prev=>withSyllabusTasks(prev,toAdd,subject));
+    setTasks(prev=>newTasksJoin(prev,withSyllabusTasks(prev,toAdd,subject),currentProfile)); // into the profile showing
     setImportedCount(toAdd.length);
     setImportText("");
     setImportPreview(null);
@@ -1010,14 +1034,16 @@ export default function HomeworkPlanner() {
     (phase==="work"?setPomodoroWorkMins:setPomodoroBreakMins)(mins);
   }
 
-  const visibleTasks=tasks;
+  // The tasks the screens show: the current profile's, or every one under All.
+  // Anything that changes tasks still works on `tasks`.
+  const visibleTasks=useMemo(()=>currentProfile==null?tasks:tasks.filter(t=>inProfile(t,currentProfile)),[tasks,currentProfile]);
   // Every tag used on any task, deduplicated -- powers the "quick add" suggestion
   // chips in TaskModal's tag editor instead of retyping tags you've already used.
   const allTags=allTagsOf(tasks);
   // Pending tasks sort by their manual drag order; done tasks always sink to the
   // bottom -- except ones in justDone, which stay put until they settle.
   const allSorted=sortTasks(visibleTasks,justDone);
-  const sidebarGroups=useMemo(()=>subjectGroups(tasks,subjects),[tasks,subjects]);
+  const sidebarGroups=useMemo(()=>subjectGroups(visibleTasks,subjects),[visibleTasks,subjects]);
   // The subject filter only counts while that subject is still in the sidebar
   // (it may have been renamed or deleted, or "No subject" emptied), so Home
   // can't get stuck filtered to something there's no row left to un-pick.
@@ -1030,13 +1056,13 @@ export default function HomeworkPlanner() {
   // then, and again when the completed card glides away.
   // suggestionTask is the task the card names (not the top of the list, which
   // can be in a hand-made order), so its × hides that one.
-  const suggestionTask=suggestedTask(withHeldOpen(tasks,justDone));
-  const suggestion=buildSuggestion(withHeldOpen(tasks,justDone));
-  const focusTask=tasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
+  const suggestionTask=suggestedTask(withHeldOpen(visibleTasks,justDone));
+  const suggestion=buildSuggestion(withHeldOpen(visibleTasks,justDone));
+  const focusTask=visibleTasks.find(t=>t.id===focusTaskId&&!t.done&&!t.archived)||topTask;
   useEffect(()=>{pomodoroTaskRef.current=focusTask?.id??null;});
   // What to do when a break ends: keep going on the task from the last session
   // if it's still open, otherwise the most urgent open task.
-  const nextSuggestion=tasks.find(t=>t.id===lastWorkedTaskId&&!t.done&&!t.archived)||mostUrgent(tasks.filter(t=>!t.done&&!t.archived));
+  const nextSuggestion=tasks.find(t=>t.id===lastWorkedTaskId&&!t.done&&!t.archived)||mostUrgent(visibleTasks.filter(t=>!t.done&&!t.archived));
   const suggestionIsContinue=nextSuggestion!=null&&nextSuggestion.id===lastWorkedTaskId;
   useEffect(()=>{nextSuggestionRef.current=nextSuggestion?.title??null;});
   function startSuggested(){
@@ -1236,7 +1262,7 @@ export default function HomeworkPlanner() {
   function finishTask(task:Task,tplSubtasks:{text:string}[]|null=templateSubtasks){
     const subtasks=freshSubtasks(tplSubtasks);
     captureTaskRects();
-    setTasks(prev=>withNewTask(prev,task,subtasks));
+    setTasks(prev=>withNewTask(prev,{...task,...profileFor(currentProfile)},subtasks)); // joins the profile showing
     setAdding(false);setStep(0);
     setUsingTemplate(false);setTemplateSubtasks(null);
   }
@@ -1742,7 +1768,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects","settings-profiles":"profiles",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -2169,6 +2195,16 @@ export default function HomeworkPlanner() {
           </button>
           <button onClick={closeSidebar} aria-label="Close sidebar" title="Close sidebar" className="hit hit-sm" style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",padding:8,borderRadius:8,display:"flex",flexShrink:0}}><IconSidebar/></button>
         </div>
+        {/* Profiles (core's lib/profiles.ts), once there are some: All, each one,
+            and + for Settings -> Profiles. Switching stays on the same screen. */}
+        {profiles.length>0&&(
+          <div role="group" aria-label="Profiles" data-tour="sidebar-profiles" style={{display:"flex",flexWrap:"wrap",gap:6,padding:"0 8px 10px"}}>
+            {[null,...profiles].map(p=>{const on=currentProfile===p;return(
+              <button key={p??"All"} aria-pressed={on} aria-label={p==null?"Show all profiles":`Show ${p}`} onClick={()=>{captureTaskRects();setSavedProfile(p);setSubjectFilter(null);setDrawerOpen(false);}}
+                style={{background:on?T.accent:"none",color:on?contrastColor(T.accent):T.textMuted,border:`1px solid ${on?T.accent:T.border}`,borderRadius:999,padding:"4px 11px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p??"All"}</button>);})}
+            <button aria-label="Add or delete profiles" onClick={()=>{setDrawerOpen(false);goTo("settings:settings-profiles");}} style={{background:"none",color:T.textMuted,border:`1px solid ${T.border}`,borderRadius:999,padding:"4px 11px",fontFamily:F.body,fontSize:fz(11),cursor:"pointer"}}>+</button>
+          </div>
+        )}
         <SidebarRow icon={<IconSearch/>} label="Search" tour="sidebar-search" onClick={()=>{setDrawerOpen(false);setSearchOpen(true);}}/>
         <div className="sb-rule" aria-hidden="true"/>
         <SidebarRow icon={<IconTasks/>} label="Home" tour="tab-tasks" current={activeTab==="tasks"&&subjectFilterOn==null} onClick={()=>{if(activeTab==="tasks"&&subjectFilterOn!=null)captureTaskRects();setSubjectFilter(null);navTo("tasks");}}/>
@@ -2213,6 +2249,8 @@ export default function HomeworkPlanner() {
             </button>
             <div style={{minWidth:0}}>
               <h2 style={{fontFamily:F.heading,fontSize:26,lineHeight:1,color:T.text,margin:0,fontWeight:400}}>{SCREEN_TITLES[activeTab]||"Home"}</h2>
+              {/* The profile showing, so a shorter list never looks like missing tasks. */}
+              {currentProfile!=null&&<div aria-label={`Profile: ${currentProfile}`} style={{fontFamily:F.body,fontSize:fz(9),color:T.textMuted,marginTop:3,letterSpacing:"0.06em",textTransform:"uppercase",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:220}}>{currentProfile}</div>}
               {fbUser&&!online&&<div title="Offline. Changes will sync when you're back online" style={{fontFamily:F.body,fontSize:fz(9),color:ink("#FFA502",T.light),marginTop:3}}>offline</div>}
             </div>
           </div>
@@ -2460,9 +2498,9 @@ export default function HomeworkPlanner() {
             ))}
           </div>
           {calendarView==="deck"
-            ?<DueDeck tasks={tasks} T={T} F={F} subjectColors={subjectColors} h24={h24} now={now}
+            ?<DueDeck tasks={visibleTasks} T={T} F={F} subjectColors={subjectColors} h24={h24} now={now}
               onOpenTask={t=>setSelectedTask(t)} onToggleDone={toggleDone}/>
-            :<CalendarView tasks={tasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
+            :<CalendarView tasks={visibleTasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
               weekStart={weekStart} monthOnly={calendarMonthOnly} h24={h24} now={now}
               onOpenTask={t=>setSelectedTask(t)} onToggleDone={toggleDone} onAddOn={addHomeworkOn}/>}
         </>}
@@ -2824,6 +2862,45 @@ export default function HomeworkPlanner() {
                 <button type="submit" disabled={!newSubjectText.trim()} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:newSubjectText.trim()?"pointer":"default",opacity:newSubjectText.trim()?1:0.5,fontSize:fz(12),fontWeight:500}}>Add</button>
               </form>
             </SettingsSection>
+            {/* Profiles: separate lists in one account. None at first; add from
+                the ready-made chips or by name. Deleting asks with a second tap
+                and keeps the profile's tasks, which then show under All. */}
+            <SettingsSection title="Profiles" tour="settings-profiles" {...sec("profiles")}>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{fontFamily:F.body,fontSize:fz(11),lineHeight:1.5,color:T.textMuted}}>Separate lists, like Homework and Sports. Each shows only its own tasks, and All shows everything. Switch between them at the top of the sidebar.</div>
+                {profiles.map(p=>{
+                  const confirming=pendingProfileDelete===p;
+                  const count=profileCount(tasks,p);
+                  return (
+                    <div key={p} style={{display:"flex",alignItems:"center",gap:10,background:T.surface,borderRadius:9,padding:"9px 12px"}}>
+                      <span style={{flex:1,fontFamily:F.body,fontSize:fz(12),color:T.text,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
+                      <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>{count} {count===1?"task":"tasks"}</span>
+                      <button onClick={()=>{if(confirming){deleteProfile(p);setPendingProfileDelete(null);}else setPendingProfileDelete(p);}} aria-label={confirming?`Confirm deleting ${p}`:`Delete ${p}`} title={confirming?"Tap again to delete (its tasks stay, under All)":"Delete profile"}
+                        style={{background:confirming?"#FF475722":"none",border:"none",borderRadius:6,color:confirming?"#FF4757":T.textFaint,fontSize:fz(confirming?11:15),cursor:"pointer",lineHeight:1,padding:confirming?"4px 8px":"0 4px"}}>{confirming?"Delete?":"×"}</button>
+                    </div>
+                  );
+                })}
+                {pendingProfileDelete!=null&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>Its tasks stay, under All.</div>}
+                {profiles.length<LIMITS.profiles&&(
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:2}}>
+                    {presetsLeft(profiles).map(p=><button key={p} onClick={()=>addProfile(p)} aria-label={`Add the ${p} profile`} style={{background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:999,padding:"7px 14px",fontFamily:F.body,fontSize:fz(12),color:T.text,cursor:"pointer"}}>+ {p}</button>)}
+                    {!addingProfile&&<button onClick={()=>setAddingProfile(true)} aria-label="Add a profile with your own name" style={{background:T.cardAlt,border:`1px solid ${T.border}`,borderRadius:999,padding:"7px 14px",fontFamily:F.body,fontSize:fz(12),color:T.text,cursor:"pointer"}}>+ Add profile</button>}
+                  </div>
+                )}
+                {addingProfile&&profiles.length<LIMITS.profiles&&(()=>{
+                  const taken=!!newProfileText.trim()&&profiles.some(p=>p.toLowerCase()===newProfileText.trim().toLowerCase());
+                  return (<>
+                    <form onSubmit={e=>{e.preventDefault();if(addProfile(newProfileText)){setNewProfileText("");setAddingProfile(false);}}} style={{display:"flex",gap:8,marginTop:2}}>
+                      <input autoFocus value={newProfileText} maxLength={LIMITS.profileName} onChange={e=>setNewProfileText(e.target.value)} placeholder="Profile name" aria-label="Profile name"
+                        style={{flex:1,minWidth:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"9px 12px",fontSize:fz(12),fontFamily:F.body,outline:"none"}}/>
+                      <button type="submit" disabled={!newProfileText.trim()||taken} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"9px 14px",cursor:newProfileText.trim()&&!taken?"pointer":"default",opacity:newProfileText.trim()&&!taken?1:0.5,fontSize:fz(12),fontWeight:500}}>Add</button>
+                    </form>
+                    {taken&&<div style={{fontFamily:F.body,fontSize:fz(10),color:ink("#FF4757",T.light)}}>There's already a profile with that name</div>}
+                  </>);
+                })()}
+                {profiles.length>=LIMITS.profiles&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted}}>That's the most for now: {LIMITS.profiles} profiles.</div>}
+              </div>
+            </SettingsSection>
             {/* Task list: grouping, what shows, auto-archive */}
             <SettingsSection title="Task list" gap={18} {...sec("tasklist")}>
             {/* Group by */}
@@ -2886,8 +2963,8 @@ export default function HomeworkPlanner() {
               )}
             </SettingsSection>
             <a href="https://forms.gle/oPuAWx6jNHvm75xi8" target="_blank" rel="noopener noreferrer" style={{display:"block",boxSizing:"border-box",textAlign:"center",textDecoration:"none",background:"none",border:`1px solid ${T.border}`,borderRadius:9,color:T.textMuted,fontFamily:F.body,fontSize:fz(11),padding:"9px 14px",cursor:"pointer",width:"100%"}}>Send feedback / report a bug</a>
-            {(()=>{const n=tasks.filter(t=>t.done&&!t.archived).length;return(
-            <button disabled={n===0} onClick={()=>deleteTasks(tasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived. You can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:fz(11),padding:"9px 14px",cursor:n?"pointer":"default",opacity:n?1:0.45,width:"100%"}}>{n?`Clear ${plural(n)} completed`:"No completed tasks to clear"}</button>);})()}
+            {(()=>{const n=visibleTasks.filter(t=>t.done&&!t.archived).length;return(
+            <button disabled={n===0} onClick={()=>deleteTasks(visibleTasks.filter(t=>t.done&&!t.archived).map(t=>t.id))} title="Deletes completed tasks that aren't archived. You can undo this" style={{background:"none",border:`1px solid #FF475744`,borderRadius:9,color:ink("#FF4757",T.light),fontFamily:F.body,fontSize:fz(11),padding:"9px 14px",cursor:n?"pointer":"default",opacity:n?1:0.45,width:"100%"}}>{n?`Clear ${plural(n)} completed`:"No completed tasks to clear"}</button>);})()}
             {fbUser&&(
               <SettingsSection title="Danger Zone" danger {...sec("danger")}>
                 {!showDeleteAccountConfirm ? (
@@ -2935,7 +3012,7 @@ export default function HomeworkPlanner() {
           onClosing={()=>setOpenUpdate(u=>u&&{...u,closing:true})}
           onClose={()=>{const o=openUpdate.origin;setOpenUpdate(null);requestAnimationFrame(()=>o?.isConnected&&o.focus({preventScroll:true}));}}/>;
       })()}
-      {searchOpen&&<SearchOverlay tasks={tasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
+      {searchOpen&&<SearchOverlay tasks={visibleTasks} T={T} F={F} subjectColors={subjectColors} colorCodeUrgency={colorCodeUrgency}
         origin={searchTriggerRef}
         onOpenTask={t=>{setSearchOpen(false);setSelectedTask(t);}}
         onClose={()=>{setSearchOpen(false);requestAnimationFrame(()=>searchTriggerRef.current?.focus());}}/>}

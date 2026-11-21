@@ -2,6 +2,7 @@ import { useState, useRef, type ComponentRef } from "react";
 import { Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { File, Paths } from "expo-file-system";
 import { parseSyllabus } from "@dueplanner/core/lib/syllabus";
+import { newTasksJoin } from "@dueplanner/core/lib/profiles";
 import { readBackup, tasksCsv, withImportedColors, withImportedSubjects, withImportedTemplates, withSyllabusTasks } from "@dueplanner/core/lib/backup";
 import { contrastColor, formatDate, ink } from "@dueplanner/core/lib/format";
 import { todayISO } from "@dueplanner/core/lib/dates";
@@ -38,7 +39,7 @@ export default function ImportExport() {
   const commit = () => {
     if (!checked.length) return;
     const items = checked.map(({ title, dueDate }) => ({ title, dueDate }));
-    app.importTasks(prev => withSyllabusTasks(prev, items, subjectEff));
+    app.importTasks(prev => newTasksJoin(prev, withSyllabusTasks(prev, items, subjectEff), app.currentProfile)); // into the profile showing
     setAdded(items.length);
     setText("");
     setPreview(null);

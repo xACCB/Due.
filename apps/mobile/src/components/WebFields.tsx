@@ -90,7 +90,7 @@ export function DateField({ mode, label, value, onChange, disabled, bare }: { mo
       {open && Platform.OS === "ios" && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setOpen(false)}>
           <View style={styles.wrap} accessibilityViewIsModal>
-            <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} onPress={() => setOpen(false)} accessibilityLabel="Close" />
+            <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
             <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
               <DateTimePicker value={current} mode={mode} display={mode === "date" ? "inline" : "spinner"}
                 onValueChange={(_e, d) => { onChange(toText(d)); if (mode === "date") setOpen(false); }}

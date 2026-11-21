@@ -37,7 +37,7 @@ export function TimeLeftMenu({ top, onClose }: { top: number; onClose: () => voi
   const go = (fn: () => void) => { setOpen(null); onClose(); fn(); };
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close Time left" />
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close Time left" />
       {/* Settles in as the web's dropdown does (.sec-body) and closes at once. */}
       <Animated.View entering={settleIn(ms(200))} accessibilityViewIsModal accessibilityLabel="Time left breakdown"
         style={[styles.menu, { top, width: Math.min(250, width - 28), maxHeight: height - top - 40, backgroundColor: T.card, borderColor: T.border }]}>

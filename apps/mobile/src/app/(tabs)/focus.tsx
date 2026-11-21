@@ -13,6 +13,7 @@ import { clock } from "../../lib/clock";
 import { cancelFocusEnd, requestNotifications, scheduleFocusEnd } from "../../lib/notifications";
 import * as Fx from "../../state/focusTimer";
 import { F } from "../../theme/fonts";
+import { ScreenBody } from "../../components/ScreenBody";
 import { Ring } from "../../components/Ring";
 import { useDevAction, useDevScroll } from "../../lib/devScroll";
 
@@ -155,7 +156,9 @@ export default function FocusScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       {running && focused && <KeepAwake />}
-      {/* The web's Focus Mode: its own heading and Exit, back to the screen before. */}
+      {/* The web's Focus Mode: its own heading and Exit, back to the screen before.
+          It all enters together: Focus Mode replaces the whole page on the web. */}
+      <ScreenBody>
       <View style={styles.header}>
         <Text style={[styles.h1, { color: T.accent }]} accessibilityRole="header">Focus Mode</Text>
         <Pressable onPress={() => (router.canGoBack() ? router.back() : router.navigate("/"))} accessibilityRole="button" accessibilityLabel="Exit Focus Mode"
@@ -269,6 +272,7 @@ export default function FocusScreen() {
           </View>
         )}
       </ScrollView>
+      </ScreenBody>
       {pomodoroDone && (
         <View style={[styles.toast, { backgroundColor: T.card, borderColor: T.border }]} accessibilityRole="alert" accessibilityLiveRegion="polite">
           <Text style={{ flex: 1, fontFamily: F.body, fontSize: fz(12), color: T.text }}>

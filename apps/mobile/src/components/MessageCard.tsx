@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { WhatsNewItem } from "@dueplanner/core/whatsNew";
 import { contrastColor, longDate } from "@dueplanner/core/lib/format";
-import { Backdrop } from "./Backdrop";
+import { FloatCard } from "./FloatCard";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
 
 // An Inbox message opened in full (the web's UpdateDetail): its kind, headline,
 // date, text and the tasks it lists, with ‹ Back and Next › stepping through
 // the messages in place (the text fades in, no slide, as on the web), "2 of 3",
-// and Dismiss. Over a dimmed screen (the web blurs it; that needs a native
-// package the phone app doesn't have yet).
+// and Dismiss, which dismisses once the card has closed. Over the blurred
+// screen, coming and going as FloatCard does.
 export function MessageCard({ items, index, onIndex, onDismiss, onClose }: {
   items: WhatsNewItem[]; index: number; onIndex: (i: number) => void; onDismiss: (id: string) => void; onClose: () => void;
 }) {
@@ -19,7 +19,7 @@ export function MessageCard({ items, index, onIndex, onDismiss, onClose }: {
   const [fade] = useState(() => new Animated.Value(1));
   useEffect(() => {
     fade.setValue(0);
-    Animated.timing(fade, { toValue: 1, duration: ms(200), useNativeDriver: true }).start();
+    Animated.timing(fade, { toValue: 1, duration: ms(200), easing: Easing.bezier(0, 0, 0.58, 1), useNativeDriver: true }).start();
   }, [index, fade, ms]);
   if (!item) return null;
   const btn = (label: string, a11y: string, onPress: () => void, disabled = false) => (
@@ -29,15 +29,14 @@ export function MessageCard({ items, index, onIndex, onDismiss, onClose }: {
     </Pressable>
   );
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.wrap} accessibilityViewIsModal>
-        <Backdrop kind="card" onPress={onClose} />
-        <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border, shadowOpacity: T.light ? 0.16 : 0.6 }]}>
+    <FloatCard onClose={onClose} style={[styles.card, { backgroundColor: T.card, borderColor: T.border, shadowOpacity: T.light ? 0.16 : 0.6 }]}>
+      {close => (
+
           <ScrollView contentContainerStyle={styles.body} bounces={false}>
             <Animated.View style={{ opacity: fade, gap: 14 }}>
               <View style={styles.top}>
                 <Text style={[styles.kind, { fontSize: fz(10), color: T.textMuted, backgroundColor: T.cardAlt, borderColor: T.border }]}>{item.kind.toUpperCase()}</Text>
-                <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+                <Pressable onPress={() => close()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
                   <Text style={{ fontSize: 20, lineHeight: 22, color: T.textFaint, paddingHorizontal: 4 }}>×</Text>
                 </Pressable>
               </View>
@@ -59,19 +58,17 @@ export function MessageCard({ items, index, onIndex, onDismiss, onClose }: {
               {btn("‹ Back", "Back to the previous message", () => onIndex(index - 1), index === 0)}
               {btn("Next ›", "Next message", () => onIndex(index + 1), index === items.length - 1)}
               <Text style={[styles.count, { fontSize: fz(10), color: T.textFaint }]} accessibilityLiveRegion="polite">{index + 1} of {items.length}</Text>
-              <Pressable onPress={() => onDismiss(item.id)} accessibilityRole="button" accessibilityLabel={`Dismiss ${item.headline}`} style={[styles.btn, { backgroundColor: T.accent, borderColor: T.accent }]}>
+              <Pressable onPress={() => close(() => onDismiss(item.id))} accessibilityRole="button" accessibilityLabel={`Dismiss ${item.headline}`} style={[styles.btn, { backgroundColor: T.accent, borderColor: T.accent }]}>
                 <Text style={{ fontFamily: F.body, fontSize: fz(12), color: contrastColor(T.accent) }}>Dismiss</Text>
               </Pressable>
             </View>
           </ScrollView>
-        </View>
-      </View>
-    </Modal>
+      )}
+    </FloatCard>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 },
   card: { width: "100%", maxWidth: 460, maxHeight: "100%", borderWidth: 1, borderRadius: 16, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 16 }, shadowRadius: 24 },
   body: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, gap: 14 },
   top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },

@@ -6,6 +6,7 @@ import { formatDate } from "@dueplanner/core/lib/format";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../../state/appContext";
 import { F } from "../../theme/fonts";
+import { ScreenBody } from "../../components/ScreenBody";
 import { AppHeader, BackButton } from "../../components/AppHeader";
 import { Dropdown } from "../../components/Dropdown";
 import { MessageCard } from "../../components/MessageCard";
@@ -39,6 +40,7 @@ export default function Inbox() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
       <AppHeader title="Inbox" />
+      <ScreenBody>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
         <BackButton />
       <Dropdown title={`Messages${items.length ? ` (${items.length})` : ""}`} gap={12}>
@@ -77,6 +79,7 @@ export default function Inbox() {
         />
       )}
       </ScrollView>
+      </ScreenBody>
     </SafeAreaView>
   );
 }

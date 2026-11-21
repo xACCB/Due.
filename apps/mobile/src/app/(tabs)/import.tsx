@@ -9,6 +9,7 @@ import { SCHEMA_VERSION } from "@dueplanner/core/lib/migrations";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../../state/appContext";
 import { F } from "../../theme/fonts";
+import { ScreenBody } from "../../components/ScreenBody";
 import { AppHeader, BackButton } from "../../components/AppHeader";
 import { Dropdown } from "../../components/Dropdown";
 import { useDevAction, useDevScroll } from "../../lib/devScroll";
@@ -96,6 +97,7 @@ export default function ImportExport() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
       <AppHeader title="Import/Export" />
+      <ScreenBody>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         <BackButton />
 
@@ -165,6 +167,7 @@ export default function ImportExport() {
         {!!note && <Text style={{ fontFamily: F.body, fontSize: fz(11), color: T.textMuted, marginTop: 8 }}>{note}</Text>}
       </Dropdown>
       </ScrollView>
+      </ScreenBody>
     </SafeAreaView>
   );
 }

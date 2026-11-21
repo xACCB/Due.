@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated from "react-native-reanimated";
 import { contrastColor } from "@dueplanner/core/lib/format";
 import { useApp } from "../state/appContext";
 import { F } from "../theme/fonts";
+import { fadeIn } from "../lib/motion";
 
 const TOAST_MS = 5000; // the web's
 
@@ -11,8 +13,9 @@ const TOAST_MS = 5000; // the web's
 // solid Undo, gone after five seconds. One for the whole app (useApp's
 // undoToast, set with sayUndo); the root layout draws it over every screen,
 // and the task sheet draws its own, since iOS puts the sheet above the rest.
+// It fades in (the web's .fade-in) and goes at once, as the web's does.
 export function UndoToast() {
-  const { T, fz, undoToast, hideUndo, undo } = useApp();
+  const { T, fz, ms, undoToast, hideUndo, undo } = useApp();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const n = undoToast?.n;
@@ -24,13 +27,13 @@ export function UndoToast() {
   if (!undoToast) return null;
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 20 }]}>
-      <View style={[styles.toast, { maxWidth: width - 32, backgroundColor: T.card, borderColor: T.border }]} accessibilityLiveRegion="polite" accessibilityRole="alert">
+      <Animated.View entering={fadeIn(ms(200))} style={[styles.toast, { maxWidth: width - 32, backgroundColor: T.card, borderColor: T.border }]} accessibilityLiveRegion="polite" accessibilityRole="alert">
         <Text numberOfLines={1} style={[styles.text, { fontSize: fz(12), color: T.text }]}>{undoToast.text}</Text>
         <Pressable onPress={() => { undo(); hideUndo(); }} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Undo ${undoToast.text}`}
           style={({ pressed }) => [styles.btn, { backgroundColor: T.accent, opacity: pressed ? 0.8 : 1 }]}>
           <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(12), color: contrastColor(T.accent) }}>Undo</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { AccessibilityInfo, FlatList, KeyboardAvoidingView, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -17,6 +17,8 @@ import { AddCard } from "../../components/AddCard";
 import { dragDelta } from "../../lib/reorder";
 import { useDevAction, useDevScroll, useDevToggle } from "../../lib/devScroll";
 import { IconSearch } from "../../components/icons";
+import { setSearchOrigin, useSearchFieldHidden } from "../../lib/searchOrigin";
+import { ScreenBody } from "../../components/ScreenBody";
 import { AppHeader } from "../../components/AppHeader";
 
 // The web's filter chips (taskViews' filterTasks). "noest" (no estimate) has
@@ -141,6 +143,16 @@ export default function Home() {
     </Pressable>
   );
 
+  // Search's bar flies out of this field and back into it (lib/searchOrigin.ts),
+  // so its place is recorded first, and it hides while the bar is out.
+  const searchRef = useRef<ComponentRef<typeof Pressable>>(null);
+  const searchHidden = useSearchFieldHidden();
+  const openSearch = () => {
+    const field = searchRef.current;
+    if (!field) { router.push("/search"); return; }
+    field.measureInWindow((x, y, w, h) => { setSearchOrigin({ x, y, w, h }); router.push("/search"); });
+  };
+
   const header = (
     <View>
       {showSuggestionCard && (
@@ -153,8 +165,8 @@ export default function Home() {
         </View>
       )}
 
-      <Pressable onPress={() => router.push("/search")} accessibilityRole="search" accessibilityLabel="Search tasks"
-        style={[styles.search, { backgroundColor: T.card, borderColor: T.border }]}>
+      <Pressable ref={searchRef} onPress={openSearch} accessibilityRole="search" accessibilityLabel="Search tasks"
+        style={[styles.search, { backgroundColor: T.card, borderColor: T.border, opacity: searchHidden ? 0 : 1 }]}>
         <IconSearch color={T.textFaint} />
         <Text style={[styles.searchText, { fontSize: fz(13), color: T.textFaint }]}>Search tasks...</Text>
       </Pressable>
@@ -217,6 +229,7 @@ export default function Home() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <AppHeader title="Home" />
+      <ScreenBody>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <FlatList ref={scrollRef}
@@ -254,6 +267,7 @@ export default function Home() {
           )}
       />
       </KeyboardAvoidingView>
+      </ScreenBody>
 
     </SafeAreaView>
   );

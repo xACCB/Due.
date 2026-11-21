@@ -15,6 +15,7 @@ import { F } from "../../theme/fonts";
 import type { Theme } from "../../theme/types";
 import { Label, Section, Slider, Tiles, Toggle, ToggleLine } from "../../components/ui";
 import { useDevAction, useDevScroll } from "../../lib/devScroll";
+import { ScreenBody } from "../../components/ScreenBody";
 import { AppHeader, BackButton } from "../../components/AppHeader";
 import { LayoutIcon } from "../../components/icons";
 
@@ -77,6 +78,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <AppHeader title="Settings" />
+      <ScreenBody>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <BackButton />
 
@@ -305,6 +307,7 @@ export default function SettingsScreen() {
           <Text onPress={() => { Linking.openURL(PRIVACY_URL).catch(() => {}); }} accessibilityRole="link" style={{ textDecorationLine: "underline" }}>Privacy policy</Text>
         </Text>
       </ScrollView>
+      </ScreenBody>
     </SafeAreaView>
   );
 }

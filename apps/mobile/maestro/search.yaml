@@ -1,0 +1,22 @@
+# Search: from Home's field (the bar flies out of it and back, app/search.tsx)
+# and from the sidebar's row (the bar fades). Typing finds a task; Cancel and
+# a tap on the blurred backdrop both close it and give Home its field back.
+appId: com.duestudios.dueplanner
+name: Search
+---
+- runFlow: common/start.yaml
+- tapOn: "Search tasks"
+- assertVisible: "Cancel"
+- inputText: "lab"
+- assertVisible: "Lab report.*"
+- tapOn: "Cancel"
+- assertNotVisible: "Cancel"
+- assertVisible: "Search tasks"
+# From the sidebar, closed by tapping the backdrop.
+- tapOn: "Open sidebar"
+- tapOn: "Search"
+- assertVisible: "Cancel"
+- tapOn:
+    point: "50%,85%"
+- assertNotVisible: "Cancel"
+- assertVisible: "Search tasks"

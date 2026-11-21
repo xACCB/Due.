@@ -21,6 +21,7 @@ import { ClearLink, DateField, SelectField, TextField } from "./WebFields";
 import { UndoToast } from "./UndoToast";
 import { useDevAction, useDevScroll } from "../lib/devScroll";
 import { AppHeader, BackButton } from "./AppHeader";
+import { ScreenBody } from "./ScreenBody";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // A task, as the web's TaskModal shows it, in its two forms:
@@ -190,6 +191,9 @@ function TaskForm({ task, page }: { task: Task; page: boolean }) {
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <SafeAreaView style={{ flex: 1 }} edges={page ? ["top", "left", "right"] : ["left", "right"]}>
       {page && <AppHeader title="Task" />}
+      {/* The page's content settles in under a still header, as the web's
+          does when it switches to a task (app/_layout.tsx gives it no fade). */}
+      <ScreenBody enter={page ? "mount" : false}>
       <ScrollView ref={scrollRef} contentContainerStyle={page ? styles.body : styles.sheetBody} keyboardShouldPersistTaps="handled">
         {page
           ? <BackButton onPress={close} />
@@ -519,6 +523,7 @@ function TaskForm({ task, page }: { task: Task; page: boolean }) {
           </View>
         )}
       </ScrollView>
+      </ScreenBody>
       </SafeAreaView>
       {!page && <UndoToast />}
     </KeyboardAvoidingView>

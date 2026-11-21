@@ -6,6 +6,7 @@ import { localDateStr } from "@dueplanner/core/lib/dates";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../../state/appContext";
 import { F } from "../../theme/fonts";
+import { ScreenBody } from "../../components/ScreenBody";
 import { AppHeader, BackButton } from "../../components/AppHeader";
 import { useDevScroll } from "../../lib/devScroll";
 
@@ -32,6 +33,7 @@ export default function History() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={["top", "left", "right"]}>
       <AppHeader title="History" />
+      <ScreenBody>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
         <BackButton />
       <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
@@ -72,6 +74,7 @@ export default function History() {
           ))}
       </View>
       </ScrollView>
+      </ScreenBody>
     </SafeAreaView>
   );
 }

@@ -8,7 +8,18 @@ appId: com.duestudios.dueplanner
 - tapOn:
     text: "Close sidebar"
     optional: true
+- tapOn:
+    text: "Close Search"
+    optional: true
 - assertVisible: "Open sidebar"
-- scrollUntilVisible:
-    element: "Search tasks"
-    direction: UP
+# Two long pulls down bring Home's list to the top. (scrollUntilVisible on
+# "Search tasks" passed while the field sat scrolled up behind the header:
+# Maestro counts an element inside the screen as visible even when clipped.)
+- swipe:
+    start: 50%, 35%
+    end: 50%, 90%
+    duration: 400
+- swipe:
+    start: 50%, 35%
+    end: 50%, 90%
+    duration: 400

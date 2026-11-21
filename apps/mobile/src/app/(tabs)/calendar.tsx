@@ -14,6 +14,7 @@ import { relativeDay, sortDay } from "../../lib/day";
 import { PopCard } from "../../components/PopCard";
 import { useDevAction, useDevScroll } from "../../lib/devScroll";
 import type { Task } from "@dueplanner/core/types";
+import { ScreenBody } from "../../components/ScreenBody";
 import { AppHeader } from "../../components/AppHeader";
 
 const longDay = (iso: string) => new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
@@ -28,6 +29,7 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={["top", "left", "right"]}>
       <AppHeader title="Calendar" />
+      <ScreenBody>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body}>
         <View style={styles.switch}>
           {([["month", "Month"], ["deck", "Deck"]] as const).map(([k, l]) => {
@@ -42,6 +44,7 @@ export default function CalendarScreen() {
         </View>
         {calendarView === "deck" ? <DueDeck /> : <MonthView />}
       </ScrollView>
+      </ScreenBody>
     </SafeAreaView>
   );
 }

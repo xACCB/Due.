@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
+import Animated from "react-native-reanimated";
 import type { Task } from "@dueplanner/core/types";
 import { timeLeft } from "@dueplanner/core/lib/taskViews";
 import { dueBucket } from "@dueplanner/core/lib/timeLeft";
@@ -12,6 +13,7 @@ import { DayTaskRow } from "./DayTaskRow";
 import { PopCard } from "./PopCard";
 import { useNow } from "../lib/useNow";
 import { useDevAction } from "../lib/devScroll";
+import { settleIn } from "../lib/motion";
 
 const fmtMins = (m: number) => formatDuration(m) || "0m";
 
@@ -21,7 +23,7 @@ const fmtMins = (m: number) => formatDuration(m) || "0m";
 // (TimeDetail, as on the web) with the dropdown still behind it.
 export function TimeLeftMenu({ top, onClose }: { top: number; onClose: () => void }) {
   const app = useApp();
-  const { T, fz } = app;
+  const { T, fz, ms } = app;
   const { subjectColors } = app.settings;
   const today = todayISO();
   const tl = timeLeft(app.tasks, today);
@@ -34,9 +36,10 @@ export function TimeLeftMenu({ top, onClose }: { top: number; onClose: () => voi
   const { width, height } = useWindowDimensions();
   const go = (fn: () => void) => { setOpen(null); onClose(); fn(); };
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close Time left" />
-      <View accessibilityViewIsModal accessibilityLabel="Time left breakdown"
+      {/* Settles in as the web's dropdown does (.sec-body) and closes at once. */}
+      <Animated.View entering={settleIn(ms(200))} accessibilityViewIsModal accessibilityLabel="Time left breakdown"
         style={[styles.menu, { top, width: Math.min(250, width - 28), maxHeight: height - top - 40, backgroundColor: T.card, borderColor: T.border }]}>
       <ScrollView contentContainerStyle={styles.body} bounces={false}>
 
@@ -102,7 +105,7 @@ export function TimeLeftMenu({ top, onClose }: { top: number; onClose: () => voi
         />
       )}
       </ScrollView>
-      </View>
+      </Animated.View>
     </Modal>
   );
 }

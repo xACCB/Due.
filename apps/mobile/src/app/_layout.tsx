@@ -61,12 +61,15 @@ function Screens() {
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: T.bg } }}>
           <Stack.Screen name="(tabs)" />
           {/* No swipe back: a swipe in from the left edge opens the sidebar, as on the web. */}
-          <Stack.Screen name="task/[id]" options={{ animation: "fade", animationDuration: 200, gestureEnabled: false }} />
+          {/* No animation of its own: its header replaces Home's at once and its
+              content settles in (ScreenBody), as the web's task page does. */}
+          <Stack.Screen name="task/[id]" options={{ animation: "none", gestureEnabled: false }} />
           {/* The web's task sheet: slides up over the screen, pulled down to close. */}
           <Stack.Screen name="task-sheet/[id]" options={{ presentation: "modal", contentStyle: { backgroundColor: T.bg } }} />
-          {/* Profile (the web's ProfileModal): over everything, fading in. */}
-          <Stack.Screen name="profile" options={{ presentation: "fullScreenModal", animation: "fade" }} />
-          <Stack.Screen name="search" options={{ presentation: "transparentModal", animation: "fade", contentStyle: { backgroundColor: "transparent" } }} />
+          {/* Profile (the web's ProfileModal): over everything. It settles in itself
+              (ScreenBody): iOS's own fade dimmed the screen behind to grey. */}
+          <Stack.Screen name="profile" options={{ presentation: "transparentModal", animation: "none", contentStyle: { backgroundColor: "transparent" } }} />
+          <Stack.Screen name="search" options={{ presentation: "transparentModal", animation: "none", contentStyle: { backgroundColor: "transparent" } }} />
         </Stack>
         <UndoToast />
       </SidebarHost>

@@ -371,8 +371,11 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   the development build with Metro running: `apps/mobile/maestro/*.yaml` (card swipes with Undo,
   the sidebar's edge swipe, the task sheet's drag to close, drag to reorder, the Deck, adding a
   task through its questions, the Focus timers, a Calendar day's card, a Settings switch taking
-  effect on Home), about four minutes. Every flow starts with `common/start.yaml`, which closes a
-  sidebar or Focus Mode a failed run left open and scrolls Home to the top. A settings switch is
+  effect on Home, Search from Home's field and from the sidebar), about four and a half minutes.
+  Every flow starts with `common/start.yaml`, which closes a sidebar, Search or Focus Mode a
+  failed run left open and pulls Home to the top (with two swipes: `scrollUntilVisible` passed
+  while the field sat scrolled up behind the header, since Maestro counts a clipped element
+  inside the screen as visible). A settings switch is
   tapped by its testID (`switch <label>`, set by `Toggle` in `components/ui.tsx`, with Maestro's
   `id:` selector): tapping its text didn't flip it. Start from Home, unscrolled, signed out, with the sample tasks (dev remote `"seed":true`;
   signed in, the cloud brings back whatever a test changed). Each test leaves the app as it found
@@ -1366,8 +1369,10 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   load (or fail: a font error must not keep the app hidden), then `GestureHandlerRootView`,
   `AppProvider`, the status bar, and `SidebarHost` around the Stack, themed from `T`, and in
   development the dev remote (`src/lib/devRemote.ts`). The Stack holds `(tabs)`, then `task/[id]`
-  (fades in, no swipe back, since a swipe from the left edge opens the sidebar as on the web), then
-  `task-sheet/[id]` (an iOS modal sheet) and `search` as a fading transparent modal.
+  (no swipe back, since a swipe from the left edge opens the sidebar as on the web), then
+  `task-sheet/[id]` (an iOS modal sheet), `profile` and `search` as transparent modals. Only the
+  sheet has an animation of its own; the others (`animation: "none"`) animate their content
+  themselves, as the web does (see "Motion on the phone" below).
 - `components/Sidebar.tsx` `SidebarHost` (the web's sidebar, `.app-sidebar` in its narrow-screen
   drawer form, in the same numbers: 260px or 84% of the width, .2s ease-out, a 45% black backdrop):
   opened by the header's sidebar button (`drawerOpen` in `useApp()`) or a swipe in from the
@@ -1380,15 +1385,18 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   current screen's row is highlighted from `usePathname()`. Icons are the web's own drawings
   (`components/icons.tsx`, `react-native-svg`, point for point from the web's `icons.tsx`). Dev remote:
   `"act":["sidebar","open"]` / `["sidebar","close"]`.
-- `(tabs)/_layout.tsx`: expo-router's JS `Tabs` (`expo-router/js-tabs`) with `tabBar={() => null}`,
-  so the main screens switch in place like the web's `activeTab`, with a .2s fade (the web's
-  `.sec-body`), and stay mounted. `backBehavior="history"` lets Focus Mode's Exit return to the
+- `(tabs)/_layout.tsx`: expo-router's JS `Tabs` (`expo-router/js-tabs`) with no tab bar drawn
+  (its `tabBar` only reports the showing screen to `lib/selectedTab.ts`), so the main screens
+  switch in place like the web's `activeTab`, at once, and stay mounted; each screen's content
+  then settles in (`ScreenBody`, below). `backBehavior="history"` lets Focus Mode's Exit return to the
   screen before. The group holds Home (`index`), `calendar`, `focus`, `inbox`, `history`, `import`
   and `settings`; the URLs don't include the group, so `/history` etc. are unchanged.
 - `search.tsx` (`searchTasks`; the bar sits where the web's does, a third of the way down the
-  space the keyboard leaves, `aimH`; a tap around it closes it; the page behind is blurred with
+  space the keyboard leaves, `aimH`; a tap around it closes it, the results list being only as
+  tall as its rows; the page behind is blurred with
   `Backdrop kind="search"`, the web's 18px and 80%/74% wash; the screen's `contentStyle` is
-  transparent so the page shows through),
+  transparent so the page shows through; the bar flies out of Home's field and back, see
+  "Motion on the phone"),
   `components/TimeLeftMenu.tsx` (the header's Time left dropdown, the web's: a 250-wide card 8px
   under the header, measured with `measureInWindow`; `timeLeft`, `dueBucket`; "no estimate" sets
   the `noest` filter; rows open `TimeDetail` in a `PopCard` over it; leaving the screen closes it,
@@ -1492,6 +1500,36 @@ cleaner and a test, then to `useAppValue`'s `settings`. Watch `as const`: defaul
   Open Settings). Then Send feedback, Privacy policy (the website's page for now; the phone app
   needs its own wording before release), Clear completed, and the "DuePlanner 0.1.0, by due.
   studios" line. Recently deleted is in History, as on the web.
+
+**Motion on the phone** (2026-11-20, matched to the web's "Motion standard" by recording the
+Simulator, `xcrun simctl io booted recordVideo`, and comparing frames). `lib/motion.ts` holds
+the web's ease-out (`EASE_OUT`) and Reanimated entrances for `.fade-in` (`fadeIn`: the undo
+toast, the timer pill) and `.sec-body` (`settleIn`: the Time left dropdown); every duration goes
+through `ms()`. What each piece does, and why:
+- **Screens** switch at once (`animation: "none"`) and `components/ScreenBody.tsx` settles the
+  content below the still header in (0.2s, from 4px above), as the web's `.sec-body` does. A
+  crossfade of whole screens showed both at once, the two headers' titles overlapping. It plays
+  when the screen is switched to (`useSelectedTab`), not on focus, so closing a sheet or Search
+  doesn't replay it. `enter="mount"` plays it once (Profile and the task page, whole pages as on
+  the web; Focus Mode wraps its heading too), `enter={false}` never (the task sheet slides up).
+- **Search** (`app/search.tsx`): Home records its field's place (`lib/searchOrigin.ts`, then
+  hides the field), the bar flies from there to its spot (440ms, the web's curve) and back on
+  closing (300ms) while the backdrop fades in (260ms) and out (280ms). Every way out goes
+  through `usePreventRemove` so the way back plays first; the leaving is then sent from an effect
+  once the guard is off (dispatching inside the guard was refused again, in a loop). The cursor
+  comes 200ms in: focusing at once held up the first 250ms of the flight, which then jumped.
+  Opened from the sidebar there's no field to fly from, so the bar fades.
+- **Blurred backdrops fade by their strength** (`Backdrop`'s `progress`: the blur's `intensity`
+  through Reanimated, the wash's opacity). iOS drops a blur view that is itself partly
+  transparent, so fading its opacity (or a Modal's fade) made the blur snap on at the end and off
+  at the start.
+- **Floating cards** (`components/FloatCard.tsx`, the shell of `PopCard` and `MessageCard`): the
+  card and its backdrop come in together (0.2s, the card from 96%) and leave the same way in
+  0.15s before `onClose` runs; Dismiss on a message waits for it, as on the web.
+- **Profile** is a transparent modal settling in (`ScreenBody enter="mount"`), gone at once on
+  closing, as the web's: iOS's full-screen fade dimmed the page behind to grey.
+- Left as they were: the sidebar drawer (already the web's 0.2s ease-out), the task sheet
+  (iOS's own), the card swipes, the Deck and drag to reorder.
 
 **Reminders (local notifications).** `src/lib/notifications.ts`. `syncReminders()` cancels every
 scheduled notification whose id starts `rem-` and schedules core's `upcomingReminders()` again (at

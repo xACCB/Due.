@@ -1,5 +1,6 @@
 import { useRef, useState, type ComponentRef } from "react";
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScreenBody } from "../components/ScreenBody";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Circle, Path, Svg } from "react-native-svg";
@@ -25,7 +26,14 @@ const FEEDBACK_URL = "https://forms.gle/oPuAWx6jNHvm75xi8";
 // Google". Signed in, as the web: picture, name, email and the sync status,
 // then the completion ring, time and By subject cards, Devices, Storage, This
 // device, and Sign out.
+// The web's ProfileModal: a whole page over the app, settling in as its
+// .sec-body does (the screen itself has no animation, app/_layout.tsx) and
+// gone at once on closing.
 export default function Profile() {
+  return <ScreenBody enter="mount"><ProfilePage /></ScreenBody>;
+}
+
+function ProfilePage() {
   const { T, fz, user, authReady, sync, signOut, devices, signOutDevice, signOutOtherDevices, signInNote, clearSignInNote, tasks, trash, settings } = useApp();
   const now = useNow(30000);
   const [busy, setBusy] = useState(false);

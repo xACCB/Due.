@@ -37,3 +37,10 @@ export const sessionMinutes = (secs: number): number | null => secs < 5 ? null :
 export function withSession(tasks: Task[], id: number, mins: number, at: number): Task[] {
   return tasks.map(t => t.id === id ? { ...t, sessions: addSession(t.sessions, { mins, at }) } : t);
 }
+
+// Focus Mode's goal for a session ("Finish questions 1 to 5"): one line, up to
+// GOAL_MAX characters. Kept on the device only (hw-focus-goal), not synced.
+export const GOAL_MAX = 100;
+export function cleanGoal(raw: unknown): string {
+  return typeof raw === "string" ? raw.replace(/[\r\n]+/g, " ").slice(0, GOAL_MAX) : "";
+}

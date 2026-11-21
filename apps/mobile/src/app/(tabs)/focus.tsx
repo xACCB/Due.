@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ComponentRef } from "react";
-import { AppState as RNAppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState as RNAppState, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useIsFocused } from "expo-router";
 import { useKeepAwake } from "expo-keep-awake";
@@ -7,6 +7,7 @@ import * as Haptics from "expo-haptics";
 import { showsPomodoro, showsStopwatch, formatStopwatch, stopwatchMinutes } from "@dueplanner/core/lib/stopwatch";
 import { sortTasks } from "@dueplanner/core/lib/taskViews";
 import { mostUrgent } from "@dueplanner/core/lib/timeLeft";
+import { cleanGoal, GOAL_MAX } from "@dueplanner/core/lib/timers";
 import { contrastColor, formatDate, formatDuration, formatTime, ink } from "@dueplanner/core/lib/format";
 import { useApp } from "../../state/appContext";
 import { clock } from "../../lib/clock";
@@ -200,6 +201,14 @@ export default function FocusScreen() {
                 <Text style={[styles.ringText, { fontSize: fz(18), color: T.text }]} accessibilityRole="timer" accessibilityLabel={`${Math.floor(secs / 60)} minutes ${secs % 60} seconds left`}>{mmss(secs)}</Text>
               </Ring>
             </View>
+            {/* The goal for this session: typed during focus, shown during the break. */}
+            {!onBreak ? (
+              <TextInput value={app.settings.focusGoal} onChangeText={v => app.settings.setFocusGoal(cleanGoal(v))} maxLength={GOAL_MAX}
+                placeholder="Goal for this session" placeholderTextColor={T.textFaint} accessibilityLabel="Goal for this session" returnKeyType="done"
+                style={[styles.goal, { fontSize: 16, color: T.text, backgroundColor: T.surface, borderColor: T.border }]} />
+            ) : !!app.settings.focusGoal && (
+              <Text style={[styles.goalText, { fontSize: fz(11), color: T.textMuted }]}>Goal: {app.settings.focusGoal}</Text>
+            )}
             <View style={styles.btnRow}>
               <Pressable onPress={() => { setPomodoroDone(false); if (state.endAt == null) startPomodoro(); else setState(Fx.pause(state, clock())); }} accessibilityRole="button" style={solid}>
                 <Text style={[styles.btnText, { fontSize: fz(12), color: contrastColor(T.accent) }]}>{state.endAt != null ? "Pause" : onBreak ? "Start break" : "Start"}</Text>
@@ -277,6 +286,7 @@ export default function FocusScreen() {
         <View style={[styles.toast, { backgroundColor: T.card, borderColor: T.border }]} accessibilityRole="alert" accessibilityLiveRegion="polite">
           <Text style={{ flex: 1, fontFamily: F.body, fontSize: fz(12), color: T.text }}>
             {pomodoroAutoBreak ? `Pomodoro done. ${pomodoroBreak}-minute break started` : "Pomodoro done. Take a short break"}
+            {!!app.settings.focusGoal && <Text style={{ fontSize: fz(11), color: T.textMuted }}>{"\n"}Goal: {app.settings.focusGoal}</Text>}
           </Text>
           <Pressable onPress={() => setPomodoroDone(false)} accessibilityRole="button" style={[styles.toastBtn, { backgroundColor: T.accent }]}>
             <Text style={{ fontFamily: F.bodyMedium, fontSize: fz(12), color: contrastColor(T.accent) }}>OK</Text>
@@ -303,6 +313,8 @@ const styles = StyleSheet.create({
   ringBox: { marginVertical: 10 },
   ringText: { fontFamily: F.bodyMedium, fontVariant: ["tabular-nums"] },
   btnRow: { flexDirection: "row", gap: 8, justifyContent: "center", flexWrap: "wrap" },
+  goal: { alignSelf: "stretch", fontFamily: F.body, textAlign: "center", borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12 },
+  goalText: { fontFamily: F.body, marginBottom: 12 },
   btn: { borderRadius: 9, paddingVertical: 8, paddingHorizontal: 18 },
   btnText: { fontFamily: F.body, textAlign: "center" },
   taskCard: { borderWidth: 1, borderRadius: 16, padding: 20 },

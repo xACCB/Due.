@@ -12,7 +12,7 @@ import { isUntouchedExample, buildSuggestion, suggestedTask, dateInDays, snoozeT
 import type { SnoozeKind } from "@dueplanner/core/lib/tasks";
 import { trashEntries, pruneTrash } from "@dueplanner/core/lib/trash";
 import type { TrashEntry } from "@dueplanner/core/lib/trash";
-import { secondsLeft, secondsSince, stopwatchTotal, pomodoroFinishMinutes, pomodoroCreditMinutes, lengthChangeResetsTimer, sessionMinutes, withSession } from "@dueplanner/core/lib/timers";
+import { secondsLeft, secondsSince, stopwatchTotal, pomodoroFinishMinutes, pomodoroCreditMinutes, lengthChangeResetsTimer, sessionMinutes, withSession, cleanGoal, GOAL_MAX } from "@dueplanner/core/lib/timers";
 import { dailySummary, offsetReminders } from "@dueplanner/core/lib/reminders";
 import type { SentReminders } from "@dueplanner/core/lib/reminders";
 import { tasksCsv, readBackup, withImportedSubjects, withImportedColors, withImportedTemplates, withSyllabusTasks } from "@dueplanner/core/lib/backup";
@@ -967,6 +967,8 @@ export default function HomeworkPlanner() {
   }
   function resetStopwatch(){setSwStartedAt(null);setSwBanked(0);setSwElapsed(0);}
   const [pomodoroDone,setPomodoroDone]=useState(false);
+  // The goal for this session (Focus Mode, on the Pomodoro card), this device only.
+  const [sessionGoal,setSessionGoal]=usePersistedState<string>("hw-focus-goal","");
   // Set when a break runs out; shows the "next up" suggestion until it's
   // started or dismissed.
   const [breakEnded,setBreakEnded]=useState(false);
@@ -2005,6 +2007,11 @@ export default function HomeworkPlanner() {
             <div style={{fontFamily:F.body,fontSize:fz(18),color:T.text,fontWeight:500}}>{String(pomMin).padStart(2,"0")}:{String(pomSec).padStart(2,"0")}</div>
           </div>
         </div>
+        {/* The goal for this session: typed during focus, shown during the break. */}
+        {!onBreak
+          ?<input value={sessionGoal} onChange={e=>setSessionGoal(cleanGoal(e.target.value))} maxLength={GOAL_MAX} placeholder="Goal for this session" aria-label="Goal for this session" data-tour="session-goal"
+            style={{display:"block",width:"100%",boxSizing:"border-box",background:T.surface,border:`1px solid ${T.border}`,borderRadius:9,color:T.text,padding:"8px 12px",fontFamily:F.body,fontSize:fz(12),textAlign:"center",outline:"none",marginBottom:12}}/>
+          :sessionGoal&&<div style={{fontFamily:F.body,fontSize:fz(11),color:T.textMuted,marginBottom:12}}>Goal: {sessionGoal}</div>}
         <div style={{display:"flex",gap:8,justifyContent:"center"}}>
           <button onClick={()=>{setPomodoroActive(a=>!a);setBreakEnded(false);}} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:9,padding:"8px 18px",fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>{pomodoroActive?"Pause":onBreak?"Start break":"Start"}</button>
           <button onClick={resetPomodoro} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:9,padding:"8px 14px",color:T.textMuted,fontFamily:F.body,fontSize:fz(12),cursor:"pointer"}}>{onBreak?"Skip break":"Reset"}</button>
@@ -2053,7 +2060,8 @@ export default function HomeworkPlanner() {
     if(!pomodoroDone)return null;
     return (
       <div role="status" style={shell}>
-        <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>{autoStartBreaks?`Pomodoro done. ${pomodoroBreakMins}-minute break started`:"Pomodoro done. Take a short break"}</span>
+        <span style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>{autoStartBreaks?`Pomodoro done. ${pomodoroBreakMins}-minute break started`:"Pomodoro done. Take a short break"}
+          {sessionGoal&&<span style={{display:"block",fontSize:fz(11),color:T.textMuted,marginTop:3}}>Goal: {sessionGoal}</span>}</span>
         <button onClick={()=>setPomodoroDone(false)} style={{background:T.accent,color:contrastColor(T.accent),border:"none",borderRadius:999,padding:"6px 14px",fontSize:fz(12),fontWeight:500,cursor:"pointer",flexShrink:0}}>OK</button>
       </div>
     );

@@ -7,6 +7,7 @@ import { LIMITS, oneLine } from "@dueplanner/core/lib/limits";
 import type { TaskTemplate } from "@dueplanner/core/types";
 import { textSizeOf, type TextSize } from "@dueplanner/core/lib/textSize";
 import type { Recap } from "@dueplanner/core/lib/recaps";
+import { cleanGoal } from "@dueplanner/core/lib/timers";
 
 export const bool = (fallback: boolean) => (raw: unknown): boolean => (typeof raw === "boolean" ? raw : fallback);
 
@@ -106,6 +107,8 @@ export const SETTINGS = {
   groupBy: { key: "hw-group", initial: "none" as (typeof GROUP_BYS)[number], clean: oneOf(GROUP_BYS, "none") },
   showSuggestion: { key: "hw-showsuggestion", initial: true as boolean, clean: bool(true) },
   showGreeting: { key: "hw-greeting", initial: true as boolean, clean: bool(true) },
+  // Focus Mode's goal for this session (core's cleanGoal), this device only.
+  focusGoal: { key: "hw-focus-goal", initial: "" as string, clean: cleanGoal },
   hiddenSuggestionFor: { key: "hw-suggestion-hidden", initial: null as number | null, clean: cleanHiddenFor },
   autoArchiveDays: { key: "hw-autoarchive", initial: 7 as number, clean: (raw: unknown) => ((AUTO_ARCHIVE_DAYS as readonly unknown[]).includes(raw) ? (raw as number) : 7) },
   templates: { key: "hw-templates", initial: [] as TaskTemplate[], clean: cleanTemplates },

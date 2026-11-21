@@ -3,7 +3,7 @@ import type { Task } from "../types";
 import { LIMITS } from "./limits";
 import {
   lengthChangeResetsTimer, pomodoroCreditMinutes, pomodoroFinishMinutes, secondsLeft, secondsSince,
-  sessionMinutes, stopwatchTotal, withSession,
+  sessionMinutes, stopwatchTotal, withSession, cleanGoal, GOAL_MAX,
 } from "./timers";
 
 const task = (id: number, extra: Partial<Task> = {}): Task =>
@@ -70,5 +70,13 @@ describe("work sessions", () => {
     const after = withSession([full], 1, 9, 123456);
     expect(after[0].sessions).toHaveLength(LIMITS.sessions);
     expect(after[0].sessions![LIMITS.sessions - 1]).toEqual({ mins: 9, at: 123456 });
+  });
+});
+
+describe("cleanGoal", () => {
+  it("keeps one line of text, up to the limit", () => {
+    expect(cleanGoal("Finish\nquestions 1 to 5")).toBe("Finish questions 1 to 5");
+    expect(cleanGoal("x".repeat(GOAL_MAX + 5))).toHaveLength(GOAL_MAX);
+    expect(cleanGoal(5)).toBe("");
   });
 });

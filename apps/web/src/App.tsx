@@ -34,6 +34,7 @@ import { same } from "@dueplanner/core/lib/sync";
 import { addTaskWrite } from "./lib/taskWrites";
 import { startProfileSync, startTaskSync, type ProfileSync, type TaskSync } from "./lib/cloudSync";
 import type { Profile } from "@dueplanner/core/lib/profile";
+import { greeting, leftToday } from "@dueplanner/core/lib/greeting";
 import { currentProfile as profileShowing, inProfile, newTasksJoin, presetsLeft, profileCount, profileFor, profileToAdd, withoutProfile } from "@dueplanner/core/lib/profiles";
 import { diffTasks, applyTaskStates } from "@dueplanner/core/lib/history";
 import { downloadFile } from "./lib/download";
@@ -136,6 +137,8 @@ export default function HomeworkPlanner() {
   const [groupBy,setGroupBy]=usePersistedState("hw-group","none");
   const [showDone,setShowDone]=usePersistedState("hw-showdone",true);
   const [showSuggestion,setShowSuggestion]=usePersistedState("hw-showsuggestion",true);
+  // Home's greeting ("Good evening, 3 things left today"), local like the suggestion's switch.
+  const [showGreeting,setShowGreeting]=usePersistedState("hw-greeting",true);
   // The suggestion card's × hides just the current suggestion (by task id);
   // it comes back when a different task becomes the most urgent. Turning
   // suggestions off entirely is the Settings toggle.
@@ -1768,7 +1771,7 @@ export default function HomeworkPlanner() {
     if(place==="settings"){
       setActiveTab("options");
       // Open the dropdown holding the anchor first.
-      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects","settings-profiles":"profiles",reminders:"reminders"} as Record<string,string>)[anchor];
+      const section=({layout:"looks","text-size":"looks","anim-speed":"looks","date-time":"datetime","calendar-days":"datetime","focus-timer":"focus","focus-show":"focus","new-task-questions":"questions",subjects:"subjects","settings-profiles":"profiles","greeting-toggle":"tasklist",reminders:"reminders"} as Record<string,string>)[anchor];
       if(section)setOpenSettings(prev=>prev.includes(section)?prev:[...prev,section]);
     }
     if(place==="tasks")setActiveTab("tasks");
@@ -2328,6 +2331,9 @@ export default function HomeworkPlanner() {
           {/* Suggestion -- hidden once there's no pending homework left (nothing
               to suggest), when turned off in Settings, or when its × hid this
               particular suggestion (see hiddenSuggestionFor). */}
+          {/* The greeting (core's lib/greeting.ts): the part of the day, the first
+              name when signed in, and what's left for today in the profile showing. */}
+          {showGreeting&&<div data-tour="greeting" style={{fontFamily:F.body,fontSize:fz(12),color:T.textMuted,marginBottom:12}}>{greeting(new Date(now).getHours(),leftToday(visibleTasks,todayStr),fbUser?.displayName)}</div>}
           {suggestionTask&&(showSuggestion&&hiddenSuggestionFor!==suggestionTask.id?(
             <div style={{background:T.gradientCard,borderRadius:12,padding:"10px 12px",marginBottom:16,border:`1px solid ${T.accent}33`,position:"relative",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
@@ -2917,6 +2923,10 @@ export default function HomeworkPlanner() {
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Show smart suggestion</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>Your most urgent task, at the top of the list</div></div>
               <Toggle on={showSuggestion} onChange={setShowSuggestion} T={T} label="Show smart suggestion"/>
+            </div>
+            <div data-tour="greeting-toggle" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+              <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Show greeting</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>"Good evening" and what's left for today, above the list</div></div>
+              <Toggle on={showGreeting} onChange={setShowGreeting} T={T} label="Show greeting"/>
             </div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div><div style={{fontFamily:F.body,fontSize:fz(12),color:T.text}}>Show completed tasks</div><div style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint,marginTop:1}}>Keep done tasks visible</div></div>

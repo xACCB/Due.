@@ -8,6 +8,8 @@ import { filterTasks, groupTasks, heldOpen, sortTasks, withHeldOpen } from "@due
 import { buildSuggestion, suggestedTask } from "@dueplanner/core/lib/tasks";
 import { contrastColor } from "@dueplanner/core/lib/format";
 import { startFromTemplate } from "@dueplanner/core/lib/addFlow";
+import { greeting, leftToday } from "@dueplanner/core/lib/greeting";
+import { todayISO } from "@dueplanner/core/lib/dates";
 import { useApp } from "../../state/appContext";
 import { useNow } from "../../lib/useNow";
 import { F } from "../../theme/fonts";
@@ -155,6 +157,11 @@ export default function Home() {
 
   const header = (
     <View>
+      {/* The greeting (core's lib/greeting.ts): the part of the day, the first
+          name when signed in, and what's left for today in the profile showing. */}
+      {s.showGreeting && (
+        <Text style={[styles.greeting, { fontSize: fz(12), color: T.textMuted }]}>{greeting(new Date(now).getHours(), leftToday(app.shownTasks, todayISO()), app.user?.name)}</Text>
+      )}
       {showSuggestionCard && (
         <View style={[styles.suggest, { backgroundColor: T.cardAlt, borderColor: T.accent + "33" }]}>
           <Text style={{ fontSize: fz(12), color: T.text }} accessibilityElementsHidden>✦</Text>
@@ -277,6 +284,7 @@ const styles = StyleSheet.create({
   addCard: { marginTop: 16 },
   root: { flex: 1 },
   list: { paddingHorizontal: 14, paddingBottom: 48 },
+  greeting: { fontFamily: F.body, marginBottom: 12 },
   suggest: { flexDirection: "row", alignItems: "flex-start", gap: 7, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 16 },
   suggestText: { flex: 1, fontFamily: F.body, lineHeight: 18 },
   search: { flexDirection: "row", alignItems: "center", gap: 9, height: 42, borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, marginBottom: 10 },

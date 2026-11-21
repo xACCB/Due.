@@ -265,6 +265,7 @@ export default function SettingsScreen() {
             {s.layout !== "list" && s.groupBy !== "none" && <Text style={[styles.note, { fontSize: fz(10), color: T.textFaint }]}>Grouping only shows in the List layout. You&apos;re using {LAYOUTS[s.layout].name}.</Text>}
           </View>
           <ToggleLine label="Show smart suggestion" hint="Your most urgent task, at the top of the list" on={s.showSuggestion} onChange={s.setShowSuggestion} T={T} />
+          <ToggleLine label="Show greeting" hint={"\"Good evening\" and what's left for today, above the list"} on={s.showGreeting} onChange={s.setShowGreeting} T={T} />
           <ToggleLine label="Show completed tasks" hint="Keep done tasks visible" on={s.showDone} onChange={s.setShowDone} T={T} />
           <View>
             <Label T={T}>Auto-Archive Completed Tasks</Label>

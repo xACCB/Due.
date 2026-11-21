@@ -105,6 +105,7 @@ export const SETTINGS = {
   layout: { key: "hw-layout", initial: "list" as LayoutName, clean: oneOf(Object.keys(LAYOUTS) as LayoutName[], "list") },
   groupBy: { key: "hw-group", initial: "none" as (typeof GROUP_BYS)[number], clean: oneOf(GROUP_BYS, "none") },
   showSuggestion: { key: "hw-showsuggestion", initial: true as boolean, clean: bool(true) },
+  showGreeting: { key: "hw-greeting", initial: true as boolean, clean: bool(true) },
   hiddenSuggestionFor: { key: "hw-suggestion-hidden", initial: null as number | null, clean: cleanHiddenFor },
   autoArchiveDays: { key: "hw-autoarchive", initial: 7 as number, clean: (raw: unknown) => ((AUTO_ARCHIVE_DAYS as readonly unknown[]).includes(raw) ? (raw as number) : 7) },
   templates: { key: "hw-templates", initial: [] as TaskTemplate[], clean: cleanTemplates },

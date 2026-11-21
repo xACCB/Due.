@@ -98,6 +98,15 @@ export function MiniCard({task,rank,reorderable,swipeable,T,F,subjectColors,colo
               <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>{task.subtasks.filter(s=>s.done).length}/{task.subtasks.length}</span>
             </div>
           )}
+          {/* Progress set by hand, for a task without subtasks. */}
+          {!task.subtasks?.length&&!task.done&&(task.progress??0)>0&&(
+            <div aria-label={`${task.progress}% done`} style={{display:"flex",alignItems:"center",gap:6,marginTop:5}}>
+              <div style={{flex:1,maxWidth:80,height:4,background:T.border,borderRadius:999}}>
+                <div style={{width:`${task.progress}%`,height:"100%",background:T.accent,borderRadius:999,transition:"width 0.3s"}}/>
+              </div>
+              <span style={{fontFamily:F.body,fontSize:fz(10),color:T.textFaint}}>{task.progress}%</span>
+            </div>
+          )}
         </div>
         {!selectionMode&&<button className="hit" aria-label={`Delete ${task.title}`} style={{background:"none",border:"none",color:T.textFaint,cursor:"pointer",fontSize:fz(15),padding:"2px 5px",lineHeight:1}} onClick={e=>{e.stopPropagation();onDelete(task.id);}}>×</button>}
       </div>

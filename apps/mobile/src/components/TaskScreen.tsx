@@ -22,6 +22,7 @@ import { UndoToast } from "./UndoToast";
 import { useDevAction, useDevScroll } from "../lib/devScroll";
 import { AppHeader, BackButton } from "./AppHeader";
 import { ScreenBody } from "./ScreenBody";
+import { Slider } from "./ui";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // A task, as the web's TaskModal shows it, in its two forms:
@@ -51,6 +52,9 @@ const PRIORITIES: (Priority | null)[] = [null, "low", "medium", "high"];
 
 // A task that fails to render shows this instead of taking the app down (the
 // web's fallback around TaskModal).
+// The progress slider's stops, in percent.
+const PROGRESS_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
 export function TaskCrash({ error }: ErrorBoundaryProps) {
   const { T, fz } = useApp();
   useEffect(() => { console.error(error); }, [error]);
@@ -354,6 +358,13 @@ function TaskForm({ task, page }: { task: Task; page: boolean }) {
               accessibilityLabel="Grade"
               style={[styles.addInput, { fontSize: 16, color: T.text, backgroundColor: T.surface, borderColor: T.border }]}
             />
+          </Field>
+        )}
+
+        {/* Progress: how far along a task without subtasks is (subtasks show their own). */}
+        {!subtasks.length && !task.done && (
+          <Field label="Progress" card T={T} fz={fz} right={`${task.progress ?? 0}%`}>
+            <Slider fill value={task.progress ?? 0} values={PROGRESS_STEPS} onChange={v => quiet({ progress: v || undefined })} T={T} label="Progress" valueText={v => `${v}% done`} />
           </Field>
         )}
 

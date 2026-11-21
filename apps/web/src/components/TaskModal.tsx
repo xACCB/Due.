@@ -400,6 +400,18 @@ export function TaskModal({page,task,T,F,subjects,subjectColors,colorCodeUrgency
             </div>
           )}
 
+          {/* Progress: how far along a task without subtasks is (subtasks show their own). */}
+          {!subtasks.length&&!task.done&&(
+            <div data-tour="task-progress" style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{fontFamily:F.body,fontSize:fz(10),color:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"}}>Progress</div>
+                <div style={{fontFamily:F.body,fontSize:fz(11),color:T.text}}>{task.progress??0}%</div>
+              </div>
+              <input type="range" min={0} max={100} step={10} value={task.progress??0} aria-label="Progress" aria-valuetext={`${task.progress??0}% done`}
+                onChange={e=>onQuietPatch({progress:Number(e.target.value)||undefined})} style={{width:"100%",accentColor:T.accent,margin:0}}/>
+            </div>
+          )}
+
           {/* Subtasks */}
           <div style={{background:T.card,borderRadius:14,padding:"14px",border:`1px solid ${T.border}`,marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:subtasks.length?10:0}}>

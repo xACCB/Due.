@@ -34,7 +34,7 @@ const TASK_FIELD_MAP: Record<keyof Task, true> = {
   id: true, title: true, subject: true, dueDate: true, dueTime: true, estMins: true, done: true, order: true,
   subtasks: true, recurrence: true, archived: true, completedAt: true, tags: true, priorityOverride: true,
   sessions: true, spawnedNextId: true, difficulty: true, grade: true, pinned: true,
-  profile: true,
+  profile: true, progress: true,
 };
 // updatedAt and schemaVersion are sync's own (when the edit happened, which
 // shape the doc holds: src/lib/migrations.ts); a trash entry adds deletedAt.
@@ -97,6 +97,7 @@ export function sanitizeTask<T extends Record<string, unknown>>(t: T): T {
   if ("difficulty" in t && !DIFFICULTY_KEYS.includes(t.difficulty as string)) delete out.difficulty;
   if ("grade" in t) { if (typeof t.grade === "string" && t.grade.trim()) out.grade = oneLine(t.grade).trim().slice(0, LIMITS.grade); else delete out.grade; }
   if ("pinned" in t) { if (t.pinned === true) out.pinned = true; else delete out.pinned; }
+  if ("progress" in t) { const p = t.progress; if (typeof p === "number" && Number.isFinite(p) && Math.round(p) >= 1) out.progress = Math.min(100, Math.round(p)); else delete out.progress; }
   if ("profile" in t) { if (typeof t.profile === "string" && t.profile.trim()) out.profile = oneLine(t.profile).trim().slice(0, LIMITS.profileName); else delete out.profile; }
   return out as T;
 }

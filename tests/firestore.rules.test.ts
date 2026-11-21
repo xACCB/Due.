@@ -161,7 +161,7 @@ describe("task sync metadata", () => {
 describe("size caps", () => {
   const full = { ...validTask, subtasks:[{ id:"a", text:"x", done:false }], recurrence:"weekly", archived:false,
     completedAt:null, tags:["exam"], priorityOverride:"high", sessions:[{ mins:25, at:1 }], spawnedNextId:null, updatedAt:1,
-    difficulty:"hard", grade:"A-", pinned:true, profile:"Homework" };
+    difficulty:"hard", grade:"A-", pinned:true, profile:"Homework", progress:40 };
   const list = (n:number, f:(i:number)=>unknown) => Array.from({ length:n }, (_, i) => f(i));
   it("accepts a task using every optional field the app writes", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
@@ -206,6 +206,12 @@ describe("size caps", () => {
     await assertFails(setDoc(ref, { ...validTask, grade:92 }));
     await assertSucceeds(setDoc(ref, { ...validTask, pinned:false }));
     await assertFails(setDoc(ref, { ...validTask, pinned:"yes" }));
+  });
+  it("accepts progress as a whole percent from 1 to 100", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(db, "users/alice/tasks/1");
+    for (const p of [1, 50, 100]) await assertSucceeds(setDoc(ref, { ...validTask, progress:p }));
+    for (const p of [0, 101, 12.5, "50"]) await assertFails(setDoc(ref, { ...validTask, progress:p }));
   });
   it("accepts a profile name of up to 40 characters, and nothing else", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();

@@ -39,7 +39,7 @@ service cloud.firestore {
     // The lists are checked against src/lib/limits.ts (TASK_FIELDS,
     // PROFILE_FIELDS) by src/lib/limits.rules.test.ts: a new field goes in
     // both, and the rules are deployed BEFORE the app that writes it.
-    function taskFields() { return ['id','title','subject','dueDate','dueTime','estMins','done','order','subtasks','recurrence','archived','completedAt','tags','priorityOverride','sessions','spawnedNextId','difficulty','grade','pinned','profile','updatedAt','schemaVersion']; }
+    function taskFields() { return ['id','title','subject','dueDate','dueTime','estMins','done','order','subtasks','recurrence','archived','completedAt','tags','priorityOverride','sessions','spawnedNextId','difficulty','grade','pinned','profile','progress','updatedAt','schemaVersion']; }
     function trashFields() { return taskFields().concat(['deletedAt']); }
     function profileFields() { return ['layout','colorCodeUrgency','subjects','subjectColors','timeFormat','weekStart','profiles','schemaVersion']; }
     function addsOnly(data, fields) {
@@ -87,9 +87,9 @@ service cloud.firestore {
 
     function isValidTask(data) {
       return data.keys().hasAll(['id','title','subject','dueDate','dueTime','estMins','done','order'])
-        // Room for today's 22 fields (23 in trash) plus a legacy one, without
+        // Room for today's 23 fields (24 in trash) plus a legacy one, without
         // allowing a doc to be padded out with arbitrary extra fields.
-        && data.keys().size() <= 24
+        && data.keys().size() <= 25
         && data.id is number
         && data.title is string && data.title.size() <= 500
         && data.subject is string && data.subject.size() <= 200
@@ -111,6 +111,8 @@ service cloud.firestore {
         && (!('pinned' in data) || data.pinned is bool)
         // The profile it belongs to (Homework, Sports...), by name.
         && (!('profile' in data) || (data.profile is string && data.profile.size() <= 40))
+        // How far along it is, in percent (a task without subtasks).
+        && (!('progress' in data) || (data.progress is int && data.progress >= 1 && data.progress <= 100))
         // Sync metadata (see src/lib/sync.ts): when the edit happened.
         && (!('updatedAt' in data) || data.updatedAt is number)
         && validVersion(data);

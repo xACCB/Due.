@@ -235,8 +235,10 @@ export function Tiles<V extends string | number | boolean>({ options, value, onC
 
 // The web's range input (Animation speed): an accent track and a round thumb
 // that snaps to `values`. Drag or tap the track; VoiceOver swipes up or down.
-export function Slider({ value, values, onChange, T, label, valueText }: {
-  value: number; values: number[]; onChange: (v: number) => void; T: Theme; label: string; valueText: (v: number) => string;
+// `fill`: the track is grey with the part up to the thumb in the accent, for
+// an amount (a task's progress) rather than a setting along a scale.
+export function Slider({ value, values, onChange, T, label, valueText, fill = false }: {
+  value: number; values: number[]; onChange: (v: number) => void; T: Theme; label: string; valueText: (v: number) => string; fill?: boolean;
 }) {
   const [w, setW] = useState(0);
   const idx = Math.max(0, values.indexOf(value));
@@ -269,7 +271,9 @@ export function Slider({ value, values, onChange, T, label, valueText }: {
       onAccessibilityAction={e => step(e.nativeEvent.actionName === "increment" ? 1 : -1)}
       style={styles.slider}
     >
-      <View pointerEvents="none" style={[styles.track, { backgroundColor: T.accent }]} />
+      <View pointerEvents="none" style={[styles.track, { backgroundColor: fill ? T.border : T.accent }]}>
+        {fill && <View style={[styles.track, { width: `${(idx / (values.length - 1)) * 100}%`, backgroundColor: T.accent }]} />}
+      </View>
       {w > 0 && (
         <View pointerEvents="none" style={[styles.thumb, { left: (idx / (values.length - 1)) * (w - 22), backgroundColor: T.light ? "#ffffff" : "#000000", borderColor: T.accent }]} />
       )}

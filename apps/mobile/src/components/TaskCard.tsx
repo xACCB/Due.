@@ -152,6 +152,15 @@ export function TaskCard({ task, rank, holding, T, fz, h24, colorCode, now, subj
                 <Text style={[styles.meta, { fontSize: fz(10), color: T.textFaint }]}>{subsDone}/{subs.length}</Text>
               </View>
             )}
+            {/* Progress set by hand, for a task without subtasks. */}
+            {subs.length === 0 && !task.done && (task.progress ?? 0) > 0 && (
+              <View style={styles.subs} accessibilityLabel={`${task.progress}% done`}>
+                <View style={[styles.subsTrack, { backgroundColor: T.border }]}>
+                  <View style={[styles.subsFill, { width: `${task.progress}%`, backgroundColor: T.accent }]} />
+                </View>
+                <Text style={[styles.meta, { fontSize: fz(10), color: T.textFaint }]}>{task.progress}%</Text>
+              </View>
+            )}
           </View>
           <Pressable onPress={onDelete} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Delete ${task.title}`} style={styles.del}>
             <Text style={[styles.delText, { fontSize: fz(15), color: T.textFaint }]}>×</Text>

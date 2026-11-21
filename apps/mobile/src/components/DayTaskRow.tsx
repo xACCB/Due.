@@ -9,7 +9,8 @@ const DONE_GREEN = "#2ED573";
 
 // A task on a Calendar day or a Deck card (the web's rows there): the check,
 // the title, the subject, and the due time (or the estimate when there's none).
-// `surface`: the Month view's day panel uses the surface colour, the Deck the card colour.
+// `surface`: the Month view's day panel uses the surface colour; the Deck and the
+// floating cards (PopCard), the card colour.
 // `note`: replaces the due time / estimate on the right (Time left's "Tomorrow · 2h").
 export function DayTaskRow({ t, surface, note, onOpen }: { t: Task; surface?: boolean; note?: string; onOpen: () => void }) {
   const app = useApp();

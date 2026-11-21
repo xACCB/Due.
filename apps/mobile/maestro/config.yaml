@@ -10,3 +10,7 @@ executionOrder:
     - task-sheet
     - reorder
     - deck
+    - add-task
+    - focus
+    - settings-show-completed
+    - calendar-day

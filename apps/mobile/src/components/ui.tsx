@@ -160,7 +160,7 @@ export function Toggle({ on, onChange, T, label }: { on: boolean; onChange: (v: 
   }, [on, x, ms]);
   const track = on ? T.accent : T.border; // the web's solidBorder is the border colour
   return (
-    <Pressable onPress={() => onChange(!on)} hitSlop={10} accessibilityRole="switch" accessibilityState={{ checked: on }} accessibilityLabel={label}
+    <Pressable onPress={() => onChange(!on)} hitSlop={10} accessibilityRole="switch" accessibilityState={{ checked: on }} accessibilityLabel={label} testID={label ? `switch ${label}` : undefined}
       style={[styles.tog, { backgroundColor: track }]}>
       <Animated.View style={[styles.knob, { backgroundColor: contrastColor(track), transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [0, 18] }) }] }]} />
     </Pressable>

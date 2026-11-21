@@ -1,0 +1,20 @@
+# Calendar (Month): tapping tomorrow (Lab report, 2h) opens its day card,
+# which lists that task; Close returns to the month. Ends back on Home.
+appId: com.duestudios.dueplanner
+name: Calendar day card
+---
+- runFlow: common/start.yaml
+- tapOn: "Open sidebar"
+- tapOn: "Calendar"
+- tapOn: "Month"
+- tapOn: ".*, 1 due, 2h.*"
+- assertVisible:
+    text: "Lab report.*"
+    index: 0
+# Close by tapping the dimmed backdrop below the card ("Close" also matches
+# hidden buttons on screens that stay loaded).
+- tapOn:
+    point: "50%,95%"
+- waitForAnimationToEnd
+- tapOn: "Open sidebar"
+- tapOn: "Home"

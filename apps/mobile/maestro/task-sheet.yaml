@@ -3,6 +3,7 @@
 appId: com.duestudios.dueplanner
 name: Task sheet drag to close
 ---
+- runFlow: common/start.yaml
 - tapOn: "Problem set 4,.*"
 - assertVisible: "Edit task"
 - assertVisible: "Snooze tomorrow"

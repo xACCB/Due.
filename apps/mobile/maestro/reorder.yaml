@@ -6,6 +6,7 @@
 appId: com.duestudios.dueplanner
 name: Drag to reorder
 ---
+- runFlow: common/start.yaml
 - assertVisible:
     text: "Problem set 4,.*"
     below: "Chapter 3 reading,.*"

@@ -1,0 +1,34 @@
+# Adding a task through every question (title, subject, due date, time,
+# estimate, repeat), then deleting it again (it stays in Recently deleted).
+appId: com.duestudios.dueplanner
+name: Add a task
+---
+- runFlow: common/start.yaml
+- scrollUntilVisible:
+    element: "Add homework"
+- tapOn: "Add homework"
+- tapOn: "What's the assignment\\?"
+- inputText: "Maestro essay"
+- tapOn: "Next"
+- assertVisible: "What subject\\?"
+- tapOn:
+    text: "English"
+    below: "What subject\\?"
+- assertVisible: "When is it due\\?"
+- tapOn: "Tomorrow"
+- tapOn: "Any time"
+- tapOn: "45 min"
+- tapOn: "Weekly"
+- scrollUntilVisible:
+    element: "Maestro essay,.*"
+    direction: UP
+- assertVisible: "Maestro essay, English, due .*"
+- swipe:
+    from:
+      text: "Maestro essay,.*"
+    direction: LEFT
+    duration: 1000
+- assertVisible: '"Maestro essay" deleted'
+- scrollUntilVisible:
+    element: "Home"
+    direction: UP

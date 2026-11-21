@@ -369,8 +369,12 @@ gets them. The user works on a Windows PC and a Mac, kept in step through GitHub
   each run).
 - `npm run test:ui` (Mac only) -- Maestro, real taps and swipes in the booted Simulator against
   the development build with Metro running: `apps/mobile/maestro/*.yaml` (card swipes with Undo,
-  the sidebar's edge swipe, the task sheet's drag to close, drag to reorder, the Deck), about a
-  minute. Start from Home, unscrolled, signed out, with the sample tasks (dev remote `"seed":true`;
+  the sidebar's edge swipe, the task sheet's drag to close, drag to reorder, the Deck, adding a
+  task through its questions, the Focus timers, a Calendar day's card, a Settings switch taking
+  effect on Home), about four minutes. Every flow starts with `common/start.yaml`, which closes a
+  sidebar or Focus Mode a failed run left open and scrolls Home to the top. A settings switch is
+  tapped by its testID (`switch <label>`, set by `Toggle` in `components/ui.tsx`, with Maestro's
+  `id:` selector): tapping its text didn't flip it. Start from Home, unscrolled, signed out, with the sample tasks (dev remote `"seed":true`;
   signed in, the cloud brings back whatever a test changed). Each test leaves the app as it found
   it. `apps/mobile/maestro/maestro.sh hierarchy` prints what Maestro sees. Notes: swipes need
   `duration: 1000` (the default was too quick to count); a task card is one element to VoiceOver

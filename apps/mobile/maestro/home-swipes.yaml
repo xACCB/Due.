@@ -4,6 +4,7 @@
 appId: com.duestudios.dueplanner
 name: Home swipes
 ---
+- runFlow: common/start.yaml
 - assertVisible: "Lab report,.*"
 - swipe:
     from:

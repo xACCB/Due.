@@ -1,0 +1,30 @@
+# Settings -> Task list -> Show completed: off hides the done task on Home,
+# on brings it back.
+appId: com.duestudios.dueplanner
+name: Settings switch takes effect
+---
+- runFlow: common/start.yaml
+- scrollUntilVisible:
+    element: "Worksheet 2.*"
+- tapOn: "Open sidebar"
+- tapOn: "Settings"
+- tapOn: "Task list"
+- tapOn:
+    id: "switch Show completed tasks"
+- tapOn: "Open sidebar"
+- tapOn: "Home"
+- scrollUntilVisible:
+    element: "Add homework"
+- assertNotVisible: "Worksheet 2.*"
+- tapOn: "Open sidebar"
+- tapOn: "Settings"
+- tapOn:
+    id: "switch Show completed tasks"
+- tapOn: "Task list"
+- tapOn: "Open sidebar"
+- tapOn: "Home"
+- scrollUntilVisible:
+    element: "Worksheet 2.*"
+- scrollUntilVisible:
+    element: "Home"
+    direction: UP

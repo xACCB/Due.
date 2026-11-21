@@ -1,0 +1,30 @@
+# Focus: the Pomodoro starts, pauses and resets; the stopwatch starts,
+# pauses (Resume) and resets. Ends back on Home.
+appId: com.duestudios.dueplanner
+name: Focus timers
+---
+- runFlow: common/start.yaml
+- tapOn: "Open sidebar"
+- tapOn: "Focus"
+- assertVisible: "Focus Mode"
+- tapOn:
+    text: "Start"
+    index: 0
+- assertVisible: "Pause"
+- tapOn: "Pause"
+# A paused Pomodoro offers Start again (only the stopwatch says Resume), on the web too.
+- assertNotVisible: "Pause"
+- tapOn: "Reset"
+- assertVisible: "25 minutes 0 seconds left"
+- tapOn:
+    text: "Start"
+    index: 1
+- assertVisible: "Pause"
+- tapOn: "Pause"
+- assertVisible: "Resume"
+- tapOn:
+    text: "Reset"
+    index: 1
+- assertNotVisible: "Resume"
+- tapOn: "Exit Focus Mode"
+- assertVisible: "Home"

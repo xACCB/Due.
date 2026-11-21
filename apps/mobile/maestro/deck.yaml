@@ -4,6 +4,7 @@
 appId: com.duestudios.dueplanner
 name: Deck swipes
 ---
+- runFlow: common/start.yaml
 - tapOn: "Open sidebar"
 - tapOn: "Calendar"
 - tapOn: "Deck"

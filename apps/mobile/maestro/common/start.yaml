@@ -1,0 +1,14 @@
+# Run first by every test: whatever an earlier test left open, get back to an
+# unscrolled Home with the sidebar closed.
+appId: com.duestudios.dueplanner
+---
+- tapOn:
+    text: "Exit Focus Mode"
+    optional: true
+- tapOn:
+    text: "Close sidebar"
+    optional: true
+- assertVisible: "Open sidebar"
+- scrollUntilVisible:
+    element: "Search tasks"
+    direction: UP

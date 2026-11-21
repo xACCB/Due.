@@ -3,15 +3,16 @@
 appId: com.duestudios.dueplanner
 name: Sidebar swipe
 ---
-- assertNotVisible: "Inbox"
+- runFlow: common/start.yaml
+- assertNotVisible: "Inbox.*"
 - swipe:
     start: 1%, 55%
     end: 75%, 55%
     duration: 800
-- assertVisible: "Inbox"
+- assertVisible: "Inbox.*"
 - assertVisible: "Import/Export"
 - swipe:
     start: 60%, 55%
     end: 5%, 55%
     duration: 800
-- assertNotVisible: "Inbox"
+- assertNotVisible: "Inbox.*"
